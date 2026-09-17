@@ -1,0 +1,21 @@
+{
+  "name": "@snapworth/shared",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Cross-platform SnapWorth product code and contracts",
+  "type": "module",
+  "files": [
+    "src"
+  ],
+  "exports": {
+    "./design": "./src/design/index.ts",
+    "./design/nativewind-preset": "./src/design/nativewind-preset.ts",
+    "./features/placeholder-views": "./src/features/placeholder-views/index.tsx",
+    "./ports": "./src/ports/index.ts",
+    "./types": "./src/types/index.ts"
+  },
+  "peerDependencies": {
+    "react": "19.2.3",
+    "react-native": "0.86.3"
+  }
+}

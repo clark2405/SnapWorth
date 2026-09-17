@@ -1,0 +1,203 @@
+import { Text, View } from 'react-native';
+
+interface RoutePlaceholderProps {
+  readonly title: string;
+  readonly question?: string;
+  readonly detail?: string;
+  readonly live?: boolean;
+}
+
+function RoutePlaceholder({
+  title,
+  question,
+  detail = 'This route is ready for its feature implementation.',
+  live = false,
+}: RoutePlaceholderProps) {
+  return (
+    <View
+      accessibilityLabel={`${title} screen`}
+      accessibilityLiveRegion={live ? 'polite' : 'none'}
+      testID="route-placeholder"
+    >
+      <Text accessibilityRole="header">{title}</Text>
+      {question ? <Text>{question}</Text> : null}
+      <Text>{detail}</Text>
+    </View>
+  );
+}
+
+export interface ItemDetailViewProps {
+  readonly itemId?: string;
+}
+
+export interface PostDetailViewProps {
+  readonly postId?: string;
+}
+
+export interface CreateListingViewProps {
+  readonly itemId?: string;
+}
+
+export interface ListingDetailViewProps {
+  readonly listingId?: string;
+}
+
+export interface ConversationViewProps {
+  readonly conversationId?: string;
+}
+
+function routeEntityDetail(kind: string, id?: string): string {
+  return id
+    ? `${kind} route ready for ${id}.`
+    : `${kind} route identifier is unavailable.`;
+}
+
+export function RootSessionView() {
+  return (
+    <RoutePlaceholder
+      title="SnapWorth"
+      detail="Checking your session."
+      live
+    />
+  );
+}
+
+export function LoginView() {
+  return (
+    <RoutePlaceholder
+      title="Sign in"
+      question="Can I get back in without thinking?"
+    />
+  );
+}
+
+export function SignupView() {
+  return (
+    <RoutePlaceholder
+      title="Create account"
+      question="What do I give up to start?"
+    />
+  );
+}
+
+export function ResetPasswordView() {
+  return (
+    <RoutePlaceholder
+      title="Reset password"
+      question="Will I get back in?"
+    />
+  );
+}
+
+export function OnboardingView() {
+  return (
+    <RoutePlaceholder
+      title="Welcome to SnapWorth"
+      question="Why should I take one photo?"
+    />
+  );
+}
+
+export function CaptureView() {
+  return (
+    <RoutePlaceholder
+      title="Capture an item"
+      question="What is this thing worth?"
+    />
+  );
+}
+
+export function ItemDetailView({ itemId }: ItemDetailViewProps) {
+  return (
+    <RoutePlaceholder
+      title="Item estimate"
+      question="What is it worth, and how much should I trust that?"
+      detail={routeEntityDetail('Item', itemId)}
+    />
+  );
+}
+
+export function HistoryView() {
+  return (
+    <RoutePlaceholder
+      title="History"
+      question="What have I already checked?"
+    />
+  );
+}
+
+export function FeedView() {
+  return (
+    <RoutePlaceholder
+      title="Feed"
+      question="Does the community think this price is right?"
+    />
+  );
+}
+
+export function PostDetailView({ postId }: PostDetailViewProps) {
+  return (
+    <RoutePlaceholder
+      title="Post"
+      question="What do people actually think, and why?"
+      detail={routeEntityDetail('Post', postId)}
+    />
+  );
+}
+
+export function CreateListingView({ itemId }: CreateListingViewProps) {
+  return (
+    <RoutePlaceholder
+      title="Create listing"
+      question="What am I actually asking for it?"
+      detail={routeEntityDetail('Item', itemId)}
+    />
+  );
+}
+
+export function MarketplaceView() {
+  return (
+    <RoutePlaceholder
+      title="Marketplace"
+      question="Is there something here I want?"
+    />
+  );
+}
+
+export function ListingDetailView({ listingId }: ListingDetailViewProps) {
+  return (
+    <RoutePlaceholder
+      title="Listing"
+      question="Is this worth buying, and is the price fair?"
+      detail={routeEntityDetail('Listing', listingId)}
+    />
+  );
+}
+
+export function ConversationListView() {
+  return (
+    <RoutePlaceholder
+      title="Chat"
+      question="Who am I mid-conversation with?"
+    />
+  );
+}
+
+export function ConversationView({ conversationId }: ConversationViewProps) {
+  return (
+    <RoutePlaceholder
+      title="Conversation"
+      question="What are we agreeing on?"
+      detail={routeEntityDetail('Conversation', conversationId)}
+    />
+  );
+}
+
+export function AdminReviewView() {
+  return (
+    <RoutePlaceholder
+      title="Admin review"
+      question="What needs a human decision, most urgent first?"
+    />
+  );
+}
