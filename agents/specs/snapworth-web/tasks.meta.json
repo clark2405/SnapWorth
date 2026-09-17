@@ -1,0 +1,516 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Replace planning-placeholder frontend folders with the canonical workspace topology": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642106976
+      },
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642131300
+      },
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642416575
+      }
+    ],
+    "1.2 Configure strict TypeScript, Expo web, NativeWind, linting, and test runners": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107066
+      },
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642446099
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643567945
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643639658
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789644040795
+      }
+    ],
+    "1.3 Scaffold the Expo Router web route manifest and deferred mobile placeholder": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107117
+      },
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642458154
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643568011
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643655544
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789644060067
+      }
+    ],
+    "2.1 Implement branded domain types, results, errors, clocks, IDs, and service ports": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107157
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643568088
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789644115992
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789644548670
+      }
+    ],
+    "2.2 Implement SnapWorth tokens, NativeWind preset, themes, fonts, and motion preference": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107208
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643568137
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789644127932
+      },
+      {
+        "executionId": "2c85d73e-7f5e-43f4-bd16-de45a6f40ee4",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789645440618
+      },
+      {
+        "executionId": "2c85d73e-7f5e-43f4-bd16-de45a6f40ee4",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789645748021
+      }
+    ],
+    "2.3 Implement shared UI primitives and honest-price components": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107238
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643568174
+      }
+    ],
+    "2.4 Implement seeded runtime configuration and contract-test fakes": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107270
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643568219
+      }
+    ],
+    "3.1 Implement auth/session application state and service orchestration": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107297
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643568257
+      }
+    ],
+    "3.2 Implement auth and onboarding shared views": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107325
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643568326
+      }
+    ],
+    "3.3 Wire root session gate, route guards, navigation, and responsive shell": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107353
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643568381
+      }
+    ],
+    "4. Checkpoint - Ensure foundation tests pass": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107380
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643568434
+      }
+    ],
+    "5.1 Implement bounded browser image validation and compression": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107405
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643568488
+      }
+    ],
+    "5.2 Implement item/history repositories and state transitions in seeded mode": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107429
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643568554
+      }
+    ],
+    "5.3 Implement capture and estimate orchestration": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107455
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643568596
+      }
+    ],
+    "5.4 Implement capture, item-detail, History, and destination views and routes": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107505
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643568645
+      }
+    ],
+    "6.1 Implement Feed, comment, report, and moderation domain services with seeded repositories": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107528
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643568694
+      }
+    ],
+    "6.2 Implement transactional vote behavior and optimistic provider state": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107554
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643568762
+      }
+    ],
+    "6.3 Implement Feed/post views and route wiring": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107579
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643568816
+      }
+    ],
+    "7. Checkpoint - Ensure core-loop and Feed tests pass": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107604
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643568860
+      }
+    ],
+    "8.1 Implement locale-aware asking-price parsing and listing publication services": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107630
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643568906
+      }
+    ],
+    "8.2 Implement Marketplace query, filter, pagination, and listing-detail services": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107655
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643568957
+      }
+    ],
+    "8.3 Implement listing-form, Marketplace, and listing-detail views and routes": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107690
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643569046
+      }
+    ],
+    "9.1 Implement Chat contracts, seeded repository, delivery state, and authorization model": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107732
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643569085
+      }
+    ],
+    "9.2 Implement Chat route-neutral views and feature-flagged routes": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107762
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643569130
+      }
+    ],
+    "9.3 Implement Admin Review contracts, seeded queue, and feature-flagged review view": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107788
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643569180
+      }
+    ],
+    "9.4 Implement feature-flagged cross-post domain orchestration": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107814
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643569243
+      }
+    ],
+    "10.1 Create ordered migrations for profiles, private items, estimate attempts, and retention queues": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107842
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643569290
+      }
+    ],
+    "10.2 Create ordered migrations for Feed, votes, comments, listings, Chat, blocks, moderation, and reports": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107870
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643569341
+      }
+    ],
+    "10.3 Implement private-item, Storage, item-finalization, estimate-attempt, and deletion authorization": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107895
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643569389
+      }
+    ],
+    "10.4 Implement public projections and transactional Feed, vote, comment, listing, filter, and report operations": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107947
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643569430
+      }
+    ],
+    "10.5 Implement participant-scoped Chat, Realtime authorization, and administrator moderation operations": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642107978
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643569476
+      }
+    ],
+    "10.6 Implement shared Edge Function authentication, CORS, errors, secrets, deadlines, and rate limits": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642108004
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643569519
+      }
+    ],
+    "10.7 Implement the authenticated `estimate-price` Edge Function": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642108030
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643569559
+      }
+    ],
+    "10.8 Implement the authenticated `moderate-content` Edge Function": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642108057
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643569606
+      }
+    ],
+    "10.9 Implement Supabase client repositories against the shared ports": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642108082
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643569659
+      }
+    ],
+    "10.10 Implement live pricing/moderation adapters and production-safe composition": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642108108
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643569695
+      }
+    ],
+    "12. Final checkpoint - Ensure all tests and builds pass": [
+      {
+        "executionId": "90d3743f-3250-45eb-a898-85188cec2cb2",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789642108134
+      },
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789643569730
+      }
+    ],
+    "1. Establish the web-first workspace and enforce architecture boundaries": [
+      {
+        "executionId": "8c2ec2a5-a57a-45fa-964e-8a565926589f",
+        "chatSessionId": "sess_ccde19c8-9104-4e36-807a-bb384d871685",
+        "timestamp": 1789644060166
+      }
+    ]
+  }
+}
