@@ -1,0 +1,7 @@
+node_modules
+web/.expo
+web/dist
+coverage
+playwright-report
+test-results
+package-lock.json
