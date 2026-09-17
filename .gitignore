@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Expo
+.expo/
+
+# Test output
+coverage/
+test-results/
+playwright-report/
+
+# Environment
+.env*
+!.env.example
+
+# OS / logs
+.DS_Store
+*.log
