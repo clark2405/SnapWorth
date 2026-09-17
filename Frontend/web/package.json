@@ -1,0 +1,29 @@
+{
+  "name": "@snapworth/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "SnapWorth Expo Router web and desktop shell",
+  "type": "module",
+  "main": "expo-router/entry",
+  "scripts": {
+    "build": "expo export --platform web --output-dir dist",
+    "dev": "expo start --web",
+    "typecheck": "tsc --project ./tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "57.0.15",
+    "@snapworth/shared": "0.0.0",
+    "expo": "57.0.23",
+    "expo-constants": "57.0.18",
+    "expo-linking": "57.0.10",
+    "expo-router": "57.0.21",
+    "expo-status-bar": "57.0.1",
+    "nativewind": "4.2.7",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "5.7.0",
+    "react-native-screens": "4.26.2",
+    "react-native-web": "0.21.2"
+  }
+}
