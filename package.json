@@ -1,0 +1,10 @@
+{
+  "name": "snapworth",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix Frontend run dev",
+    "build": "npm --prefix Frontend run build:web",
+    "test": "npm --prefix Frontend run test:unit",
+    "validate": "npm --prefix Frontend run validate"
+  }
+}
