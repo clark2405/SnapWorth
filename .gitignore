@@ -19,3 +19,6 @@ playwright-report/
 # OS / logs
 .DS_Store
 *.log
+
+# Local-only agent guidance and specifications
+/agents/
