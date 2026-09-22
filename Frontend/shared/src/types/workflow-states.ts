@@ -1,5 +1,12 @@
 import type { AppError } from './errors';
-import type { CommentBody, MessageBody, SelectedImage, StoredItem, VoteChoice, VoteSnapshot } from './entities';
+import type {
+  CommentBody,
+  MessageBody,
+  SelectedImage,
+  StoredItem,
+  VoteChoice,
+  VoteSnapshot,
+} from './entities';
 import type { AskingPriceDraft } from './money';
 import type { ClientMessageId } from './ids';
 
@@ -31,7 +38,11 @@ export type PublicSubmissionState<T> =
 export type ListingFormState<T> =
   | { readonly status: 'empty'; readonly rawInput: '' }
   | { readonly status: 'editing_invalid'; readonly rawInput: string; readonly error: AppError }
-  | { readonly status: 'editing_valid'; readonly rawInput: string; readonly draft: AskingPriceDraft }
+  | {
+      readonly status: 'editing_valid';
+      readonly rawInput: string;
+      readonly draft: AskingPriceDraft;
+    }
   | { readonly status: 'publishing'; readonly rawInput: string; readonly draft: AskingPriceDraft }
   | { readonly status: 'held'; readonly listing: T }
   | { readonly status: 'active'; readonly listing: T }

@@ -23,8 +23,6 @@ export function resolveMotionRecipe(
   }
 
   const reduced =
-    name === 'immediate'
-      ? tokens.motion.recipe.immediate
-      : tokens.motion.recipe.reducedCrossFade;
+    name === 'immediate' ? tokens.motion.recipe.immediate : tokens.motion.recipe.reducedCrossFade;
   return Object.freeze({ name, ...reduced });
 }

@@ -4,5 +4,10 @@
     "types": ["react", "react-native"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/*.property.test.ts", "src/**/*.property.test.tsx"]
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/*.property.test.ts",
+    "src/**/*.property.test.tsx"
+  ]
 }

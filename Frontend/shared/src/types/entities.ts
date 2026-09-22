@@ -76,12 +76,7 @@ export interface PhotoRef {
 }
 
 export type EstimateFailureCode =
-  | 'timeout'
-  | 'rate_limited'
-  | 'provider_unavailable'
-  | 'invalid_response'
-  | 'offline'
-  | 'unknown';
+  'timeout' | 'rate_limited' | 'provider_unavailable' | 'invalid_response' | 'offline' | 'unknown';
 
 export type EstimationState =
   | { readonly status: 'estimating'; readonly attempt: number; readonly startedAt: UtcDateTime }
@@ -158,12 +153,7 @@ export type PublicContentRef =
   | { readonly type: 'comment'; readonly id: CommentId }
   | { readonly type: 'listing'; readonly id: ListingId };
 
-export type ReportReason =
-  | 'spam'
-  | 'harassment'
-  | 'prohibited_item'
-  | 'misleading'
-  | 'other';
+export type ReportReason = 'spam' | 'harassment' | 'prohibited_item' | 'misleading' | 'other';
 
 export interface ModerationReport {
   readonly id: ReportId;

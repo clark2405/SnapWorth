@@ -5,6 +5,14 @@
     "moduleResolution": "Bundler",
     "types": ["nativewind/types", "react", "react-native"]
   },
-  "include": ["app/**/*.ts", "app/**/*.tsx", "src/**/*.ts", "src/**/*.tsx", "*.ts", "nativewind-env.d.ts", "../shared/src/**/*.d.ts"],
+  "include": [
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "*.ts",
+    "nativewind-env.d.ts",
+    "../shared/src/**/*.d.ts"
+  ],
   "exclude": ["dist", "node_modules", "**/*.test.ts", "**/*.test.tsx", "e2e"]
 }

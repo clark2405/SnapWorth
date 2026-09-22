@@ -47,8 +47,7 @@ export interface EntityIdByKind {
 export type EntityId = EntityIdByKind[EntityIdKind];
 export type IdempotencyKey = string & { readonly [idempotencyKeyBrand]: true };
 
-const uuidPattern =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const opaqueKeyPattern = /^[A-Za-z0-9_-]{16,128}$/;
 
 export const parseEntityId = <K extends EntityIdKind>(
@@ -63,9 +62,7 @@ export const parseEntityId = <K extends EntityIdKind>(
   return ok(normalized as EntityIdByKind[K]);
 };
 
-export const parseIdempotencyKey = (
-  value: string,
-): Result<IdempotencyKey, ValidationError> => {
+export const parseIdempotencyKey = (value: string): Result<IdempotencyKey, ValidationError> => {
   const normalized = value.trim();
   if (!opaqueKeyPattern.test(normalized)) {
     return err({

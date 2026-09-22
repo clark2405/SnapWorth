@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AccessibilityInfo } from 'react-native';
 
-import {
-  resolveMotionRecipe,
-  type ResolvedMotionRecipe,
-} from './motion-recipe';
+import { resolveMotionRecipe, type ResolvedMotionRecipe } from './motion-recipe';
 import type { MotionRecipeName } from './tokens';
 
 export { resolveMotionRecipe } from './motion-recipe';

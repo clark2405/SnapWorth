@@ -57,9 +57,7 @@ describe('domain value objects', () => {
   });
 
   it('requires UTC timestamps and canonicalizes valid values', () => {
-    expect(unwrap(parseUtcDateTime('2025-01-02T03:04:05Z'))).toBe(
-      '2025-01-02T03:04:05.000Z',
-    );
+    expect(unwrap(parseUtcDateTime('2025-01-02T03:04:05Z'))).toBe('2025-01-02T03:04:05.000Z');
     expect(parseUtcDateTime('2025-01-02T03:04:05+01:00').ok).toBe(false);
     expect(unwrap(utcDateTimeFromDate(new Date('2025-01-02T03:04:05Z')))).toBe(
       '2025-01-02T03:04:05.000Z',
@@ -147,9 +145,7 @@ describe('domain state transitions', () => {
       }),
     );
     const retried = unwrap(transitionEstimation(failed, { type: 'retry', startedAt: completedAt }));
-    const queued = unwrap(
-      transitionEstimation(estimating, { type: 'queue_offline', attempt: 1 }),
-    );
+    const queued = unwrap(transitionEstimation(estimating, { type: 'queue_offline', attempt: 1 }));
 
     expect(failed).toEqual({ status: 'failed', attempt: 1, code: 'timeout', retryable: true });
     expect(retried).toEqual({ status: 'estimating', attempt: 2, startedAt: completedAt });

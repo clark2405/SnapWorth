@@ -1,8 +1,4 @@
-const {
-  motionHookProject,
-  propertyProject,
-  pureUnitProject,
-} = require('./jest.projects.cjs');
+const { motionHookProject, propertyProject, pureUnitProject } = require('./jest.projects.cjs');
 
 module.exports = {
   collectCoverageFrom: [

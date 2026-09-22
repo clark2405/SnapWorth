@@ -1,4 +1,12 @@
-import type { AppError, AuthError, CaptureError, EstimateError, ModerationError, ValidationError, VoteError } from '../types/errors';
+import type {
+  AppError,
+  AuthError,
+  CaptureError,
+  EstimateError,
+  ModerationError,
+  ValidationError,
+  VoteError,
+} from '../types/errors';
 import type {
   CommentBody,
   CommentReceipt,
@@ -116,7 +124,10 @@ export interface EstimateRequest {
 }
 
 export interface PricingService {
-  estimate(request: EstimateRequest, signal?: AbortSignal): Promise<Result<AiEstimate, EstimateError>>;
+  estimate(
+    request: EstimateRequest,
+    signal?: AbortSignal,
+  ): Promise<Result<AiEstimate, EstimateError>>;
 }
 
 export interface ModerationRequest {

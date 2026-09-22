@@ -4,11 +4,11 @@ SnapWorth is an npm workspace with two app shells over one shared codebase: the 
 
 ## Workspace topology
 
-| Path | Responsibility |
-|---|---|
-| `web/` | Expo Router website and desktop composition root |
+| Path      | Responsibility                                                                                             |
+| --------- | ---------------------------------------------------------------------------------------------------------- |
+| `web/`    | Expo Router website and desktop composition root                                                           |
 | `shared/` | Route-neutral components, feature state, services, ports, domain types, and infrastructure implementations |
-| `mobile/` | Expo Router app for iOS and Android; routes mirror `web/app/` |
+| `mobile/` | Expo Router app for iOS and Android; routes mirror `web/app/`                                              |
 
 `web/` may select and inject infrastructure at its composition root, but route files remain thin wrappers around shared feature views. Shared services depend inward on ports; seeded, Supabase, pricing, and moderation implementations satisfy those ports. No client-specific backend is permitted.
 
