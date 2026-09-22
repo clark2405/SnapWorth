@@ -8,7 +8,8 @@
     "dev": "expo start",
     "ios": "expo start --ios",
     "android": "expo start --android",
-    "typecheck": "tsc --project ./tsconfig.json --noEmit"
+    "typecheck": "tsc --project ./tsconfig.json --noEmit",
+    "build": "expo export --platform ios --output-dir dist/ios && expo export --platform android --output-dir dist/android"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "0.4.2",

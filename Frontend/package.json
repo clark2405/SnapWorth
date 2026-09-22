@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "build:web": "npm run build --workspace=@snapworth/web",
+    "build:mobile": "npm run build --workspace=@snapworth/mobile",
     "dev": "npm run dev --workspace=@snapworth/web",
     "check:architecture": "eslint ./web/app ./shared/src --max-warnings=0 && node ./scripts/validate-source.mjs architecture",
     "check:dependency-pins": "node ./scripts/validate-workspace.mjs dependencies",
