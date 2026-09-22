@@ -1,4 +1,6 @@
-import { Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+
+import { tokens } from '../../design';
 
 interface RoutePlaceholderProps {
   readonly title: string;
@@ -18,13 +20,34 @@ function RoutePlaceholder({
       accessibilityLabel={`${title} screen`}
       accessibilityLiveRegion={live ? 'polite' : 'none'}
       testID="route-placeholder"
+      style={styles.screen}
     >
-      <Text accessibilityRole="header">{title}</Text>
-      {question ? <Text>{question}</Text> : null}
-      <Text>{detail}</Text>
+      <Text accessibilityRole="header" style={[styles.text, styles.title]}>
+        {title}
+      </Text>
+      {question ? <Text style={styles.text}>{question}</Text> : null}
+      <Text style={styles.text}>{detail}</Text>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    gap: tokens.spacing[2],
+    padding: tokens.layout.pageGutterCompact,
+    paddingTop: tokens.spacing[16],
+    backgroundColor: tokens.color.dark.canvas,
+  },
+  text: {
+    color: tokens.color.dark.textSecondary,
+    fontFamily: tokens.typography.family.bodyRegular,
+  },
+  title: {
+    color: tokens.color.dark.textPrimary,
+    fontFamily: tokens.typography.family.displayBold,
+  },
+});
 
 export interface ItemDetailViewProps {
   readonly itemId?: string;
@@ -47,64 +70,31 @@ export interface ConversationViewProps {
 }
 
 function routeEntityDetail(kind: string, id?: string): string {
-  return id
-    ? `${kind} route ready for ${id}.`
-    : `${kind} route identifier is unavailable.`;
+  return id ? `${kind} route ready for ${id}.` : `${kind} route identifier is unavailable.`;
 }
 
 export function RootSessionView() {
-  return (
-    <RoutePlaceholder
-      title="SnapWorth"
-      detail="Checking your session."
-      live
-    />
-  );
+  return <RoutePlaceholder title="SnapWorth" detail="Checking your session." live />;
 }
 
 export function LoginView() {
-  return (
-    <RoutePlaceholder
-      title="Sign in"
-      question="Can I get back in without thinking?"
-    />
-  );
+  return <RoutePlaceholder title="Sign in" question="Can I get back in without thinking?" />;
 }
 
 export function SignupView() {
-  return (
-    <RoutePlaceholder
-      title="Create account"
-      question="What do I give up to start?"
-    />
-  );
+  return <RoutePlaceholder title="Create account" question="What do I give up to start?" />;
 }
 
 export function ResetPasswordView() {
-  return (
-    <RoutePlaceholder
-      title="Reset password"
-      question="Will I get back in?"
-    />
-  );
+  return <RoutePlaceholder title="Reset password" question="Will I get back in?" />;
 }
 
 export function OnboardingView() {
-  return (
-    <RoutePlaceholder
-      title="Welcome to SnapWorth"
-      question="Why should I take one photo?"
-    />
-  );
+  return <RoutePlaceholder title="Welcome to SnapWorth" question="Why should I take one photo?" />;
 }
 
 export function CaptureView() {
-  return (
-    <RoutePlaceholder
-      title="Capture an item"
-      question="What is this thing worth?"
-    />
-  );
+  return <RoutePlaceholder title="Capture an item" question="What is this thing worth?" />;
 }
 
 export function ItemDetailView({ itemId }: ItemDetailViewProps) {
@@ -118,21 +108,11 @@ export function ItemDetailView({ itemId }: ItemDetailViewProps) {
 }
 
 export function HistoryView() {
-  return (
-    <RoutePlaceholder
-      title="History"
-      question="What have I already checked?"
-    />
-  );
+  return <RoutePlaceholder title="History" question="What have I already checked?" />;
 }
 
 export function FeedView() {
-  return (
-    <RoutePlaceholder
-      title="Feed"
-      question="Does the community think this price is right?"
-    />
-  );
+  return <RoutePlaceholder title="Feed" question="Does the community think this price is right?" />;
 }
 
 export function PostDetailView({ postId }: PostDetailViewProps) {
@@ -156,12 +136,7 @@ export function CreateListingView({ itemId }: CreateListingViewProps) {
 }
 
 export function MarketplaceView() {
-  return (
-    <RoutePlaceholder
-      title="Marketplace"
-      question="Is there something here I want?"
-    />
-  );
+  return <RoutePlaceholder title="Marketplace" question="Is there something here I want?" />;
 }
 
 export function ListingDetailView({ listingId }: ListingDetailViewProps) {
@@ -175,12 +150,7 @@ export function ListingDetailView({ listingId }: ListingDetailViewProps) {
 }
 
 export function ConversationListView() {
-  return (
-    <RoutePlaceholder
-      title="Chat"
-      question="Who am I mid-conversation with?"
-    />
-  );
+  return <RoutePlaceholder title="Chat" question="Who am I mid-conversation with?" />;
 }
 
 export function ConversationView({ conversationId }: ConversationViewProps) {
