@@ -32,6 +32,11 @@ jobs:
           cache: npm
           cache-dependency-path: Frontend/package-lock.json
 
+      # Use the npm version pinned in package.json#packageManager, not the runner's default.
+      # Newer npm reads this lockfile's optional peer dependencies differently and rejects it.
+      - name: Use pinned npm
+        run: npm install --global "$(node -p "require('./package.json').packageManager")"
+
       - name: Install dependencies
         run: npm ci
 
@@ -59,6 +64,11 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: Frontend/package-lock.json
+
+      # Use the npm version pinned in package.json#packageManager, not the runner's default.
+      # Newer npm reads this lockfile's optional peer dependencies differently and rejects it.
+      - name: Use pinned npm
+        run: npm install --global "$(node -p "require('./package.json').packageManager")"
 
       - name: Install dependencies
         run: npm ci
