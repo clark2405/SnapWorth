@@ -1,8 +1,9 @@
 import { tokens } from './tokens';
 
 export const snapWorthFontFaces = Object.freeze([
-  tokens.typography.family.displayMedium,
+  tokens.typography.family.displayExtraBold,
   tokens.typography.family.displayBold,
+  tokens.typography.family.displaySemibold,
   tokens.typography.family.bodyRegular,
   tokens.typography.family.bodyMedium,
   tokens.typography.family.bodySemibold,
@@ -33,8 +34,8 @@ export interface SnapWorthFontContract {
 
 export const snapWorthFontContract: SnapWorthFontContract = Object.freeze({
   requiredFaces: snapWorthFontFaces,
-  displayFamily: tokens.typography.family.displayMedium,
-  monetaryFamily: tokens.typography.family.displayBold,
+  displayFamily: tokens.typography.family.displayExtraBold,
+  monetaryFamily: tokens.typography.family.displayExtraBold,
   bodyFamily: tokens.typography.family.bodyRegular,
   maxFontSizeMultiplier: tokens.typography.maxFontSizeMultiplier,
   allowFontScaling: true,

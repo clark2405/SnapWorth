@@ -25,7 +25,7 @@ export interface ContrastIssue extends ContrastPairing {
 }
 
 export const semanticColorNames = Object.freeze(
-  Object.keys(tokens.color.light) as SemanticColorName[],
+  Object.keys(tokens.color.dark) as SemanticColorName[],
 );
 
 export const contrastPairings = Object.freeze<readonly ContrastPairing[]>([
@@ -75,16 +75,17 @@ export const nativeWindColorReferences = Object.freeze(
   ) as Record<SemanticColorName, string>,
 );
 
+// Liquid Glass is a dark-only design: every preference resolves to the dark theme.
 export function resolveThemeName(
   preference: ThemePreference,
-  systemTheme: ThemeName = 'light',
+  systemTheme: ThemeName = 'dark',
 ): ThemeName {
   return preference === 'system' ? systemTheme : preference;
 }
 
 export function resolveTheme(
   preference: ThemePreference,
-  systemTheme: ThemeName = 'light',
+  systemTheme: ThemeName = 'dark',
 ): ResolvedTheme {
   const name = resolveThemeName(preference, systemTheme);
   const colors = tokens.color[name];
@@ -102,9 +103,7 @@ export function resolveTheme(
 
 function channelToLinear(channel: number): number {
   const normalized = channel / 255;
-  return normalized <= 0.04045
-    ? normalized / 12.92
-    : Math.pow((normalized + 0.055) / 1.055, 2.4);
+  return normalized <= 0.04045 ? normalized / 12.92 : Math.pow((normalized + 0.055) / 1.055, 2.4);
 }
 
 function relativeLuminance(hex: string): number {
@@ -130,8 +129,6 @@ export function auditThemeContrast(theme: ThemeName): readonly ContrastIssue[] {
     const ratio = getContrastRatio(colors[pairing.foreground], colors[pairing.background]);
     const minimum = pairing.classification === 'normal-text' ? 4.5 : 3;
 
-    return ratio >= minimum
-      ? []
-      : [{ ...pairing, theme, ratio, minimum } satisfies ContrastIssue];
+    return ratio >= minimum ? [] : [{ ...pairing, theme, ratio, minimum } satisfies ContrastIssue];
   });
 }

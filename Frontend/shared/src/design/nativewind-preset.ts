@@ -46,24 +46,19 @@ export const snapWorthNativeWindPreset = {
     extend: {
       colors: colorTheme,
       fontFamily: {
-        display: [tokens.typography.family.displayMedium],
+        display: [tokens.typography.family.displayExtraBold],
         'display-bold': [tokens.typography.family.displayBold],
+        'display-semibold': [tokens.typography.family.displaySemibold],
         body: [tokens.typography.family.bodyRegular],
         'body-medium': [tokens.typography.family.bodyMedium],
         'body-semibold': [tokens.typography.family.bodySemibold],
       },
-      fontSize: {
-        'price-hero': [px(typography.priceHero.size), { lineHeight: px(typography.priceHero.lineHeight) }],
-        'price-lg': [px(typography.priceLarge.size), { lineHeight: px(typography.priceLarge.lineHeight) }],
-        'price-md': [px(typography.priceMedium.size), { lineHeight: px(typography.priceMedium.lineHeight) }],
-        'heading-lg': [px(typography.headingLarge.size), { lineHeight: px(typography.headingLarge.lineHeight) }],
-        'heading-md': [px(typography.headingMedium.size), { lineHeight: px(typography.headingMedium.lineHeight) }],
-        'body-lg': [px(typography.bodyLarge.size), { lineHeight: px(typography.bodyLarge.lineHeight) }],
-        'body-md': [px(typography.bodyMedium.size), { lineHeight: px(typography.bodyMedium.lineHeight) }],
-        'label-md': [px(typography.labelMedium.size), { lineHeight: px(typography.labelMedium.lineHeight) }],
-        caption: [px(typography.caption.size), { lineHeight: px(typography.caption.lineHeight) }],
-        overline: [px(typography.overline.size), { lineHeight: px(typography.overline.lineHeight) }],
-      },
+      fontSize: Object.fromEntries(
+        Object.entries(typography).map(([name, style]) => [
+          name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`),
+          [px(style.size), { lineHeight: px(style.lineHeight) }],
+        ]),
+      ),
       letterSpacing: {
         overline: `${typography.overline.letterSpacingEm}em`,
       },
@@ -75,6 +70,7 @@ export const snapWorthNativeWindPreset = {
         sm: px(tokens.radius.small),
         md: px(tokens.radius.medium),
         lg: px(tokens.radius.large),
+        xl: px(tokens.radius.xlarge),
         full: px(tokens.radius.full),
       },
       borderWidth: {
@@ -115,12 +111,14 @@ export const snapWorthNativeWindPreset = {
         data: milliseconds(tokens.motion.duration.dataShift),
         accent: milliseconds(tokens.motion.duration.artisticAccent),
         reveal: milliseconds(tokens.motion.duration.reveal),
+        entrance: milliseconds(tokens.motion.duration.entrance),
         reduced: milliseconds(tokens.motion.duration.reducedCrossFade),
       },
       transitionTimingFunction: {
         direct: tokens.motion.easing.direct,
         enter: tokens.motion.easing.enter,
         exit: tokens.motion.easing.exit,
+        expressive: tokens.motion.easing.expressive,
       },
       boxShadow: {
         sheet: `${px(tokens.elevation.sheet.x)} ${px(tokens.elevation.sheet.y)} ${px(
