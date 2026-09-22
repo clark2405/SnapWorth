@@ -8,14 +8,27 @@
     "src"
   ],
   "exports": {
+    "./components": "./src/components/index.ts",
     "./design": "./src/design/index.ts",
     "./design/nativewind-preset": "./src/design/nativewind-preset.ts",
+    "./features/auth": "./src/features/auth/index.ts",
+    "./features/capture": "./src/features/capture/index.ts",
+    "./features/chat": "./src/features/chat/index.ts",
+    "./features/feed": "./src/features/feed/index.ts",
+    "./features/history": "./src/features/history/index.ts",
+    "./features/item": "./src/features/item/index.ts",
+    "./features/marketplace": "./src/features/marketplace/index.ts",
     "./features/placeholder-views": "./src/features/placeholder-views/index.tsx",
     "./ports": "./src/ports/index.ts",
     "./types": "./src/types/index.ts"
   },
   "peerDependencies": {
+    "expo-blur": "57.0.3",
+    "expo-linear-gradient": "57.0.2",
+    "lucide-react-native": "1.47.0",
     "react": "19.2.3",
-    "react-native": "0.86.3"
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "5.7.0",
+    "react-native-svg": "15.15.4"
   }
 }
