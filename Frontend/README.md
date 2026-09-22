@@ -1,6 +1,6 @@
 # SnapWorth Frontend
 
-SnapWorth is organized as a web-first npm workspace. The browser product is delivered from `web/`, reusable product code lives in `shared/`, and native delivery remains documented but non-executable in `mobile/`. Every client uses the single backend in `../Backend/`.
+SnapWorth is an npm workspace with two app shells over one shared codebase: the website (and desktop experience) is delivered from `web/`, the iOS and Android app from `mobile/`, and all product code lives in `shared/`. Every client uses the single backend in `../Backend/`.
 
 ## Workspace topology
 
@@ -8,7 +8,7 @@ SnapWorth is organized as a web-first npm workspace. The browser product is deli
 |---|---|
 | `web/` | Expo Router website and desktop composition root |
 | `shared/` | Route-neutral components, feature state, services, ports, domain types, and infrastructure implementations |
-| `mobile/README.md` | Deferred future Expo shell for both iOS and Android |
+| `mobile/` | Expo Router app for iOS and Android; routes mirror `web/app/` |
 
 `web/` may select and inject infrastructure at its composition root, but route files remain thin wrappers around shared feature views. Shared services depend inward on ports; seeded, Supabase, pricing, and moderation implementations satisfy those ports. No client-specific backend is permitted.
 

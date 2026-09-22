@@ -87,7 +87,7 @@ SnapWorth/
 ├── Frontend/                 npm workspace (run npm commands from here)
 │   ├── web/                  Expo Router website: route files, app config, Tailwind
 │   │   └── app/              (auth)/ and (product)/ route groups
-│   ├── shared/               Code shared by web and future mobile
+│   ├── shared/               Code shared by the website and the mobile app
 │   │   └── src/
 │   │       ├── types/        Domain types: ids, money, entities, errors, workflow states
 │   │       ├── design/       Design tokens, theme, fonts, motion, NativeWind preset
@@ -96,7 +96,7 @@ SnapWorth/
 │   │       ├── components/   Reusable UI components (planned)
 │   │       ├── services/     Domain services (planned)
 │   │       └── adapters/     Supabase, pricing, and moderation adapters (planned)
-│   ├── mobile/               Deferred: one future Expo shell for iOS and Android
+│   ├── mobile/               Expo Router app for iOS and Android
 │   └── scripts/              Workspace topology, dependency-pin, and architecture checks
 ├── Backend/                  Supabase: migrations, seed data, Edge Functions, tests (planned)
 ├── agents/                   Guidance for AI coding agents
@@ -113,7 +113,7 @@ SnapWorth/
 ### Prerequisites
 
 - [Node.js](https://nodejs.org) (current LTS or newer) and npm 11
-- For mobile testing later: [Expo Go](https://expo.dev/go) on a phone
+- For the mobile app: Xcode (iOS Simulator), Android Studio (Android emulator), or [Expo Go](https://expo.dev/go) on a phone
 
 ### Install and run
 
@@ -127,6 +127,8 @@ npm run dev
 
 `npm run dev` starts the Expo web dev server. Open the URL it prints, usually http://localhost:8081.
 
+To run the mobile app instead, use `npm run ios` (iOS Simulator) or `npm run android` (Android emulator). The first run installs Expo Go on the simulator.
+
 > Run `npm install` inside `Frontend/`. The npm workspace lives there, and the root `package.json` only forwards commands to it.
 
 ### Scripts
@@ -136,6 +138,7 @@ From the repository root:
 | Command | What it does |
 |---|---|
 | `npm run dev` | Start the web development server |
+| `npm run ios` / `npm run android` | Start the mobile app in the iOS Simulator or Android emulator |
 | `npm run build` | Export a production web build to `Frontend/web/dist/` |
 | `npm test` | Run unit tests |
 | `npm run validate` | Run every check: topology, dependency pins, static checks, typecheck, lint, unit and property tests |
