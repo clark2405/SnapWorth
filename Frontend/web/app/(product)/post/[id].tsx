@@ -1,10 +1,11 @@
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { PostDetailView } from '@snapworth/shared/features/placeholder-views';
+import { PostDetailView } from '@snapworth/shared/features/feed';
 
 export default function PostDetailRoute() {
+  const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const postId = Array.isArray(id) ? id[0] : id;
 
-  return <PostDetailView postId={postId} />;
+  return <PostDetailView postId={postId} onBack={() => router.back()} />;
 }

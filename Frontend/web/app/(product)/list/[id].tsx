@@ -1,10 +1,17 @@
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { CreateListingView } from '@snapworth/shared/features/placeholder-views';
+import { ConfirmPriceView } from '@snapworth/shared/features/marketplace';
 
 export default function CreateListingRoute() {
+  const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const itemId = Array.isArray(id) ? id[0] : id;
 
-  return <CreateListingView itemId={itemId} />;
+  return (
+    <ConfirmPriceView
+      itemId={itemId}
+      onBack={() => router.back()}
+      onPublish={() => router.replace('/marketplace')}
+    />
+  );
 }

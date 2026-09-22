@@ -1,5 +1,9 @@
-import { HistoryView } from '@snapworth/shared/features/placeholder-views';
+import { useRouter } from 'expo-router';
+
+import { HistoryView } from '@snapworth/shared/features/history';
 
 export default function HistoryRoute() {
-  return <HistoryView />;
+  const router = useRouter();
+
+  return <HistoryView onOpenItem={(itemId) => router.push(`/item/${itemId}`)} />;
 }
