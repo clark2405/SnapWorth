@@ -5,6 +5,7 @@
   "packageManager": "npm@11.6.2",
   "workspaces": [
     "web",
+    "mobile",
     "shared"
   ],
   "scripts": {
@@ -21,8 +22,11 @@
     "test:browser": "playwright test --config ./playwright.config.ts --pass-with-no-tests",
     "test:property": "jest --config ./jest.property.config.cjs --runInBand --passWithNoTests",
     "test:unit": "jest --config ./jest.unit.config.cjs --runInBand --passWithNoTests",
-    "typecheck": "tsc --project ./shared/tsconfig.json --noEmit && tsc --project ./web/tsconfig.json --noEmit",
-    "validate": "npm run check:topology && npm run check:dependency-pins && npm run check:static && npm run typecheck && npm run lint && npm run test:unit && npm run test:property"
+    "typecheck": "tsc --project ./shared/tsconfig.json --noEmit && tsc --project ./web/tsconfig.json --noEmit && tsc --project ./mobile/tsconfig.json --noEmit",
+    "validate": "npm run check:topology && npm run check:dependency-pins && npm run check:static && npm run typecheck && npm run lint && npm run test:unit && npm run test:property",
+    "dev:mobile": "npm run dev --workspace=@snapworth/mobile",
+    "ios": "npm run ios --workspace=@snapworth/mobile",
+    "android": "npm run android --workspace=@snapworth/mobile"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

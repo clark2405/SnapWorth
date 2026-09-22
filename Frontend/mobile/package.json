@@ -1,0 +1,31 @@
+{
+  "name": "@snapworth/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "description": "SnapWorth Expo Router app for iOS and Android",
+  "main": "expo-router/entry",
+  "scripts": {
+    "dev": "expo start",
+    "ios": "expo start --ios",
+    "android": "expo start --android",
+    "typecheck": "tsc --project ./tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@expo-google-fonts/inter": "0.4.2",
+    "@expo-google-fonts/outfit": "0.4.3",
+    "@snapworth/shared": "0.0.0",
+    "expo": "57.0.23",
+    "expo-blur": "57.0.3",
+    "expo-constants": "57.0.18",
+    "expo-linear-gradient": "57.0.2",
+    "expo-linking": "57.0.10",
+    "expo-router": "57.0.21",
+    "expo-status-bar": "57.0.1",
+    "lucide-react-native": "1.47.0",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "5.7.0",
+    "react-native-screens": "4.26.2",
+    "react-native-svg": "15.15.4"
+  }
+}

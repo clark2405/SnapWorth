@@ -5,3 +5,6 @@ coverage
 playwright-report
 test-results
 package-lock.json
+mobile/.expo
+mobile/ios
+mobile/android

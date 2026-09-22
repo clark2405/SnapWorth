@@ -3,6 +3,8 @@
   "private": true,
   "scripts": {
     "dev": "npm --prefix Frontend run dev",
+    "ios": "npm --prefix Frontend run ios",
+    "android": "npm --prefix Frontend run android",
     "build": "npm --prefix Frontend run build:web",
     "test": "npm --prefix Frontend run test:unit",
     "validate": "npm --prefix Frontend run validate"

@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "customConditions": ["react-native"],
+    "moduleResolution": "Bundler",
+    "types": ["react", "react-native"]
+  },
+  "include": ["app/**/*.ts", "app/**/*.tsx", "*.ts", "../shared/src/**/*.d.ts"],
+  "exclude": ["node_modules", "**/*.test.ts", "**/*.test.tsx"]
+}

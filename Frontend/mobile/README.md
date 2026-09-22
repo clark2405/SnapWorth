@@ -1,5 +1,21 @@
-# SnapWorth Mobile — Deferred
+# SnapWorth Mobile
 
-Native iOS and Android delivery is intentionally deferred until the SnapWorth website is complete.
+The Expo Router app for iOS and Android. It shares every screen, component, token, and product
+rule with the website through `../shared/`; the files under `app/` are thin route wrappers that
+mirror `../web/app/`. All clients use the single backend in `../../Backend/`.
 
-When native delivery begins, this directory will contain one Expo shell for both platforms. That shell will reuse the route-neutral product code and contracts from `../shared/` and the single backend in `../../Backend/`; it must not become a second product implementation or platform-specific backend.
+## Run it
+
+From the repository root:
+
+```sh
+npm run ios       # iOS Simulator (installs Expo Go on first run)
+npm run android   # Android emulator
+```
+
+On a physical phone, run `npm run dev:mobile` and scan the QR code with Expo Go.
+
+## Keeping the shells in step
+
+A route added to `../web/app/` should get the same thin wrapper here. Product UI and behaviour
+belong in `../shared/`, never in either shell.

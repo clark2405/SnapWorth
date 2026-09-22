@@ -15,6 +15,9 @@ export default tseslint.config(
       '**/node_modules/**',
       'web/.expo/**',
       'web/dist/**',
+      'mobile/.expo/**',
+      'mobile/ios/**',
+      'mobile/android/**',
       'coverage/**',
       'playwright-report/**',
       'test-results/**',
@@ -42,7 +45,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['web/app/**/*.{ts,tsx}'],
+    files: ['web/app/**/*.{ts,tsx}', 'mobile/app/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': restricted(
         'Route wrappers may import Expo Router and shared feature/application entry points only.',
@@ -128,13 +131,18 @@ export default tseslint.config(
     },
   },
   {
-    files: ['scripts/**/*.{js,mjs,cjs}', '*.config.{js,mjs,cjs,ts}', 'web/*.config.{js,mjs,cjs,ts}'],
+    files: [
+      'scripts/**/*.{js,mjs,cjs}',
+      '*.config.{js,mjs,cjs,ts}',
+      'web/*.config.{js,mjs,cjs,ts}',
+      'mobile/*.config.{js,mjs,cjs,ts}',
+    ],
     languageOptions: {
       globals: globals.node,
     },
   },
   {
-    files: ['web/**/*.{ts,tsx}', 'shared/src/**/*.{ts,tsx}'],
+    files: ['web/**/*.{ts,tsx}', 'mobile/**/*.{ts,tsx}', 'shared/src/**/*.{ts,tsx}'],
     languageOptions: {
       globals: {
         ...globals.browser,

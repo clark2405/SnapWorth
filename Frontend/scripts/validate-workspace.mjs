@@ -27,22 +27,16 @@ async function checkTopology() {
   const rootPackage = await readJson(join(frontendRoot, 'package.json'));
   assert(rootPackage.private === true, 'Frontend workspace root must remain private.');
   assert(
-    JSON.stringify(rootPackage.workspaces) === JSON.stringify(['web', 'shared']),
-    'Frontend workspaces must contain only web and shared while mobile is deferred.',
+    JSON.stringify(rootPackage.workspaces) === JSON.stringify(['web', 'mobile', 'shared']),
+    'Frontend workspaces must be exactly web, mobile, and shared.',
   );
 
   await Promise.all([
     access(join(frontendRoot, 'web', 'package.json')),
     access(join(frontendRoot, 'shared', 'package.json')),
-    access(join(frontendRoot, 'mobile', 'README.md')),
+    access(join(frontendRoot, 'mobile', 'package.json')),
     access(join(repositoryRoot, 'Backend')),
   ]);
-
-  const mobileEntries = await readdir(join(frontendRoot, 'mobile'));
-  assert(
-    mobileEntries.length === 1 && mobileEntries[0] === 'README.md',
-    'Frontend/mobile must contain only its deferred README.md.',
-  );
 
   const legacyFolders = [
     'adapters',
@@ -64,13 +58,14 @@ async function checkTopology() {
     `Legacy planning folders remain: ${remainingLegacyFolders.join(', ')}`,
   );
 
-  console.log('Canonical Frontend/web + Frontend/shared topology is valid; mobile is deferred.');
+  console.log('Canonical Frontend/web + Frontend/mobile + Frontend/shared topology is valid.');
 }
 
 async function checkDependencyPins() {
   const manifestPaths = [
     join(frontendRoot, 'package.json'),
     join(frontendRoot, 'web', 'package.json'),
+    join(frontendRoot, 'mobile', 'package.json'),
     join(frontendRoot, 'shared', 'package.json'),
   ];
 
