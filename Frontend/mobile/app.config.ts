@@ -6,7 +6,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: 'snapworth',
   scheme: 'snapworth',
   orientation: 'portrait',
-  // Liquid Glass is dark-only.
+  // SnapWorth ships a dark theme only for now.
   userInterfaceStyle: 'dark',
   ios: {
     bundleIdentifier: 'com.snapworth.app',

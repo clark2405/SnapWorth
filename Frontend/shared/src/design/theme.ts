@@ -39,6 +39,10 @@ export const contrastPairings = Object.freeze<readonly ContrastPairing[]>([
   { foreground: 'onAccent', background: 'accent', classification: 'normal-text' },
   { foreground: 'onAccent', background: 'accentPressed', classification: 'normal-text' },
   { foreground: 'textPrimary', background: 'estimateSurface', classification: 'normal-text' },
+  { foreground: 'accent', background: 'estimateSurface', classification: 'normal-text' },
+  { foreground: 'estimateBorder', background: 'estimateSurface', classification: 'ui-boundary' },
+  { foreground: 'textPrimary', background: 'surfaceRaised', classification: 'normal-text' },
+  { foreground: 'textMuted', background: 'surfaceRaised', classification: 'normal-text' },
   { foreground: 'danger', background: 'canvas', classification: 'normal-text' },
   { foreground: 'warning', background: 'canvas', classification: 'normal-text' },
   { foreground: 'voteHigh', background: 'surface', classification: 'ui-boundary' },
@@ -75,7 +79,7 @@ export const nativeWindColorReferences = Object.freeze(
   ) as Record<SemanticColorName, string>,
 );
 
-// Liquid Glass is a dark-only design: every preference resolves to the dark theme.
+// SnapWorth ships dark only for now: every preference resolves to the dark theme.
 export function resolveThemeName(
   preference: ThemePreference,
   systemTheme: ThemeName = 'dark',

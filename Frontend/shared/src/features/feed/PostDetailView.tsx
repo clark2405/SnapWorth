@@ -4,7 +4,7 @@ import { StyleSheet, TextInput, View } from 'react-native';
 
 import {
   Avatar,
-  GlassCard,
+  BottomBar,
   hideWebFocusOutline,
   IconButton,
   NavHeader,
@@ -43,19 +43,19 @@ export function PostDetailView({
     <Screen
       header={
         <NavHeader
-          title="Post Discussion"
+          title="Discussion"
           onBack={onBack}
           banded
           trailing={<IconButton icon={Menu} label="Post menu" onPress={onMenu} />}
         />
       }
       footer={
-        <GlassCard tone="chrome" blur radius={0} style={styles.composer}>
+        <BottomBar>
           <View style={styles.composerRow}>
             <TextInput
               value={draft}
               onChangeText={setDraft}
-              placeholder="Add community feedback..."
+              placeholder="Add your take on the price"
               placeholderTextColor={tokens.color.dark.textMuted}
               selectionColor={tokens.color.dark.accent}
               accessibilityLabel="Write a comment"
@@ -73,7 +73,7 @@ export function PostDetailView({
               }}
             />
           </View>
-        </GlassCard>
+        </BottomBar>
       }
       contentStyle={styles.content}
     >
@@ -98,8 +98,8 @@ export function PostDetailView({
       </Reveal>
 
       <Reveal index={2} style={styles.discussion}>
-        <SWText variant="headingSmall" accessibilityRole="header">
-          Discussion ({post.comments.length} comments)
+        <SWText variant="headingMedium" accessibilityRole="header">
+          {post.comments.length} comments
         </SWText>
         {post.comments.map((comment) => (
           <View key={comment.id} style={styles.comment}>
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     gap: tokens.spacing[4],
     paddingBottom: tokens.spacing[6],
     borderBottomWidth: tokens.border.hairline,
-    borderBottomColor: tokens.glass.border,
+    borderBottomColor: tokens.color.dark.borderSubtle,
   },
   discussion: {
     gap: tokens.spacing[4],
@@ -176,22 +176,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginRight: -tokens.spacing[3],
   },
-  composer: {
-    borderBottomWidth: 0,
-    borderLeftWidth: 0,
-    borderRightWidth: 0,
-  },
   composerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: tokens.spacing[3],
-    paddingLeft: tokens.spacing[8],
-    paddingRight: tokens.spacing[4],
-    paddingVertical: tokens.spacing[4],
+    gap: tokens.spacing[2],
+    paddingHorizontal: tokens.layout.pageGutterCompact,
+    paddingVertical: tokens.spacing[3],
   },
   composerInput: {
     flex: 1,
     minHeight: tokens.focus.minimumTarget,
+    paddingHorizontal: tokens.spacing[4],
+    borderRadius: tokens.radius.medium,
+    borderWidth: tokens.border.hairline,
+    borderColor: tokens.color.dark.borderStrong,
+    backgroundColor: tokens.color.dark.sunken,
     color: tokens.color.dark.textPrimary,
     fontFamily: tokens.typography.family.bodyRegular,
     fontSize: tokens.typography.style.bodyMedium.size,

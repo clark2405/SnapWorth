@@ -14,7 +14,7 @@ export default function CaptureRoute() {
       onClose={() => (router.canGoBack() ? router.back() : router.replace('/feed'))}
       // Preview wiring: capture and estimation services are not built yet, so the shutter
       // opens the sample estimate.
-      onCapture={() => router.push('/item/nike-neon-windbreaker')}
+      onCapture={() => router.push('/item/nike-neon-windbreaker?fresh=1')}
       onOpenHistory={() => router.push('/history')}
     />
   );

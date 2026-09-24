@@ -2,16 +2,17 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import {
-  GlassCard,
-  GlassField,
-  GlassInput,
-  GlassSelect,
-  GlowButton,
+  BottomBar,
+  Button,
+  EstimateBadge,
+  Field,
   NavHeader,
   Photo,
   Reveal,
   Screen,
+  SelectField,
   SWText,
+  TextField,
 } from '../../components';
 import { tokens } from '../../design';
 import { formatPeso, previewItem } from '../preview/sample-data';
@@ -41,11 +42,11 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
 
   return (
     <Screen
-      header={<NavHeader title="Confirm Pricing" onBack={onBack} />}
+      header={<NavHeader title="Set your price" onBack={onBack} />}
       footer={
-        <View style={styles.footer}>
-          <GlowButton
-            label="Publish Listing"
+        <BottomBar style={styles.footer}>
+          <Button
+            label="Publish listing"
             disabled={enteredPrice === null}
             onPress={() => {
               if (enteredPrice !== null) onPublish?.(enteredPrice);
@@ -58,10 +59,10 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
             accessibilityLiveRegion="polite"
           >
             {enteredPrice === null
-              ? 'Please input a valid price above to list your item.'
+              ? 'Enter your asking price to publish.'
               : `Your listing will go live at ${formatPeso(enteredPrice)}.`}
           </SWText>
-        </View>
+        </BottomBar>
       }
       contentStyle={styles.content}
     >
@@ -80,32 +81,19 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
         </View>
       </Reveal>
 
-      <Reveal index={1}>
-        <GlassCard tone="mint" padding={tokens.spacing[4]} contentStyle={styles.estimate}>
-          <View>
-            <SWText variant="overline" tone="accent">
-              AI Estimate
-            </SWText>
-            <SWText variant="caption" tone="textMuted">
-              Recommended reference range
-            </SWText>
-          </View>
-          <SWText
-            variant="priceMedium"
-            tone="accent"
-            accessibilityLabel={`AI estimate for reference, ${formatPeso(item.estimate)}`}
-          >
-            {formatPeso(item.estimate)}
-          </SWText>
-        </GlassCard>
+      <Reveal index={1} style={styles.reference}>
+        <SWText variant="overline" tone="textMuted">
+          For reference
+        </SWText>
+        <EstimateBadge value={formatPeso(item.estimate)} />
       </Reveal>
 
       <Reveal index={2} style={styles.fields}>
-        <GlassField
-          label="Your Asking Price"
-          helper="A fair price ensures faster marketplace sales."
+        <Field
+          label="Your asking price"
+          helper="You set this. The estimate above is never copied into it."
         >
-          <GlassInput
+          <TextField
             size="large"
             prefix="₱"
             value={priceText}
@@ -115,13 +103,13 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
             inputMode="decimal"
             accessibilityLabel="Your asking price in pesos"
           />
-        </GlassField>
-        <GlassField label="Location (Optional)">
-          <GlassSelect value={item.location} accessibilityLabel="Location" />
-        </GlassField>
-        <GlassField label="Category (Optional)">
-          <GlassSelect value={item.category} accessibilityLabel="Category" />
-        </GlassField>
+        </Field>
+        <Field label="Location (optional)">
+          <SelectField value={item.location} accessibilityLabel="Location" />
+        </Field>
+        <Field label="Category (optional)">
+          <SelectField value={item.category} accessibilityLabel="Category" />
+        </Field>
       </Reveal>
     </Screen>
   );
@@ -138,25 +126,23 @@ const styles = StyleSheet.create({
     gap: tokens.spacing[4],
   },
   thumb: {
-    width: 80,
-    height: 80,
+    width: tokens.layout.thumbnail,
+    height: tokens.layout.thumbnail,
   },
   itemText: {
     flex: 1,
     gap: tokens.spacing[1],
   },
-  estimate: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  reference: {
+    gap: tokens.spacing[2],
   },
   fields: {
     gap: tokens.spacing[5],
   },
   footer: {
-    paddingHorizontal: tokens.spacing[6],
+    paddingHorizontal: tokens.layout.pageGutterCompact,
     paddingTop: tokens.spacing[4],
-    paddingBottom: tokens.spacing[5],
-    gap: tokens.spacing[4],
+    paddingBottom: tokens.spacing[4],
+    gap: tokens.spacing[3],
   },
 });

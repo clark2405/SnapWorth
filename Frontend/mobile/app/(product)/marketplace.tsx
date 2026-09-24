@@ -9,6 +9,7 @@ export default function MarketplaceRoute() {
     <MarketplaceView
       onOpenListing={(listingId) => router.push(`/listing/${listingId}`)}
       onSell={() => router.push('/capture')}
+      onOpenProfile={() => router.push('/profile')}
     />
   );
 }

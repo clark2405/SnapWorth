@@ -1,5 +1,5 @@
 /**
- * Preview content for the Liquid Glass screens, taken from the Figma exports in
+ * Preview content for the screens, originally taken from the Figma exports in
  * agents/designs/liquid-glass. It stands in for the feature services until they exist, and is
  * imported only by views — never by services or adapters.
  */
@@ -62,6 +62,8 @@ export interface PreviewPost {
   readonly body: string;
   readonly photo: ImageSourcePropType;
   readonly photoLabel: string;
+  /** The AI estimate the author is asking the community to judge. */
+  readonly estimate: number;
   readonly votes: VoteCounts;
   readonly commentCount: number;
 }
@@ -74,6 +76,7 @@ export const previewPosts: readonly PreviewPost[] = [
     body: 'Just picked up this retro 90s Nike teal windbreaker. AI valued it at ₱2,450. Is this fair? Community let me know!',
     photo: image.windbreakerTeal,
     photoLabel: 'Teal 90s Nike windbreaker laid flat on concrete',
+    estimate: 2450,
     votes: { too_high: 12, just_right: 38, too_low: 4 },
     commentCount: 18,
   },
@@ -84,6 +87,7 @@ export const previewPosts: readonly PreviewPost[] = [
     body: 'Is a vintage polaroid camera worth ₱3,500? Help me out please!',
     photo: image.polaroidCamera,
     photoLabel: 'Vintage Polaroid Sun 600 camera on a table',
+    estimate: 3500,
     votes: { too_high: 35, just_right: 12, too_low: 2 },
     commentCount: 42,
   },
@@ -276,4 +280,158 @@ export const previewHistory: readonly PreviewHistoryItem[] = [
     photo: image.jordanBred,
     photoLabel: 'Red and black Air Jordan sneaker',
   },
+];
+
+/** The signed-in user in preview mode. `isAdmin` shows the moderation entry on the profile. */
+export const previewProfile = {
+  user: previewUsers.retroCurator,
+  displayName: 'Rico Santos',
+  joined: 'Joined March 2026',
+  location: 'Makati, Metro Manila',
+  rating: '4.8',
+  stats: { checked: previewHistory.length, listed: 1, sold: 12 },
+  isAdmin: true,
+} as const;
+
+export interface PreviewConversationSummary {
+  readonly id: string;
+  readonly with: PreviewUser;
+  readonly itemTitle: string;
+  readonly itemPhoto: ImageSourcePropType;
+  readonly lastMessage: string;
+  readonly lastFromMe: boolean;
+  readonly sentAt: string;
+  readonly unread: number;
+}
+
+export const previewConversations: readonly PreviewConversationSummary[] = [
+  {
+    id: 'windbreaker-chat',
+    with: previewUsers.manilaHype,
+    itemTitle: 'Vintage Nike Neon Windbreaker',
+    itemPhoto: image.windbreakerRetro,
+    lastMessage: 'Deal! Meetup in Makati works for me. What time are you available?',
+    lastFromMe: false,
+    sentAt: '10:30 AM',
+    unread: 2,
+  },
+  {
+    id: 'polaroid-chat',
+    with: previewUsers.mariaCruz,
+    itemTitle: 'Vintage Polaroid Sun 600',
+    itemPhoto: image.polaroidCamera,
+    lastMessage: 'Does it come with the original strap?',
+    lastFromMe: true,
+    sentAt: 'Yesterday',
+    unread: 0,
+  },
+  {
+    id: 'jordan-chat',
+    with: previewUsers.justinV,
+    itemTitle: 'Air Jordan 1 Retro High',
+    itemPhoto: image.jordanBred,
+    lastMessage: 'Thanks, received them today. Great condition.',
+    lastFromMe: false,
+    sentAt: 'Sep 28',
+    unread: 0,
+  },
+];
+
+export interface PreviewSeller {
+  readonly user: PreviewUser;
+  readonly displayName: string;
+  readonly rating: string;
+  readonly sales: number;
+  readonly joined: string;
+  readonly bio: string;
+  readonly listingIds: readonly string[];
+}
+
+export const previewSellers: Readonly<Record<string, PreviewSeller>> = {
+  mariacruz: {
+    user: previewUsers.mariaCruz,
+    displayName: 'Maria Cruz',
+    rating: '4.9',
+    sales: 42,
+    joined: 'Joined January 2026',
+    bio: 'Film cameras and 90s electronics. Everything is tested before it is listed.',
+    listingIds: ['polaroid-sun-600', 'retro-walkman'],
+  },
+};
+
+export type PreviewHeldKind = 'post' | 'comment';
+
+export interface PreviewHeldContent {
+  readonly id: string;
+  readonly kind: PreviewHeldKind;
+  readonly author: PreviewUser;
+  readonly body: string;
+  readonly reason: string;
+  readonly heldAgo: string;
+  readonly reports: number;
+  readonly photo?: ImageSourcePropType;
+  readonly photoLabel?: string;
+}
+
+// Ordered most urgent first: most reports, then oldest.
+export const previewHeldContent: readonly PreviewHeldContent[] = [
+  {
+    id: 'held-1',
+    kind: 'comment',
+    author: previewUsers.justinV,
+    body: 'This is obviously fake, the seller is scamming everyone here.',
+    reason: 'Reported for harassment',
+    heldAgo: '3h ago',
+    reports: 4,
+  },
+  {
+    id: 'held-2',
+    kind: 'post',
+    author: previewUsers.manilaHype,
+    body: 'DM me for cheaper prices, selling outside the app.',
+    reason: 'Flagged by moderation: off-platform sale',
+    heldAgo: '1h ago',
+    reports: 2,
+    photo: image.keyboard,
+    photoLabel: 'Mechanical keyboard with RGB lighting on a desk',
+  },
+];
+
+export const previewRecentSearches: readonly string[] = ['Polaroid', 'Nike windbreaker', 'Jordan'];
+
+export interface PreviewSearchResult {
+  readonly id: string;
+  readonly kind: 'listing' | 'post' | 'item';
+  readonly title: string;
+  readonly photo: ImageSourcePropType;
+  readonly photoLabel: string;
+  /** Asking price for listings; AI estimate for posts and history items. */
+  readonly amount: number;
+}
+
+export const previewSearchIndex: readonly PreviewSearchResult[] = [
+  ...previewListings.map((listing) => ({
+    id: listing.id,
+    kind: 'listing' as const,
+    title: listing.title,
+    photo: listing.photo,
+    photoLabel: listing.photoLabel,
+    amount: listing.askingPrice,
+  })),
+  ...previewPosts.map((post) => ({
+    id: post.id,
+    kind: 'post' as const,
+    title: post.body,
+    photo: post.photo,
+    photoLabel: post.photoLabel,
+    amount: post.estimate,
+  })),
+  ...previewHistory.map((item) => ({
+    id: item.id,
+    kind: 'item' as const,
+    title: item.title,
+    photo: item.photo,
+    photoLabel: item.photoLabel,
+    amount: item.estimate,
+  })),
 ];

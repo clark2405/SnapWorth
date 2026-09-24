@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react';
 import { Animated, Easing, Platform, type StyleProp, type ViewStyle } from 'react-native';
 
 import { tokens, useMotionPreference } from '../design';
@@ -6,6 +6,22 @@ import { tokens, useMotionPreference } from '../design';
 const curve = tokens.motion.bezier.expressive;
 const expressive = Easing.bezier(curve[0] ?? 0, curve[1] ?? 0, curve[2] ?? 1, curve[3] ?? 1);
 const useNativeDriver = Platform.OS !== 'web';
+
+const RevealGateContext = createContext(true);
+
+/**
+ * Holds every `Reveal` beneath it at its start state until `open` is true. The launch screen
+ * uses it so the first route's entrance plays as the splash clears, not unseen behind it.
+ */
+export function RevealGate({
+  open,
+  children,
+}: {
+  readonly open: boolean;
+  readonly children: ReactNode;
+}) {
+  return <RevealGateContext.Provider value={open}>{children}</RevealGateContext.Provider>;
+}
 
 export interface RevealProps {
   readonly children: ReactNode;
@@ -15,15 +31,17 @@ export interface RevealProps {
 }
 
 /**
- * Entrance motion: content rises into place and settles. Transform and opacity only, so it
- * stays on the compositor. With reduced motion it becomes a short cross-fade with no travel.
+ * Entrance motion: content rises a short distance and settles in one beat. Transform and
+ * opacity only, and never scale, so type stays crisp mid-flight. With reduced motion it becomes
+ * a short cross-fade with no travel.
  */
 export function Reveal({ children, index = 0, style }: RevealProps) {
   const { reduceMotion, preferenceResolved } = useMotionPreference();
+  const gateOpen = useContext(RevealGateContext);
   const progress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (!preferenceResolved) return;
+    if (!preferenceResolved || !gateOpen) return;
 
     const { limits, recipe } = tokens.motion;
     const slot = Math.min(index, limits.maximumStaggerItems - 1);
@@ -44,14 +62,17 @@ export function Reveal({ children, index = 0, style }: RevealProps) {
 
     animation.start();
     return () => animation.stop();
-  }, [index, preferenceResolved, progress, reduceMotion]);
+  }, [gateOpen, index, preferenceResolved, progress, reduceMotion]);
 
-  const { offsetY, scaleFrom } = tokens.motion.entrance;
   const transform = reduceMotion
     ? []
     : [
-        { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [offsetY, 0] }) },
-        { scale: progress.interpolate({ inputRange: [0, 1], outputRange: [scaleFrom, 1] }) },
+        {
+          translateY: progress.interpolate({
+            inputRange: [0, 1],
+            outputRange: [tokens.motion.entrance.offsetY, 0],
+          }),
+        },
       ];
 
   return (

@@ -23,7 +23,7 @@ export function Photo({
   source,
   label,
   aspectRatio,
-  radius = tokens.radius.large,
+  radius = tokens.radius.medium,
   style,
 }: PhotoProps) {
   return (

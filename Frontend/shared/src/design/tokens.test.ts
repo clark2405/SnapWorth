@@ -4,7 +4,7 @@ describe('SnapWorth design tokens', () => {
   it('deep-freezes the token source so themes and components cannot mutate it', () => {
     expect(Object.isFrozen(tokens)).toBe(true);
     expect(Object.isFrozen(tokens.color.dark)).toBe(true);
-    expect(Object.isFrozen(tokens.glass)).toBe(true);
+    expect(Object.isFrozen(tokens.overlay)).toBe(true);
     expect(Object.isFrozen(tokens.typography.style.priceHero)).toBe(true);
     expect(Object.isFrozen(tokens.motion.recipe.estimateWait)).toBe(true);
   });
@@ -45,10 +45,15 @@ describe('SnapWorth design tokens', () => {
     expect(tokens.motion.limits.staggerInterval).toBeLessThanOrEqual(80);
   });
 
-  it('uses mint as the only accent on the deep ink canvas', () => {
-    expect(tokens.color.dark.canvas).toBe('#07090C');
-    expect(tokens.color.dark.accent).toBe('#7CF5CB');
+  it('uses lime as the only accent on the ink canvas', () => {
+    expect(tokens.color.dark.canvas).toBe('#0B0B0F');
+    expect(tokens.color.dark.accent).toBe('#D7FF3E');
     expect(tokens.color.dark.focusRing).toBe(tokens.color.dark.accent);
-    expect(tokens.color.dark.voteRight).toBe(tokens.color.dark.accent);
+    // Votes carry their own hues so the accent keeps meaning "the one action on this screen".
+    expect(tokens.color.dark.voteRight).not.toBe(tokens.color.dark.accent);
+  });
+
+  it('keeps the launch hold short enough that it never reads as a wait', () => {
+    expect(tokens.motion.duration.launchMinimumHold).toBeLessThanOrEqual(1500);
   });
 });

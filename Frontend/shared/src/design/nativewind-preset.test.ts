@@ -8,7 +8,10 @@ describe('SnapWorth NativeWind preset', () => {
 
     expect(extension?.colors).toMatchObject({
       canvas: nativeWindColorReferences.canvas,
-      surface: nativeWindColorReferences.surface,
+      surface: {
+        DEFAULT: nativeWindColorReferences.surface,
+        raised: nativeWindColorReferences.surfaceRaised,
+      },
       accent: {
         DEFAULT: nativeWindColorReferences.accent,
         on: nativeWindColorReferences.onAccent,
@@ -32,7 +35,7 @@ describe('SnapWorth NativeWind preset', () => {
       expanded: `${tokens.breakpoint.expanded}px`,
     });
     expect(extension?.fontFamily).toMatchObject({
-      display: [tokens.typography.family.displayExtraBold],
+      display: [tokens.typography.family.displayBold],
       body: [tokens.typography.family.bodyRegular],
     });
     expect(extension?.borderRadius).toMatchObject({

@@ -1,18 +1,16 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { tokens } from '../design';
 import { IconButton } from './IconButton';
-import { Reveal } from './Reveal';
 import { SWText } from './SWText';
 
 export interface NavHeaderProps {
   readonly title: string;
   readonly onBack?: () => void;
   readonly trailing?: ReactNode;
-  /** A glass band with a hairline beneath it, for screens whose content scrolls under the header. */
+  /** A hairline beneath the header, for screens whose content scrolls under it. */
   readonly banded?: boolean;
 }
 
@@ -20,13 +18,6 @@ export interface NavHeaderProps {
 export function NavHeader({ title, onBack, trailing, banded = false }: NavHeaderProps) {
   return (
     <View style={[styles.nav, banded ? styles.band : null]}>
-      {banded ? (
-        <LinearGradient
-          pointerEvents="none"
-          colors={[tokens.glass.highlight, tokens.glass.highlightClear]}
-          style={StyleSheet.absoluteFill}
-        />
-      ) : null}
       <View style={styles.side}>
         {onBack ? <IconButton icon={ArrowLeft} label="Go back" onPress={onBack} /> : null}
       </View>
@@ -45,33 +36,43 @@ export function NavHeader({ title, onBack, trailing, banded = false }: NavHeader
 
 export interface LargeTitleProps {
   readonly title: string;
+  /** A short line under the title that states what the screen is for. */
+  readonly subtitle?: string;
   readonly trailing?: ReactNode;
 }
 
-/** The editorial title that opens a top-level tab: Feed, Market, History. */
-export function LargeTitle({ title, trailing }: LargeTitleProps) {
+/**
+ * The editorial title that opens a top-level tab: Feed, Market, History. Set left and tight,
+ * with a quiet subtitle as its counterweight. It is part of the shell, so it does not animate.
+ */
+export function LargeTitle({ title, subtitle, trailing }: LargeTitleProps) {
   return (
-    <Reveal style={styles.large}>
-      <SWText variant="displayTitle" accessibilityRole="header">
-        {title}
-      </SWText>
+    <View style={styles.large}>
+      <View style={styles.largeText}>
+        <SWText variant="displayTitle" accessibilityRole="header">
+          {title}
+        </SWText>
+        {subtitle ? (
+          <SWText variant="bodySmall" tone="textMuted">
+            {subtitle}
+          </SWText>
+        ) : null}
+      </View>
       {trailing}
-    </Reveal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   nav: {
-    height: tokens.layout.headerHeight,
+    minHeight: tokens.layout.headerHeight,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: tokens.spacing[2],
   },
   band: {
-    backgroundColor: tokens.glass.fill,
-    borderTopWidth: tokens.border.hairline,
     borderBottomWidth: tokens.border.hairline,
-    borderColor: tokens.glass.borderStrong,
+    borderColor: tokens.color.dark.borderSubtle,
   },
   side: {
     width: tokens.focus.minimumTarget + tokens.spacing[2],
@@ -86,9 +87,14 @@ const styles = StyleSheet.create({
   },
   large: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
-    paddingTop: tokens.spacing[5],
-    paddingBottom: tokens.spacing[5],
+    gap: tokens.spacing[3],
+    paddingTop: tokens.spacing[6],
+    paddingBottom: tokens.spacing[6],
+  },
+  largeText: {
+    flex: 1,
+    gap: tokens.spacing[1],
   },
 });

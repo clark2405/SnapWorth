@@ -8,8 +8,11 @@ export interface IconButtonProps {
   readonly icon: LucideIcon;
   readonly label: string;
   readonly onPress?: () => void;
-  /** `glass` draws the round glass disc; `bare` is just the glyph with a full touch target. */
-  readonly appearance?: 'glass' | 'bare' | 'accent';
+  /**
+   * `bare` is just the glyph with a full touch target; `outline` draws a hairline ring;
+   * `accent` is a filled send/confirm control; `overlay` sits over live camera media.
+   */
+  readonly appearance?: 'bare' | 'outline' | 'accent' | 'overlay';
   readonly tone?: SemanticColorName;
   readonly size?: number;
 }
@@ -29,10 +32,11 @@ export function IconButton({
       accessibilityLabel={label}
       onPress={onPress}
       hitSlop={4}
-      style={[
+      style={({ pressed }) => [
         styles.base,
-        appearance === 'glass' ? styles.glass : null,
-        appearance === 'accent' ? styles.accent : null,
+        styles[appearance],
+        pressed && appearance === 'accent' ? styles.accentPressed : null,
+        pressed && appearance !== 'accent' ? styles.pressed : null,
       ]}
     >
       <Icon size={size} strokeWidth={2} color={color} />
@@ -48,16 +52,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  glass: {
-    width: 40,
-    height: 40,
-    backgroundColor: tokens.glass.fillRaised,
+  bare: {},
+  outline: {
     borderWidth: tokens.border.hairline,
-    borderColor: tokens.glass.border,
+    borderColor: tokens.color.dark.borderStrong,
+  },
+  overlay: {
+    backgroundColor: tokens.overlay.chrome,
+    borderWidth: tokens.border.hairline,
+    borderColor: tokens.overlay.border,
   },
   accent: {
-    width: 36,
-    height: 36,
+    borderRadius: tokens.radius.medium,
     backgroundColor: tokens.color.dark.accent,
+  },
+  accentPressed: {
+    backgroundColor: tokens.color.dark.accentPressed,
+  },
+  pressed: {
+    backgroundColor: tokens.color.dark.surfaceRaised,
   },
 });

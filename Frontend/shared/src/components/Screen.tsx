@@ -3,7 +3,6 @@ import { ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 're
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { tokens } from '../design';
-import { AmbientBackground } from './AmbientBackground';
 
 export interface ScreenProps {
   readonly children: ReactNode;
@@ -12,13 +11,13 @@ export interface ScreenProps {
   /** Pinned below the scroll area (composers, action sheets). */
   readonly footer?: ReactNode;
   readonly scroll?: boolean;
-  /** Extra bottom room so content can scroll clear of the floating tab bar. */
+  /** Extra bottom room so content can scroll clear of the docked tab bar. */
   readonly clearTabBar?: boolean;
   readonly contentStyle?: StyleProp<ViewStyle>;
 }
 
 /**
- * Every screen sits on the ambient background inside a phone-width column, centred on wider
+ * Every screen sits on the flat ink canvas inside a phone-width column, centred on wider
  * viewports until the responsive shell lands.
  */
 export function Screen({
@@ -31,18 +30,13 @@ export function Screen({
 }: ScreenProps) {
   const insets = useSafeAreaInsets();
   const bottomRoom = clearTabBar
-    ? tokens.layout.tabBarHeight + tokens.spacing[8] + tokens.spacing[6]
-    : tokens.spacing[6];
+    ? tokens.layout.tabBarHeight + insets.bottom + tokens.spacing[8]
+    : tokens.spacing[6] + (footer ? 0 : insets.bottom);
 
-  const body = [
-    styles.content,
-    { paddingBottom: bottomRoom + (footer ? 0 : insets.bottom) },
-    contentStyle,
-  ];
+  const body = [styles.content, { paddingBottom: bottomRoom }, contentStyle];
 
   return (
     <View style={styles.root}>
-      <AmbientBackground />
       <View style={[styles.column, { paddingTop: header ? 0 : insets.top }]}>
         {header ? <View style={{ paddingTop: insets.top }}>{header}</View> : null}
         {scroll ? (

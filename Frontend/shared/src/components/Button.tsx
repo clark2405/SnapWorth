@@ -1,4 +1,3 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import type { LucideIcon } from 'lucide-react-native';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
@@ -6,12 +5,17 @@ import { tokens, type SemanticColorName } from '../design';
 import { PressableScale } from './PressableScale';
 import { SWText } from './SWText';
 
-export type GlowButtonVariant = 'primary' | 'glass' | 'mintGlass' | 'mintOutline';
+/**
+ * `primary` is the one filled lime action on a screen. `secondary` is outlined and `tertiary` is
+ * bare text, so a screen never has two things competing to be pressed first. `danger` is an
+ * outline for destructive actions outside a confirmation.
+ */
+export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'danger';
 
-export interface GlowButtonProps {
+export interface ButtonProps {
   readonly label: string;
   readonly onPress?: () => void;
-  readonly variant?: GlowButtonVariant;
+  readonly variant?: ButtonVariant;
   readonly icon?: LucideIcon;
   readonly disabled?: boolean;
   readonly accessibilityHint?: string;
@@ -20,18 +24,14 @@ export interface GlowButtonProps {
   readonly containerStyle?: StyleProp<ViewStyle>;
 }
 
-const labelTone: Record<GlowButtonVariant, SemanticColorName> = {
+const labelTone: Record<ButtonVariant, SemanticColorName> = {
   primary: 'onAccent',
-  glass: 'textPrimary',
-  mintGlass: 'accent',
-  mintOutline: 'accent',
+  secondary: 'textPrimary',
+  tertiary: 'textPrimary',
+  danger: 'danger',
 };
 
-/**
- * The primary action is a mint pill that glows from underneath. Glass and mint-glass pills
- * carry the secondary actions so only one thing on a screen ever glows.
- */
-export function GlowButton({
+export function Button({
   label,
   onPress,
   variant = 'primary',
@@ -40,9 +40,8 @@ export function GlowButton({
   accessibilityHint,
   style,
   containerStyle,
-}: GlowButtonProps) {
+}: ButtonProps) {
   const tone: SemanticColorName = disabled ? 'textMuted' : labelTone[variant];
-  const glowing = variant === 'primary' && !disabled;
 
   return (
     <PressableScale
@@ -51,21 +50,15 @@ export function GlowButton({
       disabled={disabled}
       onPress={onPress}
       containerStyle={containerStyle}
-      style={[
+      style={({ pressed }) => [
         styles.base,
-        glowing ? styles.glow : null,
-        variant === 'primary' && disabled ? styles.disabled : null,
-        variant === 'glass' || variant === 'mintOutline' ? styles.glass : null,
-        variant === 'mintGlass' ? styles.mintGlass : null,
+        styles[variant],
+        pressed && variant === 'primary' ? styles.primaryPressed : null,
+        pressed && variant !== 'primary' ? styles.quietPressed : null,
+        disabled ? styles.disabled : null,
         style,
       ]}
     >
-      {glowing ? (
-        <LinearGradient
-          colors={[tokens.glow.mintTop, tokens.glow.mintBottom]}
-          style={[StyleSheet.absoluteFill, styles.gradient]}
-        />
-      ) : null}
       <View style={styles.row}>
         {Icon ? <Icon size={18} strokeWidth={2} color={tokens.color.dark[tone]} /> : null}
         <SWText variant="button" tone={tone}>
@@ -79,28 +72,35 @@ export function GlowButton({
 const styles = StyleSheet.create({
   base: {
     minHeight: tokens.layout.controlHeight,
-    borderRadius: tokens.radius.full,
+    borderRadius: tokens.radius.medium,
     justifyContent: 'center',
     paddingHorizontal: tokens.spacing[5],
+    borderWidth: tokens.border.hairline,
+    borderColor: 'transparent',
   },
-  gradient: {
-    borderRadius: tokens.radius.full,
+  primary: {
+    backgroundColor: tokens.color.dark.accent,
+    borderColor: tokens.color.dark.accent,
   },
-  glow: {
-    boxShadow: tokens.glow.button,
+  primaryPressed: {
+    backgroundColor: tokens.color.dark.accentPressed,
+    borderColor: tokens.color.dark.accentPressed,
+  },
+  secondary: {
+    borderColor: tokens.color.dark.borderStrong,
+  },
+  tertiary: {
+    paddingHorizontal: tokens.spacing[2],
+  },
+  danger: {
+    borderColor: tokens.color.dark.danger,
+  },
+  quietPressed: {
+    backgroundColor: tokens.color.dark.surfaceRaised,
   },
   disabled: {
-    backgroundColor: tokens.glass.fillRaised,
-  },
-  glass: {
-    backgroundColor: tokens.glass.fill,
-    borderWidth: tokens.border.hairline,
-    borderColor: tokens.glass.border,
-  },
-  mintGlass: {
-    backgroundColor: tokens.glass.fillRaised,
-    borderWidth: tokens.border.hairline,
-    borderColor: tokens.glass.border,
+    backgroundColor: tokens.color.dark.surface,
+    borderColor: tokens.color.dark.borderSubtle,
   },
   row: {
     flexDirection: 'row',

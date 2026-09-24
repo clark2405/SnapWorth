@@ -77,22 +77,6 @@ export function RootSessionView() {
   return <RoutePlaceholder title="SnapWorth" detail="Checking your session." live />;
 }
 
-export function LoginView() {
-  return <RoutePlaceholder title="Sign in" question="Can I get back in without thinking?" />;
-}
-
-export function SignupView() {
-  return <RoutePlaceholder title="Create account" question="What do I give up to start?" />;
-}
-
-export function ResetPasswordView() {
-  return <RoutePlaceholder title="Reset password" question="Will I get back in?" />;
-}
-
-export function OnboardingView() {
-  return <RoutePlaceholder title="Welcome to SnapWorth" question="Why should I take one photo?" />;
-}
-
 export function CaptureView() {
   return <RoutePlaceholder title="Capture an item" question="What is this thing worth?" />;
 }
@@ -149,25 +133,12 @@ export function ListingDetailView({ listingId }: ListingDetailViewProps) {
   );
 }
 
-export function ConversationListView() {
-  return <RoutePlaceholder title="Chat" question="Who am I mid-conversation with?" />;
-}
-
 export function ConversationView({ conversationId }: ConversationViewProps) {
   return (
     <RoutePlaceholder
       title="Conversation"
       question="What are we agreeing on?"
       detail={routeEntityDetail('Conversation', conversationId)}
-    />
-  );
-}
-
-export function AdminReviewView() {
-  return (
-    <RoutePlaceholder
-      title="Admin review"
-      question="What needs a human decision, most urgent first?"
     />
   );
 }

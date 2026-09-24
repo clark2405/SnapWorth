@@ -8,7 +8,10 @@ const milliseconds = (value: number): string => `${value}ms`;
 
 const colorTheme = {
   canvas: nativeWindColorReferences.canvas,
-  surface: nativeWindColorReferences.surface,
+  surface: {
+    DEFAULT: nativeWindColorReferences.surface,
+    raised: nativeWindColorReferences.surfaceRaised,
+  },
   sunken: nativeWindColorReferences.sunken,
   border: {
     subtle: nativeWindColorReferences.borderSubtle,
@@ -46,9 +49,8 @@ export const snapWorthNativeWindPreset = {
     extend: {
       colors: colorTheme,
       fontFamily: {
-        display: [tokens.typography.family.displayExtraBold],
-        'display-bold': [tokens.typography.family.displayBold],
-        'display-semibold': [tokens.typography.family.displaySemibold],
+        display: [tokens.typography.family.displayBold],
+        'display-medium': [tokens.typography.family.displayMedium],
         body: [tokens.typography.family.bodyRegular],
         'body-medium': [tokens.typography.family.bodyMedium],
         'body-semibold': [tokens.typography.family.bodySemibold],
@@ -70,7 +72,6 @@ export const snapWorthNativeWindPreset = {
         sm: px(tokens.radius.small),
         md: px(tokens.radius.medium),
         lg: px(tokens.radius.large),
-        xl: px(tokens.radius.xlarge),
         full: px(tokens.radius.full),
       },
       borderWidth: {

@@ -1,5 +1,4 @@
-import { LinearGradient } from 'expo-linear-gradient';
-import { CircleX, GalleryHorizontal, History, Sparkles, Zap } from 'lucide-react-native';
+import { GalleryHorizontal, History, X, Zap } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -41,16 +40,16 @@ export function CaptureView({
       <View style={[styles.column, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <Reveal index={0} style={styles.topBar}>
           <IconButton
-            icon={CircleX}
+            icon={X}
             label="Close camera"
-            appearance="glass"
+            appearance="overlay"
             onPress={onClose}
             size={20}
           />
           <IconButton
             icon={Zap}
             label={flashOn ? 'Turn flash off' : 'Turn flash on'}
-            appearance="glass"
+            appearance="overlay"
             tone={flashOn ? 'accent' : 'textPrimary'}
             onPress={onToggleFlash}
             size={20}
@@ -66,9 +65,8 @@ export function CaptureView({
         </View>
 
         <Reveal index={2} style={styles.hint}>
-          <Sparkles size={16} strokeWidth={2} color={tokens.color.dark.accent} />
           <SWText variant="labelMedium" accessibilityLiveRegion="polite">
-            Position item clearly inside bounds
+            Fit the whole item inside the frame
           </SWText>
         </Reveal>
 
@@ -76,7 +74,7 @@ export function CaptureView({
           <IconButton
             icon={GalleryHorizontal}
             label="Choose a photo from your gallery"
-            appearance="glass"
+            appearance="overlay"
             onPress={onOpenGallery}
             size={20}
           />
@@ -86,15 +84,12 @@ export function CaptureView({
             onPress={onCapture}
             style={styles.shutterRing}
           >
-            <LinearGradient
-              colors={[tokens.glow.mintTop, tokens.glow.mintBottom]}
-              style={styles.shutter}
-            />
+            <View style={styles.shutter} />
           </PressableScale>
           <IconButton
             icon={History}
             label="Open your history"
-            appearance="glass"
+            appearance="overlay"
             onPress={onOpenHistory}
             size={20}
           />
@@ -104,8 +99,8 @@ export function CaptureView({
   );
 }
 
-const bracketSize = 44;
-const bracketStroke = 3;
+const bracketSize = tokens.layout.viewfinderBracket * 2;
+const bracketStroke = tokens.layout.progressSegment;
 
 const styles = StyleSheet.create({
   root: {
@@ -171,9 +166,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: tokens.spacing[4],
     paddingVertical: tokens.spacing[2],
     borderRadius: tokens.radius.full,
-    backgroundColor: tokens.glass.fillChrome,
+    backgroundColor: tokens.overlay.chrome,
     borderWidth: tokens.border.hairline,
-    borderColor: tokens.glass.borderStrong,
+    borderColor: tokens.overlay.border,
     marginBottom: tokens.spacing[8],
   },
   controls: {
@@ -183,16 +178,16 @@ const styles = StyleSheet.create({
     paddingBottom: tokens.spacing[8],
   },
   shutterRing: {
-    width: 84,
-    height: 84,
+    width: tokens.layout.shutter,
+    height: tokens.layout.shutter,
     borderRadius: tokens.radius.full,
-    padding: 5,
-    borderWidth: 2,
-    borderColor: tokens.glass.borderStrong,
-    boxShadow: tokens.glow.capture,
+    padding: tokens.spacing[1],
+    borderWidth: tokens.border.focus,
+    borderColor: tokens.color.dark.textPrimary,
   },
   shutter: {
     flex: 1,
     borderRadius: tokens.radius.full,
+    backgroundColor: tokens.color.dark.accent,
   },
 });

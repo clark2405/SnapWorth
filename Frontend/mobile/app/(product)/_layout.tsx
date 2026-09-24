@@ -2,7 +2,7 @@ import { Slot, usePathname, useRouter, type Href } from 'expo-router';
 import { Clock, MessageSquare, Newspaper, ShoppingBag } from 'lucide-react-native';
 import { View } from 'react-native';
 
-import { GlassTabBar, type GlassTabItem } from '@snapworth/shared/components';
+import { TabBar, type TabItem } from '@snapworth/shared/components';
 
 type TabKey = 'feed' | 'marketplace' | 'chat' | 'history';
 
@@ -16,12 +16,12 @@ const tabRoutes: Record<TabKey, Href> = {
 const leading = [
   { key: 'feed', label: 'Feed', icon: Newspaper },
   { key: 'marketplace', label: 'Market', icon: ShoppingBag },
-] as const satisfies readonly GlassTabItem<TabKey>[];
+] as const satisfies readonly TabItem<TabKey>[];
 
 const trailing = [
   { key: 'chat', label: 'Chat', icon: MessageSquare },
   { key: 'history', label: 'History', icon: Clock },
-] as const satisfies readonly GlassTabItem<TabKey>[];
+] as const satisfies readonly TabItem<TabKey>[];
 
 export default function ProductLayout() {
   const pathname = usePathname();
@@ -32,7 +32,7 @@ export default function ProductLayout() {
     <View style={{ flex: 1 }}>
       <Slot />
       {activeKey ? (
-        <GlassTabBar
+        <TabBar
           leading={leading}
           trailing={trailing}
           activeKey={activeKey}

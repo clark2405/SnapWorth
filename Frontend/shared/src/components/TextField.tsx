@@ -14,23 +14,27 @@ import { PressableScale } from './PressableScale';
 import { SWText } from './SWText';
 
 /**
- * Browsers draw their own focus outline on text fields; the glass border shows focus instead.
+ * Browsers draw their own focus outline on text fields; the field border shows focus instead.
  * Native platforms have no such outline, so this is empty there.
  */
 export const hideWebFocusOutline: TextStyle =
   Platform.OS === 'web' ? ({ outlineStyle: 'none' } as unknown as TextStyle) : {};
 
-export interface GlassFieldProps {
+export interface FieldProps {
   readonly label?: string;
   readonly helper?: string;
   readonly children: ReactNode;
 }
 
 /** A label above a control, with optional helper text below. */
-export function GlassField({ label, helper, children }: GlassFieldProps) {
+export function Field({ label, helper, children }: FieldProps) {
   return (
     <View style={styles.field}>
-      {label ? <SWText variant="label">{label}</SWText> : null}
+      {label ? (
+        <SWText variant="labelMedium" tone="textSecondary">
+          {label}
+        </SWText>
+      ) : null}
       {children}
       {helper ? (
         <SWText variant="caption" tone="textMuted">
@@ -41,27 +45,25 @@ export function GlassField({ label, helper, children }: GlassFieldProps) {
   );
 }
 
-export interface GlassInputProps extends Omit<TextInputProps, 'style'> {
+export interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   readonly prefix?: string;
   readonly size?: 'regular' | 'large';
 }
 
-export function GlassInput({
-  prefix,
-  size = 'regular',
-  onFocus,
-  onBlur,
-  ...rest
-}: GlassInputProps) {
+export function TextField({ prefix, size = 'regular', onFocus, onBlur, ...rest }: TextFieldProps) {
   const [focused, setFocused] = useState(false);
-  const textVariant: TypographyStyleName = size === 'large' ? 'headingMedium' : 'bodyMedium';
+  const textVariant: TypographyStyleName = size === 'large' ? 'priceMedium' : 'bodyMedium';
   const text = tokens.typography.style[textVariant];
 
   return (
     <View
       style={[styles.box, size === 'large' ? styles.large : null, focused ? styles.focused : null]}
     >
-      {prefix ? <SWText variant={textVariant}>{prefix}</SWText> : null}
+      {prefix ? (
+        <SWText variant={textVariant} tone="textSecondary">
+          {prefix}
+        </SWText>
+      ) : null}
       <TextInput
         placeholderTextColor={tokens.color.dark.textMuted}
         selectionColor={tokens.color.dark.accent}
@@ -76,10 +78,8 @@ export function GlassInput({
         style={[
           styles.input,
           hideWebFocusOutline,
-          {
-            fontFamily: size === 'large' ? tokens.typography.family.bodyRegular : text.family,
-            fontSize: text.size,
-          },
+          { fontFamily: text.family, fontSize: text.size },
+          size === 'large' ? styles.tabular : null,
         ]}
         {...rest}
       />
@@ -87,24 +87,24 @@ export function GlassInput({
   );
 }
 
-export interface GlassSelectProps {
+export interface SelectFieldProps {
   readonly value: string;
   readonly accessibilityLabel: string;
   readonly onPress?: () => void;
 }
 
 /** A closed select that shows its value and a chevron; the picker itself opens elsewhere. */
-export function GlassSelect({ value, accessibilityLabel, onPress }: GlassSelectProps) {
+export function SelectField({ value, accessibilityLabel, onPress }: SelectFieldProps) {
   return (
     <PressableScale
       accessibilityLabel={`${accessibilityLabel}: ${value}`}
       onPress={onPress}
-      style={[styles.box, styles.select]}
+      style={({ pressed }) => [styles.box, styles.select, pressed ? styles.pressed : null]}
     >
       <SWText variant="bodyMedium" style={styles.selectValue}>
         {value}
       </SWText>
-      <ChevronDown size={18} strokeWidth={2} color={tokens.color.dark.textSecondary} />
+      <ChevronDown size={18} strokeWidth={2} color={tokens.color.dark.textMuted} />
     </PressableScale>
   );
 }
@@ -117,24 +117,29 @@ const styles = StyleSheet.create({
     minHeight: tokens.layout.inputHeight,
     borderRadius: tokens.radius.medium,
     borderWidth: tokens.border.hairline,
-    borderColor: tokens.glass.border,
-    backgroundColor: tokens.glass.fill,
+    borderColor: tokens.color.dark.borderStrong,
+    backgroundColor: tokens.color.dark.sunken,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: tokens.spacing[4],
     gap: tokens.spacing[2],
   },
   large: {
-    minHeight: 56,
+    minHeight: tokens.spacing[16],
   },
   focused: {
-    borderColor: tokens.glass.mintBorder,
-    backgroundColor: tokens.glass.fillRaised,
+    borderColor: tokens.color.dark.focusRing,
+  },
+  pressed: {
+    backgroundColor: tokens.color.dark.surface,
   },
   input: {
     flex: 1,
     alignSelf: 'stretch',
     color: tokens.color.dark.textPrimary,
+  },
+  tabular: {
+    fontVariant: ['tabular-nums'],
   },
   select: {
     justifyContent: 'space-between',

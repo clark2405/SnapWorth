@@ -1,10 +1,9 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowUp, Menu } from 'lucide-react-native';
 import { useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import {
-  GlassCard,
+  BottomBar,
   hideWebFocusOutline,
   IconButton,
   NavHeader,
@@ -47,7 +46,7 @@ export function ConversationView({ onBack, onMenu, onViewItem, onSend }: Convers
       header={
         <View>
           <NavHeader
-            title="Discussion Chat"
+            title="Chat"
             onBack={onBack}
             banded
             trailing={<IconButton icon={Menu} label="Report or block" onPress={onMenu} />}
@@ -63,8 +62,8 @@ export function ConversationView({ onBack, onMenu, onViewItem, onSend }: Convers
               <SWText variant="headingSmall" numberOfLines={1}>
                 {conversation.item.title}
               </SWText>
-              <SWText variant="labelSmall" tone="accent">
-                {formatPeso(conversation.item.askingPrice)}
+              <SWText variant="labelMedium" tone="textSecondary">
+                Asking {formatPeso(conversation.item.askingPrice)}
               </SWText>
             </View>
             <PressableScale
@@ -72,21 +71,19 @@ export function ConversationView({ onBack, onMenu, onViewItem, onSend }: Convers
               onPress={onViewItem}
               style={styles.viewItem}
             >
-              <SWText variant="tag" tone="accent">
-                View Item
-              </SWText>
+              <SWText variant="labelSmall">View item</SWText>
             </PressableScale>
           </View>
         </View>
       }
       footer={
-        <GlassCard tone="chrome" blur radius={0} style={styles.composer}>
+        <BottomBar>
           <View style={styles.composerRow}>
             <TextInput
               value={draft}
               onChangeText={setDraft}
               onSubmitEditing={send}
-              placeholder="Type your message..."
+              placeholder="Message"
               placeholderTextColor={tokens.color.dark.textMuted}
               selectionColor={tokens.color.dark.accent}
               accessibilityLabel="Message"
@@ -101,7 +98,7 @@ export function ConversationView({ onBack, onMenu, onViewItem, onSend }: Convers
               onPress={send}
             />
           </View>
-        </GlassCard>
+        </BottomBar>
       }
       contentStyle={styles.thread}
     >
@@ -113,11 +110,7 @@ export function ConversationView({ onBack, onMenu, onViewItem, onSend }: Convers
         >
           {message.mine ? (
             <View style={[styles.bubble, styles.bubbleMine]}>
-              <LinearGradient
-                colors={[tokens.glow.mintTop, tokens.glow.mintBottom]}
-                style={StyleSheet.absoluteFill}
-              />
-              <SWText variant="bodySmall" tone="onAccent">
+              <SWText variant="bodySmall" tone="canvas">
                 {message.body}
               </SWText>
             </View>
@@ -142,9 +135,8 @@ const styles = StyleSheet.create({
     gap: tokens.spacing[3],
     paddingHorizontal: tokens.layout.pageGutterCompact,
     paddingVertical: tokens.spacing[2],
-    backgroundColor: tokens.glass.fill,
     borderBottomWidth: tokens.border.hairline,
-    borderBottomColor: tokens.glass.border,
+    borderBottomColor: tokens.color.dark.borderSubtle,
   },
   itemThumb: {
     width: 40,
@@ -154,10 +146,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   viewItem: {
+    minHeight: tokens.focus.minimumTarget - tokens.spacing[2],
+    justifyContent: 'center',
     paddingHorizontal: tokens.spacing[3],
-    paddingVertical: tokens.spacing[1] + 2,
-    borderRadius: tokens.radius.full,
-    backgroundColor: tokens.glass.mintFillStrong,
+    borderRadius: tokens.radius.medium,
+    borderWidth: tokens.border.hairline,
+    borderColor: tokens.color.dark.borderStrong,
   },
   thread: {
     justifyContent: 'flex-end',
@@ -176,36 +170,34 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   bubble: {
-    overflow: 'hidden',
-    paddingHorizontal: tokens.spacing[3],
-    paddingVertical: tokens.spacing[3] - 2,
+    paddingHorizontal: tokens.spacing[4],
+    paddingVertical: tokens.spacing[3],
     borderRadius: tokens.radius.large,
   },
+  // Your own messages invert to paper-on-ink; the accent stays on Send, the one action here.
   bubbleMine: {
-    borderRadius: 28,
-    paddingHorizontal: tokens.spacing[4],
-    boxShadow: tokens.glow.button,
+    borderBottomRightRadius: tokens.radius.small,
+    backgroundColor: tokens.color.dark.textPrimary,
   },
   bubbleTheirs: {
-    borderRadius: tokens.radius.medium,
-    backgroundColor: tokens.glass.fillRaised,
-  },
-  composer: {
-    borderBottomWidth: 0,
-    borderLeftWidth: 0,
-    borderRightWidth: 0,
+    borderBottomLeftRadius: tokens.radius.small,
+    backgroundColor: tokens.color.dark.surfaceRaised,
   },
   composerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: tokens.spacing[3],
-    paddingLeft: tokens.spacing[8],
-    paddingRight: tokens.spacing[4],
-    paddingVertical: tokens.spacing[4],
+    gap: tokens.spacing[2],
+    paddingHorizontal: tokens.layout.pageGutterCompact,
+    paddingVertical: tokens.spacing[3],
   },
   composerInput: {
     flex: 1,
     minHeight: tokens.focus.minimumTarget,
+    paddingHorizontal: tokens.spacing[4],
+    borderRadius: tokens.radius.medium,
+    borderWidth: tokens.border.hairline,
+    borderColor: tokens.color.dark.borderStrong,
+    backgroundColor: tokens.color.dark.sunken,
     color: tokens.color.dark.textPrimary,
     fontFamily: tokens.typography.family.bodyRegular,
     fontSize: tokens.typography.style.bodySmall.size,

@@ -12,6 +12,8 @@ export default function ListingDetailRoute() {
       listingId={listingId}
       onBack={() => router.back()}
       onMessageSeller={() => router.push(`/chat/${listingId ?? ''}`)}
+      // Preview wiring: every sample listing detail belongs to the one sample seller.
+      onOpenSeller={() => router.push('/seller/mariacruz')}
     />
   );
 }

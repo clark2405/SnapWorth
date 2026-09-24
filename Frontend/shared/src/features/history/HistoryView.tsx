@@ -2,7 +2,7 @@ import { Search, Trash2 } from 'lucide-react-native';
 import { StyleSheet, View } from 'react-native';
 
 import {
-  GlassCard,
+  EstimateBadge,
   IconButton,
   LargeTitle,
   Photo,
@@ -20,40 +20,51 @@ import {
   type PreviewHistoryItem,
   type PreviewItemStatus,
 } from '../preview/sample-data';
+import { ProfileButton } from '../profile/ProfileButton';
 
 export interface HistoryViewProps {
   readonly onOpenItem?: (itemId: string) => void;
   readonly onDeleteItem?: (itemId: string) => void;
   readonly onSearch?: () => void;
+  readonly onOpenProfile?: () => void;
 }
 
-// Mint marks the one state that is live for sale; every other state is a neutral label.
+// The accent marks the one state that is live for sale; every other state is a quiet label.
 const statusTag: Record<PreviewItemStatus, { label: string; tone: TagTone }> = {
-  listed: { label: 'Listed', tone: 'mint' },
-  on_feed: { label: 'On Feed', tone: 'outline' },
+  listed: { label: 'Listed', tone: 'accent' },
+  on_feed: { label: 'On feed', tone: 'outline' },
   private: { label: 'Private', tone: 'neutral' },
   sold: { label: 'Sold', tone: 'neutral' },
 };
 
-export function HistoryView({ onOpenItem, onDeleteItem, onSearch }: HistoryViewProps) {
+export function HistoryView({
+  onOpenItem,
+  onDeleteItem,
+  onSearch,
+  onOpenProfile,
+}: HistoryViewProps) {
   return (
     <Screen clearTabBar>
       <LargeTitle
         title="History"
+        subtitle={`${previewHistory.length} items checked`}
         trailing={
-          <IconButton
-            icon={Search}
-            label="Search your history"
-            appearance="glass"
-            onPress={onSearch}
-            size={20}
-          />
+          <View style={styles.actions}>
+            <IconButton
+              icon={Search}
+              label="Search your history"
+              appearance="outline"
+              onPress={onSearch}
+              size={20}
+            />
+            <ProfileButton onPress={onOpenProfile} />
+          </View>
         }
       />
-      <View style={styles.list}>
+      <View style={styles.grid}>
         {previewHistory.map((item, index) => (
-          <Reveal key={item.id} index={index + 1}>
-            <HistoryRow
+          <Reveal key={item.id} index={index} style={styles.cell}>
+            <HistoryCell
               item={item}
               onOpen={() => onOpenItem?.(item.id)}
               onDelete={() => onDeleteItem?.(item.id)}
@@ -65,7 +76,7 @@ export function HistoryView({ onOpenItem, onDeleteItem, onSearch }: HistoryViewP
   );
 }
 
-function HistoryRow({
+function HistoryCell({
   item,
   onOpen,
   onDelete,
@@ -77,82 +88,74 @@ function HistoryRow({
   const status = statusTag[item.status];
 
   return (
-    <GlassCard padding={tokens.spacing[3]}>
-      <View style={styles.row}>
-        <PressableScale
-          accessibilityRole="link"
-          accessibilityLabel={`${item.title}, estimated ${formatPeso(item.estimate)}, ${status.label}, captured ${item.capturedOn}`}
-          onPress={onOpen}
-          containerStyle={styles.open}
-          style={styles.openInner}
-        >
-          <Photo
-            source={item.photo}
-            label={item.photoLabel}
-            radius={tokens.radius.medium}
-            style={styles.thumb}
-          />
-          <View style={styles.text}>
-            <SWText variant="headingSmall" numberOfLines={1}>
-              {item.title}
-            </SWText>
-            <View style={styles.priceRow}>
-              <SWText variant="priceSmall" tone="accent">
-                {formatPeso(item.estimate)}
-              </SWText>
-              <Tag label={status.label} tone={status.tone} />
-            </View>
-            <SWText variant="caption" tone="textMuted">
-              Captured {item.capturedOn}
-            </SWText>
-          </View>
-        </PressableScale>
-        <View style={styles.delete}>
-          <IconButton
-            icon={Trash2}
-            label={`Delete ${item.title} from history`}
-            tone="danger"
-            size={20}
-            onPress={onDelete}
-          />
+    <View style={styles.item}>
+      <PressableScale
+        accessibilityRole="link"
+        accessibilityLabel={`${item.title}, AI estimate ${formatPeso(item.estimate)}, ${status.label}, captured ${item.capturedOn}`}
+        onPress={onOpen}
+        style={styles.open}
+      >
+        <Photo
+          source={item.photo}
+          label={item.photoLabel}
+          aspectRatio={1}
+          radius={tokens.radius.large}
+        />
+        <SWText variant="headingSmall" numberOfLines={2}>
+          {item.title}
+        </SWText>
+        <EstimateBadge value={formatPeso(item.estimate)} />
+      </PressableScale>
+      <View style={styles.meta}>
+        <View style={styles.metaText}>
+          <Tag label={status.label} tone={status.tone} />
+          <SWText variant="caption" tone="textMuted">
+            {item.capturedOn}
+          </SWText>
         </View>
+        <IconButton
+          icon={Trash2}
+          label={`Delete ${item.title} from history`}
+          tone="textMuted"
+          size={18}
+          onPress={onDelete}
+        />
       </View>
-    </GlassCard>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  list: {
-    gap: tokens.spacing[3],
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  open: {
-    flex: 1,
-  },
-  openInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.spacing[3],
-  },
-  thumb: {
-    width: 72,
-    height: 72,
-  },
-  text: {
-    flex: 1,
-    gap: 2,
-  },
-  // Keeps the full 44px touch target while giving the title the width the design gives it.
-  delete: {
-    marginLeft: -tokens.spacing[1],
-    marginRight: -tokens.spacing[2],
-  },
-  priceRow: {
+  actions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing[2],
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: tokens.spacing[4],
+    rowGap: tokens.spacing[8],
+  },
+  cell: {
+    // Two columns: each cell takes just under half so the column gap fits beside it.
+    flexBasis: '46%',
+    flexGrow: 1,
+  },
+  item: {
+    gap: tokens.spacing[2],
+  },
+  open: {
+    gap: tokens.spacing[3],
+  },
+  meta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginRight: -tokens.spacing[3],
+  },
+  metaText: {
+    flex: 1,
+    gap: tokens.spacing[1],
   },
 });

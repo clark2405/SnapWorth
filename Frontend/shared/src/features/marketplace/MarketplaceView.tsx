@@ -2,35 +2,18 @@ import { Plus } from 'lucide-react-native';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import {
-  GlassCard,
-  LargeTitle,
-  Photo,
-  PressableScale,
-  Reveal,
-  Screen,
-  SWText,
-  Tag,
-  type TagTone,
-} from '../../components';
+import { Button, LargeTitle, PressableScale, Reveal, Screen, SWText } from '../../components';
 import { tokens } from '../../design';
-import type { VoteChoice } from '../../types';
-import { voteLabels } from '../feed/CommunityVerdict';
-import { formatPeso, previewListings, type PreviewListing } from '../preview/sample-data';
+import { previewListings } from '../preview/sample-data';
+import { ProfileButton } from '../profile/ProfileButton';
+import { ListingCard } from './ListingCard';
 
 export interface MarketplaceViewProps {
   readonly onOpenListing?: (listingId: string) => void;
   readonly onSell?: () => void;
   readonly onFilter?: (filter: 'category' | 'price' | 'location') => void;
+  readonly onOpenProfile?: () => void;
 }
-
-// Consistent with the feed: only "Too High" reads as a warning; the design's red "Too Low"
-// badge was an inconsistency.
-const verdictTone: Record<VoteChoice, TagTone> = {
-  just_right: 'mint',
-  too_high: 'danger',
-  too_low: 'neutral',
-};
 
 const filters = [
   { key: 'category', label: 'All Apparel' },
@@ -38,24 +21,28 @@ const filters = [
   { key: 'location', label: 'Manila, PH' },
 ] as const;
 
-export function MarketplaceView({ onOpenListing, onSell, onFilter }: MarketplaceViewProps) {
+export function MarketplaceView({
+  onOpenListing,
+  onSell,
+  onFilter,
+  onOpenProfile,
+}: MarketplaceViewProps) {
   const [activeFilter, setActiveFilter] = useState<(typeof filters)[number]['key']>('category');
 
   return (
     <Screen clearTabBar>
       <LargeTitle
         title="Market"
+        subtitle="Seller-set prices, checked by the community."
         trailing={
-          <PressableScale accessibilityLabel="Sell an item" onPress={onSell} style={styles.sell}>
-            <Plus size={16} strokeWidth={2.25} color={tokens.color.dark.accent} />
-            <SWText variant="labelSmall" tone="accent">
-              Sell
-            </SWText>
-          </PressableScale>
+          <View style={styles.actions}>
+            <Button label="Sell" variant="secondary" icon={Plus} onPress={onSell} />
+            <ProfileButton onPress={onOpenProfile} />
+          </View>
         }
       />
 
-      <Reveal index={1} style={styles.filters}>
+      <Reveal index={0} style={styles.filters}>
         {filters.map((filter) => {
           const active = filter.key === activeFilter;
           return (
@@ -70,7 +57,7 @@ export function MarketplaceView({ onOpenListing, onSell, onFilter }: Marketplace
               }}
               style={[styles.filter, active ? styles.filterActive : null]}
             >
-              <SWText variant="labelSmall" tone={active ? 'onAccent' : 'textMuted'}>
+              <SWText variant="labelMedium" tone={active ? 'textPrimary' : 'textMuted'}>
                 {filter.label}
               </SWText>
             </PressableScale>
@@ -80,7 +67,7 @@ export function MarketplaceView({ onOpenListing, onSell, onFilter }: Marketplace
 
       <View style={styles.grid}>
         {previewListings.map((listing, index) => (
-          <Reveal key={listing.id} index={index + 2} style={styles.cell}>
+          <Reveal key={listing.id} index={index + 1} style={styles.cell}>
             <ListingCard listing={listing} onPress={() => onOpenListing?.(listing.id)} />
           </Reveal>
         ))}
@@ -89,75 +76,38 @@ export function MarketplaceView({ onOpenListing, onSell, onFilter }: Marketplace
   );
 }
 
-function ListingCard({ listing, onPress }: { listing: PreviewListing; onPress: () => void }) {
-  const verdict = `${listing.verdictShare}% ${voteLabels[listing.verdict]}`;
-
-  return (
-    <PressableScale
-      accessibilityRole="link"
-      accessibilityLabel={`${listing.title}, asking ${formatPeso(listing.askingPrice)}, community says ${verdict}`}
-      onPress={onPress}
-    >
-      <GlassCard>
-        <Photo
-          source={listing.photo}
-          label={listing.photoLabel}
-          aspectRatio={172 / 129}
-          radius={0}
-        />
-        <View style={styles.cardBody}>
-          <SWText variant="priceMedium">{formatPeso(listing.askingPrice)}</SWText>
-          <SWText variant="bodyCompact" numberOfLines={1}>
-            {listing.title}
-          </SWText>
-          <Tag label={verdict} tone={verdictTone[listing.verdict]} />
-        </View>
-      </GlassCard>
-    </PressableScale>
-  );
-}
-
 const styles = StyleSheet.create({
-  sell: {
+  actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: tokens.spacing[1],
-    minHeight: 34,
-    paddingHorizontal: tokens.spacing[3],
-    borderRadius: tokens.radius.full,
-    backgroundColor: tokens.glass.mintFill,
-    borderWidth: tokens.border.hairline,
-    borderColor: tokens.glass.border,
+    gap: tokens.spacing[2],
   },
   filters: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: tokens.spacing[2],
-    marginBottom: tokens.spacing[8],
+    marginBottom: tokens.spacing[6],
   },
   filter: {
-    minHeight: 32,
+    minHeight: tokens.focus.minimumTarget - tokens.spacing[2],
     justifyContent: 'center',
     paddingHorizontal: tokens.spacing[4],
     borderRadius: tokens.radius.full,
-    backgroundColor: tokens.glass.fill,
     borderWidth: tokens.border.hairline,
-    borderColor: tokens.glass.border,
+    borderColor: tokens.color.dark.borderSubtle,
   },
   filterActive: {
-    backgroundColor: tokens.color.dark.accent,
-    borderColor: tokens.color.dark.accent,
+    backgroundColor: tokens.color.dark.surfaceRaised,
+    borderColor: tokens.color.dark.borderStrong,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: tokens.spacing[4],
+    columnGap: tokens.spacing[4],
+    rowGap: tokens.spacing[6],
   },
   cell: {
-    width: '47.6%',
+    flexBasis: '46%',
     flexGrow: 1,
-  },
-  cardBody: {
-    padding: tokens.spacing[3],
-    gap: tokens.spacing[1],
   },
 });
