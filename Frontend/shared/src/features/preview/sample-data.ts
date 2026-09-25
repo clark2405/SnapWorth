@@ -435,3 +435,141 @@ export const previewSearchIndex: readonly PreviewSearchResult[] = [
     amount: item.estimate,
   })),
 ];
+
+/*
+ * Valuation depth, from the competitive review (FlipAI, PriceSnap, Value Scout, StockX,
+ * CardLadder): an estimate is a range with a stated confidence, backed by comparable sales,
+ * adjusted by condition, and tracked over time. All of it is preview data until the pricing
+ * service returns these fields.
+ */
+
+export type PreviewConfidence = 'high' | 'medium' | 'low';
+export type PreviewCondition = 'new' | 'like_new' | 'good' | 'fair';
+
+export const previewConditions: readonly {
+  readonly key: PreviewCondition;
+  readonly label: string;
+  /** Multiplier applied to the good-condition estimate. */
+  readonly factor: number;
+  readonly hint: string;
+}[] = [
+  { key: 'new', label: 'New', factor: 1.28, hint: 'Unworn, tags or box included' },
+  { key: 'like_new', label: 'Like new', factor: 1.12, hint: 'No visible wear' },
+  { key: 'good', label: 'Good', factor: 1, hint: 'Light, honest wear' },
+  { key: 'fair', label: 'Fair', factor: 0.74, hint: 'Marks, fading, or repairs' },
+];
+
+export interface PreviewComparable {
+  readonly id: string;
+  readonly title: string;
+  readonly price: number;
+  readonly soldAgo: string;
+  readonly source: string;
+  readonly photo: ImageSourcePropType;
+  readonly photoLabel: string;
+}
+
+export const previewValuation = {
+  itemId: 'nike-neon-windbreaker',
+  low: 2100,
+  high: 2850,
+  confidence: 'high' as PreviewConfidence,
+  condition: 'like_new' as PreviewCondition,
+  demand: 'High demand',
+  demandDetail: '14 sold in the last 30 days',
+  sellTime: 'Sells in ~6 days',
+  rarity: 'Uncommon colourway',
+  /** Estimated value over the last 12 weeks, oldest first. */
+  trend: [1980, 2020, 2100, 2060, 2150, 2210, 2190, 2280, 2330, 2310, 2400, 2450],
+  trendChange: '+12% in 3 months',
+  comparables: [
+    {
+      id: 'comp-1',
+      title: 'Nike 90s Windbreaker, teal/purple',
+      price: 2600,
+      soldAgo: 'Sold 4 days ago',
+      source: 'Carousell',
+      photo: image.windbreakerTeal,
+      photoLabel: 'Teal 90s Nike windbreaker',
+    },
+    {
+      id: 'comp-2',
+      title: 'Vintage Nike Spellout Shell Jacket',
+      price: 2300,
+      soldAgo: 'Sold 1 week ago',
+      source: 'SnapWorth',
+      photo: image.windbreakerRetro,
+      photoLabel: 'Retro Nike windbreaker',
+    },
+    {
+      id: 'comp-3',
+      title: 'Nike Track Jacket, 1994',
+      price: 2150,
+      soldAgo: 'Sold 2 weeks ago',
+      source: 'Facebook Marketplace',
+      photo: image.pufferBlack,
+      photoLabel: 'Black Nike jacket',
+    },
+  ] satisfies PreviewComparable[],
+} as const;
+
+/** The user's collection: everything they have valued and still own. */
+export const previewPortfolio = {
+  total: 15250,
+  itemCount: 4,
+  change: 1180,
+  changeLabel: '+8.4% this month',
+  series: [12400, 12650, 12900, 12800, 13300, 13550, 13400, 13900, 14300, 14650, 14900, 15250],
+  topMover: { title: 'Vintage Polaroid Sun 600', change: '+₱400' },
+} as const;
+
+export const previewTrending: readonly {
+  readonly key: string;
+  readonly label: string;
+  readonly change: string;
+  readonly photo: ImageSourcePropType;
+}[] = [
+  { key: 'film-cameras', label: 'Film cameras', change: '+18%', photo: image.polaroidCamera },
+  { key: 'sneakers', label: 'Sneakers', change: '+9%', photo: image.jordanBred },
+  { key: '90s-sportswear', label: '90s sportswear', change: '+14%', photo: image.windbreakerTeal },
+  { key: 'retro-audio', label: 'Retro audio', change: '+6%', photo: image.walkman },
+  { key: 'keyboards', label: 'Keyboards', change: '−3%', photo: image.keyboard },
+];
+
+export const previewMarketCategories: readonly { readonly key: string; readonly label: string }[] =
+  [
+    { key: 'all', label: 'All' },
+    { key: 'collectibles', label: 'Collectibles' },
+    { key: 'fashion', label: 'Fashion' },
+    { key: 'sneakers', label: 'Sneakers' },
+    { key: 'electronics', label: 'Electronics' },
+    { key: 'home', label: 'Home' },
+  ];
+
+/** Market context for a listing: its AI range and quick offers a buyer can send. */
+export const previewListingInsight = {
+  listingId: 'polaroid-sun-600',
+  estimateLow: 2300,
+  estimateHigh: 3100,
+  estimate: 2750,
+  confidence: 'medium' as PreviewConfidence,
+  offerSuggestions: [2800, 2950, 3100],
+  watchers: 23,
+} as const;
+
+/** Worthy's canned knowledge for preview mode, keyed by what the question is about. */
+export const previewCompanionReplies = {
+  fairPrice:
+    'Looking at 14 similar sales this month, the fair range is ₱2,300–₱3,100. At ₱3,200 this is a touch above the top of the range — an offer around ₱2,900 is reasonable and likely to be accepted.',
+  listing:
+    'Here is a listing draft. I led with the colourway and the condition, since those are what buyers of vintage Nike search for.',
+  listingDraft: {
+    title: 'Vintage 90s Nike Windbreaker — Teal/Purple, Like New',
+    body: 'Authentic early-90s Nike shell jacket in the teal and purple colourway. Like-new condition: bright colours, working zip, no stains or tears. Size L, fits true to size. Meet-ups in Makati or shipping nationwide.',
+    price: 2650,
+  },
+  trend:
+    'Vintage sportswear has been climbing steadily — up 12% over three months, with film cameras rising even faster. Good time to sell if you have been holding.',
+  fallback:
+    'Good question. From what I can see in recent SnapWorth sales and community votes, here is my read — and I can dig deeper if you snap a photo.',
+} as const;

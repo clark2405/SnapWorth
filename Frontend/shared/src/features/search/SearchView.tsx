@@ -1,20 +1,29 @@
-import { ArrowLeft, Clock, SearchX, X } from 'lucide-react-native';
+import { ArrowLeft, Search, SearchX, X } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { View } from 'react-native';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  LinearTransition,
+  ZoomIn,
+  ZoomOut,
+} from 'react-native-reanimated';
 
 import {
   AskingPriceBadge,
-  Divider,
   EmptyState,
+  GlassSurface,
   EstimateBadge,
-  hideWebFocusOutline,
+  ChoiceChips,
   IconButton,
   Photo,
-  PressableScale,
   Screen,
+  SegmentedControl,
   SWText,
+  TextField,
+  ZoomLink,
 } from '../../components';
-import { tokens } from '../../design';
+import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import {
   formatPeso,
   previewRecentSearches,
@@ -50,7 +59,19 @@ const kindLabel: Record<PreviewSearchResult['kind'], string> = {
   item: 'Your history',
 };
 
+function hrefFor(result: PreviewSearchResult): string {
+  if (result.kind === 'listing') return `/listing/${result.id}`;
+  if (result.kind === 'post') return `/post/${result.id}`;
+  return `/item/${result.id}`;
+}
+
+/**
+ * One field, one scope, and a list that never jumps: results fade and reflow as the query
+ * changes instead of the page flashing, and recent terms are a tap away when the field is empty.
+ */
 export function SearchView({ initialScope = 'all', onBack, onOpenResult }: SearchViewProps) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(stylesFor);
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState<SearchScope>(initialScope);
   const trimmed = query.trim().toLowerCase();
@@ -67,24 +88,26 @@ export function SearchView({ initialScope = 'all', onBack, onOpenResult }: Searc
     [scope, trimmed],
   );
 
+  const scopeLabel = scopes.find((option) => option.key === scope)?.label.toLowerCase();
+
   const header = (
-    <View style={styles.header}>
+    <GlassSurface style={[styles.header, styles.headerGlass]}>
       <View style={styles.searchRow}>
         <IconButton icon={ArrowLeft} label="Go back" onPress={onBack} />
         <View style={styles.field}>
-          <TextInput
+          <TextField
             value={query}
             onChangeText={setQuery}
             autoFocus
-            placeholder={`Search ${scope === 'all' ? 'SnapWorth' : scopes.find((s) => s.key === scope)?.label.toLowerCase()}`}
-            placeholderTextColor={tokens.color.dark.textMuted}
-            selectionColor={tokens.color.dark.accent}
+            placeholder={`Search ${scope === 'all' ? 'SnapWorth' : scopeLabel}`}
             returnKeyType="search"
             autoCapitalize="none"
             accessibilityLabel="Search"
-            style={[styles.input, hideWebFocusOutline]}
+            leading={<Search size={18} strokeWidth={2} color={colors.textMuted} />}
           />
-          {query.length > 0 ? (
+        </View>
+        {query.length > 0 ? (
+          <Animated.View entering={ZoomIn.springify().damping(14)} exiting={ZoomOut.duration(120)}>
             <IconButton
               icon={X}
               label="Clear search"
@@ -92,29 +115,13 @@ export function SearchView({ initialScope = 'all', onBack, onOpenResult }: Searc
               size={18}
               onPress={() => setQuery('')}
             />
-          ) : null}
-        </View>
+          </Animated.View>
+        ) : null}
       </View>
-      <View style={styles.scopes} accessibilityRole="tablist">
-        {scopes.map((option) => {
-          const active = option.key === scope;
-          return (
-            <PressableScale
-              key={option.key}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
-              accessibilityLabel={option.label}
-              onPress={() => setScope(option.key)}
-              style={[styles.scope, active ? styles.scopeActive : null]}
-            >
-              <SWText variant="labelMedium" tone={active ? 'textPrimary' : 'textMuted'}>
-                {option.label}
-              </SWText>
-            </PressableScale>
-          );
-        })}
+      <View style={styles.scopes}>
+        <SegmentedControl options={scopes} value={scope} onChange={setScope} />
       </View>
-    </View>
+    </GlassSurface>
   );
 
   return (
@@ -124,17 +131,11 @@ export function SearchView({ initialScope = 'all', onBack, onOpenResult }: Searc
           <SWText variant="overline" tone="textMuted" accessibilityRole="header">
             Recent
           </SWText>
-          {previewRecentSearches.map((recent) => (
-            <PressableScale
-              key={recent}
-              accessibilityLabel={`Search for ${recent}`}
-              onPress={() => setQuery(recent)}
-              style={({ pressed }) => [styles.recentRow, pressed ? styles.pressed : null]}
-            >
-              <Clock size={18} strokeWidth={1.75} color={tokens.color.dark.textMuted} />
-              <SWText variant="bodyMedium">{recent}</SWText>
-            </PressableScale>
-          ))}
+          <ChoiceChips
+            options={previewRecentSearches.map((term) => ({ key: term, label: term }))}
+            value={null}
+            onChange={setQuery}
+          />
         </View>
       ) : results.length === 0 ? (
         <EmptyState
@@ -158,49 +159,60 @@ export function SearchView({ initialScope = 'all', onBack, onOpenResult }: Searc
           >
             {`${results.length} ${results.length === 1 ? 'result' : 'results'}`}
           </SWText>
-          {results.map((result, index) => (
-            <View key={`${result.kind}-${result.id}`}>
-              {index > 0 ? <Divider /> : null}
-              <PressableScale
-                accessibilityRole="link"
-                accessibilityLabel={`${kindLabel[result.kind]}: ${result.title}`}
-                onPress={() => onOpenResult?.({ kind: result.kind, id: result.id })}
-                style={({ pressed }) => [styles.result, pressed ? styles.pressed : null]}
+          <View style={styles.results}>
+            {results.map((result) => (
+              <Animated.View
+                key={`${result.kind}-${result.id}`}
+                entering={FadeIn.duration(220)}
+                exiting={FadeOut.duration(160)}
+                layout={LinearTransition.springify().damping(20)}
               >
-                <Photo
-                  source={result.photo}
-                  label={result.photoLabel}
-                  radius={tokens.radius.medium}
-                  style={styles.thumb}
-                />
-                <View style={styles.resultText}>
-                  <SWText variant="overline" tone="textMuted">
-                    {kindLabel[result.kind]}
-                  </SWText>
-                  <SWText variant="headingSmall" numberOfLines={2}>
-                    {result.title}
-                  </SWText>
-                  {result.kind === 'listing' ? (
-                    <AskingPriceBadge value={formatPeso(result.amount)} size="compact" />
-                  ) : (
-                    <EstimateBadge value={formatPeso(result.amount)} />
-                  )}
-                </View>
-              </PressableScale>
-            </View>
-          ))}
+                <ZoomLink
+                  href={hrefFor(result)}
+                  label={`${kindLabel[result.kind]}: ${result.title}`}
+                  onPress={() => onOpenResult?.({ kind: result.kind, id: result.id })}
+                  style={styles.result}
+                >
+                  <Photo
+                    source={result.photo}
+                    label={result.photoLabel}
+                    radius={tokens.radius.medium}
+                    style={styles.thumb}
+                  />
+                  <View style={styles.resultText}>
+                    <SWText variant="overline" tone="textMuted">
+                      {kindLabel[result.kind]}
+                    </SWText>
+                    <SWText variant="headingSmall" numberOfLines={2}>
+                      {result.title}
+                    </SWText>
+                    {result.kind === 'listing' ? (
+                      <AskingPriceBadge value={formatPeso(result.amount)} size="compact" />
+                    ) : (
+                      <EstimateBadge value={formatPeso(result.amount)} />
+                    )}
+                  </View>
+                </ZoomLink>
+              </Animated.View>
+            ))}
+          </View>
         </View>
       )}
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
+const stylesFor = themedStyles(() => ({
   header: {
     gap: tokens.spacing[3],
     paddingBottom: tokens.spacing[3],
-    borderBottomWidth: tokens.border.hairline,
-    borderBottomColor: tokens.color.dark.borderSubtle,
+  },
+  headerGlass: {
+    borderWidth: 0,
+  },
+  scopes: {
+    paddingHorizontal: tokens.layout.pageGutterCompact,
+    paddingBottom: tokens.spacing[3],
   },
   searchRow: {
     flexDirection: 'row',
@@ -212,63 +224,23 @@ const styles = StyleSheet.create({
   },
   field: {
     flex: 1,
-    minHeight: tokens.layout.inputHeight,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: tokens.spacing[4],
-    borderRadius: tokens.radius.medium,
-    borderWidth: tokens.border.hairline,
-    borderColor: tokens.color.dark.borderStrong,
-    backgroundColor: tokens.color.dark.sunken,
-  },
-  input: {
-    flex: 1,
-    alignSelf: 'stretch',
-    color: tokens.color.dark.textPrimary,
-    fontFamily: tokens.typography.family.bodyRegular,
-    fontSize: tokens.typography.style.bodyMedium.size,
-  },
-  scopes: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: tokens.spacing[2],
-    paddingHorizontal: tokens.layout.pageGutterCompact,
-  },
-  scope: {
-    minHeight: tokens.focus.minimumTarget - tokens.spacing[2],
-    justifyContent: 'center',
-    paddingHorizontal: tokens.spacing[4],
-    borderRadius: tokens.radius.full,
-    borderWidth: tokens.border.hairline,
-    borderColor: tokens.color.dark.borderSubtle,
-  },
-  scopeActive: {
-    backgroundColor: tokens.color.dark.surfaceRaised,
-    borderColor: tokens.color.dark.borderStrong,
   },
   content: {
     paddingTop: tokens.spacing[4],
   },
   recent: {
-    gap: tokens.spacing[1],
-  },
-  recentRow: {
-    minHeight: tokens.layout.controlHeight,
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: tokens.spacing[3],
-    borderRadius: tokens.radius.medium,
-  },
-  pressed: {
-    backgroundColor: tokens.color.dark.surface,
   },
   count: {
     marginBottom: tokens.spacing[2],
   },
+  results: {
+    gap: tokens.spacing[2],
+  },
   result: {
     flexDirection: 'row',
     gap: tokens.spacing[4],
-    paddingVertical: tokens.spacing[4],
+    paddingVertical: tokens.spacing[3],
     borderRadius: tokens.radius.medium,
   },
   thumb: {
@@ -279,4 +251,4 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: tokens.spacing[2],
   },
-});
+}));

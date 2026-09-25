@@ -11,6 +11,8 @@ export default function LoginRoute() {
     <LoginView
       onSubmit={() => router.replace('/feed')}
       onForgotPassword={() => router.push('/reset-password')}
+      onContinueWithApple={() => router.replace('/feed')}
+      onContinueWithGoogle={() => router.replace('/feed')}
     />
   );
 }

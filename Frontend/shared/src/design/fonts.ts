@@ -1,41 +1,38 @@
 import { tokens } from './tokens';
 
-export const snapWorthFontFaces = Object.freeze([
-  tokens.typography.family.displayBold,
-  tokens.typography.family.displayMedium,
-  tokens.typography.family.bodyRegular,
-  tokens.typography.family.bodyMedium,
-  tokens.typography.family.bodySemibold,
-] as const);
+export type SnapWorthFontFamily = keyof typeof tokens.typography.family;
+export type FontPlatform = 'ios' | 'android' | 'web' | (string & {});
 
-export type SnapWorthFontFace = (typeof snapWorthFontFaces)[number];
-export type FontAsset = number | string | Readonly<{ uri: string }>;
-export type SnapWorthFontAssets = Readonly<Record<SnapWorthFontFace, FontAsset>>;
+/**
+ * SnapWorth ships no bundled faces: it speaks in the platform's own type. On Apple platforms
+ * that is SF Pro, with New York as the editorial serif and SF Rounded for the companion.
+ * Android falls back to Roboto and its serif; the web uses the same system stacks.
+ */
+const platformFamilies: Record<
+  SnapWorthFontFamily,
+  { ios?: string; android?: string; web: string }
+> = {
+  sans: { web: tokens.typography.webFamily.sans },
+  serif: { ios: 'ui-serif', android: 'serif', web: tokens.typography.webFamily.serif },
+  rounded: { ios: 'ui-rounded', web: tokens.typography.webFamily.rounded },
+};
 
-export interface FontLoader {
-  loadAsync(assets: SnapWorthFontAssets): Promise<void>;
+/** `undefined` means "the platform default", which is the system face everywhere but web. */
+export function resolveFontFamily(
+  family: SnapWorthFontFamily,
+  platform: FontPlatform,
+): string | undefined {
+  const entry = platformFamilies[family];
+  if (platform === 'web') return entry.web;
+  if (platform === 'ios' || platform === 'macos') return entry.ios;
+  return entry.android;
 }
 
-export type FontLoadState =
-  | { readonly status: 'idle' }
-  | { readonly status: 'loading' }
-  | { readonly status: 'ready' }
-  | { readonly status: 'error'; readonly cause: unknown };
-
-export interface SnapWorthFontContract {
-  readonly requiredFaces: readonly SnapWorthFontFace[];
-  readonly displayFamily: SnapWorthFontFace;
-  readonly monetaryFamily: SnapWorthFontFace;
-  readonly bodyFamily: SnapWorthFontFace;
-  readonly maxFontSizeMultiplier: typeof tokens.typography.maxFontSizeMultiplier;
-  readonly allowFontScaling: true;
-}
-
-export const snapWorthFontContract: SnapWorthFontContract = Object.freeze({
-  requiredFaces: snapWorthFontFaces,
-  displayFamily: tokens.typography.family.displayBold,
-  monetaryFamily: tokens.typography.family.displayBold,
-  bodyFamily: tokens.typography.family.bodyRegular,
+export const snapWorthFontContract = Object.freeze({
+  displayFamily: tokens.typography.family.serif,
+  monetaryFamily: tokens.typography.family.sans,
+  bodyFamily: tokens.typography.family.sans,
+  companionFamily: tokens.typography.family.rounded,
   maxFontSizeMultiplier: tokens.typography.maxFontSizeMultiplier,
   allowFontScaling: true,
-});
+} as const);

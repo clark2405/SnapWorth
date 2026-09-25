@@ -1,6 +1,7 @@
 import { Check, ShieldCheck, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
+import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import {
   Avatar,
@@ -12,8 +13,9 @@ import {
   Screen,
   Surface,
   SWText,
+  useToast,
 } from '../../components';
-import { tokens } from '../../design';
+import { themedStyles, tokens, useThemedStyles } from '../../design';
 import { previewHeldContent, type PreviewHeldContent } from '../preview/sample-data';
 
 export type ModerationDecision = 'approve' | 'remove';
@@ -24,17 +26,19 @@ export interface AdminReviewViewProps {
 }
 
 export function AdminReviewView({ onBack, onDecide }: AdminReviewViewProps) {
+  const styles = useThemedStyles(stylesFor);
+  const toast = useToast();
   const [queue, setQueue] = useState<readonly PreviewHeldContent[]>(previewHeldContent);
-  const [announcement, setAnnouncement] = useState('');
 
   const decide = (content: PreviewHeldContent, decision: ModerationDecision) => {
     onDecide?.(content.id, decision);
     setQueue((current) => current.filter((entry) => entry.id !== content.id));
-    setAnnouncement(
-      `${content.kind === 'post' ? 'Post' : 'Comment'} by ${content.author.handle} ${
-        decision === 'approve' ? 'approved and published' : 'removed'
-      }.`,
-    );
+    toast.show({
+      title: decision === 'approve' ? 'Approved' : 'Removed',
+      body: `${content.kind === 'post' ? 'Post' : 'Comment'} by @${content.author.handle} ${
+        decision === 'approve' ? 'is now public.' : 'was removed.'
+      }`,
+    });
   };
 
   return (
@@ -42,17 +46,14 @@ export function AdminReviewView({ onBack, onDecide }: AdminReviewViewProps) {
       header={<NavHeader title="Review queue" onBack={onBack} />}
       contentStyle={styles.content}
     >
-      <View style={styles.summary}>
+      <Reveal index={0} style={styles.summary}>
         <SWText variant="displayTitle" accessibilityRole="header">
           {queue.length === 0 ? 'All clear.' : `${queue.length} held`}
         </SWText>
         <SWText variant="bodySmall" tone="textMuted">
           Most reported first. Nothing here is public until you approve it.
         </SWText>
-        <SWText variant="caption" tone="textSecondary" accessibilityLiveRegion="polite">
-          {announcement}
-        </SWText>
-      </View>
+      </Reveal>
 
       {queue.length === 0 ? (
         <EmptyState
@@ -62,9 +63,15 @@ export function AdminReviewView({ onBack, onDecide }: AdminReviewViewProps) {
         />
       ) : (
         queue.map((content, index) => (
-          <Reveal key={content.id} index={index}>
-            <HeldCard content={content} onDecide={(decision) => decide(content, decision)} />
-          </Reveal>
+          <Animated.View
+            key={content.id}
+            exiting={FadeOut.duration(220)}
+            layout={LinearTransition.springify().damping(20)}
+          >
+            <Reveal index={index + 1}>
+              <HeldCard content={content} onDecide={(decision) => decide(content, decision)} />
+            </Reveal>
+          </Animated.View>
         ))
       )}
     </Screen>
@@ -78,6 +85,7 @@ function HeldCard({
   content: PreviewHeldContent;
   onDecide: (decision: ModerationDecision) => void;
 }) {
+  const styles = useThemedStyles(stylesFor);
   return (
     <Surface padding={tokens.spacing[4]} contentStyle={styles.card}>
       <View style={styles.meta}>
@@ -113,7 +121,7 @@ function HeldCard({
         />
         <Button
           label="Approve"
-          variant="secondary"
+          variant="primary"
           icon={Check}
           onPress={() => onDecide('approve')}
           containerStyle={styles.action}
@@ -123,7 +131,7 @@ function HeldCard({
   );
 }
 
-const styles = StyleSheet.create({
+const stylesFor = themedStyles(() => ({
   content: {
     paddingTop: tokens.spacing[4],
     gap: tokens.spacing[4],
@@ -153,4 +161,4 @@ const styles = StyleSheet.create({
   action: {
     flex: 1,
   },
-});
+}));

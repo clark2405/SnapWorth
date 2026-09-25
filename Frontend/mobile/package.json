@@ -6,25 +6,33 @@
   "main": "expo-router/entry",
   "scripts": {
     "dev": "expo start",
-    "ios": "expo start --ios",
-    "android": "expo start --android",
+    "ios": "expo run:ios",
+    "android": "expo run:android",
     "typecheck": "tsc --project ./tsconfig.json --noEmit",
     "build": "expo export --platform ios --output-dir dist/ios && expo export --platform android --output-dir dist/android"
   },
   "dependencies": {
-    "@expo-google-fonts/inter": "0.4.2",
-    "@expo-google-fonts/space-grotesk": "0.4.1",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "@snapworth/shared": "0.0.0",
     "expo": "57.0.23",
+    "expo-blur": "57.0.3",
     "expo-constants": "57.0.18",
+    "expo-glass-effect": "57.0.4",
+    "expo-haptics": "57.0.3",
     "expo-linking": "57.0.10",
     "expo-router": "57.0.21",
+    "expo-splash-screen": "57.0.9",
     "expo-status-bar": "57.0.1",
+    "expo-symbols": "57.0.3",
+    "expo-system-ui": "57.0.4",
     "lucide-react-native": "1.47.0",
     "react": "19.2.3",
     "react-native": "0.86.3",
+    "react-native-gesture-handler": "2.32.0",
+    "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "5.7.0",
     "react-native-screens": "4.26.2",
-    "react-native-svg": "15.15.4"
+    "react-native-svg": "15.15.4",
+    "react-native-worklets": "0.10.1"
   }
 }

@@ -49,11 +49,9 @@ export const snapWorthNativeWindPreset = {
     extend: {
       colors: colorTheme,
       fontFamily: {
-        display: [tokens.typography.family.displayBold],
-        'display-medium': [tokens.typography.family.displayMedium],
-        body: [tokens.typography.family.bodyRegular],
-        'body-medium': [tokens.typography.family.bodyMedium],
-        'body-semibold': [tokens.typography.family.bodySemibold],
+        display: [tokens.typography.webFamily.serif],
+        body: [tokens.typography.webFamily.sans],
+        rounded: [tokens.typography.webFamily.rounded],
       },
       fontSize: Object.fromEntries(
         Object.entries(typography).map(([name, style]) => [

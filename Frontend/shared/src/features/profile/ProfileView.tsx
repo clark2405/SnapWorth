@@ -2,31 +2,43 @@ import {
   Bell,
   ChevronRight,
   CircleHelp,
-  FileText,
   LogOut,
   ShieldAlert,
-  ShieldCheck,
-  UserPen,
-  type LucideIcon,
+  TrendingDown,
 } from 'lucide-react-native';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import {
   Avatar,
-  Button,
-  Divider,
+  CountUp,
+  ListGroup,
+  ListRow,
   NavHeader,
   PressableScale,
   Reveal,
   Screen,
+  SegmentedControl,
+  Sparkline,
   Surface,
   SWText,
+  Tag,
 } from '../../components';
-import { tokens } from '../../design';
-import { previewHeldContent, previewProfile } from '../preview/sample-data';
+import {
+  themedStyles,
+  tokens,
+  useTheme,
+  useThemedStyles,
+  type ThemePreference,
+} from '../../design';
+import {
+  formatPeso,
+  previewHeldContent,
+  previewPortfolio,
+  previewProfile,
+} from '../preview/sample-data';
 
 export type ProfileDestination =
-  'edit-profile' | 'notifications' | 'privacy' | 'moderation' | 'help' | 'terms';
+  'edit-profile' | 'notifications' | 'price-alerts' | 'privacy' | 'moderation' | 'help' | 'terms';
 
 export interface ProfileViewProps {
   readonly onBack?: () => void;
@@ -34,57 +46,47 @@ export interface ProfileViewProps {
   readonly onLogOut?: () => void;
 }
 
-interface Row {
-  readonly key: ProfileDestination;
-  readonly label: string;
-  readonly icon: LucideIcon;
-  readonly value?: string;
-}
-
-const accountRows: readonly Row[] = [
-  { key: 'edit-profile', label: 'Edit profile', icon: UserPen },
-  { key: 'notifications', label: 'Notifications', icon: Bell },
-  { key: 'privacy', label: 'Privacy and blocked users', icon: ShieldCheck },
-];
-
-const supportRows: readonly Row[] = [
-  { key: 'help', label: 'Help and feedback', icon: CircleHelp },
-  { key: 'terms', label: 'Terms and privacy policy', icon: FileText },
+const appearanceOptions: readonly { readonly key: ThemePreference; readonly label: string }[] = [
+  { key: 'system', label: 'System' },
+  { key: 'light', label: 'Light' },
+  { key: 'dark', label: 'Dark' },
 ];
 
 export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
+  const { colors, preference, setPreference } = useTheme();
+  const styles = useThemedStyles(stylesFor);
   const profile = previewProfile;
   const stats = [
     { label: 'Checked', value: profile.stats.checked },
     { label: 'Listed', value: profile.stats.listed },
     { label: 'Sold', value: profile.stats.sold },
   ];
-  const moderationRows: readonly Row[] = profile.isAdmin
-    ? [
-        {
-          key: 'moderation',
-          label: 'Review held content',
-          icon: ShieldAlert,
-          value: String(previewHeldContent.length),
-        },
-      ]
-    : [];
 
   return (
     <Screen header={<NavHeader title="Profile" onBack={onBack} />} contentStyle={styles.content}>
-      <Reveal index={0} style={styles.identity}>
-        <Avatar source={profile.user.avatar} name={profile.user.handle} size={72} />
-        <View style={styles.identityText}>
-          <SWText variant="headingLarge" accessibilityRole="header">
-            {profile.displayName}
-          </SWText>
-          <SWText variant="bodySmall" tone="textSecondary">
-            @{profile.user.handle} · ★ {profile.rating}
-          </SWText>
-          <SWText variant="caption" tone="textMuted">
-            {profile.location} · {profile.joined}
-          </SWText>
-        </View>
+      <Reveal index={0}>
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel="Edit profile"
+          haptic="select"
+          depth="surface"
+          onPress={() => onOpen?.('edit-profile')}
+          style={styles.identity}
+        >
+          <Avatar source={profile.user.avatar} name={profile.user.handle} size={72} ring />
+          <View style={styles.identityText}>
+            <SWText variant="displayTitle" accessibilityRole="header">
+              {profile.displayName}
+            </SWText>
+            <SWText variant="bodySmall" tone="textSecondary">
+              @{profile.user.handle} · ★ {profile.rating}
+            </SWText>
+            <SWText variant="caption" tone="textMuted">
+              {profile.location} · {profile.joined}
+            </SWText>
+          </View>
+          <ChevronRight size={18} strokeWidth={2} color={colors.textMuted} />
+        </PressableScale>
       </Reveal>
 
       <Reveal index={1} style={styles.stats}>
@@ -95,7 +97,11 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
             accessibilityLabel={`${stat.value} ${stat.label.toLowerCase()}`}
             style={[styles.stat, index > 0 ? styles.statRule : null]}
           >
-            <SWText variant="priceLarge">{String(stat.value)}</SWText>
+            <CountUp
+              value={stat.value}
+              format={(value) => String(Math.round(value))}
+              variant="priceLarge"
+            />
             <SWText variant="overline" tone="textMuted">
               {stat.label}
             </SWText>
@@ -103,66 +109,57 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
         ))}
       </Reveal>
 
-      <Reveal index={2} style={styles.sections}>
-        <Section title="Account" rows={accountRows} onOpen={onOpen} />
-        {moderationRows.length > 0 ? (
-          <Section title="Moderation" rows={moderationRows} onOpen={onOpen} />
-        ) : null}
-        <Section title="Support" rows={supportRows} onOpen={onOpen} />
-        <Button label="Log out" variant="secondary" icon={LogOut} onPress={onLogOut} />
+      <Reveal index={2}>
+        <Surface padding={tokens.spacing[4]} contentStyle={styles.collectionCard}>
+          <View style={styles.collectionHeader}>
+            <SWText variant="overline" tone="textMuted">
+              Collection value
+            </SWText>
+            <Tag label={previewPortfolio.changeLabel} tone="success" />
+          </View>
+          <CountUp value={previewPortfolio.total} format={formatPeso} variant="priceLarge" />
+          <Sparkline values={previewPortfolio.series} height={56} />
+        </Surface>
+      </Reveal>
+
+      <Reveal index={3} style={styles.sections}>
+        <ListGroup title="Appearance">
+          <View style={styles.appearanceRow}>
+            <SegmentedControl
+              options={appearanceOptions}
+              value={preference}
+              onChange={setPreference}
+            />
+          </View>
+        </ListGroup>
+
+        <ListGroup title="Settings">
+          <ListRow label="Notifications" icon={Bell} onPress={() => onOpen?.('notifications')} />
+          <ListRow
+            label="Price alerts"
+            icon={TrendingDown}
+            onPress={() => onOpen?.('price-alerts')}
+          />
+          {profile.isAdmin ? (
+            <ListRow
+              label="Moderation"
+              icon={ShieldAlert}
+              value={String(previewHeldContent.length)}
+              onPress={() => onOpen?.('moderation')}
+            />
+          ) : null}
+          <ListRow label="Help" icon={CircleHelp} onPress={() => onOpen?.('help')} />
+        </ListGroup>
+
+        <ListGroup>
+          <ListRow label="Log out" icon={LogOut} destructive onPress={onLogOut} />
+        </ListGroup>
       </Reveal>
     </Screen>
   );
 }
 
-function Section({
-  title,
-  rows,
-  onOpen,
-}: {
-  title: string;
-  rows: readonly Row[];
-  onOpen?: (destination: ProfileDestination) => void;
-}) {
-  return (
-    <View style={styles.section}>
-      <SWText variant="overline" tone="textMuted" accessibilityRole="header">
-        {title}
-      </SWText>
-      <Surface>
-        {rows.map((row, index) => {
-          const Icon = row.icon;
-          return (
-            <View key={row.key}>
-              {index > 0 ? <Divider style={styles.rowDivider} /> : null}
-              <PressableScale
-                accessibilityRole="link"
-                accessibilityLabel={row.value ? `${row.label}, ${row.value}` : row.label}
-                onPress={() => onOpen?.(row.key)}
-                style={({ pressed }) => [styles.row, pressed ? styles.rowPressed : null]}
-              >
-                <Icon size={20} strokeWidth={1.75} color={tokens.color.dark.textSecondary} />
-                <SWText variant="bodyMedium" style={styles.rowLabel}>
-                  {row.label}
-                </SWText>
-                {row.value ? (
-                  <View style={styles.count}>
-                    <SWText variant="labelSmall" tone="warning">
-                      {row.value}
-                    </SWText>
-                  </View>
-                ) : null}
-                <ChevronRight size={18} strokeWidth={2} color={tokens.color.dark.textMuted} />
-              </PressableScale>
-            </View>
-          );
-        })}
-      </Surface>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
+const stylesFor = themedStyles((colors) => ({
   content: {
     paddingTop: tokens.spacing[4],
     gap: tokens.spacing[8],
@@ -181,7 +178,7 @@ const styles = StyleSheet.create({
     paddingVertical: tokens.spacing[4],
     borderTopWidth: tokens.border.hairline,
     borderBottomWidth: tokens.border.hairline,
-    borderColor: tokens.color.dark.borderSubtle,
+    borderColor: colors.borderSubtle,
   },
   stat: {
     flex: 1,
@@ -190,35 +187,21 @@ const styles = StyleSheet.create({
   },
   statRule: {
     borderLeftWidth: tokens.border.hairline,
-    borderLeftColor: tokens.color.dark.borderSubtle,
+    borderLeftColor: colors.borderSubtle,
+  },
+  collectionCard: {
+    gap: tokens.spacing[3],
+  },
+  collectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   sections: {
     gap: tokens.spacing[6],
   },
-  section: {
-    gap: tokens.spacing[2],
-  },
-  row: {
-    minHeight: tokens.layout.controlHeight,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.spacing[3],
+  appearanceRow: {
     paddingHorizontal: tokens.spacing[4],
     paddingVertical: tokens.spacing[3],
   },
-  rowPressed: {
-    backgroundColor: tokens.color.dark.surfaceRaised,
-  },
-  rowLabel: {
-    flex: 1,
-  },
-  rowDivider: {
-    marginLeft: tokens.spacing[4] + tokens.spacing[5] + tokens.spacing[3],
-  },
-  count: {
-    paddingHorizontal: tokens.spacing[2],
-    borderRadius: tokens.radius.full,
-    borderWidth: tokens.border.hairline,
-    borderColor: tokens.color.dark.warning,
-  },
-});
+}));

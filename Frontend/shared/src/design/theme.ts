@@ -52,6 +52,15 @@ export const contrastPairings = Object.freeze<readonly ContrastPairing[]>([
   { foreground: 'focusRing', background: 'surface', classification: 'ui-boundary' },
   { foreground: 'interactiveBoundary', background: 'canvas', classification: 'ui-boundary' },
   { foreground: 'interactiveBoundary', background: 'surface', classification: 'ui-boundary' },
+  { foreground: 'onInverse', background: 'inverse', classification: 'normal-text' },
+  { foreground: 'onInverse', background: 'inversePressed', classification: 'normal-text' },
+  { foreground: 'accent', background: 'canvas', classification: 'normal-text' },
+  { foreground: 'accent', background: 'surface', classification: 'normal-text' },
+  { foreground: 'accent', background: 'accentSoft', classification: 'normal-text' },
+  { foreground: 'textPrimary', background: 'accentSoft', classification: 'normal-text' },
+  { foreground: 'textSecondary', background: 'sunken', classification: 'normal-text' },
+  { foreground: 'success', background: 'surface', classification: 'ui-boundary' },
+  { foreground: 'danger', background: 'surface', classification: 'normal-text' },
 ]);
 
 function toKebabCase(value: string): string {
@@ -79,7 +88,7 @@ export const nativeWindColorReferences = Object.freeze(
   ) as Record<SemanticColorName, string>,
 );
 
-// SnapWorth ships dark only for now: every preference resolves to the dark theme.
+// `system` follows the device appearance; an explicit preference always wins.
 export function resolveThemeName(
   preference: ThemePreference,
   systemTheme: ThemeName = 'dark',

@@ -1,19 +1,21 @@
-import { useState } from 'react';
-import { StyleSheet, TextInput } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { TextInput } from 'react-native';
 
 import {
   BottomBar,
   Button,
   EstimateBadge,
   Field,
-  hideWebFocusOutline,
   NavHeader,
   Photo,
   Reveal,
   Screen,
   SWText,
+  hideWebFocusOutline,
+  typeStyle,
+  useToast,
 } from '../../components';
-import { tokens } from '../../design';
+import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import { formatPeso, previewItem } from '../preview/sample-data';
 
 export interface CreatePostViewProps {
@@ -23,31 +25,49 @@ export interface CreatePostViewProps {
 }
 
 const maxLength = 280;
+const publishDelayMs = 900;
 
 /**
  * Asking the community about an estimate. The estimate travels with the post exactly as it was
- * given, so voters judge the AI's number, not a number the author edited.
+ * given, so voters judge the AI's number, not a number the author edited. Publishing pulses
+ * briefly, then hands off with a toast so the moment reads as landed, not just dismissed.
  */
 export function CreatePostView({ onBack, onPublish }: CreatePostViewProps) {
   const item = previewItem;
+  const { colors } = useTheme();
+  const styles = useThemedStyles(stylesFor);
+  const toast = useToast();
   const [question, setQuestion] = useState(
     `Is ${formatPeso(item.estimate)} right for this ${item.title.toLowerCase()}?`,
   );
+  const [publishing, setPublishing] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const trimmed = question.trim();
   const canPost = trimmed.length > 0 && trimmed.length <= maxLength;
 
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+
+  const publish = () => {
+    if (!canPost || publishing) return;
+    setPublishing(true);
+    timer.current = setTimeout(() => {
+      setPublishing(false);
+      toast.show({ title: 'Posted to the feed' });
+      onPublish?.(trimmed);
+    }, publishDelayMs);
+  };
+
   return (
     <Screen
-      header={<NavHeader title="Ask the feed" onBack={onBack} />}
+      header={<NavHeader title="Ask the community" onBack={onBack} banded />}
       footer={
         <BottomBar style={styles.footer}>
-          <Button
-            label="Post to feed"
-            disabled={!canPost}
-            onPress={() => {
-              if (canPost) onPublish?.(trimmed);
-            }}
-          />
+          <Button label="Post to feed" disabled={!canPost} loading={publishing} onPress={publish} />
           <SWText variant="caption" tone="textMuted" align="center">
             Posts are public. The community votes Too High, Just Right, or Too Low.
           </SWText>
@@ -75,10 +95,15 @@ export function CreatePostView({ onBack, onPublish }: CreatePostViewProps) {
             onChangeText={setQuestion}
             multiline
             maxLength={maxLength}
-            placeholderTextColor={tokens.color.dark.textMuted}
-            selectionColor={tokens.color.dark.accent}
+            placeholderTextColor={colors.textMuted}
+            selectionColor={colors.accent}
             accessibilityLabel="Your question for the community"
-            style={[styles.input, hideWebFocusOutline]}
+            style={[
+              styles.input,
+              typeStyle('bodyLarge'),
+              { color: colors.textPrimary, lineHeight: undefined },
+              hideWebFocusOutline,
+            ]}
           />
         </Field>
       </Reveal>
@@ -86,7 +111,7 @@ export function CreatePostView({ onBack, onPublish }: CreatePostViewProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const stylesFor = themedStyles((colors) => ({
   content: {
     paddingTop: tokens.spacing[2],
     gap: tokens.spacing[6],
@@ -99,12 +124,8 @@ const styles = StyleSheet.create({
     padding: tokens.spacing[4],
     borderRadius: tokens.radius.medium,
     borderWidth: tokens.border.hairline,
-    borderColor: tokens.color.dark.borderStrong,
-    backgroundColor: tokens.color.dark.sunken,
-    color: tokens.color.dark.textPrimary,
-    fontFamily: tokens.typography.family.bodyRegular,
-    fontSize: tokens.typography.style.bodyLarge.size,
-    lineHeight: tokens.typography.style.bodyLarge.lineHeight,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.sunken,
     textAlignVertical: 'top',
   },
   footer: {
@@ -112,4 +133,4 @@ const styles = StyleSheet.create({
     paddingVertical: tokens.spacing[4],
     gap: tokens.spacing[3],
   },
-});
+}));

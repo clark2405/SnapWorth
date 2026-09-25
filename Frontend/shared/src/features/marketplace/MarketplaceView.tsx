@@ -1,10 +1,28 @@
-import { Plus } from 'lucide-react-native';
+import { Camera, PackageSearch } from 'lucide-react-native';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
+import Animated, { FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
 
-import { Button, LargeTitle, PressableScale, Reveal, Screen, SWText } from '../../components';
-import { tokens } from '../../design';
-import { previewListings } from '../preview/sample-data';
+import {
+  AskingPriceBadge,
+  Button,
+  ChoiceChips,
+  EmptyState,
+  EstimateBadge,
+  LargeTitle,
+  Photo,
+  Reveal,
+  Screen,
+  SWText,
+  ZoomLink,
+} from '../../components';
+import { themedStyles, tokens, useThemedStyles } from '../../design';
+import {
+  formatPeso,
+  previewListings,
+  previewMarketCategories,
+  type PreviewListing,
+} from '../preview/sample-data';
 import { ProfileButton } from '../profile/ProfileButton';
 import { ListingCard } from './ListingCard';
 
@@ -15,11 +33,20 @@ export interface MarketplaceViewProps {
   readonly onOpenProfile?: () => void;
 }
 
-const filters = [
-  { key: 'category', label: 'All Apparel' },
-  { key: 'price', label: '₱0 - ₱5,000' },
-  { key: 'location', label: 'Manila, PH' },
-] as const;
+// Preview-only: listings don't carry a category field yet, so map them locally against
+// `previewMarketCategories` until that field exists on the real listing.
+const categoryByListing: Readonly<Record<string, string>> = {
+  'polaroid-sun-600': 'collectibles',
+  'air-jordan-1-bred': 'sneakers',
+  'retro-walkman': 'electronics',
+  'keychron-keyboard': 'electronics',
+};
+
+/** A rough read on whether a listing sits under its likely fair value, from its community verdict. */
+function impliedEstimate(listing: PreviewListing): number {
+  const factor = listing.verdict === 'too_low' ? 1.18 : listing.verdict === 'too_high' ? 0.82 : 1;
+  return Math.round((listing.askingPrice * factor) / 10) * 10;
+}
 
 export function MarketplaceView({
   onOpenListing,
@@ -27,78 +54,164 @@ export function MarketplaceView({
   onFilter,
   onOpenProfile,
 }: MarketplaceViewProps) {
-  const [activeFilter, setActiveFilter] = useState<(typeof filters)[number]['key']>('category');
+  const styles = useThemedStyles(stylesFor);
+  const [category, setCategory] = useState('all');
+
+  const filtered =
+    category === 'all'
+      ? previewListings
+      : previewListings.filter((listing) => categoryByListing[listing.id] === category);
+
+  const underEstimate = previewListings
+    .filter((listing) => listing.verdict === 'too_low')
+    .slice(0, 2);
 
   return (
-    <Screen clearTabBar>
+    <Screen
+      clearTabBar
+      ambient="value"
+      onRefresh={() => new Promise<void>((resolve) => setTimeout(resolve, 900))}
+    >
       <LargeTitle
         title="Market"
         subtitle="Seller-set prices, checked by the community."
         trailing={
           <View style={styles.actions}>
-            <Button label="Sell" variant="secondary" icon={Plus} onPress={onSell} />
+            <Button label="Sell" size="small" variant="accent" icon={Camera} onPress={onSell} />
             <ProfileButton onPress={onOpenProfile} />
           </View>
         }
       />
 
       <Reveal index={0} style={styles.filters}>
-        {filters.map((filter) => {
-          const active = filter.key === activeFilter;
-          return (
-            <PressableScale
-              key={filter.key}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              accessibilityLabel={`Filter: ${filter.label}`}
-              onPress={() => {
-                setActiveFilter(filter.key);
-                onFilter?.(filter.key);
-              }}
-              style={[styles.filter, active ? styles.filterActive : null]}
-            >
-              <SWText variant="labelMedium" tone={active ? 'textPrimary' : 'textMuted'}>
-                {filter.label}
-              </SWText>
-            </PressableScale>
-          );
-        })}
+        <ChoiceChips
+          options={previewMarketCategories}
+          value={category}
+          scroll
+          onChange={(key) => {
+            setCategory(key);
+            onFilter?.('category');
+          }}
+        />
       </Reveal>
 
-      <View style={styles.grid}>
-        {previewListings.map((listing, index) => (
-          <Reveal key={listing.id} index={index + 1} style={styles.cell}>
-            <ListingCard listing={listing} onPress={() => onOpenListing?.(listing.id)} />
-          </Reveal>
-        ))}
-      </View>
+      {underEstimate.length > 0 ? (
+        <Reveal index={1} style={styles.highlightSection}>
+          <SWText variant="overline" tone="textMuted">
+            Priced under estimate
+          </SWText>
+          <View style={styles.highlightRow}>
+            {underEstimate.map((listing) => (
+              <UnderEstimateCard
+                key={listing.id}
+                listing={listing}
+                onOpen={() => onOpenListing?.(listing.id)}
+              />
+            ))}
+          </View>
+        </Reveal>
+      ) : null}
+
+      {filtered.length === 0 ? (
+        <EmptyState
+          icon={PackageSearch}
+          title="Nothing here yet"
+          body="Try a different category, or check back soon."
+        />
+      ) : (
+        <View style={styles.grid}>
+          {filtered.map((listing, index) => (
+            <Animated.View
+              key={listing.id}
+              entering={FadeInDown.springify()
+                .damping(18)
+                .delay(Math.min(index, 4) * 50)}
+              exiting={FadeOut.duration(160)}
+              layout={LinearTransition.springify().damping(20)}
+              style={styles.cell}
+            >
+              <ListingCard listing={listing} onOpen={() => onOpenListing?.(listing.id)} />
+            </Animated.View>
+          ))}
+        </View>
+      )}
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
+function UnderEstimateCard({
+  listing,
+  onOpen,
+}: {
+  readonly listing: PreviewListing;
+  readonly onOpen: () => void;
+}) {
+  const styles = useThemedStyles(stylesFor);
+  const estimate = impliedEstimate(listing);
+  return (
+    <ZoomLink
+      href={`/listing/${listing.id}`}
+      label={`${listing.title}, asking ${formatPeso(listing.askingPrice)}, estimated ${formatPeso(estimate)}`}
+      onPress={onOpen}
+      style={styles.highlightCard}
+      containerStyle={styles.highlightSlot}
+    >
+      <Photo
+        source={listing.photo}
+        label={listing.photoLabel}
+        aspectRatio={1}
+        radius={tokens.radius.medium}
+        style={styles.highlightPhoto}
+      />
+      <View style={styles.highlightText}>
+        <SWText variant="bodyCompact" tone="textSecondary" numberOfLines={1}>
+          {listing.title}
+        </SWText>
+        <AskingPriceBadge value={formatPeso(listing.askingPrice)} size="compact" />
+        <EstimateBadge value={formatPeso(estimate)} />
+      </View>
+    </ZoomLink>
+  );
+}
+
+const stylesFor = themedStyles((colors) => ({
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing[2],
   },
   filters: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: tokens.spacing[2],
     marginBottom: tokens.spacing[6],
   },
-  filter: {
-    minHeight: tokens.focus.minimumTarget - tokens.spacing[2],
-    justifyContent: 'center',
-    paddingHorizontal: tokens.spacing[4],
-    borderRadius: tokens.radius.full,
-    borderWidth: tokens.border.hairline,
-    borderColor: tokens.color.dark.borderSubtle,
+  highlightSection: {
+    gap: tokens.spacing[3],
+    marginBottom: tokens.spacing[6],
   },
-  filterActive: {
-    backgroundColor: tokens.color.dark.surfaceRaised,
-    borderColor: tokens.color.dark.borderStrong,
+  highlightRow: {
+    flexDirection: 'row',
+    gap: tokens.spacing[3],
+  },
+  highlightSlot: {
+    flex: 1,
+  },
+  highlightCard: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: tokens.spacing[3],
+    padding: tokens.spacing[3],
+    borderRadius: tokens.radius.large,
+    backgroundColor: colors.estimateSurface,
+    borderWidth: tokens.border.hairline,
+    borderColor: colors.estimateBorder,
+  },
+  highlightPhoto: {
+    width: 64,
+    height: 64,
+  },
+  highlightText: {
+    flex: 1,
+    gap: tokens.spacing['0.5'],
+    justifyContent: 'center',
   },
   grid: {
     flexDirection: 'row',
@@ -110,4 +223,4 @@ const styles = StyleSheet.create({
     flexBasis: '46%',
     flexGrow: 1,
   },
-});
+}));

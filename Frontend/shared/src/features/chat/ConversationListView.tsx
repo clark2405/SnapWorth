@@ -1,5 +1,5 @@
 import { MessageSquare } from 'lucide-react-native';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import {
   Avatar,
@@ -7,12 +7,12 @@ import {
   EmptyState,
   LargeTitle,
   Photo,
-  PressableScale,
   Reveal,
   Screen,
   SWText,
+  ZoomLink,
 } from '../../components';
-import { tokens } from '../../design';
+import { themedStyles, tokens, useThemedStyles } from '../../design';
 import { previewConversations, type PreviewConversationSummary } from '../preview/sample-data';
 import { ProfileButton } from '../profile/ProfileButton';
 
@@ -27,13 +27,18 @@ export function ConversationListView({
   onOpenProfile,
   onBrowseMarket,
 }: ConversationListViewProps) {
+  const styles = useThemedStyles(stylesFor);
   const conversations = previewConversations;
   const unread = conversations.reduce((total, conversation) => total + conversation.unread, 0);
 
   return (
-    <Screen clearTabBar>
+    <Screen
+      clearTabBar
+      ambient="quiet"
+      onRefresh={() => new Promise((resolve) => setTimeout(resolve, 900))}
+    >
       <LargeTitle
-        title="Chat"
+        title="Chats"
         subtitle={unread > 0 ? `${unread} unread` : 'All caught up'}
         trailing={<ProfileButton onPress={onOpenProfile} />}
       />
@@ -69,32 +74,33 @@ function ConversationRow({
   conversation: PreviewConversationSummary;
   onPress: () => void;
 }) {
+  const styles = useThemedStyles(stylesFor);
   const unread = conversation.unread > 0;
   const preview = `${conversation.lastFromMe ? 'You: ' : ''}${conversation.lastMessage}`;
 
   return (
-    <PressableScale
-      accessibilityRole="link"
-      accessibilityLabel={`Conversation with ${conversation.with.handle} about ${conversation.itemTitle}. ${
+    <ZoomLink
+      href={`/chat/${conversation.id}`}
+      label={`Conversation with ${conversation.with.handle} about ${conversation.itemTitle}. ${
         unread ? `${conversation.unread} unread. ` : ''
       }Last message: ${preview}, ${conversation.sentAt}`}
       onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
+      style={styles.row}
     >
       <View style={styles.media}>
-        <Photo
-          source={conversation.itemPhoto}
-          label={conversation.itemTitle}
-          radius={tokens.radius.medium}
-          style={styles.thumb}
-        />
-        <View style={styles.avatar}>
-          <Avatar source={conversation.with.avatar} name={conversation.with.handle} size={24} />
+        <Avatar source={conversation.with.avatar} name={conversation.with.handle} size={52} />
+        <View style={styles.itemBadge}>
+          <Photo
+            source={conversation.itemPhoto}
+            label={conversation.itemTitle}
+            radius={tokens.radius.small}
+            style={styles.itemThumb}
+          />
         </View>
       </View>
       <View style={styles.text}>
         <View style={styles.topLine}>
-          <SWText variant={unread ? 'labelSmall' : 'labelMedium'} style={styles.handle}>
+          <SWText variant="headingSmall" numberOfLines={1} style={styles.handle}>
             @{conversation.with.handle}
           </SWText>
           <SWText variant="caption" tone={unread ? 'textPrimary' : 'textMuted'}>
@@ -106,7 +112,7 @@ function ConversationRow({
         </SWText>
         <View style={styles.bottomLine}>
           <SWText
-            variant="bodyCompact"
+            variant={unread ? 'label' : 'bodyCompact'}
             tone={unread ? 'textPrimary' : 'textSecondary'}
             numberOfLines={1}
             style={styles.preview}
@@ -122,11 +128,11 @@ function ConversationRow({
           ) : null}
         </View>
       </View>
-    </PressableScale>
+    </ZoomLink>
   );
 }
 
-const styles = StyleSheet.create({
+const stylesFor = themedStyles((colors) => ({
   divider: {
     marginLeft: tokens.layout.thumbnail - tokens.spacing[2] + tokens.spacing[4],
   },
@@ -137,24 +143,22 @@ const styles = StyleSheet.create({
     paddingVertical: tokens.spacing[4],
     borderRadius: tokens.radius.medium,
   },
-  pressed: {
-    backgroundColor: tokens.color.dark.surface,
-  },
   media: {
-    width: tokens.layout.thumbnail - tokens.spacing[2],
-    height: tokens.layout.thumbnail - tokens.spacing[2],
+    width: 52,
+    height: 52,
   },
-  thumb: {
-    width: '100%',
-    height: '100%',
-  },
-  avatar: {
+  itemBadge: {
     position: 'absolute',
     right: -tokens.spacing[1],
     bottom: -tokens.spacing[1],
-    borderRadius: tokens.radius.full,
+    borderRadius: tokens.radius.small,
     borderWidth: tokens.border.focus,
-    borderColor: tokens.color.dark.canvas,
+    borderColor: colors.canvas,
+    overflow: 'hidden',
+  },
+  itemThumb: {
+    width: 24,
+    height: 24,
   },
   text: {
     flex: 1,
@@ -176,12 +180,12 @@ const styles = StyleSheet.create({
   preview: {
     flex: 1,
   },
-  // Unread count is informational, so it stays small; the lime marks "needs you".
+  // Unread count is informational, so it stays small; the accent marks "needs you".
   badge: {
     minWidth: tokens.spacing[5],
     paddingHorizontal: tokens.spacing[1],
     borderRadius: tokens.radius.full,
     alignItems: 'center',
-    backgroundColor: tokens.color.dark.accent,
+    backgroundColor: colors.accent,
   },
-});
+}));

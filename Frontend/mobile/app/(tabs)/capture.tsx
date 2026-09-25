@@ -11,11 +11,13 @@ export default function CaptureRoute() {
     <CaptureView
       flashOn={flashOn}
       onToggleFlash={() => setFlashOn((value) => !value)}
-      onClose={() => (router.canGoBack() ? router.back() : router.replace('/feed'))}
+      onClose={() => router.navigate('/feed')}
       // Preview wiring: capture and estimation services are not built yet, so the shutter
       // opens the sample estimate.
       onCapture={() => router.push('/item/nike-neon-windbreaker?fresh=1')}
-      onOpenHistory={() => router.push('/history')}
+      onOpenHistory={() => router.navigate('/history')}
+      // The camera sits under the floating tab bar.
+      bottomInset={64}
     />
   );
 }

@@ -1,14 +1,19 @@
 import { Camera, type LucideIcon } from 'lucide-react-native';
-import { useEffect, useRef } from 'react';
-import { Animated, Easing, Platform, StyleSheet, View } from 'react-native';
+import { useEffect } from 'react';
+import { View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { tokens, useMotionPreference } from '../design';
+import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../design';
+import { GlassSurface } from './GlassSurface';
 import { PressableScale } from './PressableScale';
 import { SWText } from './SWText';
 import { usePop } from './usePop';
-
-const useNativeDriver = Platform.OS !== 'web';
 
 export interface TabItem<Key extends string> {
   readonly key: Key;
@@ -26,8 +31,8 @@ export interface TabBarProps<Key extends string> {
 }
 
 /**
- * A bar docked to the bottom edge. Capture is the product's core action, so it is the only
- * filled element here; the active tab is marked by weight and a short rule, not by colour alone.
+ * A floating glass capsule for platforms without the native tab bar (the web). Capture is the
+ * core action, so it is the one filled control; the active tab lifts onto a soft pill.
  */
 export function TabBar<Key extends string>({
   leading,
@@ -37,40 +42,44 @@ export function TabBar<Key extends string>({
   onCapture,
 }: TabBarProps<Key>) {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(stylesFor);
 
   const renderTab = (item: TabItem<Key>) => (
     <Tab
       key={item.key}
       item={item}
       active={item.key === activeKey}
-      onPress={() => onSelect(item.key)}
+      onPress={() => {
+        if (item.key !== activeKey) haptic('select');
+        onSelect(item.key);
+      }}
     />
   );
 
   return (
-    <View style={[styles.dock, { paddingBottom: insets.bottom }]}>
-      <View accessibilityRole="tablist" style={styles.row}>
-        {leading.map(renderTab)}
-        <View style={styles.captureSlot}>
-          <PressableScale
-            accessibilityLabel="Capture an item"
-            accessibilityHint="Opens the camera to photograph something and get an estimate"
-            onPress={onCapture}
-            style={({ pressed }) => [styles.capture, pressed ? styles.capturePressed : null]}
-          >
-            <Camera size={22} strokeWidth={2} color={tokens.color.dark.onAccent} />
-          </PressableScale>
+    <View style={[styles.dock, { paddingBottom: Math.max(insets.bottom, tokens.spacing[3]) }]}>
+      <GlassSurface style={styles.capsule}>
+        <View accessibilityRole="tablist" style={styles.row}>
+          {leading.map(renderTab)}
+          <View style={styles.captureSlot}>
+            <PressableScale
+              accessibilityLabel="Capture an item"
+              accessibilityHint="Opens the camera to photograph something and get an estimate"
+              onPress={onCapture}
+              haptic="pop"
+              style={({ pressed }) => [styles.capture, pressed ? styles.capturePressed : null]}
+            >
+              <Camera size={22} strokeWidth={2} color={colors.onAccent} />
+            </PressableScale>
+          </View>
+          {trailing.map(renderTab)}
         </View>
-        {trailing.map(renderTab)}
-      </View>
+      </GlassSurface>
     </View>
   );
 }
 
-/**
- * The active rule grows out from the centre and the icon pops once as a tab becomes active.
- * Under reduced motion the rule simply appears.
- */
 function Tab<Key extends string>({
   item,
   active,
@@ -80,63 +89,68 @@ function Tab<Key extends string>({
   readonly active: boolean;
   readonly onPress: () => void;
 }) {
-  const { reduceMotion } = useMotionPreference();
-  const iconScale = usePop(active, { enabled: active });
-  const rule = useRef(new Animated.Value(active ? 1 : 0)).current;
-  const tone = active ? 'textPrimary' : 'textMuted';
+  const { colors } = useTheme();
+  const styles = useThemedStyles(stylesFor);
+  const reduceMotion = useReducedMotion();
+  const iconPop = usePop(active, { enabled: active, peak: 1.2 });
+  const lift = useSharedValue(active ? 1 : 0);
   const Icon = item.icon;
 
   useEffect(() => {
-    const toValue = active ? 1 : 0;
-    if (reduceMotion) {
-      rule.setValue(toValue);
-      return;
-    }
-    const animation = Animated.timing(rule, {
-      toValue,
-      duration: tokens.motion.recipe.functionalTransition.durationMs,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver,
-    });
-    animation.start();
-    return () => animation.stop();
-  }, [active, reduceMotion, rule]);
+    lift.value = reduceMotion
+      ? active
+        ? 1
+        : 0
+      : withSpring(active ? 1 : 0, tokens.motion.spring.snappy);
+  }, [active, lift, reduceMotion]);
+
+  const pillStyle = useAnimatedStyle(() => ({
+    opacity: lift.value,
+    transform: [{ scale: 0.7 + lift.value * 0.3 }],
+  }));
 
   return (
     <PressableScale
       accessibilityRole="tab"
       accessibilityLabel={item.label}
       accessibilityState={{ selected: active }}
+      haptic="none"
       onPress={onPress}
       containerStyle={styles.tabSlot}
       style={styles.tab}
     >
-      <Animated.View style={[styles.rule, { opacity: rule, transform: [{ scaleX: rule }] }]} />
-      <Animated.View style={{ transform: [{ scale: iconScale }] }}>
-        <Icon size={22} strokeWidth={active ? 2.25 : 1.75} color={tokens.color.dark[tone]} />
+      <Animated.View style={[styles.pill, pillStyle]} />
+      <Animated.View style={iconPop}>
+        <Icon
+          size={21}
+          strokeWidth={active ? 2.3 : 1.8}
+          color={active ? colors.textPrimary : colors.textMuted}
+        />
       </Animated.View>
-      <SWText variant="tabLabel" tone={tone}>
+      <SWText variant="tabLabel" tone={active ? 'textPrimary' : 'textMuted'}>
         {item.label}
       </SWText>
     </PressableScale>
   );
 }
 
-const styles = StyleSheet.create({
+const stylesFor = themedStyles((colors) => ({
   dock: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: tokens.color.dark.canvas,
-    borderTopWidth: tokens.border.hairline,
-    borderTopColor: tokens.color.dark.borderSubtle,
+    alignItems: 'center',
+    paddingHorizontal: tokens.spacing[4],
+    pointerEvents: 'box-none',
+  },
+  capsule: {
+    width: '100%',
+    maxWidth: tokens.layout.phoneColumn - tokens.spacing[8],
+    borderRadius: tokens.radius.full,
   },
   row: {
-    width: '100%',
-    maxWidth: tokens.layout.phoneColumn,
-    alignSelf: 'center',
-    height: tokens.layout.tabBarHeight,
+    height: 64,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: tokens.spacing[2],
@@ -149,30 +163,30 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: tokens.spacing[1],
-    minHeight: tokens.focus.minimumTarget,
+    gap: 2,
   },
-  rule: {
+  pill: {
     position: 'absolute',
-    top: 0,
-    width: tokens.spacing[6],
-    height: tokens.border.focus,
+    top: 6,
+    bottom: 6,
+    left: 2,
+    right: 2,
     borderRadius: tokens.radius.full,
-    backgroundColor: tokens.color.dark.textPrimary,
+    backgroundColor: colors.sunken,
   },
   captureSlot: {
     flex: 1,
     alignItems: 'center',
   },
   capture: {
-    width: tokens.layout.tabBarCapture,
-    height: tokens.layout.tabBarCapture,
-    borderRadius: tokens.radius.medium,
+    width: 50,
+    height: 50,
+    borderRadius: tokens.radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: tokens.color.dark.accent,
+    backgroundColor: colors.accent,
   },
   capturePressed: {
-    backgroundColor: tokens.color.dark.accentPressed,
+    backgroundColor: colors.accentPressed,
   },
-});
+}));

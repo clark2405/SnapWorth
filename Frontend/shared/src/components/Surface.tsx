@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { tokens } from '../design';
+import { themedStyles, tokens, useThemedStyles } from '../design';
+import { GlassSurface } from './GlassSurface';
 
-export type SurfaceTone = 'surface' | 'raised' | 'sunken';
+export type SurfaceTone = 'surface' | 'raised' | 'sunken' | 'accent';
 
 export interface SurfaceProps {
   readonly children?: ReactNode;
@@ -15,24 +16,9 @@ export interface SurfaceProps {
   readonly contentStyle?: StyleProp<ViewStyle>;
 }
 
-const toneStyles = {
-  surface: {
-    backgroundColor: tokens.color.dark.surface,
-    borderColor: tokens.color.dark.borderSubtle,
-  },
-  raised: {
-    backgroundColor: tokens.color.dark.surfaceRaised,
-    borderColor: tokens.color.dark.borderStrong,
-  },
-  sunken: {
-    backgroundColor: tokens.color.dark.sunken,
-    borderColor: tokens.color.dark.borderSubtle,
-  },
-} as const;
-
 /**
- * A grouped well. Depth comes from the surface step and a hairline border, never a shadow or a
- * blur, so the item photo stays the brightest thing on screen.
+ * A grouped card. In light mode it lifts off the paper on a soft, wide shadow; in dark mode it
+ * steps up in value with a hairline edge instead, since shadows vanish on a dark ground.
  */
 export function Surface({
   children,
@@ -42,14 +28,25 @@ export function Surface({
   style,
   contentStyle,
 }: SurfaceProps) {
+  const styles = useThemedStyles(stylesFor);
+
   return (
-    <View style={[styles.card, toneStyles[tone], { borderRadius: radius }, style]}>
-      <View style={[padding === undefined ? null : { padding }, contentStyle]}>{children}</View>
+    <View style={[styles.card, styles[tone], { borderRadius: radius }, style]}>
+      <View
+        style={[
+          styles.clip,
+          { borderRadius: radius },
+          padding === undefined ? null : { padding },
+          contentStyle,
+        ]}
+      >
+        {children}
+      </View>
     </View>
   );
 }
 
-/** A full-width bar pinned to the bottom edge: composers and action sheets. */
+/** A floating glass bar over the bottom edge: composers and action bars. */
 export function BottomBar({
   children,
   style,
@@ -57,10 +54,16 @@ export function BottomBar({
   readonly children: ReactNode;
   readonly style?: StyleProp<ViewStyle>;
 }) {
-  return <View style={[styles.bottomBar, style]}>{children}</View>;
+  const styles = useThemedStyles(stylesFor);
+  return (
+    <View style={[styles.bottomWrap, style]}>
+      <GlassSurface style={styles.bottomBar}>{children}</GlassSurface>
+    </View>
+  );
 }
 
 export function Divider({ style }: { readonly style?: StyleProp<ViewStyle> }) {
+  const styles = useThemedStyles(stylesFor);
   return (
     <View
       accessibilityElementsHidden
@@ -70,18 +73,43 @@ export function Divider({ style }: { readonly style?: StyleProp<ViewStyle> }) {
   );
 }
 
-const styles = StyleSheet.create({
+const stylesFor = themedStyles((colors, name) => ({
   card: {
+    borderWidth: name === 'dark' ? StyleSheet.hairlineWidth : 0,
+    borderColor: colors.borderSubtle,
+    shadowColor: tokens.shadow[name],
+    shadowOpacity: name === 'dark' ? 0 : 1,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: name === 'dark' ? 0 : 2,
+  },
+  clip: {
     overflow: 'hidden',
-    borderWidth: tokens.border.hairline,
+  },
+  surface: { backgroundColor: colors.surface },
+  raised: { backgroundColor: colors.surfaceRaised, borderColor: colors.borderStrong },
+  sunken: {
+    backgroundColor: colors.sunken,
+    shadowOpacity: 0,
+    elevation: 0,
+    borderWidth: 0,
+  },
+  accent: {
+    backgroundColor: colors.estimateSurface,
+    borderColor: colors.estimateBorder,
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowOpacity: 0,
+  },
+  bottomWrap: {
+    paddingHorizontal: tokens.spacing[3],
+    paddingBottom: tokens.spacing[2],
   },
   bottomBar: {
-    backgroundColor: tokens.color.dark.canvas,
-    borderTopWidth: tokens.border.hairline,
-    borderTopColor: tokens.color.dark.borderSubtle,
+    borderRadius: tokens.radius.xlarge,
   },
   divider: {
-    height: tokens.border.hairline,
-    backgroundColor: tokens.color.dark.borderSubtle,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.borderStrong,
+    opacity: 0.6,
   },
-});
+}));

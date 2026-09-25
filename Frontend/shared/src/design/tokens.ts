@@ -27,7 +27,7 @@ const duration = {
   dataShift: 200,
   artisticAccent: 260,
   reveal: 420,
-  entrance: 300,
+  entrance: 520,
   stepTransition: 260,
   popRise: 100,
   popSettle: 180,
@@ -47,158 +47,217 @@ const easing = {
   linear: 'linear',
 } as const;
 
-const ink = '#0B0B0F';
-const lime = '#D7FF3E';
+const ink = '#0B0B0D';
+const paper = '#F5F4F0';
+
+/**
+ * Two palettes with identical semantic names, so every surface can be themed by swapping the
+ * map. The ground is near-neutral in both; iris is the one saturated accent, and the vote hues
+ * appear only on votes. Primary actions are monochrome (`inverse`), which keeps the accent for
+ * value: estimates, the capture control, and the companion.
+ */
+export const colorLight = {
+  canvas: paper,
+  surface: '#FFFFFF',
+  surfaceRaised: '#FFFFFF',
+  sunken: '#EBEAE5',
+  borderSubtle: '#E3E1DB',
+  borderStrong: '#CBC8C0',
+  textPrimary: '#111114',
+  textSecondary: '#46464D',
+  textMuted: '#6C6C72',
+  accent: '#5B4BFF',
+  accentPressed: '#4A3AEE',
+  accentSoft: '#ECEAFF',
+  onAccent: '#FFFFFF',
+  inverse: '#111114',
+  inversePressed: '#2A2A30',
+  onInverse: '#FFFFFF',
+  estimateSurface: '#EFECFF',
+  estimateBorder: '#6F62FF',
+  voteHigh: '#D93A31',
+  voteLow: '#0071B8',
+  voteRight: '#1E8C4E',
+  success: '#1E8C4E',
+  danger: '#D1242F',
+  warning: '#A64B00',
+  focusRing: '#5B4BFF',
+  interactiveBoundary: '#86868B',
+} as const;
+
+export const colorDark = {
+  canvas: ink,
+  surface: '#161618',
+  surfaceRaised: '#1E1E21',
+  sunken: '#050506',
+  borderSubtle: '#242427',
+  borderStrong: '#3A3A3F',
+  textPrimary: '#F5F5F7',
+  textSecondary: '#AEAEB4',
+  textMuted: '#8E8E94',
+  accent: '#8F84FF',
+  accentPressed: '#7A6EF7',
+  accentSoft: '#1C1A33',
+  onAccent: ink,
+  inverse: '#F5F5F7',
+  inversePressed: '#D9D9DE',
+  onInverse: ink,
+  estimateSurface: '#17152B',
+  estimateBorder: '#6A5FE6',
+  voteHigh: '#FF6961',
+  voteLow: '#64D2FF',
+  voteRight: '#30D158',
+  success: '#30D158',
+  danger: '#FF453A',
+  warning: '#FFB340',
+  focusRing: '#8F84FF',
+  interactiveBoundary: '#8E8E94',
+} as const satisfies Record<keyof typeof colorLight, string>;
 
 export const tokens = deepFreeze({
   color: {
-    dark: {
-      canvas: ink,
-      surface: '#15151C',
-      surfaceRaised: '#1E1E27',
-      sunken: ink,
-      borderSubtle: '#24242C',
-      borderStrong: '#3A3A46',
-      textPrimary: '#F5F5F0',
-      textSecondary: '#A8A8B5',
-      textMuted: '#8A8A99',
-      accent: lime,
-      accentPressed: '#B4E01F',
-      onAccent: ink,
-      estimateSurface: '#1B2110',
-      estimateBorder: '#6F8A2A',
-      voteHigh: '#FF7A5A',
-      voteLow: '#6FA3FF',
-      voteRight: '#48C98A',
-      danger: '#FF6B6F',
-      warning: '#FFC155',
-      focusRing: lime,
-      interactiveBoundary: '#8A8A99',
-    },
+    light: colorLight,
+    dark: colorDark,
   },
+  /**
+   * The companion and brand mark share one iridescent sweep. It is decoration for the AI's
+   * presence only; no text or control state is ever carried by it.
+   */
+  aurora: ['#7B5CFF', '#3DB8FF', '#46E0B5', '#FFC23D', '#FF6A3D', '#FF3D8B'],
   /**
    * Translucent layers for controls that sit over live media (the camera viewfinder), where a
    * solid surface would hide what the user is aiming at. Nowhere else.
    */
   overlay: {
-    chrome: 'rgba(11, 11, 15, 0.64)',
-    border: 'rgba(245, 245, 240, 0.16)',
+    chrome: 'rgba(11, 11, 13, 0.46)',
+    border: 'rgba(255, 255, 255, 0.22)',
+    scrim: 'rgba(0, 0, 0, 0.42)',
+    text: '#FFFFFF',
+  },
+  shadow: {
+    light: 'rgba(17, 17, 20, 0.10)',
+    dark: 'rgba(0, 0, 0, 0.55)',
+  },
+  /** Fallback material where Liquid Glass is unavailable: a blur plus these washes. */
+  glass: {
+    light: {
+      fill: 'rgba(255, 255, 255, 0.62)',
+      border: 'rgba(17, 17, 20, 0.08)',
+      highlight: 'rgba(255, 255, 255, 0.9)',
+    },
+    dark: {
+      fill: 'rgba(38, 38, 42, 0.52)',
+      border: 'rgba(255, 255, 255, 0.10)',
+      highlight: 'rgba(255, 255, 255, 0.14)',
+    },
   },
   typography: {
+    /**
+     * Semantic families resolved per platform in `fonts.ts`: `sans` is the system face (SF Pro
+     * on Apple platforms), `serif` is the editorial counterweight (New York), and `rounded` is
+     * reserved for the companion's voice.
+     */
     family: {
-      displayBold: 'SpaceGrotesk_700Bold',
-      displayMedium: 'SpaceGrotesk_500Medium',
-      bodyRegular: 'Inter_400Regular',
-      bodyMedium: 'Inter_500Medium',
-      bodySemibold: 'Inter_600SemiBold',
+      sans: 'sans',
+      serif: 'serif',
+      rounded: 'rounded',
+    },
+    webFamily: {
+      sans: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif',
+      serif: 'ui-serif, "New York", "Iowan Old Style", Charter, Georgia, serif',
+      rounded: 'ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif',
     },
     weight: {
       regular: '400',
       medium: '500',
       semibold: '600',
       bold: '700',
+      heavy: '800',
     },
     style: {
       displayHero: {
-        family: 'SpaceGrotesk_700Bold',
-        size: 44,
-        lineHeight: 46,
-        weight: '700',
-        letterSpacing: -1.6,
+        family: 'serif',
+        size: 40,
+        lineHeight: 44,
+        weight: '600',
+        letterSpacing: -0.8,
       },
       displayTitle: {
-        family: 'SpaceGrotesk_700Bold',
-        size: 30,
-        lineHeight: 34,
-        weight: '700',
-        letterSpacing: -0.9,
-      },
-      priceHero: {
-        family: 'SpaceGrotesk_700Bold',
-        size: 48,
-        lineHeight: 52,
-        weight: '700',
-        letterSpacing: -1.2,
-      },
-      priceLarge: {
-        family: 'SpaceGrotesk_700Bold',
-        size: 32,
-        lineHeight: 36,
-        weight: '700',
+        family: 'serif',
+        size: 34,
+        lineHeight: 40,
+        weight: '600',
         letterSpacing: -0.6,
       },
-      priceMedium: {
-        family: 'SpaceGrotesk_500Medium',
-        size: 22,
-        lineHeight: 26,
-        weight: '500',
-        letterSpacing: -0.3,
-      },
-      priceSmall: {
-        family: 'SpaceGrotesk_500Medium',
-        size: 17,
-        lineHeight: 22,
-        weight: '500',
-        letterSpacing: -0.1,
-      },
+      priceHero: { family: 'sans', size: 56, lineHeight: 60, weight: '700', letterSpacing: -2 },
+      priceLarge: { family: 'sans', size: 34, lineHeight: 40, weight: '700', letterSpacing: -1 },
+      priceMedium: { family: 'sans', size: 22, lineHeight: 28, weight: '700', letterSpacing: -0.5 },
+      priceSmall: { family: 'sans', size: 17, lineHeight: 22, weight: '600', letterSpacing: -0.2 },
       headingLarge: {
-        family: 'SpaceGrotesk_500Medium',
+        family: 'sans',
         size: 22,
         lineHeight: 28,
-        weight: '500',
-        letterSpacing: -0.3,
-      },
-      headingMedium: {
-        family: 'SpaceGrotesk_500Medium',
-        size: 17,
-        lineHeight: 24,
-        weight: '500',
-        letterSpacing: -0.1,
-      },
-      headingSmall: {
-        family: 'SpaceGrotesk_500Medium',
-        size: 15,
-        lineHeight: 20,
-        weight: '500',
-        letterSpacing: 0,
-      },
-      button: { family: 'Inter_600SemiBold', size: 15, lineHeight: 20, weight: '600' },
-      bodyLarge: { family: 'Inter_400Regular', size: 16, lineHeight: 24, weight: '400' },
-      bodyMedium: { family: 'Inter_400Regular', size: 15, lineHeight: 22, weight: '400' },
-      bodySmall: { family: 'Inter_400Regular', size: 14, lineHeight: 20, weight: '400' },
-      bodyCompact: { family: 'Inter_400Regular', size: 13, lineHeight: 18, weight: '400' },
-      label: { family: 'Inter_500Medium', size: 14, lineHeight: 20, weight: '500' },
-      labelSmall: { family: 'Inter_600SemiBold', size: 13, lineHeight: 18, weight: '600' },
-      labelMedium: { family: 'Inter_500Medium', size: 13, lineHeight: 18, weight: '500' },
-      chip: { family: 'Inter_500Medium', size: 12, lineHeight: 16, weight: '500' },
-      tag: {
-        family: 'Inter_600SemiBold',
-        size: 10,
-        lineHeight: 14,
-        weight: '600',
-        letterSpacingEm: 0.08,
-        textTransform: 'uppercase',
-      },
-      caption: { family: 'Inter_400Regular', size: 12, lineHeight: 16, weight: '400' },
-      tabLabel: { family: 'Inter_500Medium', size: 11, lineHeight: 14, weight: '500' },
-      overline: {
-        family: 'Inter_600SemiBold',
-        size: 11,
-        lineHeight: 14,
-        weight: '600',
-        letterSpacingEm: 0.08,
-        textTransform: 'uppercase',
-      },
-      wordmark: {
-        family: 'SpaceGrotesk_700Bold',
-        size: 17,
-        lineHeight: 22,
         weight: '700',
         letterSpacing: -0.4,
       },
+      headingMedium: {
+        family: 'sans',
+        size: 17,
+        lineHeight: 22,
+        weight: '600',
+        letterSpacing: -0.3,
+      },
+      headingSmall: {
+        family: 'sans',
+        size: 15,
+        lineHeight: 20,
+        weight: '600',
+        letterSpacing: -0.2,
+      },
+      button: { family: 'sans', size: 17, lineHeight: 22, weight: '600', letterSpacing: -0.3 },
+      bodyLarge: { family: 'sans', size: 17, lineHeight: 24, weight: '400', letterSpacing: -0.3 },
+      bodyMedium: { family: 'sans', size: 15, lineHeight: 21, weight: '400', letterSpacing: -0.2 },
+      bodySmall: { family: 'sans', size: 14, lineHeight: 19, weight: '400', letterSpacing: -0.1 },
+      bodyCompact: {
+        family: 'sans',
+        size: 13,
+        lineHeight: 18,
+        weight: '400',
+        letterSpacing: -0.05,
+      },
+      label: { family: 'sans', size: 15, lineHeight: 20, weight: '500', letterSpacing: -0.2 },
+      labelSmall: { family: 'sans', size: 13, lineHeight: 18, weight: '600', letterSpacing: -0.1 },
+      labelMedium: { family: 'sans', size: 13, lineHeight: 18, weight: '500', letterSpacing: -0.1 },
+      chip: { family: 'sans', size: 13, lineHeight: 16, weight: '600', letterSpacing: -0.1 },
+      tag: {
+        family: 'sans',
+        size: 11,
+        lineHeight: 14,
+        weight: '600',
+        letterSpacingEm: 0.06,
+        textTransform: 'uppercase',
+      },
+      caption: { family: 'sans', size: 12, lineHeight: 16, weight: '400', letterSpacing: 0 },
+      tabLabel: { family: 'sans', size: 10, lineHeight: 12, weight: '500', letterSpacing: 0.1 },
+      overline: {
+        family: 'sans',
+        size: 12,
+        lineHeight: 16,
+        weight: '600',
+        letterSpacingEm: 0.06,
+        textTransform: 'uppercase',
+      },
+      wordmark: { family: 'serif', size: 22, lineHeight: 26, weight: '600', letterSpacing: -0.4 },
+      companion: {
+        family: 'rounded',
+        size: 17,
+        lineHeight: 22,
+        weight: '600',
+        letterSpacing: -0.2,
+      },
     },
     maxFontSizeMultiplier: {
-      priceHero: 1.6,
+      priceHero: 1.4,
       default: 2,
     },
     numericFeature: 'tabular-nums',
@@ -220,9 +279,10 @@ export const tokens = deepFreeze({
   },
   radius: {
     none: 0,
-    small: 6,
-    medium: 12,
-    large: 20,
+    small: 8,
+    medium: 14,
+    large: 22,
+    xlarge: 30,
     full: 999,
   },
   border: {
@@ -264,6 +324,9 @@ export const tokens = deepFreeze({
     gridGap: 16,
     sectionGap: 40,
     tabBarHeight: 60,
+    /** Room above the native floating tab bar, so content and the companion clear it. */
+    nativeTabBarClearance: 96,
+    headerCompact: 52,
     tabBarCapture: 48,
     headerHeight: 56,
     thumbnail: 72,
@@ -317,7 +380,18 @@ export const tokens = deepFreeze({
       exit: [0.4, 0, 1, 1],
     },
     entrance: {
-      offsetY: 8,
+      offsetY: 18,
+    },
+    /**
+     * Springs for anything the finger drives or that should feel physical. Durations are
+     * emergent; each preset is tuned to settle inside ~450ms without a visible wobble, except
+     * `playful`, which is reserved for the companion and like bursts.
+     */
+    spring: {
+      snappy: { damping: 20, stiffness: 320, mass: 0.8 },
+      smooth: { damping: 26, stiffness: 220, mass: 1 },
+      gentle: { damping: 28, stiffness: 150, mass: 1 },
+      playful: { damping: 12, stiffness: 240, mass: 0.9 },
     },
     step: {
       offsetX: 24,

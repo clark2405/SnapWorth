@@ -1,26 +1,36 @@
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import {
   BottomBar,
   Button,
-  EstimateBadge,
+  ChoiceChips,
+  CountUp,
   Field,
   NavHeader,
   Photo,
+  PriceRangeBar,
   Reveal,
   Screen,
   SelectField,
   SWText,
   TextField,
+  useToast,
 } from '../../components';
-import { tokens } from '../../design';
-import { formatPeso, previewItem } from '../preview/sample-data';
+import { themedStyles, tokens, useThemedStyles } from '../../design';
+import {
+  formatPeso,
+  previewConditions,
+  previewItem,
+  previewValuation,
+  type PreviewCondition,
+} from '../preview/sample-data';
 
 export interface ConfirmPriceViewProps {
   readonly itemId?: string;
   readonly onBack?: () => void;
-  /** Receives the price the seller typed. The AI estimate is shown for reference only. */
+  /** Receives the price the seller confirmed. The AI estimate is shown for reference only. */
   readonly onPublish?: (enteredPrice: number) => void;
 }
 
@@ -34,23 +44,52 @@ export function parseEnteredPrice(text: string): number | null {
   return value > 0 ? value : null;
 }
 
+function suggestedPrice(condition: PreviewCondition): number {
+  const factor = previewConditions.find((entry) => entry.key === condition)?.factor ?? 1;
+  return Math.round((previewItem.estimate * factor) / 10) * 10;
+}
+
 export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
+  const styles = useThemedStyles(stylesFor);
+  const toast = useToast();
   const item = previewItem;
-  // Starts empty on purpose: the seller must type their own price (SRS 3.1.5).
-  const [priceText, setPriceText] = useState('');
+  const [condition, setCondition] = useState<PreviewCondition>('good');
+  // Prefilled with the live suggestion so the seller always sees a number, but once they type
+  // their own it stops following the condition — the price they publish is always theirs, seen
+  // and editable, never silently swapped in behind the scenes.
+  const [priceText, setPriceText] = useState(() => String(suggestedPrice('good')));
+  const [edited, setEdited] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+
   const enteredPrice = parseEnteredPrice(priceText);
+  const suggestion = suggestedPrice(condition);
+  const hint = previewConditions.find((entry) => entry.key === condition)?.hint ?? '';
+
+  const handleCondition = (key: PreviewCondition) => {
+    setCondition(key);
+    if (!edited) setPriceText(String(suggestedPrice(key)));
+  };
+
+  const handlePublish = () => {
+    if (enteredPrice === null) return;
+    setPublishing(true);
+    setTimeout(() => {
+      setPublishing(false);
+      toast.show({ title: 'Listing published', body: `Live at ${formatPeso(enteredPrice)}.` });
+      onPublish?.(enteredPrice);
+    }, 700);
+  };
 
   return (
     <Screen
-      header={<NavHeader title="Set your price" onBack={onBack} />}
+      header={<NavHeader title="List for sale" onBack={onBack} banded />}
       footer={
         <BottomBar style={styles.footer}>
           <Button
             label="Publish listing"
             disabled={enteredPrice === null}
-            onPress={() => {
-              if (enteredPrice !== null) onPublish?.(enteredPrice);
-            }}
+            loading={publishing}
+            onPress={handlePublish}
           />
           <SWText
             variant="caption"
@@ -81,23 +120,52 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
         </View>
       </Reveal>
 
-      <Reveal index={1} style={styles.reference}>
+      <Reveal index={1} style={styles.conditionSection}>
         <SWText variant="overline" tone="textMuted">
-          For reference
+          Condition
         </SWText>
-        <EstimateBadge value={formatPeso(item.estimate)} />
+        <ChoiceChips options={previewConditions} value={condition} onChange={handleCondition} />
+        <View style={styles.suggestion}>
+          <SWText variant="overline" tone="accent">
+            Suggested price
+          </SWText>
+          <CountUp value={suggestion} format={formatPeso} variant="priceLarge" tone="accent" />
+          <Animated.View
+            key={condition}
+            entering={FadeIn.duration(160)}
+            exiting={FadeOut.duration(120)}
+          >
+            <SWText variant="caption" tone="textMuted">
+              {hint}
+            </SWText>
+          </Animated.View>
+        </View>
       </Reveal>
 
-      <Reveal index={2} style={styles.fields}>
+      <Reveal index={2} style={styles.range}>
+        <PriceRangeBar
+          low={previewValuation.low}
+          high={previewValuation.high}
+          estimate={item.estimate}
+          confidence={previewValuation.confidence}
+          asking={enteredPrice ?? suggestion}
+          format={formatPeso}
+        />
+      </Reveal>
+
+      <Reveal index={3} style={styles.fields}>
         <Field
           label="Your asking price"
-          helper="You set this. The estimate above is never copied into it."
+          helper="This is yours to set. Edit it, or publish the suggestion above."
         >
           <TextField
             size="large"
             prefix="₱"
             value={priceText}
-            onChangeText={setPriceText}
+            onChangeText={(text) => {
+              setEdited(true);
+              setPriceText(text);
+            }}
             placeholder="Enter price"
             keyboardType="decimal-pad"
             inputMode="decimal"
@@ -115,10 +183,10 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const stylesFor = themedStyles(() => ({
   content: {
     paddingTop: tokens.spacing[4],
-    gap: tokens.spacing[5],
+    gap: tokens.spacing[6],
   },
   item: {
     flexDirection: 'row',
@@ -133,7 +201,14 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: tokens.spacing[1],
   },
-  reference: {
+  conditionSection: {
+    gap: tokens.spacing[3],
+  },
+  suggestion: {
+    gap: tokens.spacing[1],
+    marginTop: tokens.spacing[2],
+  },
+  range: {
     gap: tokens.spacing[2],
   },
   fields: {
@@ -145,4 +220,4 @@ const styles = StyleSheet.create({
     paddingBottom: tokens.spacing[4],
     gap: tokens.spacing[3],
   },
-});
+}));

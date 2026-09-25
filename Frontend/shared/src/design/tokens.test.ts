@@ -15,7 +15,7 @@ describe('SnapWorth design tokens', () => {
     expect(tokens.focus.ringWidth).toBeGreaterThan(0);
     expect(tokens.breakpoint.compactMin).toBe(320);
     expect(tokens.breakpoint.supportedMax).toBe(1920);
-    expect(tokens.typography.maxFontSizeMultiplier.priceHero).toBe(1.6);
+    expect(tokens.typography.maxFontSizeMultiplier.priceHero).toBe(1.4);
     expect(tokens.typography.maxFontSizeMultiplier.default).toBe(2);
   });
 
@@ -45,12 +45,22 @@ describe('SnapWorth design tokens', () => {
     expect(tokens.motion.limits.staggerInterval).toBeLessThanOrEqual(80);
   });
 
-  it('uses lime as the only accent on the ink canvas', () => {
-    expect(tokens.color.dark.canvas).toBe('#0B0B0F');
-    expect(tokens.color.dark.accent).toBe('#D7FF3E');
-    expect(tokens.color.dark.focusRing).toBe(tokens.color.dark.accent);
-    // Votes carry their own hues so the accent keeps meaning "the one action on this screen".
-    expect(tokens.color.dark.voteRight).not.toBe(tokens.color.dark.accent);
+  it.each(['light', 'dark'] as const)(
+    '%s keeps iris as the only accent on a neutral ground',
+    (name) => {
+      const palette = tokens.color[name];
+      expect(palette.focusRing).toBe(palette.accent);
+      // Votes carry their own hues so the accent keeps meaning "value" and nothing else.
+      for (const vote of [palette.voteHigh, palette.voteLow, palette.voteRight]) {
+        expect(vote).not.toBe(palette.accent);
+      }
+      // Primary actions are monochrome, never the accent.
+      expect(palette.inverse).toBe(palette.textPrimary);
+    },
+  );
+
+  it('pairs light and dark palettes with identical semantic names', () => {
+    expect(Object.keys(tokens.color.light).sort()).toEqual(Object.keys(tokens.color.dark).sort());
   });
 
   it('keeps the launch hold short enough that it never reads as a wait', () => {

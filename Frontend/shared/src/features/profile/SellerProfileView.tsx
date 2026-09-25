@@ -1,5 +1,6 @@
 import { Flag, UserX } from 'lucide-react-native';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 
 import {
   Avatar,
@@ -10,7 +11,7 @@ import {
   Screen,
   SWText,
 } from '../../components';
-import { tokens } from '../../design';
+import { themedStyles, tokens, useThemedStyles } from '../../design';
 import { ListingCard } from '../marketplace/ListingCard';
 import { previewListings, previewSellers } from '../preview/sample-data';
 
@@ -28,6 +29,7 @@ export function SellerProfileView({
   onOpenListing,
   onReport,
 }: SellerProfileViewProps) {
+  const styles = useThemedStyles(stylesFor);
   const seller = handle ? previewSellers[handle] : undefined;
 
   if (!seller) {
@@ -60,9 +62,9 @@ export function SellerProfileView({
       contentStyle={styles.content}
     >
       <Reveal index={0} style={styles.identity}>
-        <Avatar source={seller.user.avatar} name={seller.user.handle} size={72} />
+        <Avatar source={seller.user.avatar} name={seller.user.handle} size={72} ring />
         <View style={styles.identityText}>
-          <SWText variant="headingLarge" accessibilityRole="header">
+          <SWText variant="displayTitle" accessibilityRole="header">
             {seller.displayName}
           </SWText>
           <SWText variant="bodySmall" tone="textSecondary">
@@ -92,10 +94,17 @@ export function SellerProfileView({
           />
         ) : (
           <View style={styles.grid}>
-            {listings.map((listing) => (
-              <View key={listing.id} style={styles.cell}>
-                <ListingCard listing={listing} onPress={() => onOpenListing?.(listing.id)} />
-              </View>
+            {listings.map((listing, index) => (
+              <Animated.View
+                key={listing.id}
+                entering={FadeInDown.springify()
+                  .damping(18)
+                  .delay(Math.min(index, 4) * 50)}
+                layout={LinearTransition.springify().damping(20)}
+                style={styles.cell}
+              >
+                <ListingCard listing={listing} onOpen={() => onOpenListing?.(listing.id)} />
+              </Animated.View>
             ))}
           </View>
         )}
@@ -104,7 +113,7 @@ export function SellerProfileView({
   );
 }
 
-const styles = StyleSheet.create({
+const stylesFor = themedStyles((colors) => ({
   content: {
     paddingTop: tokens.spacing[4],
     gap: tokens.spacing[6],
@@ -122,7 +131,7 @@ const styles = StyleSheet.create({
     gap: tokens.spacing[3],
     paddingTop: tokens.spacing[6],
     borderTopWidth: tokens.border.hairline,
-    borderTopColor: tokens.color.dark.borderSubtle,
+    borderTopColor: colors.borderSubtle,
   },
   grid: {
     flexDirection: 'row',
@@ -134,4 +143,4 @@ const styles = StyleSheet.create({
     flexBasis: '46%',
     flexGrow: 1,
   },
-});
+}));

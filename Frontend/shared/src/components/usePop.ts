@@ -1,9 +1,15 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, Platform } from 'react-native';
+import {
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 
-import { tokens, useMotionPreference } from '../design';
-
-const useNativeDriver = Platform.OS !== 'web';
+import { tokens } from '../design';
 
 export interface PopOptions {
   /** Peak scale; below 1 makes the pop a dip, e.g. for withdrawing a like. */
@@ -13,40 +19,31 @@ export interface PopOptions {
 }
 
 /**
- * A scale that swells and squash-settles whenever `trigger` changes, never on mount. Both
- * beats together stay inside the artistic-motion ceiling, and reduced motion skips it.
+ * A scale style that swells and springs back whenever `trigger` changes, never on mount. The
+ * rise is a quick timing; the return is a playful spring, so it lands with a little life.
  */
 export function usePop(
   trigger: unknown,
   { peak = tokens.motion.pop.scale, enabled = true }: PopOptions = {},
 ) {
-  const { reduceMotion } = useMotionPreference();
-  const scale = useRef(new Animated.Value(1)).current;
+  const reduceMotion = useReducedMotion();
+  const scale = useSharedValue(1);
   const previous = useRef(trigger);
 
   useEffect(() => {
     if (Object.is(previous.current, trigger)) return;
     previous.current = trigger;
     if (!enabled || reduceMotion) return;
-
-    const { duration, pop } = tokens.motion;
-    Animated.sequence([
-      Animated.timing(scale, {
-        toValue: peak,
-        duration: duration.popRise,
+    scale.value = withSequence(
+      withTiming(peak, {
+        duration: tokens.motion.duration.popRise,
         easing: Easing.out(Easing.quad),
-        useNativeDriver,
       }),
-      Animated.timing(scale, {
-        toValue: 1,
-        duration: duration.popSettle,
-        easing: Easing.out(Easing.back(pop.overshoot)),
-        useNativeDriver,
-      }),
-    ]).start();
+      withSpring(1, tokens.motion.spring.playful),
+    );
   }, [enabled, peak, reduceMotion, scale, trigger]);
 
-  return scale;
+  return useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 }
 
 /**
@@ -54,25 +51,24 @@ export function usePop(
  * it falls, so the direction of the change reads without comparing digits.
  */
 export function useCountShift(count: number) {
-  const { reduceMotion } = useMotionPreference();
-  const translateY = useRef(new Animated.Value(0)).current;
-  const opacity = useRef(new Animated.Value(1)).current;
+  const reduceMotion = useReducedMotion();
+  const offset = useSharedValue(0);
+  const opacity = useSharedValue(1);
   const previous = useRef(count);
 
   useEffect(() => {
     const delta = count - previous.current;
     previous.current = count;
     if (delta === 0 || reduceMotion) return;
+    const distance = tokens.motion.countShift.offsetY;
+    offset.value = delta > 0 ? distance : -distance;
+    opacity.value = 0;
+    offset.value = withSpring(0, tokens.motion.spring.snappy);
+    opacity.value = withTiming(1, { duration: 180 });
+  }, [count, offset, opacity, reduceMotion]);
 
-    const { countShift, recipe } = tokens.motion;
-    translateY.setValue(delta > 0 ? countShift.offsetY : -countShift.offsetY);
-    opacity.setValue(0);
-    const timing = { duration: recipe.functionalTransition.durationMs, useNativeDriver };
-    Animated.parallel([
-      Animated.timing(translateY, { ...timing, toValue: 0, easing: Easing.out(Easing.cubic) }),
-      Animated.timing(opacity, { ...timing, toValue: 1, easing: Easing.out(Easing.quad) }),
-    ]).start();
-  }, [count, opacity, reduceMotion, translateY]);
-
-  return { opacity, transform: [{ translateY }] };
+  return useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: offset.value }],
+  }));
 }

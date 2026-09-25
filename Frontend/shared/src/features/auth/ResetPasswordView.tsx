@@ -1,9 +1,9 @@
 import { MailCheck } from 'lucide-react-native';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import Animated, { ZoomIn } from 'react-native-reanimated';
 
 import { Button, Field, NavHeader, Reveal, Screen, SWText, TextField } from '../../components';
-import { tokens } from '../../design';
+import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 
 export interface ResetPasswordViewProps {
   readonly onBack?: () => void;
@@ -17,6 +17,8 @@ type Status = 'idle' | 'sending' | 'sent' | 'error';
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function ResetPasswordView({ onBack, onSendLink, onBackToLogin }: ResetPasswordViewProps) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(stylesFor);
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<Status>('idle');
   const valid = emailPattern.test(email.trim());
@@ -30,11 +32,15 @@ export function ResetPasswordView({ onBack, onSendLink, onBackToLogin }: ResetPa
 
   if (status === 'sent') {
     return (
-      <Screen header={<NavHeader title="" onBack={onBack} />} contentStyle={styles.content}>
+      <Screen
+        ambient="aurora"
+        header={<NavHeader title="" onBack={onBack} />}
+        contentStyle={styles.content}
+      >
         <Reveal index={0} style={styles.intro}>
-          <View style={styles.icon}>
-            <MailCheck size={24} strokeWidth={1.75} color={tokens.color.dark.voteRight} />
-          </View>
+          <Animated.View entering={ZoomIn.springify().damping(14)} style={styles.icon}>
+            <MailCheck size={24} strokeWidth={1.75} color={colors.success} />
+          </Animated.View>
           <SWText variant="displayHero" accessibilityRole="header">
             Check your inbox.
           </SWText>
@@ -55,7 +61,11 @@ export function ResetPasswordView({ onBack, onSendLink, onBackToLogin }: ResetPa
   }
 
   return (
-    <Screen header={<NavHeader title="" onBack={onBack} />} contentStyle={styles.content}>
+    <Screen
+      ambient="aurora"
+      header={<NavHeader title="" onBack={onBack} />}
+      contentStyle={styles.content}
+    >
       <Reveal index={0} style={styles.intro}>
         <SWText variant="displayHero" accessibilityRole="header">
           Reset your password.
@@ -96,7 +106,8 @@ export function ResetPasswordView({ onBack, onSendLink, onBackToLogin }: ResetPa
       <Reveal index={2} style={styles.actions}>
         <Button
           label={status === 'sending' ? 'Sending…' : 'Send reset link'}
-          disabled={!valid || status === 'sending'}
+          loading={status === 'sending'}
+          disabled={!valid}
           onPress={send}
         />
       </Reveal>
@@ -104,7 +115,7 @@ export function ResetPasswordView({ onBack, onSendLink, onBackToLogin }: ResetPa
   );
 }
 
-const styles = StyleSheet.create({
+const stylesFor = themedStyles((colors) => ({
   content: {
     paddingTop: tokens.spacing[6],
     gap: tokens.spacing[10],
@@ -118,8 +129,7 @@ const styles = StyleSheet.create({
     borderRadius: tokens.radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: tokens.border.hairline,
-    borderColor: tokens.color.dark.borderStrong,
+    backgroundColor: colors.sunken,
     marginBottom: tokens.spacing[2],
   },
   form: {
@@ -128,4 +138,4 @@ const styles = StyleSheet.create({
   actions: {
     gap: tokens.spacing[3],
   },
-});
+}));

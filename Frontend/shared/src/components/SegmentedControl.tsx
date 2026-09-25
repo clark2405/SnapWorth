@@ -1,14 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Platform, StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 
-import { tokens, useMotionPreference } from '../design';
+import { haptic, themedStyles, tokens, useThemedStyles } from '../design';
 import { PressableScale } from './PressableScale';
 import { SWText } from './SWText';
 
-const curve = tokens.motion.bezier.expressive;
-const expressive = Easing.bezier(curve[0] ?? 0, curve[1] ?? 0, curve[2] ?? 1, curve[3] ?? 1);
-const useNativeDriver = Platform.OS !== 'web';
-const inset = tokens.spacing[1] + tokens.border.hairline;
+const inset = 3;
 
 export interface SegmentedControlProps<Key extends string> {
   readonly options: readonly { readonly key: Key; readonly label: string }[];
@@ -17,44 +20,38 @@ export interface SegmentedControlProps<Key extends string> {
 }
 
 /**
- * The active segment is a single raised pill that slides to the chosen option, so the change
- * reads as one object moving rather than two segments swapping state. Until the track has been
- * measured the active segment draws its own pill, and reduced motion moves it without travel.
+ * The active segment is one raised pill that glides to the chosen option on a spring, so the
+ * change reads as a single object moving. Each change ticks with a selection haptic.
  */
 export function SegmentedControl<Key extends string>({
   options,
   value,
   onChange,
 }: SegmentedControlProps<Key>) {
-  const { reduceMotion } = useMotionPreference();
+  const reduceMotion = useReducedMotion();
+  const styles = useThemedStyles(stylesFor);
   const [trackWidth, setTrackWidth] = useState(0);
-  const offset = useRef(new Animated.Value(0)).current;
-  const placed = useRef(false);
+  const offset = useSharedValue(0);
+  const placed = useSharedValue(false);
 
   const activeIndex = Math.max(
     0,
     options.findIndex((option) => option.key === value),
   );
   const segmentWidth = trackWidth > 0 ? (trackWidth - inset * 2) / options.length : 0;
-  const measured = segmentWidth > 0;
 
   useEffect(() => {
-    if (!measured) return;
-    const toValue = activeIndex * segmentWidth;
-    if (!placed.current || reduceMotion) {
-      placed.current = true;
-      offset.setValue(toValue);
+    if (segmentWidth === 0) return;
+    const target = activeIndex * segmentWidth;
+    if (!placed.value || reduceMotion) {
+      placed.value = true;
+      offset.value = target;
       return;
     }
-    const animation = Animated.timing(offset, {
-      toValue,
-      duration: tokens.motion.recipe.functionalTransition.durationMs,
-      easing: expressive,
-      useNativeDriver,
-    });
-    animation.start();
-    return () => animation.stop();
-  }, [activeIndex, measured, offset, reduceMotion, segmentWidth]);
+    offset.value = withSpring(target, tokens.motion.spring.snappy);
+  }, [activeIndex, offset, placed, reduceMotion, segmentWidth]);
+
+  const pillStyle = useAnimatedStyle(() => ({ transform: [{ translateX: offset.value }] }));
 
   return (
     <View
@@ -62,14 +59,8 @@ export function SegmentedControl<Key extends string>({
       style={styles.track}
       onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
     >
-      {measured ? (
-        <Animated.View
-          style={[
-            styles.pill,
-            styles.active,
-            { width: segmentWidth, transform: [{ translateX: offset }] },
-          ]}
-        />
+      {segmentWidth > 0 ? (
+        <Animated.View style={[styles.pill, { width: segmentWidth }, pillStyle]} />
       ) : null}
       {options.map((option) => {
         const active = option.key === value;
@@ -79,14 +70,15 @@ export function SegmentedControl<Key extends string>({
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             accessibilityLabel={option.label}
-            onPress={() => onChange(option.key)}
+            haptic="none"
+            onPress={() => {
+              if (!active) haptic('select');
+              onChange(option.key);
+            }}
             containerStyle={styles.slot}
-            style={[styles.segment, active && !measured ? styles.active : null]}
+            style={[styles.segment, active && segmentWidth === 0 ? styles.pillStatic : null]}
           >
-            <SWText
-              variant={active ? 'labelSmall' : 'labelMedium'}
-              tone={active ? 'textPrimary' : 'textMuted'}
-            >
+            <SWText variant="labelSmall" tone={active ? 'textPrimary' : 'textMuted'}>
               {option.label}
             </SWText>
           </PressableScale>
@@ -96,39 +88,36 @@ export function SegmentedControl<Key extends string>({
   );
 }
 
-const segmentRadius = tokens.radius.medium - tokens.spacing[1];
-
-const styles = StyleSheet.create({
+const stylesFor = themedStyles((colors, name) => ({
   track: {
     flexDirection: 'row',
-    padding: tokens.spacing[1],
-    borderRadius: tokens.radius.medium,
-    borderWidth: tokens.border.hairline,
-    borderColor: tokens.color.dark.borderSubtle,
-    backgroundColor: tokens.color.dark.sunken,
+    padding: inset,
+    borderRadius: tokens.radius.full,
+    backgroundColor: colors.sunken,
   },
   slot: {
     flex: 1,
   },
   pill: {
     position: 'absolute',
+    top: inset,
+    bottom: inset,
+    left: inset,
+    borderRadius: tokens.radius.full,
+    backgroundColor: name === 'dark' ? colors.borderStrong : colors.surface,
+    shadowColor: tokens.shadow[name],
+    shadowOpacity: 1,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
     pointerEvents: 'none',
-    top: tokens.spacing[1],
-    bottom: tokens.spacing[1],
-    left: tokens.spacing[1],
-    borderRadius: segmentRadius,
-    borderWidth: tokens.border.hairline,
+  },
+  pillStatic: {
+    backgroundColor: name === 'dark' ? colors.borderStrong : colors.surface,
   },
   segment: {
-    minHeight: tokens.layout.inputHeight - tokens.spacing[3],
-    borderRadius: segmentRadius,
+    minHeight: 36,
+    borderRadius: tokens.radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: tokens.border.hairline,
-    borderColor: 'transparent',
   },
-  active: {
-    backgroundColor: tokens.color.dark.surfaceRaised,
-    borderColor: tokens.color.dark.borderStrong,
-  },
-});
+}));

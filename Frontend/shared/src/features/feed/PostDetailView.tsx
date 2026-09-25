@@ -1,52 +1,105 @@
-import { ArrowUpRight, Flag, Menu, Trash2 } from 'lucide-react-native';
-import { useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { ArrowUp, Flag, Share as ShareIcon, Trash2 } from 'lucide-react-native';
+import { useCallback, useRef, useState } from 'react';
+import { TextInput, View, type ImageSourcePropType } from 'react-native';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 
 import {
   Avatar,
   BottomBar,
-  hideWebFocusOutline,
+  EstimateBadge,
   IconButton,
   NavHeader,
   Photo,
   Reveal,
   Screen,
   SWText,
+  VerdictBar,
   VoteChips,
+  ZoomTarget,
+  hideWebFocusOutline,
+  typeStyle,
+  useToast,
 } from '../../components';
-import { tokens } from '../../design';
+import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import type { VoteChoice } from '../../types';
-import { previewPostDetail } from '../preview/sample-data';
+import { previewPostDetail, previewProfile } from '../preview/sample-data';
 
 export interface PostDetailViewProps {
   readonly postId?: string;
   readonly onBack?: () => void;
-  readonly onMenu?: () => void;
+  readonly onShare?: () => void;
   readonly onSubmitComment?: (body: string) => void;
   readonly onReportComment?: (commentId: string) => void;
   readonly onDeleteComment?: (commentId: string) => void;
 }
 
+interface PostComment {
+  readonly id: string;
+  readonly author: { readonly handle: string; readonly avatar: ImageSourcePropType };
+  readonly body: string;
+  readonly postedAgo: string;
+  readonly mine: boolean;
+}
+
+/**
+ * The discussion behind one post: the photo runs full-bleed under a floating header, the
+ * question and community verdict sit below it, and comments arrive from a floating composer,
+ * appended live with the same entrance every reveal on the page uses.
+ */
 export function PostDetailView({
   onBack,
-  onMenu,
+  onShare,
   onSubmitComment,
   onReportComment,
   onDeleteComment,
 }: PostDetailViewProps) {
   const post = previewPostDetail;
+  const { colors } = useTheme();
+  const styles = useThemedStyles(stylesFor);
+  const toast = useToast();
   const [vote, setVote] = useState<VoteChoice | null>(null);
+  const [comments, setComments] = useState<readonly PostComment[]>(post.comments);
   const [draft, setDraft] = useState('');
+  const counter = useRef(0);
   const canSend = draft.trim().length > 0;
+  // The detail preview has no discrete `estimate` field yet; the AI number the author is asking
+  // about lives inside their question, so it is read from there for the hero badge.
+  const estimateValue = post.body.match(/₱[\d,]+/)?.[0];
+
+  const submit = useCallback(() => {
+    const body = draft.trim();
+    if (!body) return;
+    counter.current += 1;
+    setComments((current) => [
+      {
+        id: `local-${counter.current}`,
+        author: previewProfile.user,
+        body,
+        postedAgo: 'Just now',
+        mine: true,
+      },
+      ...current,
+    ]);
+    setDraft('');
+    onSubmitComment?.(body);
+    toast.show({ title: 'Comment posted' });
+  }, [draft, onSubmitComment, toast]);
 
   return (
     <Screen
+      bleedTop
       header={
         <NavHeader
           title="Discussion"
           onBack={onBack}
-          banded
-          trailing={<IconButton icon={Menu} label="Post menu" onPress={onMenu} />}
+          trailing={
+            <IconButton
+              icon={ShareIcon}
+              label="Share this post"
+              appearance="glass"
+              onPress={onShare}
+            />
+          }
         />
       }
       footer={
@@ -56,107 +109,137 @@ export function PostDetailView({
               value={draft}
               onChangeText={setDraft}
               placeholder="Add your take on the price"
-              placeholderTextColor={tokens.color.dark.textMuted}
-              selectionColor={tokens.color.dark.accent}
+              placeholderTextColor={colors.textMuted}
+              selectionColor={colors.accent}
               accessibilityLabel="Write a comment"
-              style={[styles.composerInput, hideWebFocusOutline]}
+              multiline
+              style={[
+                styles.composerInput,
+                typeStyle('bodyLarge'),
+                { color: colors.textPrimary, lineHeight: undefined },
+                hideWebFocusOutline,
+              ]}
             />
             <IconButton
-              icon={ArrowUpRight}
+              icon={ArrowUp}
               label="Post comment"
               appearance="accent"
               size={18}
-              onPress={() => {
-                if (!canSend) return;
-                onSubmitComment?.(draft.trim());
-                setDraft('');
-              }}
+              haptic={canSend ? 'pop' : 'none'}
+              onPress={submit}
             />
           </View>
         </BottomBar>
       }
       contentStyle={styles.content}
     >
-      <Reveal index={0} style={styles.author}>
-        <Avatar source={post.author.avatar} name={post.author.handle} size={40} />
-        <View>
-          <SWText variant="label">@{post.author.handle}</SWText>
-          <SWText variant="caption" tone="textMuted">
-            {post.createdAgo}
+      <ZoomTarget>
+        <Photo source={post.photo} label={post.photoLabel} aspectRatio={4 / 3} radius={0} />
+      </ZoomTarget>
+
+      <View style={styles.body}>
+        <Reveal index={0} style={styles.author}>
+          <Avatar source={post.author.avatar} name={post.author.handle} size={40} />
+          <View>
+            <SWText variant="label">@{post.author.handle}</SWText>
+            <SWText variant="caption" tone="textMuted">
+              {post.createdAgo}
+            </SWText>
+          </View>
+        </Reveal>
+
+        <Reveal index={1} style={styles.question}>
+          {estimateValue ? <EstimateBadge value={estimateValue} size="hero" /> : null}
+          <SWText variant="bodyLarge">{post.body}</SWText>
+        </Reveal>
+
+        <Reveal index={2} style={styles.verdict}>
+          <VerdictBar tally={post.votes} />
+          <VoteChips
+            tally={post.votes}
+            selected={vote}
+            onVote={(choice) => setVote((current) => (current === choice ? null : choice))}
+          />
+        </Reveal>
+
+        <Reveal index={3}>
+          <SWText variant="headingMedium" accessibilityRole="header">
+            {comments.length} {comments.length === 1 ? 'comment' : 'comments'}
           </SWText>
-        </View>
-      </Reveal>
+        </Reveal>
 
-      <Reveal index={1} style={styles.post}>
-        <SWText variant="bodyMedium">{post.body}</SWText>
-        <Photo source={post.photo} label={post.photoLabel} aspectRatio={362 / 239} />
-        <VoteChips
-          tally={post.votes}
-          selected={vote}
-          onVote={(choice) => setVote((current) => (current === choice ? null : choice))}
-        />
-      </Reveal>
-
-      <Reveal index={2} style={styles.discussion}>
-        <SWText variant="headingMedium" accessibilityRole="header">
-          {post.comments.length} comments
-        </SWText>
-        {post.comments.map((comment) => (
-          <View key={comment.id} style={styles.comment}>
-            <Avatar source={comment.author.avatar} name={comment.author.handle} size={32} />
-            <View style={styles.commentBody}>
-              <View style={styles.commentHeader}>
-                <SWText variant="labelSmall">@{comment.author.handle}</SWText>
-                <View style={styles.commentActions}>
-                  <IconButton
-                    icon={Flag}
-                    label={`Report comment by ${comment.author.handle}`}
-                    tone="textMuted"
-                    size={16}
-                    onPress={() => onReportComment?.(comment.id)}
-                  />
-                  {comment.mine ? (
+        <View style={styles.discussion}>
+          {comments.map((comment, index) => (
+            <Animated.View
+              key={comment.id}
+              entering={FadeInDown.springify()
+                .damping(18)
+                .delay(Math.min(index, 4) * 50)}
+              layout={LinearTransition.springify().damping(20)}
+              style={styles.comment}
+            >
+              <Avatar source={comment.author.avatar} name={comment.author.handle} size={32} />
+              <View style={styles.commentBody}>
+                <View style={styles.commentHeader}>
+                  <SWText variant="labelSmall">@{comment.author.handle}</SWText>
+                  <View style={styles.commentActions}>
                     <IconButton
-                      icon={Trash2}
-                      label="Delete your comment"
+                      icon={Flag}
+                      label={`Report comment by ${comment.author.handle}`}
                       tone="textMuted"
                       size={16}
-                      onPress={() => onDeleteComment?.(comment.id)}
+                      onPress={() => onReportComment?.(comment.id)}
                     />
-                  ) : null}
+                    {comment.mine ? (
+                      <IconButton
+                        icon={Trash2}
+                        label="Delete your comment"
+                        tone="textMuted"
+                        size={16}
+                        onPress={() => {
+                          setComments((current) => current.filter((c) => c.id !== comment.id));
+                          onDeleteComment?.(comment.id);
+                        }}
+                      />
+                    ) : null}
+                  </View>
                 </View>
+                <SWText variant="bodyCompact">{comment.body}</SWText>
+                <SWText variant="caption" tone="textMuted">
+                  {comment.postedAgo}
+                </SWText>
               </View>
-              <SWText variant="bodyCompact">{comment.body}</SWText>
-              <SWText variant="caption" tone="textMuted">
-                {comment.postedAgo}
-              </SWText>
-            </View>
-          </View>
-        ))}
-      </Reveal>
+            </Animated.View>
+          ))}
+        </View>
+      </View>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
+const stylesFor = themedStyles((colors) => ({
   content: {
+    paddingTop: 0,
+    paddingHorizontal: 0,
+  },
+  body: {
+    paddingHorizontal: tokens.layout.pageGutterCompact,
     paddingTop: tokens.spacing[5],
-    gap: tokens.spacing[4],
+    gap: tokens.spacing[5],
   },
   author: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing[3],
   },
-  post: {
-    gap: tokens.spacing[4],
-    paddingBottom: tokens.spacing[6],
-    borderBottomWidth: tokens.border.hairline,
-    borderBottomColor: tokens.color.dark.borderSubtle,
+  question: {
+    gap: tokens.spacing[2],
+  },
+  verdict: {
+    gap: tokens.spacing[3],
   },
   discussion: {
     gap: tokens.spacing[4],
-    paddingTop: tokens.spacing[2],
   },
   comment: {
     flexDirection: 'row',
@@ -186,13 +269,12 @@ const styles = StyleSheet.create({
   composerInput: {
     flex: 1,
     minHeight: tokens.focus.minimumTarget,
+    maxHeight: tokens.spacing[16] + tokens.spacing[8],
     paddingHorizontal: tokens.spacing[4],
+    paddingVertical: tokens.spacing[3],
     borderRadius: tokens.radius.medium,
     borderWidth: tokens.border.hairline,
-    borderColor: tokens.color.dark.borderStrong,
-    backgroundColor: tokens.color.dark.sunken,
-    color: tokens.color.dark.textPrimary,
-    fontFamily: tokens.typography.family.bodyRegular,
-    fontSize: tokens.typography.style.bodyMedium.size,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.sunken,
   },
-});
+}));

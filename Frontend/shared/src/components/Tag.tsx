@@ -1,25 +1,17 @@
 import { StyleSheet, View } from 'react-native';
 
-import { tokens, type SemanticColorName } from '../design';
+import { themedStyles, tokens, useThemedStyles, type SemanticColorName } from '../design';
 import { SWText } from './SWText';
 
-export type TagTone = 'accent' | 'neutral' | 'danger' | 'outline';
-
-const toneStyles = {
-  accent: { backgroundColor: tokens.color.dark.accent, borderColor: tokens.color.dark.accent },
-  neutral: {
-    backgroundColor: tokens.color.dark.surfaceRaised,
-    borderColor: tokens.color.dark.surfaceRaised,
-  },
-  danger: { backgroundColor: 'transparent', borderColor: tokens.color.dark.danger },
-  outline: { backgroundColor: 'transparent', borderColor: tokens.color.dark.borderStrong },
-} as const;
+export type TagTone = 'accent' | 'neutral' | 'danger' | 'outline' | 'success' | 'inverse';
 
 const textTone: Record<TagTone, SemanticColorName> = {
-  accent: 'onAccent',
+  accent: 'accent',
   neutral: 'textSecondary',
   danger: 'danger',
   outline: 'textSecondary',
+  success: 'success',
+  inverse: 'onInverse',
 };
 
 export interface TagProps {
@@ -28,8 +20,9 @@ export interface TagProps {
 }
 
 export function Tag({ label, tone = 'neutral' }: TagProps) {
+  const styles = useThemedStyles(stylesFor);
   return (
-    <View style={[styles.tag, toneStyles[tone]]}>
+    <View style={[styles.tag, styles[tone]]}>
       <SWText variant="tag" tone={textTone[tone]}>
         {label}
       </SWText>
@@ -37,12 +30,19 @@ export function Tag({ label, tone = 'neutral' }: TagProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const stylesFor = themedStyles((colors) => ({
   tag: {
     alignSelf: 'flex-start',
-    borderRadius: tokens.radius.small,
-    borderWidth: tokens.border.hairline,
-    paddingHorizontal: tokens.spacing[2],
-    paddingVertical: tokens.spacing['0.5'],
+    borderRadius: tokens.radius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'transparent',
+    paddingHorizontal: tokens.spacing[2] + 2,
+    paddingVertical: 3,
   },
-});
+  accent: { backgroundColor: colors.accentSoft },
+  neutral: { backgroundColor: colors.sunken },
+  danger: { borderColor: colors.danger },
+  outline: { borderColor: colors.borderStrong },
+  success: { backgroundColor: colors.sunken },
+  inverse: { backgroundColor: colors.inverse },
+}));

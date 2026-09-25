@@ -1,11 +1,18 @@
-import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react';
-import { Animated, Easing, Platform, type StyleProp, type ViewStyle } from 'react-native';
+import { createContext, useContext, useEffect, type ReactNode } from 'react';
+import type { StyleProp, ViewStyle } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated';
 
-import { tokens, useMotionPreference } from '../design';
+import { tokens } from '../design';
 
 const curve = tokens.motion.bezier.expressive;
 const expressive = Easing.bezier(curve[0] ?? 0, curve[1] ?? 0, curve[2] ?? 1, curve[3] ?? 1);
-const useNativeDriver = Platform.OS !== 'web';
 
 const RevealGateContext = createContext(true);
 
@@ -28,54 +35,38 @@ export interface RevealProps {
   /** Position in a staggered group. Items past the stagger cap enter with the last slot. */
   readonly index?: number;
   readonly style?: StyleProp<ViewStyle>;
+  /** Extra wait before this group starts, e.g. to follow a hero. */
+  readonly delay?: number;
 }
 
 /**
- * Entrance motion: content rises a short distance and settles in one beat. Transform and
- * opacity only, and never scale, so type stays crisp mid-flight. With reduced motion it becomes
- * a short cross-fade with no travel.
+ * Entrance motion: content rises a short distance and settles in one long, decelerating beat,
+ * cascading 50ms per sibling. Transform and opacity only, never scale, so type stays crisp.
+ * With reduced motion it becomes a short cross-fade with no travel.
  */
-export function Reveal({ children, index = 0, style }: RevealProps) {
-  const { reduceMotion, preferenceResolved } = useMotionPreference();
+export function Reveal({ children, index = 0, style, delay = 0 }: RevealProps) {
+  const reduceMotion = useReducedMotion();
   const gateOpen = useContext(RevealGateContext);
-  const progress = useRef(new Animated.Value(0)).current;
+  const progress = useSharedValue(0);
 
   useEffect(() => {
-    if (!preferenceResolved || !gateOpen) return;
-
+    if (!gateOpen) return;
     const { limits, recipe } = tokens.motion;
     const slot = Math.min(index, limits.maximumStaggerItems - 1);
-    const animation = reduceMotion
-      ? Animated.timing(progress, {
-          toValue: 1,
-          duration: recipe.reducedCrossFade.durationMs,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver,
-        })
-      : Animated.timing(progress, {
-          toValue: 1,
-          duration: recipe.entrance.durationMs,
-          delay: slot * limits.staggerInterval,
-          easing: expressive,
-          useNativeDriver,
-        });
+    progress.value = reduceMotion
+      ? withTiming(1, { duration: recipe.reducedCrossFade.durationMs })
+      : withDelay(
+          delay + slot * limits.staggerInterval,
+          withTiming(1, { duration: recipe.entrance.durationMs, easing: expressive }),
+        );
+  }, [delay, gateOpen, index, progress, reduceMotion]);
 
-    animation.start();
-    return () => animation.stop();
-  }, [gateOpen, index, preferenceResolved, progress, reduceMotion]);
+  const animated = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: reduceMotion
+      ? []
+      : [{ translateY: (1 - progress.value) * tokens.motion.entrance.offsetY }],
+  }));
 
-  const transform = reduceMotion
-    ? []
-    : [
-        {
-          translateY: progress.interpolate({
-            inputRange: [0, 1],
-            outputRange: [tokens.motion.entrance.offsetY, 0],
-          }),
-        },
-      ];
-
-  return (
-    <Animated.View style={[style, { opacity: progress, transform }]}>{children}</Animated.View>
-  );
+  return <Animated.View style={[style, animated]}>{children}</Animated.View>;
 }

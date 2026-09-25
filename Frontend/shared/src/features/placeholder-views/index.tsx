@@ -1,6 +1,7 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
 
-import { tokens } from '../../design';
+import { SWText } from '../../components';
+import { themedStyles, tokens, useThemedStyles } from '../../design';
 
 interface RoutePlaceholderProps {
   readonly title: string;
@@ -15,6 +16,7 @@ function RoutePlaceholder({
   detail = 'This route is ready for its feature implementation.',
   live = false,
 }: RoutePlaceholderProps) {
+  const styles = useThemedStyles(stylesFor);
   return (
     <View
       accessibilityLabel={`${title} screen`}
@@ -22,32 +24,30 @@ function RoutePlaceholder({
       testID="route-placeholder"
       style={styles.screen}
     >
-      <Text accessibilityRole="header" style={[styles.text, styles.title]}>
+      <SWText variant="headingLarge" accessibilityRole="header">
         {title}
-      </Text>
-      {question ? <Text style={styles.text}>{question}</Text> : null}
-      <Text style={styles.text}>{detail}</Text>
+      </SWText>
+      {question ? (
+        <SWText variant="bodyMedium" tone="textSecondary">
+          {question}
+        </SWText>
+      ) : null}
+      <SWText variant="bodyMedium" tone="textSecondary">
+        {detail}
+      </SWText>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const stylesFor = themedStyles((colors) => ({
   screen: {
     flex: 1,
     gap: tokens.spacing[2],
     padding: tokens.layout.pageGutterCompact,
     paddingTop: tokens.spacing[16],
-    backgroundColor: tokens.color.dark.canvas,
+    backgroundColor: colors.canvas,
   },
-  text: {
-    color: tokens.color.dark.textSecondary,
-    fontFamily: tokens.typography.family.bodyRegular,
-  },
-  title: {
-    color: tokens.color.dark.textPrimary,
-    fontFamily: tokens.typography.family.displayBold,
-  },
-});
+}));
 
 export interface ItemDetailViewProps {
   readonly itemId?: string;

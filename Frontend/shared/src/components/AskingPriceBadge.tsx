@@ -1,6 +1,6 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
-import { tokens } from '../design';
+import { themedStyles, tokens, useThemedStyles } from '../design';
 import { SWText } from './SWText';
 
 export interface AskingPriceBadgeProps {
@@ -9,20 +9,21 @@ export interface AskingPriceBadgeProps {
   readonly size?: 'large' | 'compact';
 }
 
-/** The seller's own price: a settled, solid treatment with no estimate language. */
+/** The seller's price: monochrome and plain, so it never borrows the estimate's authority. */
 export function AskingPriceBadge({ value, size = 'large' }: AskingPriceBadgeProps) {
+  const styles = useThemedStyles(stylesFor);
   return (
     <View accessible accessibilityLabel={`Asking price ${value}`} style={styles.asking}>
       <SWText variant="overline" tone="textMuted">
-        Asking Price
+        Asking
       </SWText>
       <SWText variant={size === 'large' ? 'priceLarge' : 'priceMedium'}>{value}</SWText>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const stylesFor = themedStyles(() => ({
   asking: {
-    gap: tokens.spacing[1],
+    gap: tokens.spacing['0.5'],
   },
-});
+}));

@@ -1,17 +1,22 @@
 import { ChevronDown } from 'lucide-react-native';
-import { useState, type ReactNode } from 'react';
-import {
-  Platform,
-  StyleSheet,
-  TextInput,
-  View,
-  type TextInputProps,
-  type TextStyle,
-} from 'react-native';
+import type { ReactNode } from 'react';
+import { Platform, TextInput, View, type TextInputProps, type TextStyle } from 'react-native';
+import Animated, {
+  interpolateColor,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
-import { tokens, type TypographyStyleName } from '../design';
+import {
+  themedStyles,
+  tokens,
+  useTheme,
+  useThemedStyles,
+  type TypographyStyleName,
+} from '../design';
 import { PressableScale } from './PressableScale';
-import { SWText } from './SWText';
+import { SWText, typeStyle } from './SWText';
 
 /**
  * Browsers draw their own focus outline on text fields; the field border shows focus instead.
@@ -28,16 +33,17 @@ export interface FieldProps {
 
 /** A label above a control, with optional helper text below. */
 export function Field({ label, helper, children }: FieldProps) {
+  const styles = useThemedStyles(stylesFor);
   return (
     <View style={styles.field}>
       {label ? (
-        <SWText variant="labelMedium" tone="textSecondary">
+        <SWText variant="labelSmall" tone="textSecondary" style={styles.fieldLabel}>
           {label}
         </SWText>
       ) : null}
       {children}
       {helper ? (
-        <SWText variant="caption" tone="textMuted">
+        <SWText variant="caption" tone="textMuted" style={styles.fieldLabel}>
           {helper}
         </SWText>
       ) : null}
@@ -48,42 +54,63 @@ export function Field({ label, helper, children }: FieldProps) {
 export interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   readonly prefix?: string;
   readonly size?: 'regular' | 'large';
+  /** Leading glyph, e.g. a search icon. */
+  readonly leading?: ReactNode;
 }
 
-export function TextField({ prefix, size = 'regular', onFocus, onBlur, ...rest }: TextFieldProps) {
-  const [focused, setFocused] = useState(false);
-  const textVariant: TypographyStyleName = size === 'large' ? 'priceMedium' : 'bodyMedium';
-  const text = tokens.typography.style[textVariant];
+/**
+ * A filled field. Focus is shown by the edge warming to the accent and the well lifting a step,
+ * both eased over 180ms so the change reads as attention, not a flicker.
+ */
+export function TextField({
+  prefix,
+  size = 'regular',
+  leading,
+  onFocus,
+  onBlur,
+  ...rest
+}: TextFieldProps) {
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(stylesFor);
+  const focus = useSharedValue(0);
+  const textVariant: TypographyStyleName = size === 'large' ? 'priceLarge' : 'bodyLarge';
+
+  const boxStyle = useAnimatedStyle(() => ({
+    borderColor: interpolateColor(focus.value, [0, 1], [colors.sunken, colors.focusRing]),
+    backgroundColor: interpolateColor(focus.value, [0, 1], [colors.sunken, colors.surface]),
+  }));
 
   return (
-    <View
-      style={[styles.box, size === 'large' ? styles.large : null, focused ? styles.focused : null]}
-    >
+    <Animated.View style={[styles.box, size === 'large' ? styles.large : null, boxStyle]}>
+      {leading}
       {prefix ? (
-        <SWText variant={textVariant} tone="textSecondary">
+        <SWText variant={textVariant} tone="textMuted">
           {prefix}
         </SWText>
       ) : null}
       <TextInput
-        placeholderTextColor={tokens.color.dark.textMuted}
-        selectionColor={tokens.color.dark.accent}
+        placeholderTextColor={colors.textMuted}
+        selectionColor={colors.accent}
+        cursorColor={colors.accent}
+        keyboardAppearance={isDark ? 'dark' : 'light'}
         onFocus={(event) => {
-          setFocused(true);
+          focus.value = withTiming(1, { duration: 180 });
           onFocus?.(event);
         }}
         onBlur={(event) => {
-          setFocused(false);
+          focus.value = withTiming(0, { duration: 180 });
           onBlur?.(event);
         }}
         style={[
           styles.input,
           hideWebFocusOutline,
-          { fontFamily: text.family, fontSize: text.size },
+          typeStyle(textVariant),
+          { color: colors.textPrimary, lineHeight: undefined },
           size === 'large' ? styles.tabular : null,
         ]}
         {...rest}
       />
-    </View>
+    </Animated.View>
   );
 }
 
@@ -93,50 +120,53 @@ export interface SelectFieldProps {
   readonly onPress?: () => void;
 }
 
-/** A closed select that shows its value and a chevron; the picker itself opens elsewhere. */
+/** A field that opens a picker. */
 export function SelectField({ value, accessibilityLabel, onPress }: SelectFieldProps) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(stylesFor);
   return (
     <PressableScale
       accessibilityLabel={`${accessibilityLabel}: ${value}`}
       onPress={onPress}
+      haptic="select"
+      depth="surface"
       style={({ pressed }) => [styles.box, styles.select, pressed ? styles.pressed : null]}
     >
-      <SWText variant="bodyMedium" style={styles.selectValue}>
+      <SWText variant="bodyLarge" style={styles.selectValue}>
         {value}
       </SWText>
-      <ChevronDown size={18} strokeWidth={2} color={tokens.color.dark.textMuted} />
+      <ChevronDown size={18} strokeWidth={2} color={colors.textMuted} />
     </PressableScale>
   );
 }
 
-const styles = StyleSheet.create({
+const stylesFor = themedStyles((colors) => ({
   field: {
     gap: tokens.spacing[2],
   },
+  fieldLabel: {
+    paddingHorizontal: tokens.spacing[1],
+  },
   box: {
-    minHeight: tokens.layout.inputHeight,
+    minHeight: tokens.layout.controlHeight,
     borderRadius: tokens.radius.medium,
-    borderWidth: tokens.border.hairline,
-    borderColor: tokens.color.dark.borderStrong,
-    backgroundColor: tokens.color.dark.sunken,
+    borderWidth: 1.5,
+    borderColor: colors.sunken,
+    backgroundColor: colors.sunken,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: tokens.spacing[4],
     gap: tokens.spacing[2],
   },
   large: {
-    minHeight: tokens.spacing[16],
-  },
-  focused: {
-    borderColor: tokens.color.dark.focusRing,
+    minHeight: tokens.spacing[16] + tokens.spacing[2],
   },
   pressed: {
-    backgroundColor: tokens.color.dark.surface,
+    backgroundColor: colors.borderSubtle,
   },
   input: {
     flex: 1,
     alignSelf: 'stretch',
-    color: tokens.color.dark.textPrimary,
   },
   tabular: {
     fontVariant: ['tabular-nums'],
@@ -147,4 +177,4 @@ const styles = StyleSheet.create({
   selectValue: {
     flex: 1,
   },
-});
+}));

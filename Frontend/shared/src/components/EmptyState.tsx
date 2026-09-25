@@ -1,7 +1,8 @@
 import type { LucideIcon } from 'lucide-react-native';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
+import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 
-import { tokens } from '../design';
+import { themedStyles, tokens, useTheme, useThemedStyles } from '../design';
 import { Button } from './Button';
 import { SWText } from './SWText';
 
@@ -16,7 +17,6 @@ export interface EmptyStateProps {
   readonly tone?: 'neutral' | 'error';
 }
 
-/** What a list says when it has nothing to show, or could not load. */
 export function EmptyState({
   icon: Icon,
   title,
@@ -25,29 +25,36 @@ export function EmptyState({
   onAction,
   tone = 'neutral',
 }: EmptyStateProps) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(stylesFor);
+
   return (
     <View style={styles.root} accessibilityLiveRegion="polite">
-      <View style={styles.icon}>
+      <Animated.View entering={ZoomIn.springify().damping(14)} style={styles.icon}>
         <Icon
-          size={22}
+          size={24}
           strokeWidth={1.75}
-          color={tokens.color.dark[tone === 'error' ? 'danger' : 'textSecondary']}
+          color={tone === 'error' ? colors.danger : colors.textSecondary}
         />
-      </View>
-      <View style={styles.text}>
-        <SWText variant="headingMedium" align="center">
+      </Animated.View>
+      <Animated.View entering={FadeInDown.delay(80).duration(420)} style={styles.text}>
+        <SWText variant="headingLarge" align="center">
           {title}
         </SWText>
-        <SWText variant="bodySmall" tone="textMuted" align="center">
+        <SWText variant="bodyMedium" tone="textMuted" align="center">
           {body}
         </SWText>
-      </View>
-      {actionLabel ? <Button label={actionLabel} variant="secondary" onPress={onAction} /> : null}
+      </Animated.View>
+      {actionLabel ? (
+        <Animated.View entering={FadeInDown.delay(160).duration(420)}>
+          <Button label={actionLabel} variant="secondary" size="medium" onPress={onAction} />
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const stylesFor = themedStyles((colors) => ({
   root: {
     alignItems: 'center',
     gap: tokens.spacing[4],
@@ -55,16 +62,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: tokens.spacing[4],
   },
   icon: {
-    width: tokens.spacing[12],
-    height: tokens.spacing[12],
+    width: 64,
+    height: 64,
     borderRadius: tokens.radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: tokens.border.hairline,
-    borderColor: tokens.color.dark.borderStrong,
+    backgroundColor: colors.sunken,
   },
   text: {
-    gap: tokens.spacing[1],
+    gap: tokens.spacing[2],
     maxWidth: tokens.layout.phoneColumn - tokens.spacing[16],
   },
-});
+}));

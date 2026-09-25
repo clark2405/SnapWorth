@@ -8,6 +8,7 @@ export default function HistoryRoute() {
   return (
     <HistoryView
       onOpenItem={(itemId) => router.push(`/item/${itemId}`)}
+      onListItem={(itemId) => router.push(`/list/${itemId}`)}
       onSearch={() => router.push('/search?scope=history')}
       onOpenProfile={() => router.push('/profile')}
     />
