@@ -4,6 +4,7 @@ import {
   CircleHelp,
   LogOut,
   ShieldAlert,
+  Sparkles,
   TrendingDown,
 } from 'lucide-react-native';
 import { View } from 'react-native';
@@ -38,7 +39,14 @@ import {
 } from '../preview/sample-data';
 
 export type ProfileDestination =
-  'edit-profile' | 'notifications' | 'price-alerts' | 'privacy' | 'moderation' | 'help' | 'terms';
+  | 'edit-profile'
+  | 'notifications'
+  | 'price-alerts'
+  | 'privacy'
+  | 'moderation'
+  | 'help'
+  | 'terms'
+  | 'introduction';
 
 export interface ProfileViewProps {
   readonly onBack?: () => void;
@@ -149,6 +157,12 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
             />
           ) : null}
           <ListRow label="Help" icon={CircleHelp} onPress={() => onOpen?.('help')} />
+          <ListRow
+            label="Replay introduction"
+            detail="See how SnapWorth works"
+            icon={Sparkles}
+            onPress={() => onOpen?.('introduction')}
+          />
         </ListGroup>
 
         <ListGroup>

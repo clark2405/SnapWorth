@@ -54,6 +54,11 @@ export interface OnboardingViewProps {
   readonly onSignIn?: () => void;
   /** Leaves the introduction early. */
   readonly onSkip?: () => void;
+  /**
+   * `replay` is the introduction reopened from Settings by someone already signed in: it closes
+   * instead of skipping, ends on Done, and has no sign-in line.
+   */
+  readonly mode?: 'first-run' | 'replay';
 }
 
 const steps = [
@@ -129,7 +134,14 @@ const bubbles: readonly Bubble[] = [
  * aside as the community's votes arrive. Every layer is a function of the pager's offset on the
  * UI thread, so a swipe scrubs the story under the finger and Continue plays the same path.
  */
-export function OnboardingView({ onGetStarted, onSignIn, onSkip }: OnboardingViewProps) {
+export function OnboardingView({
+  onGetStarted,
+  onSignIn,
+  onSkip,
+  mode = 'first-run',
+}: OnboardingViewProps) {
+  const replay = mode === 'replay';
+  const finishLabel = replay ? 'Done' : 'Get started';
   const insets = useSafeAreaInsets();
   const styles = useThemedStyles(stylesFor);
   const reduceMotion = useReducedMotion();
@@ -233,13 +245,13 @@ export function OnboardingView({ onGetStarted, onSignIn, onSkip }: OnboardingVie
           <Animated.View style={skipStyle} pointerEvents={last ? 'none' : 'auto'}>
             <PressableScale
               accessibilityRole="button"
-              accessibilityLabel="Skip the introduction"
+              accessibilityLabel={replay ? 'Close the introduction' : 'Skip the introduction'}
               onPress={onSkip}
               hitSlop={tokens.spacing[2]}
               style={styles.skip}
             >
               <SWText variant="label" tone="textSecondary">
-                Skip
+                {replay ? 'Close' : 'Skip'}
               </SWText>
             </PressableScale>
           </Animated.View>
@@ -300,8 +312,8 @@ export function OnboardingView({ onGetStarted, onSignIn, onSkip }: OnboardingVie
 
           <PressableScale
             accessibilityRole="button"
-            accessibilityLabel={last ? 'Get started' : 'Continue'}
-            accessibilityHint={last ? 'Creates your SnapWorth account' : undefined}
+            accessibilityLabel={last ? finishLabel : 'Continue'}
+            accessibilityHint={last && !replay ? 'Creates your SnapWorth account' : undefined}
             haptic={last ? 'pop' : 'tap'}
             onPress={advance}
             style={({ pressed }) => [styles.primary, pressed ? styles.primaryPressed : null]}
@@ -313,25 +325,27 @@ export function OnboardingView({ onGetStarted, onSignIn, onSkip }: OnboardingVie
             </Animated.View>
             <Animated.View style={[styles.primaryLabel, startStyle]}>
               <SWText variant="button" tone="onInverse">
-                Get started
+                {finishLabel}
               </SWText>
             </Animated.View>
           </PressableScale>
 
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityLabel="I already have an account. Sign in"
-            haptic="none"
-            onPress={onSignIn}
-            style={styles.signIn}
-          >
-            <SWText variant="bodyMedium" tone="textSecondary">
-              Have an account?{' '}
-              <SWText variant="label" tone="textPrimary">
-                Sign in
+          {replay ? null : (
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel="I already have an account. Sign in"
+              haptic="none"
+              onPress={onSignIn}
+              style={styles.signIn}
+            >
+              <SWText variant="bodyMedium" tone="textSecondary">
+                Have an account?{' '}
+                <SWText variant="label" tone="textPrimary">
+                  Sign in
+                </SWText>
               </SWText>
-            </SWText>
-          </PressableScale>
+            </PressableScale>
+          )}
         </Reveal>
       </View>
     </View>

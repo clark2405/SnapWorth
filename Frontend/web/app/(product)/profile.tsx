@@ -11,6 +11,7 @@ export default function ProfileRoute() {
       onOpen={(destination) => {
         // Only moderation has a screen so far; the other settings are not built yet.
         if (destination === 'moderation') router.push('/admin/review');
+        if (destination === 'introduction') router.push('/onboarding?replay=1');
       }}
       // Preview wiring: there is no session to end yet, so logging out returns to login.
       onLogOut={() => router.replace('/login')}
