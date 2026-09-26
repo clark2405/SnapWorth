@@ -223,7 +223,7 @@ export function Companion({
       ) : null}
       {showHint && hint && !open ? (
         <Animated.View
-          entering={FadeInDown.springify().damping(16)}
+          entering={glassEntering}
           exiting={FadeOut.duration(160)}
           style={[
             styles.hint,
@@ -261,6 +261,21 @@ export function Companion({
       </GestureDetector>
     </View>
   );
+}
+
+/**
+ * Entrance for anything holding Liquid Glass: it rises and swells into place without touching
+ * opacity, which would leave the glass unrendered on iOS 26.
+ */
+function glassEntering() {
+  'worklet';
+  const spring = { damping: 16, stiffness: 240, mass: 0.8 };
+  return {
+    initialValues: { transform: [{ translateY: 10 }, { scale: 0.6 }] },
+    animations: {
+      transform: [{ translateY: withSpring(0, spring) }, { scale: withSpring(1, spring) }],
+    },
+  };
 }
 
 function CompanionPanel({
@@ -306,9 +321,10 @@ function CompanionPanel({
     return () => clearInterval(timer);
   }, [greeting, reduceMotion]);
 
+  // Scale and travel only: Liquid Glass drops its material if an ancestor's opacity animates,
+  // so the panel grows out of the orb instead of fading in.
   const panelStyle = useAnimatedStyle(() => ({
-    opacity: Math.min(1, bloom.value * 1.4),
-    transform: [{ translateY: (1 - bloom.value) * 40 }, { scale: 0.6 + bloom.value * 0.4 }],
+    transform: [{ translateY: (1 - bloom.value) * 40 }, { scale: 0.25 + bloom.value * 0.75 }],
   }));
   const scrimStyle = useAnimatedStyle(() => ({ opacity: bloom.value }));
 

@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../design';
 import { AmbientBackdrop, type AmbientBackdropProps } from './AmbientBackdrop';
-import { GlassSurface } from './GlassSurface';
+import { ScrollEdge } from './ScrollEdge';
 import { SWText } from './SWText';
 
 interface ScreenScrollState {
@@ -61,7 +61,7 @@ export interface ScreenProps {
 
 /**
  * The shell every screen sits in. Headers and footers float as glass over the content, so the
- * page scrolls beneath them; a large title in the content hands off to a compact glass bar as it
+ * page scrolls beneath them; a large title in the content hands off to a compact title as it
  * scrolls away, the way system apps do.
  */
 export function Screen({
@@ -179,7 +179,7 @@ export function Screen({
   );
 }
 
-/** The bar a large title collapses into; invisible until the title has scrolled away. */
+/** The soft edge a large title collapses into; invisible until the title has scrolled away. */
 function CompactTitleBar({
   title,
   topInset,
@@ -210,13 +210,12 @@ function CompactTitleBar({
 
   return (
     <Animated.View style={[styles.compact, barStyle]}>
-      <GlassSurface style={[styles.compactGlass, { paddingTop: topInset }]}>
-        <Animated.View style={[styles.compactTitle, titleStyle]}>
-          <SWText variant="headingMedium" numberOfLines={1}>
-            {title}
-          </SWText>
-        </Animated.View>
-      </GlassSurface>
+      <ScrollEdge solid={topInset + tokens.layout.headerCompact} />
+      <Animated.View style={[styles.compactTitle, { marginTop: topInset }, titleStyle]}>
+        <SWText variant="headingMedium" numberOfLines={1}>
+          {title}
+        </SWText>
+      </Animated.View>
     </Animated.View>
   );
 }
@@ -271,9 +270,6 @@ const stylesFor = themedStyles((colors) => ({
     left: 0,
     right: 0,
     pointerEvents: 'none',
-  },
-  compactGlass: {
-    borderWidth: 0,
   },
   compactTitle: {
     height: tokens.layout.headerCompact - tokens.spacing[1],

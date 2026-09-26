@@ -1,12 +1,13 @@
 import { ChevronLeft } from 'lucide-react-native';
 import type { ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import Animated, { Extrapolation, interpolate, useAnimatedStyle } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { themedStyles, tokens, useThemedStyles } from '../design';
-import { GlassSurface } from './GlassSurface';
 import { IconButton } from './IconButton';
 import { useRegisterLargeTitle, useScreenScroll } from './Screen';
+import { ScrollEdge } from './ScrollEdge';
 import { SWText } from './SWText';
 
 export interface NavHeaderProps {
@@ -22,11 +23,12 @@ export interface NavHeaderProps {
 
 /**
  * Floating navigation for detail and flow screens: the controls sit in glass circles over the
- * content, and a glass bar with the title materialises only once the page has scrolled beneath
- * it. At rest the content (usually the item photo) runs to the top edge.
+ * content, and a soft scroll edge with the title materialises only once the page has scrolled
+ * beneath it. At rest the content (usually the item photo) runs to the top edge.
  */
 export function NavHeader({ title, onBack, trailing, banded = false }: NavHeaderProps) {
   const scroll = useScreenScroll();
+  const insets = useSafeAreaInsets();
   const styles = useThemedStyles(stylesFor);
 
   const barStyle = useAnimatedStyle(() => {
@@ -48,8 +50,8 @@ export function NavHeader({ title, onBack, trailing, banded = false }: NavHeader
 
   return (
     <View style={styles.wrap}>
-      <Animated.View style={[StyleSheet.absoluteFill, styles.barLayer, barStyle]}>
-        <GlassSurface style={styles.bar} />
+      <Animated.View style={[styles.barLayer, { top: -insets.top }, barStyle]}>
+        <ScrollEdge solid={insets.top + tokens.layout.headerCompact} />
       </Animated.View>
       <View style={styles.nav}>
         <View style={styles.side}>
@@ -82,7 +84,7 @@ export interface LargeTitleProps {
 
 /**
  * The editorial title that opens a top-level tab, set in the serif. As the page scrolls it
- * drifts up a little slower than the content and fades, handing off to the compact glass bar.
+ * drifts up a little slower than the content and fades, handing off to the compact title.
  */
 export function LargeTitle({ title, subtitle, trailing }: LargeTitleProps) {
   const scroll = useScreenScroll();
@@ -126,11 +128,10 @@ const stylesFor = themedStyles(() => ({
     position: 'relative',
   },
   barLayer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
     pointerEvents: 'none',
-  },
-  bar: {
-    flex: 1,
-    borderWidth: 0,
   },
   nav: {
     minHeight: tokens.layout.headerCompact,
