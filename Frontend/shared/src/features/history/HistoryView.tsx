@@ -1,4 +1,4 @@
-import { PackageSearch, Search } from 'lucide-react-native';
+import { PackageSearch } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Share, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -8,17 +8,18 @@ import {
   CountUp,
   EmptyState,
   EstimateBadge,
-  IconButton,
   LargeTitle,
   Photo,
   Reveal,
   Screen,
+  SearchButton,
   Sparkline,
   Surface,
   SWText,
   Tag,
   useToast,
   ZoomLink,
+  type SearchOrigin,
   type TagTone,
 } from '../../components';
 import { themedStyles, tokens, useThemedStyles } from '../../design';
@@ -36,7 +37,7 @@ export interface HistoryViewProps {
   readonly onDeleteItem?: (itemId: string) => void;
   /** Opens the listing flow for this item, e.g. `/list/:id`. */
   readonly onListItem?: (itemId: string) => void;
-  readonly onSearch?: () => void;
+  readonly onSearch?: (origin?: SearchOrigin) => void;
   readonly onOpenProfile?: () => void;
 }
 
@@ -102,13 +103,7 @@ export function HistoryView({
         subtitle={`${previewHistory.length} items checked`}
         trailing={
           <View style={styles.actions}>
-            <IconButton
-              icon={Search}
-              label="Search your history"
-              appearance="outline"
-              onPress={onSearch}
-              size={20}
-            />
+            <SearchButton label="Search your history" onOpen={onSearch} />
             <ProfileButton onPress={onOpenProfile} />
           </View>
         }

@@ -1,15 +1,15 @@
-import { Search } from 'lucide-react-native';
 import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 
 import {
-  IconButton,
   LargeTitle,
   Photo,
   PressableScale,
   Reveal,
   Screen,
+  SearchButton,
   SWText,
+  type SearchOrigin,
 } from '../../components';
 import { themedStyles, tokens, useThemedStyles } from '../../design';
 import type { VoteChoice } from '../../types';
@@ -19,7 +19,7 @@ import { PostCard } from './PostCard';
 
 export interface FeedViewProps {
   readonly onOpenPost?: (postId: string) => void;
-  readonly onSearch?: () => void;
+  readonly onSearch?: (origin?: SearchOrigin) => void;
   readonly onOpenProfile?: () => void;
 }
 
@@ -45,12 +45,7 @@ export function FeedView({ onOpenPost, onSearch, onOpenProfile }: FeedViewProps)
         subtitle="Vote on whether the AI got the price right."
         trailing={
           <View style={styles.actions}>
-            <IconButton
-              icon={Search}
-              label="Search the feed"
-              appearance="tinted"
-              onPress={onSearch}
-            />
+            <SearchButton label="Search the feed" onOpen={onSearch} />
             <ProfileButton onPress={onOpenProfile} />
           </View>
         }

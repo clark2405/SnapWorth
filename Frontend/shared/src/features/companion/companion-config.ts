@@ -40,6 +40,7 @@ const hiddenOn = [
   /^\/capture/,
   /^\/chat\/./,
   /^\/worthy/,
+  /^\/search/,
   /^\/ask\//,
   /^\/list\//,
 ];

@@ -56,7 +56,15 @@ function Shell() {
           <Stack.Screen name="worthy" options={{ presentation: 'modal' }} />
           <Stack.Screen name="ask/[id]" options={{ presentation: 'modal' }} />
           <Stack.Screen name="list/[id]" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="search" options={{ animation: 'fade_from_bottom' }} />
+          {/* Transparent, with no stack animation: search draws its own entrance out of the button. */}
+          <Stack.Screen
+            name="search"
+            options={{
+              presentation: 'transparentModal',
+              animation: 'none',
+              contentStyle: { backgroundColor: 'transparent' },
+            }}
+          />
         </Stack>
         <CompanionHost ready={launched} />
       </RevealGate>

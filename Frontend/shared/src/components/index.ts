@@ -19,6 +19,7 @@ export * from './Reveal';
 export * from './Screen';
 export * from './ScreenHeader';
 export * from './ScrollEdge';
+export * from './SearchButton';
 export * from './SegmentedControl';
 export * from './Sheet';
 export * from './Sparkline';

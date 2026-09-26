@@ -57,6 +57,8 @@ export interface ScreenProps {
    * photo. Otherwise any `contentStyle.paddingTop` is added below the header's clearance.
    */
   readonly bleedTop?: boolean;
+  /** Drops the canvas so a screen can fade its own background in over the one beneath. */
+  readonly transparent?: boolean;
 }
 
 /**
@@ -74,6 +76,7 @@ export function Screen({
   ambient = 'quiet',
   onRefresh,
   bleedTop = false,
+  transparent = false,
 }: ScreenProps) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -119,7 +122,7 @@ export function Screen({
 
   return (
     <ScreenScrollContext.Provider value={context}>
-      <View style={styles.root}>
+      <View style={[styles.root, transparent ? styles.clear : null]}>
         <AmbientBackdrop mood={ambient} />
         <KeyboardAvoidingView
           style={styles.fill}
@@ -238,6 +241,9 @@ const stylesFor = themedStyles((colors) => ({
   root: {
     flex: 1,
     backgroundColor: colors.canvas,
+  },
+  clear: {
+    backgroundColor: 'transparent',
   },
   column: {
     flex: 1,
