@@ -3,6 +3,8 @@
   "private": true,
   "scripts": {
     "dev": "npm --prefix Frontend run dev",
+    "dev:mobile": "npm --prefix Frontend run dev:mobile",
+    "start": "npm --prefix Frontend run dev:mobile",
     "ios": "npm --prefix Frontend run ios",
     "android": "npm --prefix Frontend run android",
     "build": "npm --prefix Frontend run build:web",
