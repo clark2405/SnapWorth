@@ -1,6 +1,6 @@
 import MaskedView from '@react-native-masked-view/masked-view';
 import { BlurView } from 'expo-blur';
-import { useId } from 'react';
+import { useId, type RefObject } from 'react';
 import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
@@ -12,6 +12,8 @@ export interface ScrollEdgeProps {
   /** How far below that it dissolves into the content. */
   readonly fade?: number;
   readonly style?: StyleProp<ViewStyle>;
+  /** An optional target ref for Android native blur when wrapped in BlurTargetView. */
+  readonly blurTarget?: RefObject<View | null>;
 }
 
 /**
@@ -20,7 +22,7 @@ export interface ScrollEdgeProps {
  * title stays legible over whatever scrolls beneath. There is no line where the bar ends. The
  * web, without native blur masking, gets the wash alone.
  */
-export function ScrollEdge({ solid, fade = 44, style }: ScrollEdgeProps) {
+export function ScrollEdge({ solid, fade = 44, style, blurTarget }: ScrollEdgeProps) {
   const { colors, isDark } = useTheme();
   const id = `edge-${useId().replace(/:/g, '')}`;
   const height = solid + fade;
@@ -66,7 +68,8 @@ export function ScrollEdge({ solid, fade = 44, style }: ScrollEdgeProps) {
         <BlurView
           intensity={isDark ? 36 : 30}
           tint={isDark ? 'dark' : 'light'}
-          blurMethod="dimezisBlurView"
+          blurTarget={blurTarget}
+          blurMethod={blurTarget ? 'dimezisBlurView' : undefined}
           style={StyleSheet.absoluteFill}
         />
       </MaskedView>

@@ -1,6 +1,6 @@
 import { BlurView } from 'expo-blur';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { tokens, useTheme } from '../design';
@@ -16,6 +16,8 @@ export interface GlassSurfaceProps {
   readonly interactive?: boolean;
   /** A faint tint, e.g. the accent for the companion's panel. */
   readonly tint?: string;
+  /** An optional target ref for Android native blur when wrapped in BlurTargetView. */
+  readonly blurTarget?: RefObject<View | null>;
 }
 
 /**
@@ -29,6 +31,7 @@ export function GlassSurface({
   variant = 'regular',
   interactive = false,
   tint,
+  blurTarget,
 }: GlassSurfaceProps) {
   const { name, isDark } = useTheme();
 
@@ -52,7 +55,8 @@ export function GlassSurface({
       <BlurView
         intensity={variant === 'clear' ? 30 : 60}
         tint={isDark ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight'}
-        blurMethod="dimezisBlurView"
+        blurTarget={blurTarget}
+        blurMethod={blurTarget ? 'dimezisBlurView' : undefined}
         style={StyleSheet.absoluteFill}
       />
       <View style={[StyleSheet.absoluteFill, { backgroundColor: tint ?? glass.fill }]} />
