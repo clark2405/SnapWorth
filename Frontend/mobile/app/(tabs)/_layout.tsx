@@ -24,10 +24,7 @@ export default function TabsLayout() {
         <NativeTabs.Trigger.Label>Feed</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="marketplace">
-        <NativeTabs.Trigger.Icon
-          sf={{ default: 'bag', selected: 'bag.fill' }}
-          md="shopping_bag"
-        />
+        <NativeTabs.Trigger.Icon sf={{ default: 'bag', selected: 'bag.fill' }} md="shopping_bag" />
         <NativeTabs.Trigger.Label>Market</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="capture">
