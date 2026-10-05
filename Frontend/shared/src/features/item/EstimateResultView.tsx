@@ -8,7 +8,6 @@ import {
   RotateCw,
   Share2,
   ShoppingBag,
-  Sparkles,
   Users,
   WifiOff,
   type LucideIcon,
@@ -36,6 +35,7 @@ import {
   ChoiceChips,
   CompanionOrb,
   CountUp,
+  EstimateMark,
   Field,
   IconButton,
   NavHeader,
@@ -96,7 +96,6 @@ export function EstimateResultView({
 }: EstimateResultViewProps) {
   const item = previewItem;
   const styles = useThemedStyles(stylesFor);
-  const { colors } = useTheme();
   const { height } = useWindowDimensions();
   const [title, setTitle] = useState<string>(item.title);
   const [condition, setCondition] = useState<PreviewCondition>(previewValuation.condition);
@@ -189,8 +188,8 @@ export function EstimateResultView({
                 <Tag label={`${previewValuation.confidence} confidence`} tone="accent" />
               </View>
               <View style={styles.estimateLabel}>
-                <Sparkles size={14} strokeWidth={2.2} color={colors.accent} />
-                <SWText variant="overline" tone="accent">
+                <EstimateMark />
+                <SWText variant="overline" tone="textSecondary">
                   AI Estimate
                 </SWText>
               </View>
@@ -684,7 +683,7 @@ const stylesFor = themedStyles((colors, name) => ({
   estimateLabel: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: tokens.spacing[1],
+    gap: tokens.spacing[2],
   },
   insights: {
     flexDirection: 'row',

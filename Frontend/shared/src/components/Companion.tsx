@@ -54,7 +54,7 @@ export interface CompanionProps {
   readonly hidden?: boolean;
 }
 
-const orbSize = 58;
+const orbSize = 50;
 const edgeGap = 16;
 const holdMs = 520;
 
@@ -397,7 +397,7 @@ function CompanionPanel({
                     style={({ pressed }) => [styles.action, pressed ? styles.actionPressed : null]}
                   >
                     <View style={styles.actionIcon}>
-                      <Icon size={17} strokeWidth={2.2} color={colors.accent} />
+                      <Icon size={16} strokeWidth={1.75} color={colors.textPrimary} />
                     </View>
                     <View style={styles.flex}>
                       <SWText variant="headingSmall">{action.label}</SWText>
@@ -458,10 +458,10 @@ const stylesFor = themedStyles((colors, name) => ({
     left: 0,
     width: orbSize,
     height: orbSize,
-    shadowColor: tokens.aurora[0],
-    shadowOpacity: name === 'dark' ? 0.55 : 0.35,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
+    shadowColor: tokens.shadow.dark,
+    shadowOpacity: name === 'dark' ? 0.9 : 0.35,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
   },
   charge: {
     position: 'absolute',
@@ -470,7 +470,7 @@ const stylesFor = themedStyles((colors, name) => ({
     right: -6,
     bottom: -6,
     borderRadius: orbSize,
-    borderWidth: 2.5,
+    borderWidth: 1.5,
     borderColor: colors.accent,
   },
   scrim: {
@@ -528,10 +528,11 @@ const stylesFor = themedStyles((colors, name) => ({
   actionIcon: {
     width: 34,
     height: 34,
-    borderRadius: 11,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.accentSoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
   },
   ask: {
     flexDirection: 'row',

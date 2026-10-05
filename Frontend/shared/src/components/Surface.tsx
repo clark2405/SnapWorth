@@ -79,9 +79,9 @@ const stylesFor = themedStyles((colors, name) => ({
     borderColor: colors.borderSubtle,
     shadowColor: tokens.shadow[name],
     shadowOpacity: name === 'dark' ? 0 : 1,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: name === 'dark' ? 0 : 2,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: name === 'dark' ? 0 : 1,
   },
   clip: {
     overflow: 'hidden',
@@ -96,7 +96,7 @@ const stylesFor = themedStyles((colors, name) => ({
   },
   accent: {
     backgroundColor: colors.estimateSurface,
-    borderColor: colors.estimateBorder,
+    borderColor: colors.borderSubtle,
     borderWidth: StyleSheet.hairlineWidth,
     shadowOpacity: 0,
   },

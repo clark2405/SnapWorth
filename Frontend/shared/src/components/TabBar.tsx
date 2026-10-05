@@ -70,7 +70,7 @@ export function TabBar<Key extends string>({
               haptic="pop"
               style={({ pressed }) => [styles.capture, pressed ? styles.capturePressed : null]}
             >
-              <Camera size={22} strokeWidth={2} color={colors.onAccent} />
+              <Camera size={21} strokeWidth={1.75} color={colors.onInverse} />
             </PressableScale>
           </View>
           {trailing.map(renderTab)}
@@ -123,7 +123,7 @@ function Tab<Key extends string>({
       <Animated.View style={iconPop}>
         <Icon
           size={21}
-          strokeWidth={active ? 2.3 : 1.8}
+          strokeWidth={active ? 2 : 1.6}
           color={active ? colors.textPrimary : colors.textMuted}
         />
       </Animated.View>
@@ -179,14 +179,14 @@ const stylesFor = themedStyles((colors) => ({
     alignItems: 'center',
   },
   capture: {
-    width: 50,
-    height: 50,
+    width: 48,
+    height: 48,
     borderRadius: tokens.radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.accent,
+    backgroundColor: colors.inverse,
   },
   capturePressed: {
-    backgroundColor: colors.accentPressed,
+    backgroundColor: colors.inversePressed,
   },
 }));

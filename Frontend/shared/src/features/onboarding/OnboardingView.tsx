@@ -1,6 +1,6 @@
-import { ArrowDown, ArrowUp, Check, Sparkles, type LucideIcon } from 'lucide-react-native';
+import { ArrowDown, ArrowUp, Check, type LucideIcon } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { View, type LayoutChangeEvent } from 'react-native';
+import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import Animated, {
   Easing,
   Extrapolation,
@@ -24,6 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   AmbientBackdrop,
   CountUp,
+  EstimateMark,
   Photo,
   PressableScale,
   Reveal,
@@ -364,7 +365,6 @@ interface StageProps {
 /** The scene behind the pager. `progress` is the raw scroll offset; pages are `width` apart. */
 function Stage({ progress, idle, width, height, index, reduceMotion }: StageProps) {
   const styles = useThemedStyles(stylesFor);
-  const { colors } = useTheme();
   const cardWidth = Math.min(width * 0.56, height * 0.5);
   const cardHeight = cardWidth * 1.25;
   const lift = height * 0.1;
@@ -465,7 +465,7 @@ function Stage({ progress, idle, width, height, index, reduceMotion }: StageProp
         </Animated.View>
         <Animated.View style={[styles.float, styles.detect, detectStyle]}>
           <View style={styles.detectIcon}>
-            <Sparkles size={14} strokeWidth={2.2} color={colors.accent} />
+            <EstimateMark size={7} />
           </View>
           <SWText variant="labelSmall">Nike windbreaker</SWText>
           <SWText variant="caption" tone="textMuted">
@@ -895,7 +895,8 @@ const stylesFor = themedStyles((colors, name) => ({
     borderRadius: tokens.radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.accentSoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
   },
   range: {
     width: 290,

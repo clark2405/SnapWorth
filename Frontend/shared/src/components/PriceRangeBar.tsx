@@ -126,7 +126,7 @@ const stylesFor = themedStyles((colors) => ({
   },
   band: {
     position: 'absolute',
-    height: 8,
+    height: 4,
     borderRadius: tokens.radius.full,
   },
   bandStrong: { backgroundColor: colors.accent },
@@ -144,9 +144,9 @@ const stylesFor = themedStyles((colors) => ({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: colors.surface,
-    borderWidth: 4,
-    borderColor: colors.accent,
+    backgroundColor: colors.textPrimary,
+    borderWidth: 5,
+    borderColor: colors.surface,
   },
   legend: {
     flexDirection: 'row',

@@ -24,7 +24,7 @@ export interface CompanionOrbProps {
   readonly mood?: CompanionMood;
 }
 
-const [iris, sky, mint, amber, ember, rose] = tokens.aurora as unknown as readonly [
+const [champagne, pearl, brass, gold, , umber] = tokens.aurora as unknown as readonly [
   string,
   string,
   string,
@@ -34,8 +34,8 @@ const [iris, sky, mint, amber, ember, rose] = tokens.aurora as unknown as readon
 ];
 
 /**
- * Worthy's body: an iridescent sphere whose colours slowly orbit inside it, with a lens for an
- * eye. It breathes at rest, blinks now and then, and glances around; when attentive the lens
+ * Worthy's body: an obsidian sphere with champagne light slowly orbiting beneath its glass,
+ * and a lens for an eye. It breathes at rest, blinks now and then, and glances around; when attentive the lens
  * widens, when thinking the colours race. Every loop is transform-only on the UI thread.
  */
 export function CompanionOrb({ size = 60, mood = 'idle' }: CompanionOrbProps) {
@@ -128,8 +128,8 @@ export function CompanionOrb({ size = 60, mood = 'idle' }: CompanionOrbProps) {
         <Svg width={size} height={size}>
           <Defs>
             <RadialGradient id="halo" cx="50%" cy="50%" r="50%">
-              <Stop offset="0.55" stopColor={iris} stopOpacity={0.5} />
-              <Stop offset="1" stopColor={rose} stopOpacity={0} />
+              <Stop offset="0.55" stopColor={champagne} stopOpacity={0.28} />
+              <Stop offset="1" stopColor={champagne} stopOpacity={0} />
             </RadialGradient>
           </Defs>
           <Circle cx={size / 2} cy={size / 2} r={size / 2} fill="url(#halo)" />
@@ -141,31 +141,31 @@ export function CompanionOrb({ size = 60, mood = 'idle' }: CompanionOrbProps) {
         <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
           <Defs>
             <LinearGradient id="base" x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0" stopColor={iris} />
-              <Stop offset="0.5" stopColor={rose} />
-              <Stop offset="1" stopColor={ember} />
+              <Stop offset="0" stopColor={umber} />
+              <Stop offset="0.55" stopColor={tokens.color.dark.surface} />
+              <Stop offset="1" stopColor={tokens.color.dark.canvas} />
             </LinearGradient>
           </Defs>
           <Circle cx={size / 2} cy={size / 2} r={size / 2} fill="url(#base)" />
         </Svg>
         <Animated.View style={[StyleSheet.absoluteFill, layerA]}>
-          <Blob size={size} color={sky} x={0.28} y={0.3} r={0.42} id="a" />
-          <Blob size={size} color={amber} x={0.78} y={0.72} r={0.36} id="b" />
+          <Blob size={size} color={pearl} x={0.28} y={0.3} r={0.42} id="a" opacity={0.22} />
+          <Blob size={size} color={gold} x={0.78} y={0.72} r={0.36} id="b" opacity={0.5} />
         </Animated.View>
         <Animated.View style={[StyleSheet.absoluteFill, layerB]}>
-          <Blob size={size} color={mint} x={0.3} y={0.78} r={0.34} id="c" />
-          <Blob size={size} color={iris} x={0.74} y={0.24} r={0.3} id="d" />
+          <Blob size={size} color={brass} x={0.3} y={0.78} r={0.34} id="c" opacity={0.28} />
+          <Blob size={size} color={champagne} x={0.74} y={0.24} r={0.3} id="d" opacity={0.3} />
         </Animated.View>
         {/* Glass sheen: a soft highlight top-left and a shade bottom-right. */}
         <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
           <Defs>
             <RadialGradient id="sheen" cx="32%" cy="26%" r="46%">
-              <Stop offset="0" stopColor="white" stopOpacity={0.75} />
-              <Stop offset="0.4" stopColor="white" stopOpacity={0.12} />
+              <Stop offset="0" stopColor="white" stopOpacity={0.32} />
+              <Stop offset="0.4" stopColor="white" stopOpacity={0.05} />
               <Stop offset="1" stopColor="white" stopOpacity={0} />
             </RadialGradient>
             <RadialGradient id="shade" cx="72%" cy="84%" r="60%">
-              <Stop offset="0" stopColor="black" stopOpacity={0.25} />
+              <Stop offset="0" stopColor="black" stopOpacity={0.4} />
               <Stop offset="1" stopColor="black" stopOpacity={0} />
             </RadialGradient>
           </Defs>
@@ -180,7 +180,7 @@ export function CompanionOrb({ size = 60, mood = 'idle' }: CompanionOrbProps) {
                 width: lens,
                 height: lens,
                 borderRadius: lens / 2,
-                borderWidth: Math.max(2, size * 0.035),
+                borderWidth: Math.max(1.5, size * 0.028),
               },
               lensStyle,
             ]}
@@ -211,6 +211,7 @@ function Blob({
   y,
   r,
   id,
+  opacity = 0.95,
 }: {
   readonly size: number;
   readonly color: string;
@@ -218,12 +219,13 @@ function Blob({
   readonly y: number;
   readonly r: number;
   readonly id: string;
+  readonly opacity?: number;
 }) {
   return (
     <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
       <Defs>
         <RadialGradient id={`blob-${id}`} cx="50%" cy="50%" r="50%">
-          <Stop offset="0" stopColor={color} stopOpacity={0.95} />
+          <Stop offset="0" stopColor={color} stopOpacity={opacity} />
           <Stop offset="1" stopColor={color} stopOpacity={0} />
         </RadialGradient>
       </Defs>
@@ -235,6 +237,8 @@ function Blob({
 const styles = StyleSheet.create({
   body: {
     overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: tokens.glass.dark.highlight,
   },
   center: {
     ...StyleSheet.absoluteFill,
@@ -243,7 +247,7 @@ const styles = StyleSheet.create({
   },
   lens: {
     backgroundColor: tokens.color.dark.canvas,
-    borderColor: tokens.overlay.text,
+    borderColor: champagne,
   },
   glint: {
     position: 'absolute',

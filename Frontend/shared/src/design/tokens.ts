@@ -47,71 +47,71 @@ const easing = {
   linear: 'linear',
 } as const;
 
-const ink = '#0B0B0D';
-const paper = '#F5F4F0';
+const ink = '#0A0A0A';
+const paper = '#F6F4EF';
 
 /**
  * Two palettes with identical semantic names, so every surface can be themed by swapping the
- * map. The ground is near-neutral in both; iris is the one saturated accent, and the vote hues
- * appear only on votes. Primary actions are monochrome (`inverse`), which keeps the accent for
- * value: estimates, the capture control, and the companion.
+ * map. The ground is a warm neutral in both; champagne is the one accent, kept for value
+ * (estimates, the companion) and used sparingly, and the vote hues are muted so a verdict reads
+ * without shouting. Primary actions are monochrome (`inverse`).
  */
 export const colorLight = {
   canvas: paper,
   surface: '#FFFFFF',
   surfaceRaised: '#FFFFFF',
-  sunken: '#EBEAE5',
-  borderSubtle: '#E3E1DB',
-  borderStrong: '#CBC8C0',
-  textPrimary: '#111114',
-  textSecondary: '#46464D',
-  textMuted: '#6C6C72',
-  accent: '#5B4BFF',
-  accentPressed: '#4A3AEE',
-  accentSoft: '#ECEAFF',
+  sunken: '#EDEAE3',
+  borderSubtle: '#E6E2D9',
+  borderStrong: '#D2CDC2',
+  textPrimary: '#141413',
+  textSecondary: '#4A4844',
+  textMuted: '#6E6B65',
+  accent: '#84642F',
+  accentPressed: '#6F5326',
+  accentSoft: '#F2ECE0',
   onAccent: '#FFFFFF',
-  inverse: '#111114',
-  inversePressed: '#2A2A30',
+  inverse: '#141413',
+  inversePressed: '#2B2A28',
   onInverse: '#FFFFFF',
-  estimateSurface: '#EFECFF',
-  estimateBorder: '#6F62FF',
-  voteHigh: '#D93A31',
-  voteLow: '#0071B8',
-  voteRight: '#1E8C4E',
-  success: '#1E8C4E',
-  danger: '#D1242F',
-  warning: '#A64B00',
-  focusRing: '#5B4BFF',
-  interactiveBoundary: '#86868B',
+  estimateSurface: '#F5F0E6',
+  estimateBorder: '#9C7A42',
+  voteHigh: '#B4473B',
+  voteLow: '#3D6B96',
+  voteRight: '#3B7A55',
+  success: '#3B7A55',
+  danger: '#B3302A',
+  warning: '#8C5A14',
+  focusRing: '#84642F',
+  interactiveBoundary: '#8A867E',
 } as const;
 
 export const colorDark = {
   canvas: ink,
-  surface: '#161618',
-  surfaceRaised: '#1E1E21',
-  sunken: '#050506',
-  borderSubtle: '#242427',
-  borderStrong: '#3A3A3F',
-  textPrimary: '#F5F5F7',
-  textSecondary: '#AEAEB4',
-  textMuted: '#8E8E94',
-  accent: '#8F84FF',
-  accentPressed: '#7A6EF7',
-  accentSoft: '#1C1A33',
+  surface: '#141414',
+  surfaceRaised: '#1B1B1B',
+  sunken: '#1A1A1A',
+  borderSubtle: '#222222',
+  borderStrong: '#363636',
+  textPrimary: '#F4F2EE',
+  textSecondary: '#ADAAA4',
+  textMuted: '#8D8A84',
+  accent: '#D8BA82',
+  accentPressed: '#C6A66D',
+  accentSoft: '#1F1B13',
   onAccent: ink,
-  inverse: '#F5F5F7',
-  inversePressed: '#D9D9DE',
+  inverse: '#F4F2EE',
+  inversePressed: '#D9D6D0',
   onInverse: ink,
-  estimateSurface: '#17152B',
-  estimateBorder: '#6A5FE6',
-  voteHigh: '#FF6961',
-  voteLow: '#64D2FF',
-  voteRight: '#30D158',
-  success: '#30D158',
-  danger: '#FF453A',
-  warning: '#FFB340',
-  focusRing: '#8F84FF',
-  interactiveBoundary: '#8E8E94',
+  estimateSurface: '#17150F',
+  estimateBorder: '#8E7546',
+  voteHigh: '#E48C80',
+  voteLow: '#8FB3D6',
+  voteRight: '#8EC6A1',
+  success: '#8EC6A1',
+  danger: '#EF7B70',
+  warning: '#E2B666',
+  focusRing: '#D8BA82',
+  interactiveBoundary: '#8D8A84',
 } as const satisfies Record<keyof typeof colorLight, string>;
 
 export const tokens = deepFreeze({
@@ -120,10 +120,10 @@ export const tokens = deepFreeze({
     dark: colorDark,
   },
   /**
-   * The companion and brand mark share one iridescent sweep. It is decoration for the AI's
-   * presence only; no text or control state is ever carried by it.
+   * The companion and brand mark share one metallic sweep, champagne through pearl to bronze.
+   * It is decoration for the AI's presence only; no text or control state is ever carried by it.
    */
-  aurora: ['#7B5CFF', '#3DB8FF', '#46E0B5', '#FFC23D', '#FF6A3D', '#FF3D8B'],
+  aurora: ['#E8D3A6', '#F7F0E2', '#BFA06A', '#D8BA82', '#8A6B3C', '#3B3226'],
   /**
    * Translucent layers for controls that sit over live media (the camera viewfinder), where a
    * solid surface would hide what the user is aiming at. Nowhere else.
@@ -135,20 +135,20 @@ export const tokens = deepFreeze({
     text: '#FFFFFF',
   },
   shadow: {
-    light: 'rgba(17, 17, 20, 0.10)',
-    dark: 'rgba(0, 0, 0, 0.55)',
+    light: 'rgba(20, 20, 19, 0.07)',
+    dark: 'rgba(0, 0, 0, 0.6)',
   },
   /** Fallback material where Liquid Glass is unavailable: a blur plus these washes. */
   glass: {
     light: {
-      fill: 'rgba(255, 255, 255, 0.62)',
-      border: 'rgba(17, 17, 20, 0.08)',
+      fill: 'rgba(250, 249, 246, 0.72)',
+      border: 'rgba(20, 20, 19, 0.07)',
       highlight: 'rgba(255, 255, 255, 0.9)',
     },
     dark: {
-      fill: 'rgba(38, 38, 42, 0.52)',
-      border: 'rgba(255, 255, 255, 0.10)',
-      highlight: 'rgba(255, 255, 255, 0.14)',
+      fill: 'rgba(28, 28, 28, 0.62)',
+      border: 'rgba(255, 255, 255, 0.08)',
+      highlight: 'rgba(255, 255, 255, 0.10)',
     },
   },
   typography: {
@@ -179,25 +179,25 @@ export const tokens = deepFreeze({
         family: 'serif',
         size: 40,
         lineHeight: 44,
-        weight: '600',
-        letterSpacing: -0.8,
+        weight: '500',
+        letterSpacing: -0.9,
       },
       displayTitle: {
         family: 'serif',
         size: 34,
         lineHeight: 40,
-        weight: '600',
-        letterSpacing: -0.6,
+        weight: '500',
+        letterSpacing: -0.7,
       },
-      priceHero: { family: 'sans', size: 56, lineHeight: 60, weight: '700', letterSpacing: -2 },
-      priceLarge: { family: 'sans', size: 34, lineHeight: 40, weight: '700', letterSpacing: -1 },
-      priceMedium: { family: 'sans', size: 22, lineHeight: 28, weight: '700', letterSpacing: -0.5 },
+      priceHero: { family: 'sans', size: 52, lineHeight: 58, weight: '600', letterSpacing: -1.8 },
+      priceLarge: { family: 'sans', size: 32, lineHeight: 38, weight: '600', letterSpacing: -1 },
+      priceMedium: { family: 'sans', size: 21, lineHeight: 26, weight: '600', letterSpacing: -0.5 },
       priceSmall: { family: 'sans', size: 17, lineHeight: 22, weight: '600', letterSpacing: -0.2 },
       headingLarge: {
         family: 'sans',
         size: 22,
         lineHeight: 28,
-        weight: '700',
+        weight: '600',
         letterSpacing: -0.4,
       },
       headingMedium: {
@@ -228,26 +228,26 @@ export const tokens = deepFreeze({
       label: { family: 'sans', size: 15, lineHeight: 20, weight: '500', letterSpacing: -0.2 },
       labelSmall: { family: 'sans', size: 13, lineHeight: 18, weight: '600', letterSpacing: -0.1 },
       labelMedium: { family: 'sans', size: 13, lineHeight: 18, weight: '500', letterSpacing: -0.1 },
-      chip: { family: 'sans', size: 13, lineHeight: 16, weight: '600', letterSpacing: -0.1 },
+      chip: { family: 'sans', size: 13, lineHeight: 16, weight: '500', letterSpacing: -0.1 },
       tag: {
         family: 'sans',
-        size: 11,
+        size: 10,
         lineHeight: 14,
-        weight: '600',
-        letterSpacingEm: 0.06,
+        weight: '500',
+        letterSpacingEm: 0.1,
         textTransform: 'uppercase',
       },
       caption: { family: 'sans', size: 12, lineHeight: 16, weight: '400', letterSpacing: 0 },
       tabLabel: { family: 'sans', size: 10, lineHeight: 12, weight: '500', letterSpacing: 0.1 },
       overline: {
         family: 'sans',
-        size: 12,
+        size: 11,
         lineHeight: 16,
-        weight: '600',
-        letterSpacingEm: 0.06,
+        weight: '500',
+        letterSpacingEm: 0.12,
         textTransform: 'uppercase',
       },
-      wordmark: { family: 'serif', size: 22, lineHeight: 26, weight: '600', letterSpacing: -0.4 },
+      wordmark: { family: 'serif', size: 22, lineHeight: 26, weight: '500', letterSpacing: -0.3 },
       companion: {
         family: 'rounded',
         size: 17,

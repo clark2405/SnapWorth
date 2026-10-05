@@ -200,9 +200,9 @@ const stylesFor = themedStyles((colors) => ({
     gap: tokens.spacing[3],
     padding: tokens.spacing[3],
     borderRadius: tokens.radius.large,
-    backgroundColor: colors.estimateSurface,
+    backgroundColor: colors.surface,
     borderWidth: tokens.border.hairline,
-    borderColor: colors.estimateBorder,
+    borderColor: colors.borderSubtle,
   },
   highlightPhoto: {
     width: 64,

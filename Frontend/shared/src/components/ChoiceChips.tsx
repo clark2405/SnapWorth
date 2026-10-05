@@ -1,4 +1,4 @@
-import { ScrollView, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 
 import { haptic, themedStyles, tokens, useThemedStyles } from '../design';
@@ -47,7 +47,7 @@ export function ChoiceChips<Key extends string>({
             pressed && !active ? styles.pressed : null,
           ]}
         >
-          <SWText variant="labelSmall" tone={active ? 'onInverse' : 'textPrimary'}>
+          <SWText variant="chip" tone={active ? 'onInverse' : 'textSecondary'}>
             {option.label}
           </SWText>
         </PressableScale>
@@ -90,17 +90,19 @@ const stylesFor = themedStyles((colors) => ({
     paddingHorizontal: tokens.layout.pageGutterCompact,
   },
   chip: {
-    minHeight: 36,
+    minHeight: 34,
     paddingHorizontal: tokens.spacing[4],
     borderRadius: tokens.radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.sunken,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
   },
   active: {
     backgroundColor: colors.inverse,
+    borderColor: colors.inverse,
   },
   pressed: {
-    backgroundColor: colors.borderSubtle,
+    backgroundColor: colors.sunken,
   },
 }));

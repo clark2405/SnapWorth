@@ -13,12 +13,12 @@ import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { tokens, useTheme } from '../design';
 
 export interface AmbientBackdropProps {
-  /** Which hues bloom behind the screen; `value` leans on the accent, `aurora` on the brand sweep. */
+  /** Which hues warm the screen; `value` leans on the accent, `aurora` on the brand sweep. */
   readonly mood?: 'value' | 'aurora' | 'quiet';
 }
 
 /**
- * Two soft light-pools behind the top of a screen, drifting on a slow loop so the page feels
+ * Two faint light-pools behind the top of a screen, drifting on a slow loop so the page feels
  * lit rather than flat. Pure transform on pre-rendered gradients, so it costs nothing per frame
  * on the JS thread; under reduced motion it holds still.
  */
@@ -53,11 +53,12 @@ export function AmbientBackdrop({ mood = 'value' }: AmbientBackdropProps) {
   if (mood === 'quiet') return null;
 
   const size = width * 1.2;
-  const strength = isDark ? 0.34 : 0.22;
+  // Barely there: a warm lift of the ground, never a coloured wash.
+  const strength = isDark ? 0.1 : 0.14;
   const hues =
     mood === 'aurora'
-      ? [tokens.aurora[0], tokens.aurora[5]]
-      : [colors.accent, isDark ? tokens.aurora[1] : tokens.aurora[5]];
+      ? [tokens.aurora[0], tokens.aurora[2]]
+      : [colors.accent, isDark ? tokens.aurora[1] : tokens.aurora[0]];
 
   return (
     <View style={styles.layer}>
@@ -72,7 +73,7 @@ export function AmbientBackdrop({ mood = 'value' }: AmbientBackdropProps) {
           <Svg width={size} height={size}>
             <Defs>
               <RadialGradient id={`pool-${index}`} cx="50%" cy="50%" r="50%">
-                <Stop offset="0" stopColor={hue} stopOpacity={strength * (index === 0 ? 1 : 0.7)} />
+                <Stop offset="0" stopColor={hue} stopOpacity={strength * (index === 0 ? 1 : 0.5)} />
                 <Stop offset="0.55" stopColor={hue} stopOpacity={strength * 0.22} />
                 <Stop offset="1" stopColor={hue} stopOpacity={0} />
               </RadialGradient>

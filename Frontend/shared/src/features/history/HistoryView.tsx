@@ -210,7 +210,7 @@ function HistoryRow({
           </SWText>
         </View>
       </View>
-      <EstimateBadge value={formatPeso(item.estimate)} size="compact" />
+      <EstimateBadge value={formatPeso(item.estimate)} size="inline" />
     </ZoomLink>
   );
 }

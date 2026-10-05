@@ -30,19 +30,20 @@ export function Tag({ label, tone = 'neutral' }: TagProps) {
   );
 }
 
+// Tags are labels, not buttons: a hairline and small tracked caps, never a coloured fill.
 const stylesFor = themedStyles((colors) => ({
   tag: {
     alignSelf: 'flex-start',
-    borderRadius: tokens.radius.full,
+    borderRadius: tokens.radius.small - 2,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'transparent',
-    paddingHorizontal: tokens.spacing[2] + 2,
-    paddingVertical: 3,
+    borderColor: colors.borderStrong,
+    paddingHorizontal: tokens.spacing[2],
+    paddingVertical: 2,
   },
-  accent: { backgroundColor: colors.accentSoft },
-  neutral: { backgroundColor: colors.sunken },
+  accent: { borderColor: colors.estimateBorder },
+  neutral: {},
   danger: { borderColor: colors.danger },
-  outline: { borderColor: colors.borderStrong },
-  success: { backgroundColor: colors.sunken },
-  inverse: { backgroundColor: colors.inverse },
+  outline: {},
+  success: { borderColor: colors.success },
+  inverse: { backgroundColor: colors.inverse, borderColor: colors.inverse },
 }));
