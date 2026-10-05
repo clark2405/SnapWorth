@@ -637,10 +637,7 @@ const stylesFor = themedStyles((colors) => ({
     aspectRatio: 4 / 3,
   },
   tileText: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: tokens.spacing[2],
+    gap: 2,
   },
   count: {
     marginBottom: tokens.spacing[1],

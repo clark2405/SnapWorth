@@ -98,7 +98,10 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
               <Rating value={profile.rating} variant="bodySmall" tone="textSecondary" />
             </View>
             <SWText variant="caption" tone="textMuted">
-              {profile.location} · {profile.joined}
+              {profile.location}
+            </SWText>
+            <SWText variant="caption" tone="textMuted">
+              {profile.joined}
             </SWText>
           </View>
           <ChevronRight size={18} strokeWidth={2} color={colors.textMuted} />
@@ -129,16 +132,14 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
 
       <Reveal index={2}>
         <Surface tone="feature" padding={tokens.spacing[5]} contentStyle={styles.collectionCard}>
-          <View style={styles.collectionHeader}>
-            <Overline icon={Wallet} label="Collection value" tone="onFeatureDim" />
-            <Tag label={previewPortfolio.changeLabel} tone="mint" />
-          </View>
+          <Overline icon={Wallet} label="Collection value" tone="onFeatureDim" />
           <CountUp
             value={previewPortfolio.total}
             format={formatPeso}
             variant="priceLarge"
             tone="onFeature"
           />
+          <Tag label={previewPortfolio.changeLabel} tone="mint" />
           <Sparkline values={previewPortfolio.series} height={56} color={colors.onFeature} />
         </Surface>
       </Reveal>
@@ -216,11 +217,6 @@ const stylesFor = themedStyles(() => ({
   },
   collectionCard: {
     gap: tokens.spacing[3],
-  },
-  collectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
   },
   sections: {
     gap: tokens.spacing[6],

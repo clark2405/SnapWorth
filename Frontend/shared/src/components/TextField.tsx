@@ -143,9 +143,7 @@ const stylesFor = themedStyles((colors) => ({
   field: {
     gap: tokens.spacing[2],
   },
-  fieldLabel: {
-    paddingHorizontal: tokens.spacing[1],
-  },
+  fieldLabel: {},
   box: {
     minHeight: tokens.layout.controlHeight,
     borderRadius: tokens.radius.medium,

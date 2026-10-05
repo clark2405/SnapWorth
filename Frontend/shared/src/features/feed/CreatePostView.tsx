@@ -66,7 +66,7 @@ export function CreatePostView({ onBack, onPublish }: CreatePostViewProps) {
     <Screen
       header={<NavHeader title="Ask the community" onBack={onBack} banded />}
       footer={
-        <BottomBar style={styles.footer}>
+        <BottomBar>
           <Button label="Post to feed" disabled={!canPost} loading={publishing} onPress={publish} />
           <SWText variant="caption" tone="textMuted" align="center">
             Posts are public.
@@ -124,10 +124,5 @@ const stylesFor = themedStyles((colors) => ({
     borderColor: colors.borderStrong,
     backgroundColor: colors.sunken,
     textAlignVertical: 'top',
-  },
-  footer: {
-    paddingHorizontal: tokens.layout.pageGutterCompact,
-    paddingVertical: tokens.spacing[4],
-    gap: tokens.spacing[3],
   },
 }));

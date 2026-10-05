@@ -81,6 +81,7 @@ export function PriceRangeBar({
       accessibilityLabel={`Likely between ${format(low)} and ${format(high)}. ${confidenceCopy[confidence]}.`}
     >
       <View style={styles.track} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
+        <View style={styles.rail} />
         {width > 0 ? (
           <>
             <Animated.View
@@ -104,30 +105,62 @@ export function PriceRangeBar({
           </>
         ) : null}
       </View>
-      <View style={styles.legend}>
-        <SWText variant="caption" tone="textMuted">
-          {format(low)}
-        </SWText>
-        {showConfidence ? (
-          <SWText variant="labelSmall" tone={confidence === 'low' ? 'warning' : 'textSecondary'}>
-            {confidenceCopy[confidence]}
-          </SWText>
-        ) : null}
-        <SWText variant="caption" tone="textMuted">
-          {format(high)}
-        </SWText>
+      {/* The low and high figures sit centred under the band's ends, so each number labels the
+          exact point it describes; they clamp inside the rail at narrow widths. */}
+      <View style={styles.ends}>
+        {width > 0
+          ? [low, high].map((value) => (
+              <SWText
+                key={value}
+                variant="caption"
+                tone="textMuted"
+                align="center"
+                numberOfLines={1}
+                style={[
+                  styles.end,
+                  { left: Math.min(width - endWidth, Math.max(0, at(value) - endWidth / 2)) },
+                ]}
+              >
+                {format(value)}
+              </SWText>
+            ))
+          : null}
       </View>
+      {showConfidence ? (
+        <SWText
+          variant="labelSmall"
+          tone={confidence === 'low' ? 'warning' : 'textSecondary'}
+          align="center"
+        >
+          {confidenceCopy[confidence]}
+        </SWText>
+      ) : null}
     </View>
   );
 }
 
+const endWidth = 76;
+
 const stylesFor = themedStyles((colors) => ({
   root: {
-    gap: tokens.spacing[3],
+    gap: tokens.spacing[2],
   },
   track: {
     height: 18,
     justifyContent: 'center',
+  },
+  rail: {
+    height: 4,
+    borderRadius: tokens.radius.full,
+    backgroundColor: colors.sunken,
+  },
+  ends: {
+    height: 16,
+  },
+  end: {
+    position: 'absolute',
+    top: 0,
+    width: endWidth,
   },
   band: {
     position: 'absolute',
@@ -152,10 +185,5 @@ const stylesFor = themedStyles((colors) => ({
     backgroundColor: colors.textPrimary,
     borderWidth: 5,
     borderColor: colors.surface,
-  },
-  legend: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
 }));

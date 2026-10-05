@@ -291,11 +291,14 @@ export function EstimateResultView({
                       radius={tokens.radius.medium}
                     />
                     <SWText variant="priceSmall">{formatPeso(comparable.price)}</SWText>
-                    <SWText variant="caption" numberOfLines={1}>
+                    <SWText variant="caption" numberOfLines={2} style={styles.comparableTitle}>
                       {comparable.title}
                     </SWText>
                     <SWText variant="caption" tone="textMuted" numberOfLines={1}>
-                      {comparable.soldAgo} · {comparable.source}
+                      {comparable.soldAgo}
+                    </SWText>
+                    <SWText variant="caption" tone="textMuted" numberOfLines={1}>
+                      {comparable.source}
                     </SWText>
                   </Animated.View>
                 ))}
@@ -589,7 +592,6 @@ function Destinations({
           icon={ShoppingBag}
           accessibilityHint="Opens price confirmation. You set the asking price yourself."
           onPress={onListForSale}
-          containerStyle={styles.flex}
         />
       </Animated.View>
     </BottomBar>
@@ -733,7 +735,12 @@ const stylesFor = themedStyles((colors, name) => ({
   },
   comparable: {
     width: 148,
-    gap: tokens.spacing[1],
+    gap: 2,
+  },
+  // Two lines reserved for every title, so the cards in the row stay the same height.
+  comparableTitle: {
+    minHeight: tokens.typography.style.caption.lineHeight * 2,
+    marginTop: tokens.spacing[1],
   },
   saved: {
     flexDirection: 'row',
@@ -762,7 +769,6 @@ const stylesFor = themedStyles((colors, name) => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing[2],
-    padding: tokens.spacing[2],
   },
   scanDim: {
     backgroundColor: tokens.overlay.chrome,

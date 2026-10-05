@@ -154,13 +154,11 @@ export function ListingDetailView({
 
       <View style={styles.body}>
         <Reveal index={1} style={styles.titleBlock}>
+          <Tag label={listing.category} tone="sand" />
           <SWText variant="headingLarge" accessibilityRole="header">
             {listing.title}
           </SWText>
-          <View style={styles.priceRow}>
-            <AskingPriceBadge value={formatPeso(listing.askingPrice)} />
-            <Tag label={listing.category} tone="sand" />
-          </View>
+          <AskingPriceBadge value={formatPeso(listing.askingPrice)} />
         </Reveal>
 
         <Reveal index={2} style={styles.sections}>
@@ -290,11 +288,6 @@ const stylesFor = themedStyles((colors) => ({
     borderBottomWidth: tokens.border.hairline,
     borderBottomColor: colors.borderSubtle,
   },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-  },
   sections: {
     gap: tokens.spacing[5],
   },
@@ -315,9 +308,7 @@ const stylesFor = themedStyles((colors) => ({
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: tokens.spacing[3],
-    paddingHorizontal: tokens.layout.pageGutterCompact,
-    paddingVertical: tokens.spacing[3],
+    gap: tokens.spacing[2],
   },
   footerButton: {
     flex: 1,

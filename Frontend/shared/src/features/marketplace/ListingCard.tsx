@@ -93,7 +93,12 @@ export function ListingCard({ listing, onOpen, onMessageSeller }: ListingCardPro
         </View>
       </View>
       <View style={styles.cardBody}>
-        <SWText variant="bodyCompact" tone="textSecondary" numberOfLines={1}>
+        <SWText
+          variant="bodyCompact"
+          tone="textSecondary"
+          numberOfLines={2}
+          style={styles.cardTitle}
+        >
           {listing.title}
         </SWText>
         <SWText variant="priceMedium">{formatPeso(listing.askingPrice)}</SWText>
@@ -134,6 +139,10 @@ const stylesFor = themedStyles((colors, name) => ({
   cardBody: {
     gap: tokens.spacing['0.5'],
     paddingHorizontal: tokens.spacing[2],
+  },
+  // Two lines reserved for every title, so prices line up across the grid.
+  cardTitle: {
+    minHeight: tokens.typography.style.bodyCompact.lineHeight * 2,
   },
   verdictRow: {
     flexDirection: 'row',

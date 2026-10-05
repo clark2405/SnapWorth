@@ -263,8 +263,6 @@ const stylesFor = themedStyles((colors) => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing[2],
-    paddingHorizontal: tokens.layout.pageGutterCompact,
-    paddingVertical: tokens.spacing[3],
   },
   composerInput: {
     flex: 1,

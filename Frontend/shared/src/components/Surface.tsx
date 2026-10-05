@@ -47,7 +47,10 @@ export function Surface({
   );
 }
 
-/** A floating glass bar over the bottom edge: composers and action bars. */
+/**
+ * A floating glass bar over the bottom edge: composers and action bars. It owns the inner
+ * padding, so every bar in the app sits its contents the same distance from the glass edge.
+ */
 export function BottomBar({
   children,
   style,
@@ -57,8 +60,10 @@ export function BottomBar({
 }) {
   const styles = useThemedStyles(stylesFor);
   return (
-    <View style={[styles.bottomWrap, style]}>
-      <GlassSurface style={styles.bottomBar}>{children}</GlassSurface>
+    <View style={styles.bottomWrap}>
+      <GlassSurface style={styles.bottomBar}>
+        <View style={[styles.bottomContent, style]}>{children}</View>
+      </GlassSurface>
     </View>
   );
 }
@@ -107,6 +112,10 @@ const stylesFor = themedStyles((colors, name) => ({
   },
   bottomBar: {
     borderRadius: tokens.radius.xlarge,
+  },
+  bottomContent: {
+    padding: tokens.spacing[3],
+    gap: tokens.spacing[2],
   },
   divider: {
     height: StyleSheet.hairlineWidth,

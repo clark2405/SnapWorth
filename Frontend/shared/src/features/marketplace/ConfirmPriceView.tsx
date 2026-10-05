@@ -88,7 +88,7 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
     <Screen
       header={<NavHeader title="List for sale" onBack={onBack} banded />}
       footer={
-        <BottomBar style={styles.footer}>
+        <BottomBar>
           <Button
             label="Publish listing"
             disabled={enteredPrice === null}
@@ -214,11 +214,5 @@ const stylesFor = themedStyles(() => ({
   },
   fields: {
     gap: tokens.spacing[5],
-  },
-  footer: {
-    paddingHorizontal: tokens.layout.pageGutterCompact,
-    paddingTop: tokens.spacing[4],
-    paddingBottom: tokens.spacing[4],
-    gap: tokens.spacing[3],
   },
 }));

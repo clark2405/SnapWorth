@@ -362,9 +362,7 @@ const stylesFor = themedStyles((colors) => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing[2],
-    paddingLeft: tokens.spacing[4],
-    paddingRight: tokens.spacing[2],
-    paddingVertical: tokens.spacing[2],
+    paddingLeft: tokens.spacing[1],
   },
   input: {
     flex: 1,

@@ -112,19 +112,23 @@ function VoteChip({
         containerStyle={styles.slot}
       >
         <Animated.View style={[styles.chip, flood]}>
-          <View style={styles.labelRow}>
+          <SWText
+            variant="chip"
+            tone={isSelected ? 'textPrimary' : 'textSecondary'}
+            numberOfLines={1}
+          >
+            {vote.label}
+          </SWText>
+          <View style={styles.countRow}>
             <Animated.View style={iconPop}>
-              <Icon size={14} strokeWidth={2.5} color={hue} />
+              <Icon size={13} strokeWidth={2.5} color={hue} />
             </Animated.View>
-            <SWText variant="chip" tone={isSelected ? 'textPrimary' : 'textSecondary'}>
-              {vote.label}
-            </SWText>
+            <Animated.View style={countStyle}>
+              <SWText variant="caption" tone="textMuted" style={styles.count}>
+                {count}
+              </SWText>
+            </Animated.View>
           </View>
-          <Animated.View style={countStyle}>
-            <SWText variant="caption" tone="textMuted" style={styles.count}>
-              {count}
-            </SWText>
-          </Animated.View>
         </Animated.View>
       </PressableScale>
     </Animated.View>
@@ -217,8 +221,9 @@ const stylesFor = themedStyles((colors) => ({
     paddingVertical: tokens.spacing[2],
     gap: 2,
   },
-  // Count sits under the label so all three chips keep one line of label at phone widths.
-  labelRow: {
+  // The label has a line to itself and the icon rides with the count beneath, so all three
+  // chips keep one line of label, and one height, down to the narrowest phones.
+  countRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing[1],

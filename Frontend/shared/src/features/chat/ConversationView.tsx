@@ -354,14 +354,11 @@ const stylesFor = themedStyles((colors) => ({
   },
   footerColumn: {
     gap: tokens.spacing[2],
-    paddingTop: tokens.spacing[2],
-    paddingHorizontal: tokens.layout.pageGutterCompact,
   },
   composerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing[2],
-    paddingVertical: tokens.spacing[2],
   },
   composerInput: {
     flex: 1,
