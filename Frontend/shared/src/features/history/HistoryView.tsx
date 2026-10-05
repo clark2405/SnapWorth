@@ -1,4 +1,14 @@
-import { ChevronRight, PackageSearch } from 'lucide-react-native';
+import {
+  Archive,
+  ChevronRight,
+  Handshake,
+  Lock,
+  PackageSearch,
+  Tag as TagIcon,
+  Vote,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Share, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -9,6 +19,7 @@ import {
   Divider,
   EmptyState,
   LargeTitle,
+  Overline,
   Photo,
   Reveal,
   Screen,
@@ -43,13 +54,13 @@ export interface HistoryViewProps {
 
 type FilterKey = 'all' | PreviewItemStatus;
 
-// Statuses are soft tonal chips with an emoji: live states lean positive, private is neutral,
-// and sold is archived.
-const statusTag: Record<PreviewItemStatus, { label: string; tone: TagTone; emoji: string }> = {
-  listed: { label: 'Listed', tone: 'mint', emoji: '🏷️' },
-  on_feed: { label: 'On feed', tone: 'sand', emoji: '🗳️' },
-  private: { label: 'Private', tone: 'sand', emoji: '🔒' },
-  sold: { label: 'Sold', tone: 'grave', emoji: '🤝' },
+// Statuses are soft tonal chips with a line icon: live states lean positive, private is
+// neutral, and sold is archived.
+const statusTag: Record<PreviewItemStatus, { label: string; tone: TagTone; icon: LucideIcon }> = {
+  listed: { label: 'Listed', tone: 'mint', icon: TagIcon },
+  on_feed: { label: 'On feed', tone: 'sand', icon: Vote },
+  private: { label: 'Private', tone: 'sand', icon: Lock },
+  sold: { label: 'Sold', tone: 'grave', icon: Handshake },
 };
 
 const filters: readonly { key: FilterKey; label: string }[] = [
@@ -102,7 +113,8 @@ export function HistoryView({
     >
       <LargeTitle
         title="Your stash"
-        overline={`🗂️ Everything you snapped · ${previewHistory.length} checked`}
+        overlineIcon={Archive}
+        overline={`Everything you snapped · ${previewHistory.length} checked`}
         trailing={
           <View style={styles.actions}>
             <SearchButton label="Search your history" onOpen={onSearch} />
@@ -114,9 +126,7 @@ export function HistoryView({
       <Reveal index={0} style={styles.hero}>
         {/* The screen's one feature slab: the number everything else here adds up to. */}
         <Surface tone="feature" padding={tokens.spacing[5]} contentStyle={styles.heroContent}>
-          <SWText variant="overline" tone="onFeatureDim">
-            💰 What it's all worth
-          </SWText>
+          <Overline icon={Wallet} label="What it's all worth" tone="onFeatureDim" />
           <CountUp
             value={previewPortfolio.total}
             format={formatPeso}
@@ -216,7 +226,7 @@ function HistoryRow({
         <SWText variant="labelSmall" tone="textSecondary" numberOfLines={1}>
           {formatPeso(item.estimate)} est. · {item.capturedOn}
         </SWText>
-        <Tag label={status.label} tone={status.tone} emoji={status.emoji} />
+        <Tag label={status.label} tone={status.tone} icon={status.icon} />
       </View>
       <ChevronRight size={18} strokeWidth={1.75} color={colors.textMuted} />
     </ZoomLink>

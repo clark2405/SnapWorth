@@ -76,7 +76,7 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
     setTimeout(() => {
       setPublishing(false);
       toast.show({
-        title: 'Listing published 🎉',
+        title: 'Listing published',
         body: `Live at ${formatPeso(enteredPrice)}.`,
         celebrate: true,
       });

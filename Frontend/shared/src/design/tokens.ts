@@ -443,10 +443,11 @@ export const tokens = deepFreeze({
     tabBarHeight: 60,
     /** Room above the native floating tab bar, so content and the companion clear it. */
     nativeTabBarClearance: 96,
-    /** Room above the web's floating tab bar and the Snap button riding above it. */
-    floatingTabBarClearance: 176,
+    /** Room above the web's floating tab bar, so content and the companion clear it. */
+    floatingTabBarClearance: 112,
     floatingTabBar: 74,
-    fab: 56,
+    /** The tall primary pill: the one accent action on a screen. */
+    primaryButton: 56,
     headerCompact: 52,
     tabBarCapture: 48,
     headerHeight: 56,

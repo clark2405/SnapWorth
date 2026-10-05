@@ -57,7 +57,7 @@ const labelTone: Record<ButtonVariant, SemanticColorName> = {
   danger: 'danger',
 };
 
-const heights = { large: tokens.layout.fab, medium: 44, small: 34 } as const;
+const heights = { large: tokens.layout.primaryButton, medium: 44, small: 34 } as const;
 
 export function Button({
   label,

@@ -1,4 +1,4 @@
-import { ArrowUp } from 'lucide-react-native';
+import { ArrowUp, PenLine } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-reanimated';
@@ -8,14 +8,15 @@ import {
   Button,
   ChoiceChips,
   CompanionOrb,
+  hideWebFocusOutline,
   NavHeader,
+  Overline,
   PressableScale,
   PriceRangeBar,
   Screen,
   Sparkline,
-  SWText,
   Surface,
-  hideWebFocusOutline,
+  SWText,
   typeStyle,
   useToast,
 } from '../../components';
@@ -295,9 +296,7 @@ function ReplyCardView({
     const draft = previewCompanionReplies.listingDraft;
     return (
       <Surface padding={tokens.spacing[4]} contentStyle={styles.card}>
-        <SWText variant="overline" tone="textMuted">
-          ✍️ Draft listing
-        </SWText>
+        <Overline icon={PenLine} label="Draft listing" />
         <SWText variant="headingMedium">{draft.title}</SWText>
         <SWText variant="bodyMedium" tone="textSecondary">
           {draft.body}

@@ -3,28 +3,29 @@ import { useState } from 'react';
 import { Switch, View } from 'react-native';
 
 import {
+  Tag,
   AskingPriceBadge,
   Avatar,
   BottomBar,
   Button,
   ChoiceChips,
+  Photo,
   IconButton,
   LikeButton,
   ListRow,
   NavHeader,
-  Photo,
+  Rating,
   PressableScale,
-  PriceRangeBar,
   Reveal,
+  PriceRangeBar,
   Screen,
   Sheet,
   Surface,
   SWText,
-  Tag,
-  TextField,
-  VerdictBar,
-  ZoomTarget,
   useToast,
+  VerdictBar,
+  TextField,
+  ZoomTarget,
 } from '../../components';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import type { VoteCounts } from '../../types';
@@ -194,9 +195,7 @@ export function ListingDetailView({
                 />
                 <View style={styles.sellerText}>
                   <SWText variant="label">@{listing.seller.handle}</SWText>
-                  <SWText variant="caption" tone="textMuted">
-                    ★ {listing.seller.rating} ({listing.seller.sales} sales)
-                  </SWText>
+                  <Rating value={listing.seller.rating} detail={`${listing.seller.sales} sales`} />
                 </View>
                 <ChevronRight size={20} strokeWidth={2} color={colors.textMuted} />
               </View>

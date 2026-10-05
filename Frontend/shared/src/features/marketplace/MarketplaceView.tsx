@@ -1,4 +1,4 @@
-import { Camera, PackageSearch } from 'lucide-react-native';
+import { BadgePercent, Camera, PackageSearch, ShoppingBag } from 'lucide-react-native';
 import { useState } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -10,6 +10,7 @@ import {
   EmptyState,
   EstimateBadge,
   LargeTitle,
+  Overline,
   Photo,
   Reveal,
   Screen,
@@ -74,7 +75,8 @@ export function MarketplaceView({
     >
       <LargeTitle
         title="Market"
-        overline="🛍️ Up for grabs · Seller-set prices"
+        overlineIcon={ShoppingBag}
+        overline="Up for grabs · Seller-set prices"
         trailing={
           <View style={styles.actions}>
             <Button label="Sell" size="small" variant="secondary" icon={Camera} onPress={onSell} />
@@ -97,9 +99,7 @@ export function MarketplaceView({
 
       {underEstimate.length > 0 ? (
         <Reveal index={1} style={styles.highlightSection}>
-          <SWText variant="overline" tone="textMuted">
-            💸 Steals · Under estimate
-          </SWText>
+          <Overline icon={BadgePercent} label="Steals · Under estimate" />
           <View style={styles.highlightRow}>
             {underEstimate.map((listing) => (
               <UnderEstimateCard

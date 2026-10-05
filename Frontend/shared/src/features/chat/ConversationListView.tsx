@@ -1,4 +1,4 @@
-import { MessageSquare } from 'lucide-react-native';
+import { MessageSquare, MessagesSquare } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import {
@@ -40,7 +40,8 @@ export function ConversationListView({
     >
       <LargeTitle
         title="Chats"
-        overline="💬 Buyers & sellers"
+        overlineIcon={MessagesSquare}
+        overline="Buyers & sellers"
         overlineCount={unread > 0 ? `${unread} unread` : undefined}
         trailing={<ProfileButton onPress={onOpenProfile} />}
       />

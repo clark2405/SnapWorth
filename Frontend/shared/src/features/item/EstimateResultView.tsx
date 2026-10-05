@@ -8,9 +8,10 @@ import {
   RotateCw,
   Share2,
   ShoppingBag,
+  Target,
+  type LucideIcon,
   Users,
   WifiOff,
-  type LucideIcon,
 } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, Share, StyleSheet, View, useWindowDimensions } from 'react-native';
@@ -188,7 +189,7 @@ export function EstimateResultView({
                 <Tag
                   label={`${previewValuation.confidence.charAt(0).toUpperCase()}${previewValuation.confidence.slice(1)} confidence`}
                   tone="mint"
-                  emoji="🎯"
+                  icon={Target}
                 />
               </View>
               <View style={styles.estimateLabel}>

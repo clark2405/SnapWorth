@@ -4,7 +4,10 @@ import {
   CircleHelp,
   LogOut,
   ShieldAlert,
+  Palette,
+  Settings2,
   Sparkles,
+  Wallet,
   TrendingDown,
 } from 'lucide-react-native';
 import { View } from 'react-native';
@@ -15,7 +18,9 @@ import {
   ListGroup,
   ListRow,
   NavHeader,
+  Overline,
   PressableScale,
+  Rating,
   Reveal,
   Screen,
   SegmentedControl,
@@ -86,9 +91,12 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
             <SWText variant="displayTitle" accessibilityRole="header">
               {profile.displayName}
             </SWText>
-            <SWText variant="bodySmall" tone="textSecondary">
-              @{profile.user.handle} · ★ {profile.rating}
-            </SWText>
+            <View style={styles.handleRow}>
+              <SWText variant="bodySmall" tone="textSecondary">
+                @{profile.user.handle} ·
+              </SWText>
+              <Rating value={profile.rating} variant="bodySmall" tone="textSecondary" />
+            </View>
             <SWText variant="caption" tone="textMuted">
               {profile.location} · {profile.joined}
             </SWText>
@@ -122,9 +130,7 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
       <Reveal index={2}>
         <Surface tone="feature" padding={tokens.spacing[5]} contentStyle={styles.collectionCard}>
           <View style={styles.collectionHeader}>
-            <SWText variant="overline" tone="onFeatureDim">
-              💰 Collection value
-            </SWText>
+            <Overline icon={Wallet} label="Collection value" tone="onFeatureDim" />
             <Tag label={previewPortfolio.changeLabel} tone="mint" />
           </View>
           <CountUp
@@ -138,7 +144,7 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
       </Reveal>
 
       <Reveal index={3} style={styles.sections}>
-        <ListGroup title="🎨 The look">
+        <ListGroup title="The look" icon={Palette}>
           <View style={styles.appearanceRow}>
             <SegmentedControl
               options={appearanceOptions}
@@ -148,7 +154,7 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
           </View>
         </ListGroup>
 
-        <ListGroup title="⚙️ The fine print">
+        <ListGroup title="The fine print" icon={Settings2}>
           <ListRow label="Notifications" icon={Bell} onPress={() => onOpen?.('notifications')} />
           <ListRow
             label="Price alerts"
@@ -192,6 +198,11 @@ const stylesFor = themedStyles(() => ({
   },
   identityText: {
     flex: 1,
+    gap: tokens.spacing[1],
+  },
+  handleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: tokens.spacing[1],
   },
   stats: {

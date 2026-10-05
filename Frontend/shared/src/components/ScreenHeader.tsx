@@ -1,4 +1,4 @@
-import { ChevronLeft } from 'lucide-react-native';
+import { ChevronLeft, type LucideIcon } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
 import Animated, { Extrapolation, interpolate, useAnimatedStyle } from 'react-native-reanimated';
@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { themedStyles, tokens, useThemedStyles } from '../design';
 import { IconButton } from './IconButton';
+import { Overline } from './Overline';
 import { useRegisterLargeTitle, useScreenScroll } from './Screen';
 import { ScrollEdge } from './ScrollEdge';
 import { SWText } from './SWText';
@@ -77,8 +78,10 @@ export function NavHeader({ title, onBack, trailing, banded = false }: NavHeader
 
 export interface LargeTitleProps {
   readonly title: string;
-  /** The small uppercase line above the title, often led by an emoji, e.g. "🗳️ Community". */
+  /** The small uppercase line above the title, e.g. "Community · Is the AI right?". */
   readonly overline?: string;
+  /** A thin line icon that leads the overline. */
+  readonly overlineIcon?: LucideIcon;
   /** An urgent count after a "·" in the overline, e.g. "2 unread"; the one accent text use. */
   readonly overlineCount?: string;
   /** A short line under the title that states what the screen is for. */
@@ -93,6 +96,7 @@ export interface LargeTitleProps {
 export function LargeTitle({
   title,
   overline,
+  overlineIcon,
   overlineCount,
   subtitle,
   trailing,
@@ -122,19 +126,7 @@ export function LargeTitle({
           gets the full width beneath, so nothing wraps into a ragged line beside the buttons. */}
       {overline ? (
         <Animated.View style={[styles.overlineRow, textStyle]}>
-          <SWText variant="overline" tone="textMuted" numberOfLines={1}>
-            {overline}
-            {overlineCount ? (
-              <>
-                <SWText variant="overline" tone="textMuted">
-                  {'  ·  '}
-                </SWText>
-                <SWText variant="overline" tone="accent">
-                  {overlineCount}
-                </SWText>
-              </>
-            ) : null}
-          </SWText>
+          <Overline label={overline} icon={overlineIcon} count={overlineCount} />
         </Animated.View>
       ) : null}
       <View style={styles.largeRow}>

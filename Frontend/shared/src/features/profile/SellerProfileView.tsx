@@ -4,9 +4,10 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 
 import {
   Avatar,
-  EmptyState,
   IconButton,
+  EmptyState,
   NavHeader,
+  Rating,
   Reveal,
   Screen,
   SWText,
@@ -67,9 +68,12 @@ export function SellerProfileView({
           <SWText variant="displayTitle" accessibilityRole="header">
             {seller.displayName}
           </SWText>
-          <SWText variant="bodySmall" tone="textSecondary">
-            ★ {seller.rating} · {seller.sales} sales
-          </SWText>
+          <Rating
+            value={seller.rating}
+            detail={`${seller.sales} sales`}
+            variant="bodySmall"
+            tone="textSecondary"
+          />
           <SWText variant="caption" tone="textMuted">
             {seller.joined}
           </SWText>

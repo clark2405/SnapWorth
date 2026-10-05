@@ -957,7 +957,7 @@ const stylesFor = themedStyles((colors, name) => ({
     borderRadius: tokens.radius.full,
   },
   primary: {
-    height: tokens.layout.fab,
+    height: tokens.layout.primaryButton,
     borderRadius: tokens.radius.full,
     backgroundColor: colors.accent,
     alignItems: 'center',

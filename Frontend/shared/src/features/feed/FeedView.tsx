@@ -1,8 +1,10 @@
+import { Flame, Users } from 'lucide-react-native';
 import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 
 import {
   LargeTitle,
+  Overline,
   Photo,
   PressableScale,
   Reveal,
@@ -41,7 +43,8 @@ export function FeedView({ onOpenPost, onSearch, onOpenProfile }: FeedViewProps)
       onRefresh={() => new Promise<void>((resolve) => setTimeout(resolve, 900))}
     >
       <LargeTitle
-        overline="🗳️ Community · Is the AI right?"
+        overlineIcon={Users}
+        overline="Community · Is the AI right?"
         title="Price check"
         trailing={
           <View style={styles.actions}>
@@ -52,14 +55,7 @@ export function FeedView({ onOpenPost, onSearch, onOpenProfile }: FeedViewProps)
       />
 
       <Reveal index={0} style={styles.trending}>
-        <SWText
-          variant="overline"
-          tone="textMuted"
-          style={styles.trendingTitle}
-          accessibilityRole="header"
-        >
-          🔥 Hot this month
-        </SWText>
+        <Overline icon={Flame} label="Hot this month" style={styles.trendingTitle} />
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}

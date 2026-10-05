@@ -23,24 +23,18 @@ const palette: Record<TagTone, { fill: SemanticColorName; ink: SemanticColorName
 export interface TagProps {
   readonly label: string;
   readonly tone?: TagTone;
-  /** A leading emoji for personality, e.g. "🏷️ Listed". */
-  readonly emoji?: string;
+  /** A small leading line icon, e.g. a tag for "Listed". */
   readonly icon?: LucideIcon;
 }
 
-export function Tag({ label, tone = 'sand', emoji, icon: Icon }: TagProps) {
+export function Tag({ label, tone = 'sand', icon: Icon }: TagProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const { fill, ink } = palette[tone];
 
   return (
     <View style={[styles.tag, { backgroundColor: colors[fill] }]}>
-      {Icon ? <Icon size={12} strokeWidth={2.4} color={colors[ink]} /> : null}
-      {emoji ? (
-        <SWText variant="tag" accessibilityElementsHidden importantForAccessibility="no">
-          {emoji}
-        </SWText>
-      ) : null}
+      {Icon ? <Icon size={12} strokeWidth={2.2} color={colors[ink]} /> : null}
       <SWText variant="tag" tone={ink}>
         {label}
       </SWText>

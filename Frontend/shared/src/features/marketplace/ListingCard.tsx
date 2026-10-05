@@ -1,3 +1,4 @@
+import { CircleCheck, TrendingDown, TrendingUp, type LucideIcon } from 'lucide-react-native';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -22,10 +23,10 @@ const verdictLabel: Record<VoteChoice, string> = {
 };
 
 // The community verdict is a status, so it wears a soft tonal chip, never a bright colour.
-const verdictChip: Record<VoteChoice, { tone: TagTone; emoji: string }> = {
-  too_high: { tone: 'warn', emoji: '📈' },
-  just_right: { tone: 'mint', emoji: '✅' },
-  too_low: { tone: 'sand', emoji: '📉' },
+const verdictChip: Record<VoteChoice, { tone: TagTone; icon: LucideIcon }> = {
+  too_high: { tone: 'warn', icon: TrendingUp },
+  just_right: { tone: 'mint', icon: CircleCheck },
+  too_low: { tone: 'sand', icon: TrendingDown },
 };
 
 export interface ListingCardProps {
@@ -100,7 +101,7 @@ export function ListingCard({ listing, onOpen, onMessageSeller }: ListingCardPro
           <Tag
             label={verdict}
             tone={verdictChip[listing.verdict].tone}
-            emoji={verdictChip[listing.verdict].emoji}
+            icon={verdictChip[listing.verdict].icon}
           />
         </View>
       </View>
