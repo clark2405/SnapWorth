@@ -185,7 +185,11 @@ export function EstimateResultView({
                 <SWText variant="caption" tone="textMuted">
                   {item.category}
                 </SWText>
-                <Tag label={`${previewValuation.confidence} confidence`} tone="accent" />
+                <Tag
+                  label={`${previewValuation.confidence.charAt(0).toUpperCase()}${previewValuation.confidence.slice(1)} confidence`}
+                  tone="mint"
+                  emoji="🎯"
+                />
               </View>
               <View style={styles.estimateLabel}>
                 <EstimateMark />
@@ -619,7 +623,7 @@ function ShareCardSheet({
         <View style={styles.shareBody}>
           <SWText variant="headingMedium">{title}</SWText>
           <View style={styles.estimateLabel}>
-            <SWText variant="overline" tone="accent">
+            <SWText variant="overline" tone="textMuted">
               Worth about
             </SWText>
           </View>
@@ -799,13 +803,13 @@ const stylesFor = themedStyles((colors, name) => ({
   },
   scanGlow: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: colors.accent,
-    opacity: 0.18,
+    backgroundColor: colors.sand,
+    opacity: 0.35,
   },
   scanCore: {
     height: 2,
     backgroundColor: tokens.overlay.text,
-    shadowColor: colors.accent,
+    shadowColor: tokens.overlay.text,
     shadowOpacity: 1,
     shadowRadius: 10,
   },

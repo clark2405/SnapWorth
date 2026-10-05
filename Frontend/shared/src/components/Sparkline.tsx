@@ -18,11 +18,14 @@ export interface SparklineProps {
   readonly height?: number;
   /** Tint the area under the line with a flat, faint fill. */
   readonly filled?: boolean;
+  /** Line colour; defaults to ink. Pass the slab's ink when drawn on a feature slab. */
+  readonly color?: string;
 }
 
 /** A smooth trend line that draws itself left to right, like a pen stroke, when it appears. */
-export function Sparkline({ values, height = 56, filled = true }: SparklineProps) {
+export function Sparkline({ values, height = 56, filled = true, color }: SparklineProps) {
   const { colors } = useTheme();
+  const stroke = color ?? colors.textPrimary;
   const reduceMotion = useReducedMotion();
   const [width, setWidth] = useState(0);
   const draw = useSharedValue(reduceMotion ? 1 : 0);
@@ -68,16 +71,11 @@ export function Sparkline({ values, height = 56, filled = true }: SparklineProps
       {width > 0 ? (
         <Svg width={width} height={height}>
           {filled ? (
-            <AnimatedPath
-              d={area}
-              fill={colors.accent}
-              fillOpacity={0.08}
-              animatedProps={areaProps}
-            />
+            <AnimatedPath d={area} fill={stroke} fillOpacity={0.08} animatedProps={areaProps} />
           ) : null}
           <AnimatedPath
             d={line}
-            stroke={colors.accent}
+            stroke={stroke}
             strokeWidth={2.2}
             strokeLinecap="round"
             fill="none"

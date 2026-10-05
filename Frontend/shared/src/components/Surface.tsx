@@ -4,7 +4,7 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { themedStyles, tokens, useThemedStyles } from '../design';
 import { GlassSurface } from './GlassSurface';
 
-export type SurfaceTone = 'surface' | 'raised' | 'sunken' | 'accent';
+export type SurfaceTone = 'surface' | 'raised' | 'sunken' | 'accent' | 'feature';
 
 export interface SurfaceProps {
   readonly children?: ReactNode;
@@ -17,8 +17,9 @@ export interface SurfaceProps {
 }
 
 /**
- * A grouped card. In light mode it lifts off the paper on a soft, wide shadow; in dark mode it
- * steps up in value with a hairline edge instead, since shadows vanish on a dark ground.
+ * A soft, rounded card. In light mode it lifts off the cream page on a warm shadow with no
+ * border; in dark mode it steps up in value with a hairline edge, since shadows vanish there.
+ * `feature` is the inverted slab a screen may use once, for its hero number.
  */
 export function Surface({
   children,
@@ -78,16 +79,17 @@ const stylesFor = themedStyles((colors, name) => ({
     borderWidth: name === 'dark' ? StyleSheet.hairlineWidth : 0,
     borderColor: colors.borderSubtle,
     shadowColor: tokens.shadow[name],
-    shadowOpacity: name === 'dark' ? 0 : 1,
-    shadowRadius: 24,
+    shadowOpacity: 1,
+    shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
-    elevation: name === 'dark' ? 0 : 1,
+    elevation: name === 'dark' ? 0 : 2,
   },
   clip: {
     overflow: 'hidden',
   },
   surface: { backgroundColor: colors.surface },
-  raised: { backgroundColor: colors.surfaceRaised, borderColor: colors.borderStrong },
+  raised: { backgroundColor: colors.surfaceRaised },
+  feature: { backgroundColor: colors.feature, borderWidth: 0 },
   sunken: {
     backgroundColor: colors.sunken,
     shadowOpacity: 0,
@@ -96,8 +98,7 @@ const stylesFor = themedStyles((colors, name) => ({
   },
   accent: {
     backgroundColor: colors.estimateSurface,
-    borderColor: colors.borderSubtle,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 0,
     shadowOpacity: 0,
   },
   bottomWrap: {
@@ -109,7 +110,6 @@ const stylesFor = themedStyles((colors, name) => ({
   },
   divider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.borderStrong,
-    opacity: 0.6,
+    backgroundColor: colors.borderSubtle,
   },
 }));

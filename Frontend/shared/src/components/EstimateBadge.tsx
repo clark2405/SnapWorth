@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import { themedStyles, tokens, useThemedStyles } from '../design';
 import { SWText } from './SWText';
@@ -18,8 +18,9 @@ export interface EstimateBadgeProps {
 }
 
 /**
- * The AI's number always wears the same mark: a small champagne diamond and a quiet "Est."
- * label. It is set apart from asking prices, which are the seller's and are always bare.
+ * The AI's number always wears the same mark: a small sand diamond and a quiet "Est." label.
+ * It is set apart from asking prices, which are the seller's and are always bare. The accent
+ * is never spent here: it belongs to the screen's primary action.
  */
 export function EstimateBadge({ value, size = 'compact', range }: EstimateBadgeProps) {
   const styles = useThemedStyles(stylesFor);
@@ -78,7 +79,7 @@ export function EstimateBadge({ value, size = 'compact', range }: EstimateBadgeP
   );
 }
 
-/** The estimate's signature: a small accent diamond, used wherever the AI's number appears. */
+/** The estimate's signature: a small sand diamond, used wherever the AI's number appears. */
 export function EstimateMark({ size = 6 }: { readonly size?: number }) {
   const styles = useThemedStyles(stylesFor);
   return (
@@ -101,8 +102,6 @@ const stylesFor = themedStyles((colors) => ({
     paddingVertical: tokens.spacing[1] + 2,
     borderRadius: tokens.radius.full,
     backgroundColor: colors.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderSubtle,
   },
   hero: {
     gap: tokens.spacing[2],
@@ -117,7 +116,7 @@ const stylesFor = themedStyles((colors) => ({
     gap: tokens.spacing[2],
   },
   mark: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.sandInk,
     transform: [{ rotate: '45deg' }],
     borderRadius: 1,
   },

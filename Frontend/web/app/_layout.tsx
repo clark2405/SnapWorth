@@ -104,7 +104,7 @@ function WebCompanion({ ready }: { readonly ready: boolean }) {
       greeting={config.greeting}
       hint={config.hint}
       hidden={!ready || config.hidden}
-      bottomOffset={config.lift === 'tabBar' ? 84 : 92}
+      bottomOffset={config.lift === 'tabBar' ? 90 : 92}
       onAsk={(question) => router.push({ pathname: '/worthy', params: { q: question } })}
       onHoldSnap={() => router.push('/capture')}
     />

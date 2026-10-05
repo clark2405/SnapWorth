@@ -66,7 +66,7 @@ export interface AvatarProps {
   readonly source: ImageSourcePropType;
   readonly name: string;
   readonly size?: number;
-  /** A ring in the accent, e.g. for a verified or top seller. */
+  /** A sand ring, e.g. for a verified or top seller. */
   readonly ring?: boolean;
 }
 
@@ -100,6 +100,6 @@ const stylesFor = themedStyles((colors) => ({
   ring: {
     padding: 2,
     borderWidth: 1.5,
-    borderColor: colors.accent,
+    borderColor: colors.sandInk,
   },
 }));

@@ -60,7 +60,7 @@ export const snapWorthNativeWindPreset = {
         ]),
       ),
       letterSpacing: {
-        overline: `${typography.overline.letterSpacingEm}em`,
+        overline: px(typography.overline.letterSpacing),
       },
       spacing: Object.fromEntries(
         Object.entries(tokens.spacing).map(([name, value]) => [name, px(value)]),

@@ -11,12 +11,7 @@ import {
 type TypeStyle = (typeof tokens.typography.style)[TypographyStyleName];
 
 function toTextStyle(style: TypeStyle): TextStyle {
-  const letterSpacing =
-    'letterSpacingEm' in style
-      ? style.letterSpacingEm * style.size
-      : 'letterSpacing' in style
-        ? style.letterSpacing
-        : undefined;
+  const { letterSpacing } = style;
 
   // Each weight is its own bundled face, so no `fontWeight`: setting one would make the web
   // synthesise a fake bold and Android fall back to the system font.

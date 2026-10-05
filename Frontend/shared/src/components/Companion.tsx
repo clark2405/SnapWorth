@@ -380,7 +380,7 @@ function CompanionPanel({
           <SWText variant="bodyLarge" style={styles.greeting} accessibilityLabel={greeting}>
             {typed}
             {typed.length < greeting.length ? (
-              <SWText variant="bodyLarge" tone="accent">
+              <SWText variant="bodyLarge" tone="textMuted">
                 ▍
               </SWText>
             ) : null}

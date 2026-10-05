@@ -59,8 +59,8 @@ export interface TextFieldProps extends Omit<TextInputProps, 'style'> {
 }
 
 /**
- * A filled field. Focus is shown by the edge warming to the accent and the well lifting a step,
- * both eased over 180ms so the change reads as attention, not a flicker.
+ * A white field on the cream page. Focus is shown by a 2px edge warming to the accent, eased
+ * so the change reads as attention, not a flicker.
  */
 export function TextField({
   prefix,
@@ -76,8 +76,7 @@ export function TextField({
   const textVariant: TypographyStyleName = size === 'large' ? 'priceLarge' : 'bodyLarge';
 
   const boxStyle = useAnimatedStyle(() => ({
-    borderColor: interpolateColor(focus.value, [0, 1], [colors.sunken, colors.focusRing]),
-    backgroundColor: interpolateColor(focus.value, [0, 1], [colors.sunken, colors.surface]),
+    borderColor: interpolateColor(focus.value, [0, 1], [colors.borderSubtle, colors.focusRing]),
   }));
 
   return (
@@ -94,11 +93,11 @@ export function TextField({
         cursorColor={colors.accent}
         keyboardAppearance={isDark ? 'dark' : 'light'}
         onFocus={(event) => {
-          focus.value = withTiming(1, { duration: 180 });
+          focus.value = withTiming(1, { duration: tokens.motion.duration.base });
           onFocus?.(event);
         }}
         onBlur={(event) => {
-          focus.value = withTiming(0, { duration: 180 });
+          focus.value = withTiming(0, { duration: tokens.motion.duration.base });
           onBlur?.(event);
         }}
         style={[
@@ -150,9 +149,9 @@ const stylesFor = themedStyles((colors) => ({
   box: {
     minHeight: tokens.layout.controlHeight,
     borderRadius: tokens.radius.medium,
-    borderWidth: 1.5,
-    borderColor: colors.sunken,
-    backgroundColor: colors.sunken,
+    borderWidth: 2,
+    borderColor: colors.borderSubtle,
+    backgroundColor: colors.surface,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: tokens.spacing[4],
@@ -162,7 +161,7 @@ const stylesFor = themedStyles((colors) => ({
     minHeight: tokens.spacing[16] + tokens.spacing[2],
   },
   pressed: {
-    backgroundColor: colors.borderSubtle,
+    backgroundColor: colors.surfaceRaised,
   },
   input: {
     flex: 1,

@@ -26,9 +26,10 @@ import { PressableScale } from './PressableScale';
 import { SWText } from './SWText';
 
 /**
- * `primary` is the one monochrome action on a screen; `accent` is reserved for value moments
- * (get the estimate, list for sale); `secondary` is a quiet filled pill; `tertiary` is bare
- * text; `danger` marks destructive actions outside a confirmation.
+ * `primary` is THE action on a screen: the one place the vermilion accent appears, as a tall
+ * full pill. `accent` is the same treatment, kept as an alias for value moments. `secondary`
+ * is a white pill with a hairline; `tertiary` is a quiet soft-ink text link; `danger` marks
+ * destructive actions outside a confirmation.
  */
 export type ButtonVariant = 'primary' | 'accent' | 'secondary' | 'tertiary' | 'danger';
 
@@ -49,14 +50,14 @@ export interface ButtonProps {
 }
 
 const labelTone: Record<ButtonVariant, SemanticColorName> = {
-  primary: 'onInverse',
+  primary: 'onAccent',
   accent: 'onAccent',
   secondary: 'textPrimary',
-  tertiary: 'accent',
+  tertiary: 'textSecondary',
   danger: 'danger',
 };
 
-const heights = { large: tokens.layout.controlHeight, medium: 44, small: 34 } as const;
+const heights = { large: tokens.layout.fab, medium: 44, small: 34 } as const;
 
 export function Button({
   label,
@@ -73,7 +74,7 @@ export function Button({
 }: ButtonProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
-  const tone: SemanticColorName = disabled ? 'textMuted' : labelTone[variant];
+  const tone: SemanticColorName = labelTone[variant];
 
   return (
     <PressableScale
@@ -82,7 +83,7 @@ export function Button({
       accessibilityState={{ disabled: disabled || loading, busy: loading }}
       disabled={disabled || loading}
       onPress={onPress}
-      haptic={haptic ?? (variant === 'accent' ? 'pop' : 'tap')}
+      haptic={haptic ?? (variant === 'accent' || variant === 'primary' ? 'pop' : 'tap')}
       containerStyle={containerStyle}
       style={({ pressed }) => [
         styles.base,
@@ -172,21 +173,20 @@ const stylesFor = themedStyles((colors) => ({
     justifyContent: 'center',
     gap: tokens.spacing[2],
   },
-  primary: { backgroundColor: colors.inverse },
-  primaryPressed: { backgroundColor: colors.inversePressed },
+  primary: { backgroundColor: colors.accent },
+  primaryPressed: { backgroundColor: colors.accentPressed },
   accent: { backgroundColor: colors.accent },
   accentPressed: { backgroundColor: colors.accentPressed },
-  secondary: { backgroundColor: colors.sunken },
-  secondaryPressed: { backgroundColor: colors.borderSubtle },
+  secondary: {
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+  },
+  secondaryPressed: { backgroundColor: colors.surfaceRaised },
   tertiary: { paddingHorizontal: tokens.spacing[2] },
   tertiaryPressed: { opacity: 0.6 },
-  danger: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.danger,
-  },
-  dangerPressed: { backgroundColor: colors.sunken },
-  disabled: {
-    backgroundColor: colors.sunken,
-    borderColor: colors.borderSubtle,
-  },
+  danger: { backgroundColor: colors.dangerSoft },
+  dangerPressed: { opacity: 0.8 },
+  // Disabled keeps the variant's colours at 45%, so the button still reads as itself.
+  disabled: { opacity: 0.45 },
 }));

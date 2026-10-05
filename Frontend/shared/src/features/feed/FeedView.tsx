@@ -37,12 +37,12 @@ export function FeedView({ onOpenPost, onSearch, onOpenProfile }: FeedViewProps)
   return (
     <Screen
       clearTabBar
-      ambient="value"
+      ambient="feed"
       onRefresh={() => new Promise<void>((resolve) => setTimeout(resolve, 900))}
     >
       <LargeTitle
-        title="Feed"
-        subtitle="Vote on whether the AI got the price right."
+        overline="🗳️ Community · Is the AI right?"
+        title="Price check"
         trailing={
           <View style={styles.actions}>
             <SearchButton label="Search the feed" onOpen={onSearch} />
@@ -58,7 +58,7 @@ export function FeedView({ onOpenPost, onSearch, onOpenProfile }: FeedViewProps)
           style={styles.trendingTitle}
           accessibilityRole="header"
         >
-          Trending this month
+          🔥 Hot this month
         </SWText>
         <ScrollView
           horizontal
@@ -149,6 +149,6 @@ const stylesFor = themedStyles(() => ({
     marginBottom: tokens.spacing[2],
   },
   list: {
-    gap: tokens.spacing[12],
+    gap: tokens.spacing[4],
   },
 }));

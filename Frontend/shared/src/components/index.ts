@@ -31,3 +31,4 @@ export * from './TextField';
 export * from './Toast';
 export * from './usePop';
 export * from './VoteChips';
+export * from './Confetti';

@@ -1,4 +1,4 @@
-import { PackageSearch } from 'lucide-react-native';
+import { ChevronRight, PackageSearch } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Share, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -6,8 +6,8 @@ import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition } from 'react-n
 import {
   ChoiceChips,
   CountUp,
+  Divider,
   EmptyState,
-  EstimateBadge,
   LargeTitle,
   Photo,
   Reveal,
@@ -22,7 +22,7 @@ import {
   type SearchOrigin,
   type TagTone,
 } from '../../components';
-import { themedStyles, tokens, useThemedStyles } from '../../design';
+import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import {
   formatPeso,
   previewHistory,
@@ -43,12 +43,13 @@ export interface HistoryViewProps {
 
 type FilterKey = 'all' | PreviewItemStatus;
 
-// The accent marks the one state that is live for sale; every other state is a quiet label.
-const statusTag: Record<PreviewItemStatus, { label: string; tone: TagTone }> = {
-  listed: { label: 'Listed', tone: 'accent' },
-  on_feed: { label: 'On feed', tone: 'outline' },
-  private: { label: 'Private', tone: 'neutral' },
-  sold: { label: 'Sold', tone: 'neutral' },
+// Statuses are soft tonal chips with an emoji: live states lean positive, private is neutral,
+// and sold is archived.
+const statusTag: Record<PreviewItemStatus, { label: string; tone: TagTone; emoji: string }> = {
+  listed: { label: 'Listed', tone: 'mint', emoji: '🏷️' },
+  on_feed: { label: 'On feed', tone: 'sand', emoji: '🗳️' },
+  private: { label: 'Private', tone: 'sand', emoji: '🔒' },
+  sold: { label: 'Sold', tone: 'grave', emoji: '🤝' },
 };
 
 const filters: readonly { key: FilterKey; label: string }[] = [
@@ -67,6 +68,7 @@ export function HistoryView({
   onOpenProfile,
 }: HistoryViewProps) {
   const styles = useThemedStyles(stylesFor);
+  const { colors } = useTheme();
   const toast = useToast();
   const [items, setItems] = useState<readonly PreviewHistoryItem[]>(previewHistory);
   const [filter, setFilter] = useState<FilterKey>('all');
@@ -95,12 +97,12 @@ export function HistoryView({
   return (
     <Screen
       clearTabBar
-      ambient="value"
+      ambient="history"
       onRefresh={() => new Promise((resolve) => setTimeout(resolve, 900))}
     >
       <LargeTitle
-        title="History"
-        subtitle={`${previewHistory.length} items checked`}
+        title="Your stash"
+        overline={`🗂️ Everything you snapped · ${previewHistory.length} checked`}
         trailing={
           <View style={styles.actions}>
             <SearchButton label="Search your history" onOpen={onSearch} />
@@ -110,18 +112,24 @@ export function HistoryView({
       />
 
       <Reveal index={0} style={styles.hero}>
-        <Surface tone="raised" padding={tokens.spacing[5]} contentStyle={styles.heroContent}>
-          <SWText variant="overline" tone="textMuted">
-            Your collection
+        {/* The screen's one feature slab: the number everything else here adds up to. */}
+        <Surface tone="feature" padding={tokens.spacing[5]} contentStyle={styles.heroContent}>
+          <SWText variant="overline" tone="onFeatureDim">
+            💰 What it's all worth
           </SWText>
-          <CountUp value={previewPortfolio.total} format={formatPeso} variant="priceHero" />
+          <CountUp
+            value={previewPortfolio.total}
+            format={formatPeso}
+            variant="priceHero"
+            tone="onFeature"
+          />
           <View style={styles.heroMeta}>
-            <Tag label={previewPortfolio.changeLabel} tone="success" />
-            <SWText variant="caption" tone="textMuted">
+            <Tag label={previewPortfolio.changeLabel} tone="mint" />
+            <SWText variant="labelSmall" tone="onFeatureDim">
               {previewPortfolio.itemCount} items tracked
             </SWText>
           </View>
-          <Sparkline values={previewPortfolio.series} height={56} />
+          <Sparkline values={previewPortfolio.series} height={56} color={colors.onFeature} />
         </Surface>
       </Reveal>
 
@@ -140,7 +148,7 @@ export function HistoryView({
           />
         </Animated.View>
       ) : (
-        <View>
+        <Surface padding={tokens.spacing[2]}>
           {visible.map((item, index) => (
             <Animated.View
               key={item.id}
@@ -149,6 +157,7 @@ export function HistoryView({
               layout={LinearTransition.springify().damping(20)}
             >
               <Reveal index={index + 2}>
+                {index > 0 ? <Divider style={styles.divider} /> : null}
                 <HistoryRow
                   item={item}
                   onOpen={() => onOpenItem?.(item.id)}
@@ -159,7 +168,7 @@ export function HistoryView({
               </Reveal>
             </Animated.View>
           ))}
-        </View>
+        </Surface>
       )}
     </Screen>
   );
@@ -179,6 +188,7 @@ function HistoryRow({
   onDelete: () => void;
 }) {
   const styles = useThemedStyles(stylesFor);
+  const { colors } = useTheme();
   const status = statusTag[item.status];
 
   return (
@@ -196,21 +206,19 @@ function HistoryRow({
       <Photo
         source={item.photo}
         label={item.photoLabel}
-        radius={tokens.radius.medium}
+        radius={tokens.radius.small}
         style={styles.thumb}
       />
       <View style={styles.text}>
         <SWText variant="headingSmall" numberOfLines={1}>
           {item.title}
         </SWText>
-        <View style={styles.meta}>
-          <Tag label={status.label} tone={status.tone} />
-          <SWText variant="caption" tone="textMuted">
-            {item.capturedOn}
-          </SWText>
-        </View>
+        <SWText variant="labelSmall" tone="textSecondary" numberOfLines={1}>
+          {formatPeso(item.estimate)} est. · {item.capturedOn}
+        </SWText>
+        <Tag label={status.label} tone={status.tone} emoji={status.emoji} />
       </View>
-      <EstimateBadge value={formatPeso(item.estimate)} size="inline" />
+      <ChevronRight size={18} strokeWidth={1.75} color={colors.textMuted} />
     </ZoomLink>
   );
 }
@@ -238,21 +246,20 @@ const stylesFor = themedStyles(() => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: tokens.spacing[4],
-    paddingVertical: tokens.spacing[3],
+    gap: tokens.spacing[3],
+    padding: tokens.spacing[3],
     borderRadius: tokens.radius.medium,
   },
   thumb: {
-    width: tokens.layout.thumbnail - tokens.spacing[2],
-    height: tokens.layout.thumbnail - tokens.spacing[2],
+    width: 56,
+    height: 56,
   },
   text: {
     flex: 1,
-    gap: tokens.spacing[1],
+    gap: 3,
   },
-  meta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.spacing[2],
+  divider: {
+    marginLeft: tokens.spacing[3] + 56 + tokens.spacing[3],
+    marginRight: tokens.spacing[3],
   },
 }));

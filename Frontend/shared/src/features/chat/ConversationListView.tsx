@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import {
   Avatar,
   Divider,
+  Surface,
   EmptyState,
   LargeTitle,
   Photo,
@@ -34,12 +35,13 @@ export function ConversationListView({
   return (
     <Screen
       clearTabBar
-      ambient="quiet"
+      ambient="chat"
       onRefresh={() => new Promise((resolve) => setTimeout(resolve, 900))}
     >
       <LargeTitle
         title="Chats"
-        subtitle={unread > 0 ? `${unread} unread` : 'All caught up'}
+        overline="💬 Buyers & sellers"
+        overlineCount={unread > 0 ? `${unread} unread` : undefined}
         trailing={<ProfileButton onPress={onOpenProfile} />}
       />
       {conversations.length === 0 ? (
@@ -51,7 +53,7 @@ export function ConversationListView({
           onAction={onBrowseMarket}
         />
       ) : (
-        <View>
+        <Surface padding={tokens.spacing[2]}>
           {conversations.map((conversation, index) => (
             <Reveal key={conversation.id} index={index}>
               {index > 0 ? <Divider style={styles.divider} /> : null}
@@ -61,7 +63,7 @@ export function ConversationListView({
               />
             </Reveal>
           ))}
-        </View>
+        </Surface>
       )}
     </Screen>
   );
@@ -88,7 +90,7 @@ function ConversationRow({
       style={styles.row}
     >
       <View style={styles.media}>
-        <Avatar source={conversation.with.avatar} name={conversation.with.handle} size={52} />
+        <Avatar source={conversation.with.avatar} name={conversation.with.handle} size={48} />
         <View style={styles.itemBadge}>
           <Photo
             source={conversation.itemPhoto}
@@ -134,18 +136,19 @@ function ConversationRow({
 
 const stylesFor = themedStyles((colors) => ({
   divider: {
-    marginLeft: tokens.layout.thumbnail - tokens.spacing[2] + tokens.spacing[4],
+    marginLeft: tokens.spacing[3] + 48 + tokens.spacing[3],
+    marginRight: tokens.spacing[3],
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: tokens.spacing[4],
-    paddingVertical: tokens.spacing[4],
+    gap: tokens.spacing[3],
+    padding: tokens.spacing[3],
     borderRadius: tokens.radius.medium,
   },
   media: {
-    width: 52,
-    height: 52,
+    width: 48,
+    height: 48,
   },
   itemBadge: {
     position: 'absolute',
@@ -153,7 +156,7 @@ const stylesFor = themedStyles((colors) => ({
     bottom: -tokens.spacing[1],
     borderRadius: tokens.radius.small,
     borderWidth: tokens.border.focus,
-    borderColor: colors.canvas,
+    borderColor: colors.surface,
     overflow: 'hidden',
   },
   itemThumb: {
@@ -180,7 +183,7 @@ const stylesFor = themedStyles((colors) => ({
   preview: {
     flex: 1,
   },
-  // Unread count is informational, so it stays small; the accent marks "needs you".
+  // The unread count is the urgent number on this screen, so it alone may wear the accent.
   badge: {
     minWidth: tokens.spacing[5],
     paddingHorizontal: tokens.spacing[1],

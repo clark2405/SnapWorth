@@ -69,15 +69,15 @@ export function MarketplaceView({
   return (
     <Screen
       clearTabBar
-      ambient="value"
+      ambient="market"
       onRefresh={() => new Promise<void>((resolve) => setTimeout(resolve, 900))}
     >
       <LargeTitle
         title="Market"
-        subtitle="Seller-set prices, checked by the community."
+        overline="🛍️ Up for grabs · Seller-set prices"
         trailing={
           <View style={styles.actions}>
-            <Button label="Sell" size="small" variant="accent" icon={Camera} onPress={onSell} />
+            <Button label="Sell" size="small" variant="secondary" icon={Camera} onPress={onSell} />
             <ProfileButton onPress={onOpenProfile} />
           </View>
         }
@@ -98,7 +98,7 @@ export function MarketplaceView({
       {underEstimate.length > 0 ? (
         <Reveal index={1} style={styles.highlightSection}>
           <SWText variant="overline" tone="textMuted">
-            Priced under estimate
+            💸 Steals · Under estimate
           </SWText>
           <View style={styles.highlightRow}>
             {underEstimate.map((listing) => (
@@ -216,8 +216,8 @@ const stylesFor = themedStyles((colors) => ({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    columnGap: tokens.spacing[4],
-    rowGap: tokens.spacing[8],
+    columnGap: tokens.spacing[3],
+    rowGap: tokens.spacing[4],
   },
   cell: {
     flexBasis: '46%',

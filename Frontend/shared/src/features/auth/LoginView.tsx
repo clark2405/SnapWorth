@@ -70,7 +70,7 @@ export function LoginView({
     onContinueWithGoogle ? onContinueWithGoogle() : onSubmit?.({ mode, email, password });
 
   return (
-    <Screen ambient="aurora" contentStyle={styles.content}>
+    <Screen ambient="feed" contentStyle={styles.content}>
       <Reveal index={0} style={styles.brand}>
         <SWText variant="wordmark">SnapWorth</SWText>
       </Reveal>
@@ -141,7 +141,7 @@ export function LoginView({
           </SWText>
           <View style={styles.rule} />
         </View>
-        <Button label="Continue with Apple" variant="primary" onPress={continueWithApple} />
+        <Button label="Continue with Apple" variant="secondary" onPress={continueWithApple} />
         <Button label="Continue with Google" variant="secondary" onPress={continueWithGoogle} />
       </Reveal>
     </Screen>

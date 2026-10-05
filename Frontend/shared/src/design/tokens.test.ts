@@ -46,15 +46,22 @@ describe('SnapWorth design tokens', () => {
   });
 
   it.each(['light', 'dark'] as const)(
-    '%s keeps iris as the only accent on a neutral ground',
+    '%s keeps vermilion as the only accent on a warm ground',
     (name) => {
       const palette = tokens.color[name];
       expect(palette.focusRing).toBe(palette.accent);
-      // Votes carry their own hues so the accent keeps meaning "value" and nothing else.
-      for (const vote of [palette.voteHigh, palette.voteLow, palette.voteRight]) {
-        expect(vote).not.toBe(palette.accent);
+      // Votes and statuses wear tonal inks, so the accent keeps meaning "the primary action".
+      for (const tone of [
+        palette.voteHigh,
+        palette.voteLow,
+        palette.voteRight,
+        palette.sandInk,
+        palette.mintInk,
+        palette.graveInk,
+      ]) {
+        expect(tone).not.toBe(palette.accent);
       }
-      // Primary actions are monochrome, never the accent.
+      // Selected chips and the segmented thumb are solid ink, never the accent.
       expect(palette.inverse).toBe(palette.textPrimary);
     },
   );

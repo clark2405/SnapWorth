@@ -77,6 +77,10 @@ export function NavHeader({ title, onBack, trailing, banded = false }: NavHeader
 
 export interface LargeTitleProps {
   readonly title: string;
+  /** The small uppercase line above the title, often led by an emoji, e.g. "🗳️ Community". */
+  readonly overline?: string;
+  /** An urgent count after a "·" in the overline, e.g. "2 unread"; the one accent text use. */
+  readonly overlineCount?: string;
   /** A short line under the title that states what the screen is for. */
   readonly subtitle?: string;
   readonly trailing?: ReactNode;
@@ -86,7 +90,13 @@ export interface LargeTitleProps {
  * The bold title that opens a top-level tab. As the page scrolls it
  * drifts up a little slower than the content and fades, handing off to the compact title.
  */
-export function LargeTitle({ title, subtitle, trailing }: LargeTitleProps) {
+export function LargeTitle({
+  title,
+  overline,
+  overlineCount,
+  subtitle,
+  trailing,
+}: LargeTitleProps) {
   const scroll = useScreenScroll();
   const register = useRegisterLargeTitle(title);
   const styles = useThemedStyles(stylesFor);
@@ -108,8 +118,25 @@ export function LargeTitle({ title, subtitle, trailing }: LargeTitleProps) {
         register(y + height - tokens.spacing[6]);
       }}
     >
-      {/* Title and actions share one line; the subtitle gets the full width beneath, so it
-          never wraps into a ragged second line beside the buttons. */}
+      {/* Overline, then the huge title sharing a line with its circular actions; any subtitle
+          gets the full width beneath, so nothing wraps into a ragged line beside the buttons. */}
+      {overline ? (
+        <Animated.View style={[styles.overlineRow, textStyle]}>
+          <SWText variant="overline" tone="textMuted" numberOfLines={1}>
+            {overline}
+            {overlineCount ? (
+              <>
+                <SWText variant="overline" tone="textMuted">
+                  {'  ·  '}
+                </SWText>
+                <SWText variant="overline" tone="accent">
+                  {overlineCount}
+                </SWText>
+              </>
+            ) : null}
+          </SWText>
+        </Animated.View>
+      ) : null}
       <View style={styles.largeRow}>
         <Animated.View style={[styles.largeText, textStyle]}>
           <SWText variant="displayTitle" accessibilityRole="header" numberOfLines={1}>
@@ -160,8 +187,11 @@ const stylesFor = themedStyles(() => ({
   },
   large: {
     gap: tokens.spacing[1],
-    paddingTop: tokens.spacing[5],
-    paddingBottom: tokens.spacing[8],
+    paddingTop: tokens.spacing[4],
+    paddingBottom: tokens.spacing[6],
+  },
+  overlineRow: {
+    marginBottom: tokens.spacing[1],
   },
   largeRow: {
     flexDirection: 'row',

@@ -158,7 +158,7 @@ export function ListingDetailView({
           </SWText>
           <View style={styles.priceRow}>
             <AskingPriceBadge value={formatPeso(listing.askingPrice)} />
-            <Tag label={listing.category} tone="outline" />
+            <Tag label={listing.category} tone="sand" />
           </View>
         </Reveal>
 
@@ -228,7 +228,7 @@ export function ListingDetailView({
                       });
                     }
                   }}
-                  trackColor={{ false: colors.sunken, true: colors.accent }}
+                  trackColor={{ false: colors.sunken, true: colors.textPrimary }}
                   accessibilityLabel="Alert me if the price drops"
                 />
               }

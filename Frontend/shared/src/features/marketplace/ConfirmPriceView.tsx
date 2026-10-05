@@ -75,7 +75,11 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
     setPublishing(true);
     setTimeout(() => {
       setPublishing(false);
-      toast.show({ title: 'Listing published', body: `Live at ${formatPeso(enteredPrice)}.` });
+      toast.show({
+        title: 'Listing published 🎉',
+        body: `Live at ${formatPeso(enteredPrice)}.`,
+        celebrate: true,
+      });
       onPublish?.(enteredPrice);
     }, 700);
   };
@@ -126,10 +130,10 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
         </SWText>
         <ChoiceChips options={previewConditions} value={condition} onChange={handleCondition} />
         <View style={styles.suggestion}>
-          <SWText variant="overline" tone="accent">
+          <SWText variant="overline" tone="textMuted">
             Suggested price
           </SWText>
-          <CountUp value={suggestion} format={formatPeso} variant="priceLarge" tone="accent" />
+          <CountUp value={suggestion} format={formatPeso} variant="priceLarge" />
           <Animated.View
             key={condition}
             entering={FadeIn.duration(160)}

@@ -19,7 +19,7 @@ import {
   typeStyle,
   useToast,
 } from '../../components';
-import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import { NightRoom, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import {
   formatPeso,
   previewCompanionReplies,
@@ -67,14 +67,20 @@ export interface CompanionChatViewProps {
 }
 
 /**
- * A conversation with Worthy. Answers arrive the way a person speaks: the orb thinks, the words
- * type themselves out, then the evidence (a range, a draft, a trend) rises into place beneath.
+ * A conversation with Worthy, set in the app's one "night room": a plum-dark palette that makes
+ * talking to the AI feel like stepping into a different space. Answers arrive the way a person
+ * speaks: the orb thinks, the words type themselves out, then the evidence (a range, a draft, a
+ * trend) rises into place beneath.
  */
-export function CompanionChatView({
-  initialQuestion,
-  onBack,
-  onUseListing,
-}: CompanionChatViewProps) {
+export function CompanionChatView(props: CompanionChatViewProps) {
+  return (
+    <NightRoom>
+      <CompanionChat {...props} />
+    </NightRoom>
+  );
+}
+
+function CompanionChat({ initialQuestion, onBack, onUseListing }: CompanionChatViewProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
@@ -289,8 +295,8 @@ function ReplyCardView({
     const draft = previewCompanionReplies.listingDraft;
     return (
       <Surface padding={tokens.spacing[4]} contentStyle={styles.card}>
-        <SWText variant="overline" tone="accent">
-          Draft listing
+        <SWText variant="overline" tone="textMuted">
+          ✍️ Draft listing
         </SWText>
         <SWText variant="headingMedium">{draft.title}</SWText>
         <SWText variant="bodyMedium" tone="textSecondary">

@@ -1,6 +1,6 @@
 import { Check, MessageCircle } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
@@ -38,8 +38,8 @@ export interface PostCardProps {
 }
 
 /**
- * One feed beat: photo and estimate lead, the author's question frames them, and the vote is
- * the action. No card chrome; posts are separated by space alone. The photo opens the discussion
+ * One feed beat in a soft card: photo and estimate lead, the author's question frames them, and
+ * the vote is the action. The photo opens the discussion
  * on tap and carries a long-press menu; double-tapping its estimate corner casts "Just Right"
  * without leaving the feed, the way a double-tap-to-like works elsewhere.
  */
@@ -120,7 +120,7 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
             source={post.photo}
             label={post.photoLabel}
             aspectRatio={4 / 3}
-            radius={tokens.radius.large}
+            radius={tokens.radius.medium}
           />
           <JustRightBurst trigger={burst} />
           <GestureDetector gesture={doubleTap}>
@@ -196,6 +196,15 @@ function JustRightBurst({ trigger }: { readonly trigger: number }) {
 const stylesFor = themedStyles((colors, name) => ({
   post: {
     gap: tokens.spacing[4],
+    padding: tokens.spacing[4],
+    borderRadius: tokens.radius.large,
+    backgroundColor: colors.surface,
+    borderWidth: name === 'dark' ? StyleSheet.hairlineWidth : 0,
+    borderColor: colors.borderSubtle,
+    shadowColor: tokens.shadow[name],
+    shadowOpacity: 1,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
   },
   header: {
     flexDirection: 'row',
@@ -207,7 +216,7 @@ const stylesFor = themedStyles((colors, name) => ({
   },
   photoWrap: {
     position: 'relative',
-    borderRadius: tokens.radius.large,
+    borderRadius: tokens.radius.medium,
     overflow: 'hidden',
   },
   badgeOverlay: {

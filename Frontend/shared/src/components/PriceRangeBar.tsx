@@ -129,8 +129,8 @@ const stylesFor = themedStyles((colors) => ({
     height: 4,
     borderRadius: tokens.radius.full,
   },
-  bandStrong: { backgroundColor: colors.accent },
-  bandMedium: { backgroundColor: colors.accent, opacity: 0.7 },
+  bandStrong: { backgroundColor: colors.textPrimary },
+  bandMedium: { backgroundColor: colors.textPrimary, opacity: 0.6 },
   bandWeak: { backgroundColor: colors.estimateBorder },
   asking: {
     position: 'absolute',

@@ -57,7 +57,7 @@ export function CreatePostView({ onBack, onPublish }: CreatePostViewProps) {
     setPublishing(true);
     timer.current = setTimeout(() => {
       setPublishing(false);
-      toast.show({ title: 'Posted to the feed' });
+      toast.show({ title: 'Posted to the feed 🗳️', celebrate: true });
       onPublish?.(trimmed);
     }, publishDelayMs);
   };

@@ -1,6 +1,7 @@
 import { tokens, type SemanticColorName, type ThemeName } from './tokens';
 
-export type ThemePreference = ThemeName | 'system';
+/** What a user can choose. The night room is scoped to one section, never a preference. */
+export type ThemePreference = Exclude<ThemeName, 'night'> | 'system';
 export type ThemeColors = Readonly<Record<SemanticColorName, string>>;
 export type NativeWindThemeVariables = Readonly<Record<`--sw-color-${string}`, string>>;
 
@@ -39,7 +40,6 @@ export const contrastPairings = Object.freeze<readonly ContrastPairing[]>([
   { foreground: 'onAccent', background: 'accent', classification: 'normal-text' },
   { foreground: 'onAccent', background: 'accentPressed', classification: 'normal-text' },
   { foreground: 'textPrimary', background: 'estimateSurface', classification: 'normal-text' },
-  { foreground: 'accent', background: 'estimateSurface', classification: 'normal-text' },
   { foreground: 'estimateBorder', background: 'estimateSurface', classification: 'ui-boundary' },
   { foreground: 'textPrimary', background: 'surfaceRaised', classification: 'normal-text' },
   { foreground: 'textMuted', background: 'surfaceRaised', classification: 'normal-text' },
@@ -56,7 +56,14 @@ export const contrastPairings = Object.freeze<readonly ContrastPairing[]>([
   { foreground: 'onInverse', background: 'inversePressed', classification: 'normal-text' },
   { foreground: 'accent', background: 'canvas', classification: 'normal-text' },
   { foreground: 'accent', background: 'surface', classification: 'normal-text' },
-  { foreground: 'accent', background: 'accentSoft', classification: 'normal-text' },
+  { foreground: 'accentPressed', background: 'accentSoft', classification: 'normal-text' },
+  { foreground: 'sandInk', background: 'sand', classification: 'normal-text' },
+  { foreground: 'mintInk', background: 'mint', classification: 'normal-text' },
+  { foreground: 'graveInk', background: 'grave', classification: 'normal-text' },
+  { foreground: 'danger', background: 'dangerSoft', classification: 'normal-text' },
+  { foreground: 'onFeature', background: 'feature', classification: 'normal-text' },
+  { foreground: 'onFeatureDim', background: 'feature', classification: 'normal-text' },
+  { foreground: 'textMuted', background: 'surface', classification: 'normal-text' },
   { foreground: 'textPrimary', background: 'accentSoft', classification: 'normal-text' },
   { foreground: 'textSecondary', background: 'sunken', classification: 'normal-text' },
   { foreground: 'success', background: 'surface', classification: 'ui-boundary' },

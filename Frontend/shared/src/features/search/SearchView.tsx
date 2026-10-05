@@ -280,7 +280,7 @@ export function SearchView({
             onPress={leave}
             style={styles.cancel}
           >
-            <SWText variant="label" tone="accent">
+            <SWText variant="label" tone="textSecondary">
               Cancel
             </SWText>
           </PressableScale>
@@ -342,7 +342,7 @@ export function SearchView({
                       hitSlop={tokens.spacing[2]}
                       onPress={() => setRecents([])}
                     >
-                      <SWText variant="label" tone="accent">
+                      <SWText variant="label" tone="textSecondary">
                         Clear
                       </SWText>
                     </PressableScale>

@@ -100,7 +100,8 @@ export function ChoiceChips<Key extends string>({
       <Chip
         label={option.label}
         active={option.key === value}
-        // Until the pill has measured its target, the chip paints its own fill.
+        // Until the layers have measured, the chip paints its own background and fill.
+        painted={!placed}
         solid={option.key === value && !placed}
         onPress={() => {
           if (option.key !== value) haptic('select');
@@ -110,8 +111,31 @@ export function ChoiceChips<Key extends string>({
     </Animated.View>
   ));
 
+  // Layers, back to front: each chip's resting pill, the gliding ink pill, then the labels. The
+  // resting pills sit beneath the glide so it is visible the whole way across.
   const indicator = (
-    <Animated.View pointerEvents="none" style={[styles.indicator, indicatorStyle]} />
+    <>
+      {placed
+        ? options.map((option) => {
+            const layout = layouts[option.key];
+            return layout ? (
+              <View
+                key={option.key}
+                pointerEvents="none"
+                style={[
+                  styles.base,
+                  {
+                    width: layout.width,
+                    height: layout.height,
+                    transform: [{ translateX: layout.x }, { translateY: layout.y }],
+                  },
+                ]}
+              />
+            ) : null;
+          })
+        : null}
+      <Animated.View pointerEvents="none" style={[styles.indicator, indicatorStyle]} />
+    </>
   );
 
   if (scroll) {
@@ -139,11 +163,13 @@ export function ChoiceChips<Key extends string>({
 function Chip({
   label,
   active,
+  painted,
   solid,
   onPress,
 }: {
   readonly label: string;
   readonly active: boolean;
+  readonly painted: boolean;
   readonly solid: boolean;
   readonly onPress: () => void;
 }) {
@@ -166,7 +192,7 @@ function Chip({
       onPress={onPress}
       style={({ pressed }) => [
         styles.chip,
-        active ? styles.activeChip : null,
+        painted ? styles.painted : null,
         solid ? styles.solid : null,
         pressed && !active ? styles.pressed : null,
       ]}
@@ -206,17 +232,26 @@ const stylesFor = themedStyles((colors) => ({
     borderRadius: tokens.radius.full,
     backgroundColor: colors.inverse,
   },
+  base: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    borderRadius: tokens.radius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle,
+    backgroundColor: colors.surface,
+  },
   chip: {
     minHeight: 36,
     paddingHorizontal: tokens.spacing[4],
     borderRadius: tokens.radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
   },
-  activeChip: {
-    borderColor: 'transparent',
+  painted: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle,
+    backgroundColor: colors.surface,
   },
   solid: {
     backgroundColor: colors.inverse,

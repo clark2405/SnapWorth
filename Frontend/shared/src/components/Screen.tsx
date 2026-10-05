@@ -52,7 +52,7 @@ export interface ScreenProps {
   /** Extra bottom room so content can scroll clear of the floating tab bar. */
   readonly clearTabBar?: boolean;
   readonly contentStyle?: StyleProp<ViewStyle>;
-  /** A soft light behind the top of the screen. Tab roots use it; flows stay quiet. */
+  /** Which area's warm blobs drift behind the screen. Every screen has them; tabs re-tint. */
   readonly ambient?: AmbientBackdropProps['mood'];
   /** Enables pull-to-refresh. Resolve the promise when the new content is in. */
   readonly onRefresh?: () => Promise<void> | void;
@@ -77,7 +77,7 @@ export function Screen({
   scroll = true,
   clearTabBar = false,
   contentStyle,
-  ambient = 'quiet',
+  ambient = 'calm',
   onRefresh,
   bleedTop = false,
   transparent = false,
@@ -132,17 +132,20 @@ export function Screen({
   const clearance = insets.top + (header ? headerHeight : 0);
   const extraTop = Number(StyleSheet.flatten(contentStyle)?.paddingTop ?? 0);
   const topRoom = bleedTop ? extraTop : clearance + extraTop;
+  // The web draws its own floating tab bar with the Snap button above it, so it needs more room.
+  const tabBarRoom =
+    Platform.OS === 'web'
+      ? tokens.layout.floatingTabBarClearance
+      : tokens.layout.nativeTabBarClearance;
   const bottomRoom =
-    (clearTabBar ? tokens.layout.nativeTabBarClearance : 0) +
-    (footer ? footerHeight : insets.bottom) +
-    tokens.spacing[8];
+    (clearTabBar ? tabBarRoom : 0) + (footer ? footerHeight : insets.bottom) + tokens.spacing[8];
 
   const body = [styles.content, contentStyle, { paddingTop: topRoom, paddingBottom: bottomRoom }];
 
   return (
     <ScreenScrollContext.Provider value={context}>
       <View style={[styles.root, transparent ? styles.clear : null]}>
-        <AmbientBackdrop mood={ambient} />
+        {transparent ? null : <AmbientBackdrop mood={ambient} />}
         <KeyboardAvoidingView
           style={styles.fill}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}

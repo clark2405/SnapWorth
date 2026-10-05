@@ -98,40 +98,47 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
       </Reveal>
 
       <Reveal index={1} style={styles.stats}>
-        {stats.map((stat, index) => (
-          <View
+        {stats.map((stat) => (
+          <Surface
             key={stat.label}
-            accessible
-            accessibilityLabel={`${stat.value} ${stat.label.toLowerCase()}`}
-            style={[styles.stat, index > 0 ? styles.statRule : null]}
+            padding={tokens.spacing[4]}
+            style={styles.statTile}
+            contentStyle={styles.stat}
           >
-            <CountUp
-              value={stat.value}
-              format={(value) => String(Math.round(value))}
-              variant="priceLarge"
-            />
-            <SWText variant="overline" tone="textMuted">
-              {stat.label}
-            </SWText>
-          </View>
+            <View accessible accessibilityLabel={`${stat.value} ${stat.label.toLowerCase()}`}>
+              <CountUp
+                value={stat.value}
+                format={(value) => String(Math.round(value))}
+                variant="priceMedium"
+              />
+              <SWText variant="labelSmall" tone="textSecondary">
+                {stat.label}
+              </SWText>
+            </View>
+          </Surface>
         ))}
       </Reveal>
 
       <Reveal index={2}>
-        <Surface padding={tokens.spacing[4]} contentStyle={styles.collectionCard}>
+        <Surface tone="feature" padding={tokens.spacing[5]} contentStyle={styles.collectionCard}>
           <View style={styles.collectionHeader}>
-            <SWText variant="overline" tone="textMuted">
-              Collection value
+            <SWText variant="overline" tone="onFeatureDim">
+              💰 Collection value
             </SWText>
-            <Tag label={previewPortfolio.changeLabel} tone="success" />
+            <Tag label={previewPortfolio.changeLabel} tone="mint" />
           </View>
-          <CountUp value={previewPortfolio.total} format={formatPeso} variant="priceLarge" />
-          <Sparkline values={previewPortfolio.series} height={56} />
+          <CountUp
+            value={previewPortfolio.total}
+            format={formatPeso}
+            variant="priceLarge"
+            tone="onFeature"
+          />
+          <Sparkline values={previewPortfolio.series} height={56} color={colors.onFeature} />
         </Surface>
       </Reveal>
 
       <Reveal index={3} style={styles.sections}>
-        <ListGroup title="Appearance">
+        <ListGroup title="🎨 The look">
           <View style={styles.appearanceRow}>
             <SegmentedControl
               options={appearanceOptions}
@@ -141,7 +148,7 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
           </View>
         </ListGroup>
 
-        <ListGroup title="Settings">
+        <ListGroup title="⚙️ The fine print">
           <ListRow label="Notifications" icon={Bell} onPress={() => onOpen?.('notifications')} />
           <ListRow
             label="Price alerts"
@@ -173,7 +180,7 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
   );
 }
 
-const stylesFor = themedStyles((colors) => ({
+const stylesFor = themedStyles(() => ({
   content: {
     paddingTop: tokens.spacing[4],
     gap: tokens.spacing[8],
@@ -189,19 +196,13 @@ const stylesFor = themedStyles((colors) => ({
   },
   stats: {
     flexDirection: 'row',
-    paddingVertical: tokens.spacing[4],
-    borderTopWidth: tokens.border.hairline,
-    borderBottomWidth: tokens.border.hairline,
-    borderColor: colors.borderSubtle,
+    gap: tokens.spacing[3],
+  },
+  statTile: {
+    flex: 1,
   },
   stat: {
-    flex: 1,
-    alignItems: 'center',
     gap: tokens.spacing[1],
-  },
-  statRule: {
-    borderLeftWidth: tokens.border.hairline,
-    borderLeftColor: colors.borderSubtle,
   },
   collectionCard: {
     gap: tokens.spacing[3],

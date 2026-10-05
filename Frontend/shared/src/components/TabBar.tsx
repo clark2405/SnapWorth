@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../design';
 import { GlassSurface } from './GlassSurface';
 import { PressableScale } from './PressableScale';
+import { contentScrolling } from './scroll-signal';
 import { SWText } from './SWText';
 import { usePop } from './usePop';
 
@@ -32,8 +33,9 @@ export interface TabBarProps<Key extends string> {
 }
 
 /**
- * A floating glass capsule for platforms without the native tab bar (the web). Capture is the
- * core action, so it is the one filled control; the active tab lifts onto a soft pill.
+ * A floating glass capsule for platforms without the native tab bar (the web): four tabs with
+ * thin line icons, the active one in ink with a bold label on a soft gliding pill. The Snap
+ * button, the core action, floats just above it in the accent.
  */
 export function TabBar<Key extends string>({
   leading,
@@ -43,7 +45,6 @@ export function TabBar<Key extends string>({
   onCapture,
 }: TabBarProps<Key>) {
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const reduceMotion = useReducedMotion();
   const [slots, setSlots] = useState<Partial<Record<Key, LayoutRectangle>>>({});
@@ -107,25 +108,65 @@ export function TabBar<Key extends string>({
 
   return (
     <View style={[styles.dock, { paddingBottom: Math.max(insets.bottom, tokens.spacing[3]) }]}>
-      <GlassSurface style={styles.capsule}>
-        <View accessibilityRole="tablist" style={styles.row}>
-          <Animated.View pointerEvents="none" style={[styles.pill, pillStyle]} />
-          {leading.map(renderTab)}
-          <View style={styles.captureSlot}>
-            <PressableScale
-              accessibilityLabel="Capture an item"
-              accessibilityHint="Opens the camera to photograph something and get an estimate"
-              onPress={onCapture}
-              haptic="pop"
-              style={({ pressed }) => [styles.capture, pressed ? styles.capturePressed : null]}
-            >
-              <Camera size={21} strokeWidth={1.75} color={colors.onInverse} />
-            </PressableScale>
+      <SnapButton onPress={onCapture} />
+      <View style={styles.capsuleShadow}>
+        <GlassSurface style={styles.capsule}>
+          <View accessibilityRole="tablist" style={styles.row}>
+            <Animated.View pointerEvents="none" style={[styles.pill, pillStyle]} />
+            {leading.map(renderTab)}
+            {trailing.map(renderTab)}
           </View>
-          {trailing.map(renderTab)}
-        </View>
-      </GlassSurface>
+        </GlassSurface>
+      </View>
     </View>
+  );
+}
+
+/**
+ * The screen's one primary action, floating just above the tab bar: a vermilion pill with a
+ * lighter camera badge. While the page scrolls it folds down to the badge alone, then unfolds
+ * once the content settles, so it never sits wide across what you are reading.
+ */
+function SnapButton({ onPress }: { readonly onPress: () => void }) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(stylesFor);
+
+  // The clip narrows from a little wider than the label to nothing; the label itself never
+  // shrinks or wraps, so it slides out of view rather than ellipsizing.
+  const labelStyle = useAnimatedStyle(() => {
+    const fold = contentScrolling.value;
+    return {
+      opacity: 1 - fold,
+      maxWidth: 120 * (1 - fold),
+      transform: [{ translateX: -fold * 8 }],
+    };
+  });
+  const pillStyle = useAnimatedStyle(() => ({
+    paddingRight: tokens.spacing[5] - contentScrolling.value * (tokens.spacing[5] - 6),
+  }));
+
+  return (
+    <PressableScale
+      accessibilityLabel="Snap it"
+      accessibilityHint="Opens the camera to photograph something and get an estimate"
+      onPress={onPress}
+      haptic="pop"
+      containerStyle={styles.fabSlot}
+      style={({ pressed }) => [styles.fab, pressed ? styles.fabPressed : null]}
+    >
+      <Animated.View style={[styles.fabRow, pillStyle]}>
+        <View style={styles.fabBadge}>
+          <Camera size={20} strokeWidth={2} color={colors.onAccent} />
+        </View>
+        <Animated.View style={[styles.fabLabelClip, labelStyle]}>
+          <View style={styles.fabLabel}>
+            <SWText variant="button" tone="onAccent">
+              Snap it
+            </SWText>
+          </View>
+        </Animated.View>
+      </Animated.View>
+    </PressableScale>
   );
 }
 
@@ -163,16 +204,16 @@ function Tab<Key extends string>({
       style={styles.tab}
     >
       <Animated.View style={[styles.tabFace, restStyle]}>
-        <Icon size={21} strokeWidth={1.6} color={colors.textMuted} />
+        <Icon size={22} strokeWidth={1.75} color={colors.textMuted} />
         <SWText variant="tabLabel" tone="textMuted">
           {item.label}
         </SWText>
       </Animated.View>
       <Animated.View style={[styles.tabFace, styles.tabFaceActive, activeStyle]}>
         <Animated.View style={iconPop}>
-          <Icon size={21} strokeWidth={2} color={colors.textPrimary} />
+          <Icon size={22} strokeWidth={2} color={colors.textPrimary} />
         </Animated.View>
-        <SWText variant="tabLabel" tone="textPrimary">
+        <SWText variant="tabLabelActive" tone="textPrimary">
           {item.label}
         </SWText>
       </Animated.View>
@@ -180,23 +221,32 @@ function Tab<Key extends string>({
   );
 }
 
-const stylesFor = themedStyles((colors) => ({
+const stylesFor = themedStyles((colors, name) => ({
   dock: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
     alignItems: 'center',
+    gap: tokens.spacing[3],
     paddingHorizontal: tokens.spacing[4],
     pointerEvents: 'box-none',
   },
-  capsule: {
+  capsuleShadow: {
     width: '100%',
     maxWidth: tokens.layout.phoneColumn - tokens.spacing[8],
     borderRadius: tokens.radius.full,
+    shadowColor: tokens.lifted[name],
+    shadowOpacity: 1,
+    shadowRadius: 26,
+    shadowOffset: { width: 0, height: 14 },
+  },
+  capsule: {
+    width: '100%',
+    borderRadius: tokens.radius.full,
   },
   row: {
-    height: 64,
+    height: tokens.layout.floatingTabBar,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: tokens.spacing[2],
@@ -215,7 +265,7 @@ const stylesFor = themedStyles((colors) => ({
   },
   tabFace: {
     alignItems: 'center',
-    gap: 2,
+    gap: 3,
   },
   tabFaceActive: {
     ...StyleSheet.absoluteFill,
@@ -223,25 +273,46 @@ const stylesFor = themedStyles((colors) => ({
   },
   pill: {
     position: 'absolute',
-    top: 6,
-    bottom: 6,
+    top: 9,
+    bottom: 9,
     left: 0,
     borderRadius: tokens.radius.full,
     backgroundColor: colors.sunken,
   },
-  captureSlot: {
-    flex: 1,
-    alignItems: 'center',
+  fabSlot: {
+    alignSelf: 'center',
   },
-  capture: {
-    width: 48,
-    height: 48,
+  fab: {
+    height: tokens.layout.fab,
     borderRadius: tokens.radius.full,
+    backgroundColor: colors.accent,
+    justifyContent: 'center',
+    shadowColor: tokens.lifted[name],
+    shadowOpacity: 1,
+    shadowRadius: 26,
+    shadowOffset: { width: 0, height: 14 },
+  },
+  fabPressed: {
+    backgroundColor: colors.accentPressed,
+  },
+  fabRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing[3],
+    paddingLeft: 6,
+  },
+  fabBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.inverse,
+    backgroundColor: colors.accentPressed,
   },
-  capturePressed: {
-    backgroundColor: colors.inversePressed,
+  fabLabelClip: {
+    overflow: 'hidden',
+  },
+  fabLabel: {
+    flexShrink: 0,
   },
 }));
