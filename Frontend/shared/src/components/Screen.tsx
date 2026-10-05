@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -63,6 +71,8 @@ export interface ScreenProps {
   readonly bleedTop?: boolean;
   /** Drops the canvas so a screen can fade its own background in over the one beneath. */
   readonly transparent?: boolean;
+  /** Lets a screen scroll itself, e.g. to bring a just-posted comment into view. */
+  readonly scrollRef?: RefObject<Animated.ScrollView | null>;
 }
 
 /**
@@ -81,6 +91,7 @@ export function Screen({
   onRefresh,
   bleedTop = false,
   transparent = false,
+  scrollRef,
 }: ScreenProps) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -153,6 +164,7 @@ export function Screen({
           <View style={styles.column}>
             {scroll ? (
               <Animated.ScrollView
+                ref={scrollRef}
                 style={styles.fill}
                 contentContainerStyle={body}
                 onScroll={onScroll}

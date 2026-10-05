@@ -1,6 +1,6 @@
 import { ArrowUp, Flag, Share as ShareIcon, Trash2 } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
-import { TextInput, View, type ImageSourcePropType } from 'react-native';
+import { TextInput, View } from 'react-native';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 
 import {
@@ -22,7 +22,13 @@ import {
 } from '../../components';
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import type { VoteChoice } from '../../types';
-import { previewPostDetail, previewProfile } from '../preview/sample-data';
+import {
+  formatPeso,
+  previewPostDetail,
+  previewPosts,
+  previewProfile,
+  type PreviewComment,
+} from '../preview/sample-data';
 
 export interface PostDetailViewProps {
   readonly postId?: string;
@@ -33,38 +39,34 @@ export interface PostDetailViewProps {
   readonly onDeleteComment?: (commentId: string) => void;
 }
 
-interface PostComment {
-  readonly id: string;
-  readonly author: { readonly handle: string; readonly avatar: ImageSourcePropType };
-  readonly body: string;
-  readonly postedAgo: string;
-  readonly mine: boolean;
-}
-
 /**
  * The discussion behind one post: the photo runs full-bleed under a floating header, the
  * question and community verdict sit below it, and comments arrive from a floating composer,
  * appended live with the same entrance every reveal on the page uses.
  */
 export function PostDetailView({
+  postId,
   onBack,
   onShare,
   onSubmitComment,
   onReportComment,
   onDeleteComment,
 }: PostDetailViewProps) {
-  const post = previewPostDetail;
+  // The post the user tapped; a link to a post outside the preview feed falls back to a sample.
+  const post = previewPosts.find((entry) => entry.id === postId) ?? previewPostDetail;
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
   const [vote, setVote] = useState<VoteChoice | null>(null);
-  const [comments, setComments] = useState<readonly PostComment[]>(post.comments);
+  const [comments, setComments] = useState<readonly PreviewComment[]>(post.comments);
+  const [reported, setReported] = useState<ReadonlySet<string>>(() => new Set());
   const [draft, setDraft] = useState('');
   const counter = useRef(0);
+  const scrollRef = useRef<Animated.ScrollView>(null);
+  // Where the discussion starts in the scroll content, so a new comment can be scrolled to.
+  const bodyY = useRef(0);
+  const discussionY = useRef(0);
   const canSend = draft.trim().length > 0;
-  // The detail preview has no discrete `estimate` field yet; the AI number the author is asking
-  // about lives inside their question, so it is read from there for the hero badge.
-  const estimateValue = post.body.match(/₱[\d,]+/)?.[0];
 
   const submit = useCallback(() => {
     const body = draft.trim();
@@ -83,11 +85,37 @@ export function PostDetailView({
     setDraft('');
     onSubmitComment?.(body);
     toast.show({ title: 'Comment posted' });
+    // New comments go to the top of the thread; bring it into view so the post is seen to land.
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({
+        y: Math.max(0, bodyY.current + discussionY.current - tokens.spacing[16] * 2),
+        animated: true,
+      });
+    }, 120);
   }, [draft, onSubmitComment, toast]);
+
+  const report = useCallback(
+    (comment: PreviewComment) => {
+      setReported((current) => new Set(current).add(comment.id));
+      onReportComment?.(comment.id);
+      toast.show({ title: 'Comment reported', body: 'Our moderators will take a look.' });
+    },
+    [onReportComment, toast],
+  );
+
+  const remove = useCallback(
+    (comment: PreviewComment) => {
+      setComments((current) => current.filter((entry) => entry.id !== comment.id));
+      onDeleteComment?.(comment.id);
+      toast.show({ title: 'Comment deleted' });
+    },
+    [onDeleteComment, toast],
+  );
 
   return (
     <Screen
       bleedTop
+      scrollRef={scrollRef}
       header={
         <NavHeader
           title="Discussion"
@@ -125,7 +153,8 @@ export function PostDetailView({
               label="Post comment"
               appearance="accent"
               size={18}
-              haptic={canSend ? 'pop' : 'none'}
+              haptic="pop"
+              disabled={!canSend}
               onPress={submit}
             />
           </View>
@@ -137,19 +166,24 @@ export function PostDetailView({
         <Photo source={post.photo} label={post.photoLabel} aspectRatio={4 / 3} radius={0} />
       </ZoomTarget>
 
-      <View style={styles.body}>
+      <View
+        style={styles.body}
+        onLayout={(event) => {
+          bodyY.current = event.nativeEvent.layout.y;
+        }}
+      >
         <Reveal index={0} style={styles.author}>
           <Avatar source={post.author.avatar} name={post.author.handle} size={40} />
           <View>
             <SWText variant="label">@{post.author.handle}</SWText>
             <SWText variant="caption" tone="textMuted">
-              {post.createdAgo}
+              {post.postedAgo}
             </SWText>
           </View>
         </Reveal>
 
         <Reveal index={1} style={styles.question}>
-          {estimateValue ? <EstimateBadge value={estimateValue} size="hero" /> : null}
+          <EstimateBadge value={formatPeso(post.estimate)} size="hero" />
           <SWText variant="bodyLarge">{post.body}</SWText>
         </Reveal>
 
@@ -168,7 +202,12 @@ export function PostDetailView({
           </SWText>
         </Reveal>
 
-        <View style={styles.discussion}>
+        <View
+          style={styles.discussion}
+          onLayout={(event) => {
+            discussionY.current = event.nativeEvent.layout.y;
+          }}
+        >
           {comments.map((comment, index) => (
             <Animated.View
               key={comment.id}
@@ -183,25 +222,34 @@ export function PostDetailView({
                 <View style={styles.commentHeader}>
                   <SWText variant="labelSmall">@{comment.author.handle}</SWText>
                   <View style={styles.commentActions}>
-                    <IconButton
-                      icon={Flag}
-                      label={`Report comment by ${comment.author.handle}`}
-                      tone="textMuted"
-                      size={16}
-                      onPress={() => onReportComment?.(comment.id)}
-                    />
                     {comment.mine ? (
                       <IconButton
                         icon={Trash2}
                         label="Delete your comment"
                         tone="textMuted"
                         size={16}
-                        onPress={() => {
-                          setComments((current) => current.filter((c) => c.id !== comment.id));
-                          onDeleteComment?.(comment.id);
-                        }}
+                        onPress={() => remove(comment)}
                       />
-                    ) : null}
+                    ) : reported.has(comment.id) ? (
+                      <View
+                        style={styles.reported}
+                        accessible
+                        accessibilityLabel="You reported this comment"
+                      >
+                        <Flag size={14} strokeWidth={2} color={colors.textMuted} />
+                        <SWText variant="caption" tone="textMuted">
+                          Reported
+                        </SWText>
+                      </View>
+                    ) : (
+                      <IconButton
+                        icon={Flag}
+                        label={`Report comment by ${comment.author.handle}`}
+                        tone="textMuted"
+                        size={16}
+                        onPress={() => report(comment)}
+                      />
+                    )}
                   </View>
                 </View>
                 <SWText variant="bodyCompact">{comment.body}</SWText>
@@ -254,6 +302,13 @@ const stylesFor = themedStyles((colors) => ({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginVertical: -tokens.spacing[3],
+  },
+  reported: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing[1],
+    minHeight: tokens.focus.minimumTarget,
+    paddingHorizontal: tokens.spacing[3],
   },
   commentActions: {
     flexDirection: 'row',

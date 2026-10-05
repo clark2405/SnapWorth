@@ -137,10 +137,10 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
 
       <View style={styles.meta}>
         <VerdictBar tally={post.votes} />
-        <View style={styles.comments} accessibilityLabel={`${post.commentCount} comments`}>
+        <View style={styles.comments} accessibilityLabel={`${post.comments.length} comments`}>
           <MessageCircle size={16} strokeWidth={1.75} color={colors.textMuted} />
           <SWText variant="labelMedium" tone="textMuted">
-            {post.commentCount}
+            {post.comments.length}
           </SWText>
         </View>
       </View>

@@ -28,6 +28,8 @@ export interface IconButtonProps {
   /** A small count, e.g. unread messages. */
   readonly badge?: number;
   readonly haptic?: HapticKind;
+  /** Dims the control to 45% and ignores presses, e.g. a send button with nothing to send. */
+  readonly disabled?: boolean;
 }
 
 export function IconButton({
@@ -39,6 +41,7 @@ export function IconButton({
   size = 20,
   badge,
   haptic,
+  disabled = false,
 }: IconButtonProps) {
   const { colors, name } = useTheme();
   const styles = useThemedStyles(stylesFor);
@@ -54,9 +57,12 @@ export function IconButton({
       onPress={onPress}
       hitSlop={4}
       haptic={haptic}
+      disabled={disabled}
+      accessibilityState={{ disabled }}
       style={({ pressed }) => [
         styles.base,
         styles[appearance],
+        disabled ? styles.disabled : null,
         pressed && appearance === 'accent' ? styles.accentPressed : null,
         pressed && (appearance === 'bare' || appearance === 'outline' || appearance === 'tinted')
           ? styles.pressed
@@ -84,6 +90,9 @@ export function IconButton({
 const target = tokens.focus.minimumTarget;
 
 const stylesFor = themedStyles((colors) => ({
+  disabled: {
+    opacity: 0.45,
+  },
   base: {
     width: target,
     height: target,
