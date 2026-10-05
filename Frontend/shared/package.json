@@ -9,6 +9,7 @@
   ],
   "exports": {
     "./components": "./src/components/index.ts",
+    "./composition": "./src/composition/index.tsx",
     "./design": "./src/design/index.ts",
     "./design/font-assets": "./src/design/font-assets.ts",
     "./design/nativewind-preset": "./src/design/nativewind-preset.ts",
@@ -31,7 +32,9 @@
   },
   "peerDependencies": {
     "@expo-google-fonts/plus-jakarta-sans": "0.4.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-masked-view/masked-view": "0.3.2",
+    "@supabase/supabase-js": "2.117.2",
     "expo-blur": "57.0.3",
     "expo-font": "57.0.4",
     "expo-glass-effect": "57.0.4",

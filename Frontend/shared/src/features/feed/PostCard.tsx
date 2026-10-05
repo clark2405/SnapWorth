@@ -26,6 +26,7 @@ import {
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import type { VoteChoice } from '../../types';
 import { formatPeso, type PreviewPost } from '../preview/sample-data';
+import { useCommentCount } from './comment-thread';
 
 export interface PostCardProps {
   readonly post: PreviewPost;
@@ -48,6 +49,8 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
   const [burst, setBurst] = useState(0);
+  // Live from the comment service; the bundled sample count shows until it loads.
+  const commentCount = useCommentCount(post.id) ?? post.comments.length;
 
   const castJustRight = useCallback(() => {
     haptic('pop');
@@ -137,10 +140,10 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
 
       <View style={styles.meta}>
         <VerdictBar tally={post.votes} />
-        <View style={styles.comments} accessibilityLabel={`${post.comments.length} comments`}>
+        <View style={styles.comments} accessibilityLabel={`${commentCount} comments`}>
           <MessageCircle size={16} strokeWidth={1.75} color={colors.textMuted} />
           <SWText variant="labelMedium" tone="textMuted">
-            {post.comments.length}
+            {commentCount}
           </SWText>
         </View>
       </View>

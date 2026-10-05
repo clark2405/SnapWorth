@@ -13,6 +13,7 @@ import {
   type ThemePreferenceStore,
 } from '@snapworth/shared/design';
 import { companionConfigFor } from '@snapworth/shared/features/companion';
+import { AppServicesProvider, type BackendConfig } from '@snapworth/shared/composition';
 import { useSnapWorthFonts } from '@snapworth/shared/design/font-assets';
 import { SplashView } from '@snapworth/shared/features/launch';
 
@@ -39,15 +40,24 @@ const browserThemeStore: ThemePreferenceStore = {
   },
 };
 
+// A Supabase project's URL and public anon key, from EXPO_PUBLIC_* environment variables
+// (see Backend/README.md). Without them, comments are kept on this device instead.
+const backend: BackendConfig = {
+  supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
+  supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+};
+
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ThemeProvider store={browserThemeStore}>
-          <ToastProvider>
-            <Shell />
-          </ToastProvider>
-        </ThemeProvider>
+        <AppServicesProvider config={backend}>
+          <ThemeProvider store={browserThemeStore}>
+            <ToastProvider>
+              <Shell />
+            </ToastProvider>
+          </ThemeProvider>
+        </AppServicesProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

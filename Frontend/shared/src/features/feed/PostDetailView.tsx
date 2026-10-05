@@ -1,15 +1,17 @@
-import { ArrowUp, Flag, Share as ShareIcon, Trash2 } from 'lucide-react-native';
+import { ArrowUp, Share as ShareIcon, X } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
 import { TextInput, View } from 'react-native';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import {
   Avatar,
   BottomBar,
+  Button,
   EstimateBadge,
   IconButton,
   NavHeader,
   Photo,
+  PressableScale,
   Reveal,
   Screen,
   SWText,
@@ -21,96 +23,129 @@ import {
   useToast,
 } from '../../components';
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import { commentBodyMaxLength, type ThreadComment } from '../../types/entities';
+import type { AppError } from '../../types/errors';
 import type { VoteChoice } from '../../types';
-import {
-  formatPeso,
-  previewPostDetail,
-  previewPosts,
-  previewProfile,
-  type PreviewComment,
-} from '../preview/sample-data';
+import { formatPeso, previewPostDetail, previewPosts } from '../preview/sample-data';
+import { CommentList } from './CommentList';
+import { useCommentThread } from './comment-thread';
 
 export interface PostDetailViewProps {
   readonly postId?: string;
   readonly onBack?: () => void;
   readonly onShare?: () => void;
-  readonly onSubmitComment?: (body: string) => void;
-  readonly onReportComment?: (commentId: string) => void;
-  readonly onDeleteComment?: (commentId: string) => void;
+}
+
+/** What to tell someone when posting, deleting or reporting did not go through. */
+function failureCopy(error: AppError): string {
+  switch (error.kind) {
+    case 'validation':
+      return error.code === 'too_long'
+        ? `Keep it under ${commentBodyMaxLength} characters.`
+        : 'Write something first.';
+    case 'offline':
+    case 'timeout':
+      return 'You are offline. Your text is still here; try again when you reconnect.';
+    case 'rate_limited':
+      return 'You are commenting quickly. Give it a minute.';
+    case 'authorization':
+      return 'That comment is no longer available.';
+    default:
+      return 'Something went wrong. Try again.';
+  }
 }
 
 /**
  * The discussion behind one post: the photo runs full-bleed under a floating header, the
- * question and community verdict sit below it, and comments arrive from a floating composer,
- * appended live with the same entrance every reveal on the page uses.
+ * question and community verdict sit below it, and the thread loads from the comment service.
+ * Replying puts the composer into reply mode for that person; new comments land in the thread
+ * as moderation left them, approved or visibly pending.
  */
-export function PostDetailView({
-  postId,
-  onBack,
-  onShare,
-  onSubmitComment,
-  onReportComment,
-  onDeleteComment,
-}: PostDetailViewProps) {
+export function PostDetailView({ postId, onBack, onShare }: PostDetailViewProps) {
   // The post the user tapped; a link to a post outside the preview feed falls back to a sample.
   const post = previewPosts.find((entry) => entry.id === postId) ?? previewPostDetail;
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
+  const thread = useCommentThread(post.id);
   const [vote, setVote] = useState<VoteChoice | null>(null);
-  const [comments, setComments] = useState<readonly PreviewComment[]>(post.comments);
-  const [reported, setReported] = useState<ReadonlySet<string>>(() => new Set());
   const [draft, setDraft] = useState('');
-  const counter = useRef(0);
+  const [replyingTo, setReplyingTo] = useState<ThreadComment | null>(null);
+  const [sending, setSending] = useState(false);
+  const input = useRef<TextInput>(null);
   const scrollRef = useRef<Animated.ScrollView>(null);
   // Where the discussion starts in the scroll content, so a new comment can be scrolled to.
   const bodyY = useRef(0);
   const discussionY = useRef(0);
-  const canSend = draft.trim().length > 0;
+  const canSend = draft.trim().length > 0 && !sending;
 
-  const submit = useCallback(() => {
-    const body = draft.trim();
-    if (!body) return;
-    counter.current += 1;
-    setComments((current) => [
-      {
-        id: `local-${counter.current}`,
-        author: previewProfile.user,
-        body,
-        postedAgo: 'Just now',
-        mine: true,
-      },
-      ...current,
-    ]);
-    setDraft('');
-    onSubmitComment?.(body);
-    toast.show({ title: 'Comment posted' });
-    // New comments go to the top of the thread; bring it into view so the post is seen to land.
-    setTimeout(() => {
-      scrollRef.current?.scrollTo({
-        y: Math.max(0, bodyY.current + discussionY.current - tokens.spacing[16] * 2),
-        animated: true,
+  const startReply = useCallback((comment: ThreadComment) => {
+    setReplyingTo(comment);
+    input.current?.focus();
+  }, []);
+
+  const submit = useCallback(async () => {
+    if (!canSend) return;
+    setSending(true);
+    const target = replyingTo;
+    const result = await thread.submit(draft, target?.id);
+    setSending(false);
+    if (!result.ok) {
+      toast.show({
+        title: target ? 'Reply not posted' : 'Comment not posted',
+        body: failureCopy(result.error),
       });
-    }, 120);
-  }, [draft, onSubmitComment, toast]);
-
-  const report = useCallback(
-    (comment: PreviewComment) => {
-      setReported((current) => new Set(current).add(comment.id));
-      onReportComment?.(comment.id);
-      toast.show({ title: 'Comment reported', body: 'Our moderators will take a look.' });
-    },
-    [onReportComment, toast],
-  );
+      return;
+    }
+    setDraft('');
+    setReplyingTo(null);
+    const status = result.value.comment.moderationStatus;
+    if (status === 'approved') {
+      toast.show({ title: target ? 'Reply posted' : 'Comment posted' });
+    } else if (status === 'held') {
+      toast.show({
+        title: 'Held for review',
+        body: 'It may break a community guideline, so only you can see it for now.',
+      });
+    } else {
+      toast.show({ title: 'Posted', body: 'Others will see it once it has been checked.' });
+    }
+    if (!target) {
+      // New conversations go to the top of the thread; bring it into view.
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({
+          y: Math.max(0, bodyY.current + discussionY.current - tokens.spacing[16] * 2),
+          animated: true,
+        });
+      }, 120);
+    }
+  }, [canSend, draft, replyingTo, thread, toast]);
 
   const remove = useCallback(
-    (comment: PreviewComment) => {
-      setComments((current) => current.filter((entry) => entry.id !== comment.id));
-      onDeleteComment?.(comment.id);
-      toast.show({ title: 'Comment deleted' });
+    async (comment: ThreadComment) => {
+      const result = await thread.remove(comment);
+      toast.show(
+        result.ok
+          ? { title: comment.parentId ? 'Reply deleted' : 'Comment deleted' }
+          : { title: 'Not deleted', body: failureCopy(result.error) },
+      );
     },
-    [onDeleteComment, toast],
+    [thread, toast],
   );
+
+  const report = useCallback(
+    async (comment: ThreadComment) => {
+      const result = await thread.report(comment);
+      toast.show(
+        result.ok
+          ? { title: 'Comment reported', body: 'Our moderators will take a look.' }
+          : { title: 'Not reported', body: failureCopy(result.error) },
+      );
+    },
+    [thread, toast],
+  );
+
+  const count = thread.comments.length;
 
   return (
     <Screen
@@ -132,14 +167,43 @@ export function PostDetailView({
       }
       footer={
         <BottomBar>
+          {replyingTo ? (
+            <Animated.View
+              entering={FadeIn.duration(tokens.motion.duration.base)}
+              exiting={FadeOut.duration(tokens.motion.duration.fast)}
+              style={styles.replyingRow}
+            >
+              <SWText
+                variant="labelSmall"
+                tone="textSecondary"
+                numberOfLines={1}
+                style={styles.replyingLabel}
+              >
+                Replying to @{replyingTo.author.handle}
+              </SWText>
+              <PressableScale
+                accessibilityLabel="Cancel reply"
+                haptic="select"
+                hitSlop={tokens.spacing[2]}
+                onPress={() => setReplyingTo(null)}
+                style={styles.cancelReply}
+              >
+                <X size={14} strokeWidth={2.2} color={colors.textSecondary} />
+              </PressableScale>
+            </Animated.View>
+          ) : null}
           <View style={styles.composerRow}>
             <TextInput
+              ref={input}
               value={draft}
               onChangeText={setDraft}
-              placeholder="Add your take on the price"
+              placeholder={
+                replyingTo ? `Reply to @${replyingTo.author.handle}` : 'Add your take on the price'
+              }
               placeholderTextColor={colors.textMuted}
               selectionColor={colors.accent}
-              accessibilityLabel="Write a comment"
+              accessibilityLabel={replyingTo ? 'Write a reply' : 'Write a comment'}
+              maxLength={commentBodyMaxLength}
               multiline
               style={[
                 styles.composerInput,
@@ -150,12 +214,12 @@ export function PostDetailView({
             />
             <IconButton
               icon={ArrowUp}
-              label="Post comment"
+              label={replyingTo ? 'Post reply' : 'Post comment'}
               appearance="accent"
               size={18}
               haptic="pop"
               disabled={!canSend}
-              onPress={submit}
+              onPress={() => void submit()}
             />
           </View>
         </BottomBar>
@@ -196,69 +260,41 @@ export function PostDetailView({
           />
         </Reveal>
 
-        <Reveal index={3}>
-          <SWText variant="headingMedium" accessibilityRole="header">
-            {comments.length} {comments.length === 1 ? 'comment' : 'comments'}
-          </SWText>
-        </Reveal>
-
         <View
           style={styles.discussion}
           onLayout={(event) => {
             discussionY.current = event.nativeEvent.layout.y;
           }}
         >
-          {comments.map((comment, index) => (
-            <Animated.View
-              key={comment.id}
-              entering={FadeInDown.springify()
-                .damping(18)
-                .delay(Math.min(index, 4) * 50)}
-              layout={LinearTransition.springify().damping(20)}
-              style={styles.comment}
-            >
-              <Avatar source={comment.author.avatar} name={comment.author.handle} size={32} />
-              <View style={styles.commentBody}>
-                <View style={styles.commentHeader}>
-                  <SWText variant="labelSmall">@{comment.author.handle}</SWText>
-                  <View style={styles.commentActions}>
-                    {comment.mine ? (
-                      <IconButton
-                        icon={Trash2}
-                        label="Delete your comment"
-                        tone="textMuted"
-                        size={16}
-                        onPress={() => remove(comment)}
-                      />
-                    ) : reported.has(comment.id) ? (
-                      <View
-                        style={styles.reported}
-                        accessible
-                        accessibilityLabel="You reported this comment"
-                      >
-                        <Flag size={14} strokeWidth={2} color={colors.textMuted} />
-                        <SWText variant="caption" tone="textMuted">
-                          Reported
-                        </SWText>
-                      </View>
-                    ) : (
-                      <IconButton
-                        icon={Flag}
-                        label={`Report comment by ${comment.author.handle}`}
-                        tone="textMuted"
-                        size={16}
-                        onPress={() => report(comment)}
-                      />
-                    )}
-                  </View>
-                </View>
-                <SWText variant="bodyCompact">{comment.body}</SWText>
-                <SWText variant="caption" tone="textMuted">
-                  {comment.postedAgo}
-                </SWText>
-              </View>
-            </Animated.View>
-          ))}
+          <SWText variant="headingMedium" accessibilityRole="header">
+            {thread.status === 'ready'
+              ? `${count} ${count === 1 ? 'comment' : 'comments'}`
+              : 'Comments'}
+          </SWText>
+
+          {thread.status === 'loading' ? (
+            <SWText variant="bodySmall" tone="textMuted" accessibilityLiveRegion="polite">
+              Loading the discussion…
+            </SWText>
+          ) : thread.status === 'failed' ? (
+            <View style={styles.problem} accessibilityLiveRegion="polite">
+              <SWText variant="bodySmall" tone="textSecondary">
+                {thread.error ? failureCopy(thread.error) : 'The discussion did not load.'}
+              </SWText>
+              <Button label="Try again" variant="secondary" size="small" onPress={thread.reload} />
+            </View>
+          ) : count === 0 ? (
+            <SWText variant="bodySmall" tone="textMuted">
+              No comments yet. Be the first to weigh in on the price.
+            </SWText>
+          ) : (
+            <CommentList
+              groups={thread.groups}
+              onReply={startReply}
+              onDelete={(comment) => void remove(comment)}
+              onReport={(comment) => void report(comment)}
+            />
+          )}
         </View>
       </View>
     </Screen>
@@ -287,32 +323,30 @@ const stylesFor = themedStyles((colors) => ({
     gap: tokens.spacing[4],
   },
   discussion: {
-    gap: tokens.spacing[6],
+    gap: tokens.spacing[5],
   },
-  comment: {
-    flexDirection: 'row',
+  problem: {
+    alignItems: 'flex-start',
     gap: tokens.spacing[3],
   },
-  commentBody: {
-    flex: 1,
-    gap: tokens.spacing[1],
+  // The cancel sits right after the name rather than at the far edge, where floating chrome
+  // (the companion orb) could cover it.
+  replyingLabel: {
+    flexShrink: 1,
   },
-  commentHeader: {
+  replyingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginVertical: -tokens.spacing[3],
+    gap: tokens.spacing[2],
+    paddingLeft: tokens.spacing[2],
   },
-  reported: {
-    flexDirection: 'row',
+  cancelReply: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
-    gap: tokens.spacing[1],
-    minHeight: tokens.focus.minimumTarget,
-    paddingHorizontal: tokens.spacing[3],
-  },
-  commentActions: {
-    flexDirection: 'row',
-    marginRight: -tokens.spacing[3],
+    justifyContent: 'center',
+    backgroundColor: colors.sunken,
   },
   composerRow: {
     flexDirection: 'row',

@@ -55,13 +55,17 @@ export const previewUsers = {
   justinV: { handle: 'justin_v', avatar: image.avatarJustinV },
 } satisfies Record<string, PreviewUser>;
 
+/** Avatars for the demo accounts by handle. The backend's seed uses the same handles. */
+export const previewAvatarByHandle: Readonly<Record<string, ImageSourcePropType>> =
+  Object.fromEntries(Object.values(previewUsers).map((user) => [user.handle, user.avatar]));
+
 export interface PreviewComment {
   readonly id: string;
+  /** The comment this one replies to, if any. */
+  readonly replyTo?: string;
   readonly author: PreviewUser;
   readonly body: string;
   readonly postedAgo: string;
-  /** Written by the signed-in user, so they may delete it (and not report it). */
-  readonly mine: boolean;
 }
 
 export interface PreviewPost {
@@ -93,14 +97,12 @@ export const previewPosts: readonly PreviewPost[] = [
         author: previewUsers.manilaHype,
         body: 'Teal colourways go fast. ₱2,450 is fair, maybe even a little low.',
         postedAgo: '1m ago',
-        mine: false,
       },
       {
         id: 'windbreaker-c2',
         author: previewUsers.justinV,
         body: 'Check the inner tag. If it says "Made in Korea" it could be worth more.',
         postedAgo: '2m ago',
-        mine: false,
       },
     ],
   },
@@ -115,25 +117,29 @@ export const previewPosts: readonly PreviewPost[] = [
     votes: { too_high: 35, just_right: 12, too_low: 2 },
     comments: [
       {
+        id: 'polaroid-c4',
+        replyTo: 'polaroid-c3',
+        author: previewUsers.mariaCruz,
+        body: 'Good to know, thanks. It does come with one sealed pack of film.',
+        postedAgo: '40m ago',
+      },
+      {
         id: 'polaroid-c3',
         author: previewUsers.retroCurator,
         body: 'Agree with the others. I would list it around ₱2,900.',
         postedAgo: '12m ago',
-        mine: false,
       },
       {
         id: 'polaroid-c2',
         author: previewUsers.manilaHype,
         body: 'Test the flash first. A working one is worth the extra.',
         postedAgo: '30m ago',
-        mine: false,
       },
       {
         id: 'polaroid-c1',
         author: previewUsers.justinV,
         body: 'Sun 600s usually go for ₱2,500 to ₱3,000 here. ₱3,500 feels high unless it comes with film.',
         postedAgo: '48m ago',
-        mine: false,
       },
     ],
   },
@@ -155,14 +161,12 @@ export const previewPostDetail: PreviewPost = {
       author: previewUsers.justinV,
       body: "If there's any stains or zip faults, it could fall closer to ₱1,800. Looks clean though!",
       postedAgo: '45m ago',
-      mine: false,
     },
     {
       id: 'c1',
       author: previewUsers.manilaHype,
       body: '₱2,450 is actually extremely fair. Authentic 90s Nike sells for easily ₱3k in high-end thrift shops. Buy!',
       postedAgo: '1h ago',
-      mine: false,
     },
   ],
 };
