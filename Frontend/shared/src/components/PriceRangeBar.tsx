@@ -23,6 +23,8 @@ export interface PriceRangeBarProps {
   readonly format: (value: number) => string;
   /** Optional asking price to plot against the range, e.g. on a listing. */
   readonly asking?: number;
+  /** Hide the confidence label when the screen already states it (e.g. as a chip). */
+  readonly showConfidence?: boolean;
 }
 
 const confidenceCopy: Record<EstimateConfidence, string> = {
@@ -43,6 +45,7 @@ export function PriceRangeBar({
   confidence,
   format,
   asking,
+  showConfidence = true,
 }: PriceRangeBarProps) {
   const styles = useThemedStyles(stylesFor);
   const reduceMotion = useReducedMotion();
@@ -105,9 +108,11 @@ export function PriceRangeBar({
         <SWText variant="caption" tone="textMuted">
           {format(low)}
         </SWText>
-        <SWText variant="labelSmall" tone={confidence === 'low' ? 'warning' : 'textSecondary'}>
-          {confidenceCopy[confidence]}
-        </SWText>
+        {showConfidence ? (
+          <SWText variant="labelSmall" tone={confidence === 'low' ? 'warning' : 'textSecondary'}>
+            {confidenceCopy[confidence]}
+          </SWText>
+        ) : null}
         <SWText variant="caption" tone="textMuted">
           {format(high)}
         </SWText>

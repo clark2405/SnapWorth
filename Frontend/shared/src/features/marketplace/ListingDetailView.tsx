@@ -175,9 +175,6 @@ export function ListingDetailView({
               format={formatPeso}
             />
             <VerdictBar tally={tally} />
-            <SWText variant="caption" tone="textMuted">
-              {listing.assessmentNote}
-            </SWText>
           </Surface>
 
           <PressableScale

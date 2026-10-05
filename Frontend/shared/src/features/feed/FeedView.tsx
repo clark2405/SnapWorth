@@ -1,4 +1,4 @@
-import { Flame, Users } from 'lucide-react-native';
+import { Flame } from 'lucide-react-native';
 import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 
@@ -43,8 +43,6 @@ export function FeedView({ onOpenPost, onSearch, onOpenProfile }: FeedViewProps)
       onRefresh={() => new Promise<void>((resolve) => setTimeout(resolve, 900))}
     >
       <LargeTitle
-        overlineIcon={Users}
-        overline="Community · Is the AI right?"
         title="Price check"
         trailing={
           <View style={styles.actions}>

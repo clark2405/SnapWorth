@@ -40,9 +40,8 @@ export function ConversationListView({
     >
       <LargeTitle
         title="Chats"
-        overlineIcon={MessagesSquare}
-        overline="Buyers & sellers"
-        overlineCount={unread > 0 ? `${unread} unread` : undefined}
+        overlineIcon={unread > 0 ? MessagesSquare : undefined}
+        overline={unread > 0 ? `${unread} unread` : undefined}
         trailing={<ProfileButton onPress={onOpenProfile} />}
       />
       {conversations.length === 0 ? (

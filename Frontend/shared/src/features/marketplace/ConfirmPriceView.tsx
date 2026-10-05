@@ -95,16 +95,16 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
             loading={publishing}
             onPress={handlePublish}
           />
-          <SWText
-            variant="caption"
-            tone="textMuted"
-            align="center"
-            accessibilityLiveRegion="polite"
-          >
-            {enteredPrice === null
-              ? 'Enter your asking price to publish.'
-              : `Your listing will go live at ${formatPeso(enteredPrice)}.`}
-          </SWText>
+          {enteredPrice === null ? (
+            <SWText
+              variant="caption"
+              tone="textMuted"
+              align="center"
+              accessibilityLiveRegion="polite"
+            >
+              Enter your asking price to publish.
+            </SWText>
+          ) : null}
         </BottomBar>
       }
       contentStyle={styles.content}
@@ -158,10 +158,7 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
       </Reveal>
 
       <Reveal index={3} style={styles.fields}>
-        <Field
-          label="Your asking price"
-          helper="This is yours to set. Edit it, or publish the suggestion above."
-        >
+        <Field label="Your asking price">
           <TextField
             size="large"
             prefix="₱"

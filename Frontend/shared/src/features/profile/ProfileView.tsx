@@ -172,7 +172,6 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
           <ListRow label="Help" icon={CircleHelp} onPress={() => onOpen?.('help')} />
           <ListRow
             label="Replay introduction"
-            detail="See how SnapWorth works"
             icon={Sparkles}
             onPress={() => onOpen?.('introduction')}
           />

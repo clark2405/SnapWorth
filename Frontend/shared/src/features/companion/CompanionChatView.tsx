@@ -176,9 +176,6 @@ function CompanionChat({ initialQuestion, onBack, onUseListing }: CompanionChatV
           <SWText variant="companion" align="center">
             Worthy
           </SWText>
-          <SWText variant="caption" tone="textMuted" align="center">
-            Preview answers use sample market data
-          </SWText>
         </Animated.View>
 
         {messages.map((message) =>

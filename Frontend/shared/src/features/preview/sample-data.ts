@@ -96,7 +96,7 @@ export const previewPosts: readonly PreviewPost[] = [
 export const previewPostDetail = {
   id: 'puffer-jacket',
   author: previewUsers.retroCurator,
-  createdAgo: 'Post created 2h ago',
+  createdAgo: '2h ago',
   body: 'Is ₱2,450 too high or just right for this pristine condition jacket? Help out!',
   photo: image.pufferBlack,
   photoLabel: 'Black puffer jacket laid flat',

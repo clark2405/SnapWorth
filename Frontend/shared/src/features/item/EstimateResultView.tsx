@@ -206,7 +206,7 @@ export function EstimateResultView({
                 accessibilityLiveRegion="polite"
               />
               <SWText variant="bodyMedium" tone="textMuted">
-                Likely {formatPeso(low)} – {formatPeso(high)} · AI estimate, not a sale price
+                AI estimate, not a sale price
               </SWText>
             </Reveal>
 
@@ -217,6 +217,7 @@ export function EstimateResultView({
                 estimate={value}
                 confidence={previewValuation.confidence}
                 format={formatPeso}
+                showConfidence={false}
               />
             </Reveal>
 
@@ -226,11 +227,7 @@ export function EstimateResultView({
                 label={previewValuation.demand}
                 detail={previewValuation.demandDetail}
               />
-              <Insight
-                icon={Clock3}
-                label={previewValuation.sellTime}
-                detail="Based on similar listings"
-              />
+              <Insight icon={Clock3} label={previewValuation.sellTime} />
               <Insight
                 icon={Gem}
                 label={previewValuation.rarity}
@@ -239,7 +236,7 @@ export function EstimateResultView({
             </Reveal>
 
             <Reveal index={3} style={styles.section}>
-              <SectionTitle title="Condition" detail="Adjusts the estimate" />
+              <SectionTitle title="Condition" />
               <ChoiceChips
                 options={previewConditions.map(({ key, label }) => ({ key, label }))}
                 value={condition}
@@ -272,7 +269,7 @@ export function EstimateResultView({
             </Reveal>
 
             <Reveal index={4} delay={120} style={styles.section}>
-              <SectionTitle title="Recent sales" detail="Comparable items" />
+              <SectionTitle title="Recent sales" />
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -367,18 +364,24 @@ function Insight({
 }: {
   readonly icon: LucideIcon;
   readonly label: string;
-  readonly detail: string;
+  readonly detail?: string;
 }) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   return (
-    <View style={styles.insight} accessible accessibilityLabel={`${label}. ${detail}`}>
+    <View
+      style={styles.insight}
+      accessible
+      accessibilityLabel={detail ? `${label}. ${detail}` : label}
+    >
       <Icon size={22} strokeWidth={1.5} color={colors.textPrimary} />
       <View style={styles.insightText}>
         <SWText variant="headingSmall">{label}</SWText>
-        <SWText variant="bodySmall" tone="textMuted">
-          {detail}
-        </SWText>
+        {detail ? (
+          <SWText variant="bodySmall" tone="textMuted">
+            {detail}
+          </SWText>
+        ) : null}
       </View>
     </View>
   );

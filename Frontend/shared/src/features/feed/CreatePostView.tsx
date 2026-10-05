@@ -69,7 +69,7 @@ export function CreatePostView({ onBack, onPublish }: CreatePostViewProps) {
         <BottomBar style={styles.footer}>
           <Button label="Post to feed" disabled={!canPost} loading={publishing} onPress={publish} />
           <SWText variant="caption" tone="textMuted" align="center">
-            Posts are public. The community votes Too High, Just Right, or Too Low.
+            Posts are public.
           </SWText>
         </BottomBar>
       }
@@ -86,10 +86,7 @@ export function CreatePostView({ onBack, onPublish }: CreatePostViewProps) {
       </Reveal>
 
       <Reveal index={1}>
-        <Field
-          label="Your question"
-          helper={`${trimmed.length}/${maxLength} · Mention condition, size, or anything the photo does not show.`}
-        >
+        <Field label="Your question" helper={`${trimmed.length}/${maxLength}`}>
           <TextInput
             value={question}
             onChangeText={setQuestion}

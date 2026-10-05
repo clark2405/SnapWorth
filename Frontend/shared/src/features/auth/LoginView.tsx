@@ -31,12 +31,10 @@ const modes = [
 const copy = {
   login: {
     title: 'Welcome back.',
-    subtitle: 'Your history, votes, and listings are where you left them.',
     submit: 'Log in',
   },
   signup: {
     title: 'Start with one photo.',
-    subtitle: 'An email and a password. Nothing else until you need it.',
     submit: 'Create account',
   },
 } as const;
@@ -85,9 +83,6 @@ export function LoginView({
         >
           <SWText variant="displayHero" accessibilityRole="header">
             {text.title}
-          </SWText>
-          <SWText variant="bodyLarge" tone="textSecondary">
-            {text.subtitle}
           </SWText>
         </Animated.View>
       </Reveal>

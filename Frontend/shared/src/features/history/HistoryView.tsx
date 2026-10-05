@@ -114,7 +114,7 @@ export function HistoryView({
       <LargeTitle
         title="Your stash"
         overlineIcon={Archive}
-        overline={`Everything you snapped · ${previewHistory.length} checked`}
+        overline={`${previewHistory.length} items`}
         trailing={
           <View style={styles.actions}>
             <SearchButton label="Search your history" onOpen={onSearch} />
@@ -135,9 +135,6 @@ export function HistoryView({
           />
           <View style={styles.heroMeta}>
             <Tag label={previewPortfolio.changeLabel} tone="mint" />
-            <SWText variant="labelSmall" tone="onFeatureDim">
-              {previewPortfolio.itemCount} items tracked
-            </SWText>
           </View>
           <Sparkline values={previewPortfolio.series} height={56} color={colors.onFeature} />
         </Surface>

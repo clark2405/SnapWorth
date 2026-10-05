@@ -82,8 +82,6 @@ export interface LargeTitleProps {
   readonly overline?: string;
   /** A thin line icon that leads the overline. */
   readonly overlineIcon?: LucideIcon;
-  /** An urgent count after a "·" in the overline, e.g. "2 unread"; the one accent text use. */
-  readonly overlineCount?: string;
   /** A short line under the title that states what the screen is for. */
   readonly subtitle?: string;
   readonly trailing?: ReactNode;
@@ -93,14 +91,7 @@ export interface LargeTitleProps {
  * The bold title that opens a top-level tab. As the page scrolls it
  * drifts up a little slower than the content and fades, handing off to the compact title.
  */
-export function LargeTitle({
-  title,
-  overline,
-  overlineIcon,
-  overlineCount,
-  subtitle,
-  trailing,
-}: LargeTitleProps) {
+export function LargeTitle({ title, overline, overlineIcon, subtitle, trailing }: LargeTitleProps) {
   const scroll = useScreenScroll();
   const register = useRegisterLargeTitle(title);
   const styles = useThemedStyles(stylesFor);
@@ -126,7 +117,7 @@ export function LargeTitle({
           gets the full width beneath, so nothing wraps into a ragged line beside the buttons. */}
       {overline ? (
         <Animated.View style={[styles.overlineRow, textStyle]}>
-          <Overline label={overline} icon={overlineIcon} count={overlineCount} />
+          <Overline label={overline} icon={overlineIcon} />
         </Animated.View>
       ) : null}
       <View style={styles.largeRow}>

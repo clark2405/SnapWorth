@@ -1,4 +1,4 @@
-import { BadgePercent, Camera, PackageSearch, ShoppingBag } from 'lucide-react-native';
+import { BadgePercent, Camera, PackageSearch } from 'lucide-react-native';
 import { useState } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -75,8 +75,6 @@ export function MarketplaceView({
     >
       <LargeTitle
         title="Market"
-        overlineIcon={ShoppingBag}
-        overline="Up for grabs · Seller-set prices"
         trailing={
           <View style={styles.actions}>
             <Button label="Sell" size="small" variant="secondary" icon={Camera} onPress={onSell} />

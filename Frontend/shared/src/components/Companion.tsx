@@ -368,9 +368,6 @@ function CompanionPanel({
             <CompanionOrb size={30} mood="attentive" />
             <View style={styles.flex}>
               <SWText variant="companion">Worthy</SWText>
-              <SWText variant="caption" tone="textMuted">
-                Your pricing companion
-              </SWText>
             </View>
             <PressableScale accessibilityLabel="Close" onPress={onClose} style={styles.close}>
               <X size={16} strokeWidth={2.4} color={colors.textSecondary} />
