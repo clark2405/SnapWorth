@@ -2,86 +2,83 @@ import { useEffect } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
+  cancelAnimation,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, Pattern, Rect } from 'react-native-svg';
 
-import { tokens, useTheme } from '../design';
+import { useTheme } from '../design';
 
 export interface AmbientBackdropProps {
-  /** Which hues warm the screen; `value` leans on the accent, `aurora` on the brand sweep. */
+  /**
+   * `value` (tab roots) and `aurora` (sign-in) lay a faint dot field over the canvas; `quiet`
+   * leaves the canvas flat, for flows that should stay out of the way.
+   */
   readonly mood?: 'value' | 'aurora' | 'quiet';
 }
 
+const cell = 24;
+const driftMs = 9000;
+
 /**
- * Two faint light-pools behind the top of a screen, drifting on a slow loop so the page feels
- * lit rather than flat. Pure transform on pre-rendered gradients, so it costs nothing per frame
- * on the JS thread; under reduced motion it holds still.
+ * A flat canvas with a fine dot field that drifts one cell on a slow loop, so the page feels
+ * alive without a single gradient. One pre-rendered pattern moved by transform only, so it costs
+ * nothing per frame on the JS thread; under reduced motion it holds still.
  */
 export function AmbientBackdrop({ mood = 'value' }: AmbientBackdropProps) {
   const { colors, isDark } = useTheme();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
   const drift = useSharedValue(0);
+  const breathe = useSharedValue(0);
 
   useEffect(() => {
-    if (reduceMotion) return;
-    drift.value = withRepeat(
-      withTiming(1, { duration: 11000, easing: Easing.inOut(Easing.sin) }),
+    if (reduceMotion || mood === 'quiet') return;
+    drift.value = withRepeat(withTiming(1, { duration: driftMs, easing: Easing.linear }), -1);
+    breathe.value = withRepeat(
+      withTiming(1, { duration: 4200, easing: Easing.inOut(Easing.sin) }),
       -1,
       true,
     );
-  }, [drift, reduceMotion]);
+    return () => {
+      cancelAnimation(drift);
+      cancelAnimation(breathe);
+    };
+  }, [breathe, drift, mood, reduceMotion]);
 
-  const first = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: -width * 0.18 + drift.value * width * 0.12 },
-      { translateY: -width * 0.3 + drift.value * 18 },
-    ],
-  }));
-  const second = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: width * 0.32 - drift.value * width * 0.14 },
-      { translateY: -width * 0.42 + drift.value * 26 },
-    ],
+  // Moving exactly one cell makes the loop seamless: the last frame matches the first.
+  const field = useAnimatedStyle(() => ({
+    opacity: 0.75 + breathe.value * 0.25,
+    transform: [{ translateX: -drift.value * cell }, { translateY: -drift.value * cell }],
   }));
 
   if (mood === 'quiet') return null;
 
-  const size = width * 1.2;
-  // Barely there: a warm lift of the ground, never a coloured wash.
-  const strength = isDark ? 0.1 : 0.14;
-  const hues =
-    mood === 'aurora'
-      ? [tokens.aurora[0], tokens.aurora[2]]
-      : [colors.accent, isDark ? tokens.aurora[1] : tokens.aurora[0]];
+  const fieldWidth = width + cell * 2;
+  const fieldHeight = height + cell * 2;
 
   return (
     <View style={styles.layer}>
-      {hues.map((hue, index) => (
-        <Animated.View
-          key={hue}
-          style={[
-            { position: 'absolute', width: size, height: size },
-            index === 0 ? first : second,
-          ]}
-        >
-          <Svg width={size} height={size}>
-            <Defs>
-              <RadialGradient id={`pool-${index}`} cx="50%" cy="50%" r="50%">
-                <Stop offset="0" stopColor={hue} stopOpacity={strength * (index === 0 ? 1 : 0.5)} />
-                <Stop offset="0.55" stopColor={hue} stopOpacity={strength * 0.22} />
-                <Stop offset="1" stopColor={hue} stopOpacity={0} />
-              </RadialGradient>
-            </Defs>
-            <Rect width={size} height={size} fill={`url(#pool-${index})`} />
-          </Svg>
-        </Animated.View>
-      ))}
+      <Animated.View style={[{ width: fieldWidth, height: fieldHeight }, field]}>
+        <Svg width={fieldWidth} height={fieldHeight}>
+          <Defs>
+            <Pattern id="dots" width={cell} height={cell} patternUnits="userSpaceOnUse">
+              <Circle
+                cx={cell / 2}
+                cy={cell / 2}
+                r={1}
+                fill={colors.textPrimary}
+                fillOpacity={isDark ? 0.09 : 0.07}
+              />
+            </Pattern>
+          </Defs>
+          <Rect width={fieldWidth} height={fieldHeight} fill="url(#dots)" />
+        </Svg>
+      </Animated.View>
     </View>
   );
 }

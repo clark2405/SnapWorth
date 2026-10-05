@@ -127,12 +127,10 @@ const stylesFor = themedStyles(() => ({
     gap: tokens.spacing[2],
   },
   trending: {
-    gap: tokens.spacing[3],
-    marginBottom: tokens.spacing[8],
+    gap: tokens.spacing[4],
+    marginBottom: tokens.spacing[10],
   },
-  trendingTitle: {
-    paddingHorizontal: tokens.spacing['0.5'],
-  },
+  trendingTitle: {},
   trendingBleed: {
     marginHorizontal: -tokens.layout.pageGutterCompact,
     flexGrow: 0,
@@ -142,14 +140,15 @@ const stylesFor = themedStyles(() => ({
     paddingHorizontal: tokens.layout.pageGutterCompact,
   },
   tile: {
-    width: 112,
-    gap: tokens.spacing[1],
+    width: 120,
+    gap: tokens.spacing['0.5'],
   },
   tilePhoto: {
-    width: 112,
-    height: 112,
+    width: 120,
+    height: 120,
+    marginBottom: tokens.spacing[2],
   },
   list: {
-    gap: tokens.spacing[8],
+    gap: tokens.spacing[12],
   },
 }));

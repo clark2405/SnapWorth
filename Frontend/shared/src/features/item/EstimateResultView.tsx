@@ -368,13 +368,13 @@ function Insight({
   const styles = useThemedStyles(stylesFor);
   return (
     <View style={styles.insight} accessible accessibilityLabel={`${label}. ${detail}`}>
-      <Icon size={17} strokeWidth={2.1} color={colors.accent} />
-      <SWText variant="labelSmall" numberOfLines={2}>
-        {label}
-      </SWText>
-      <SWText variant="caption" tone="textMuted" numberOfLines={2}>
-        {detail}
-      </SWText>
+      <Icon size={22} strokeWidth={1.5} color={colors.textPrimary} />
+      <View style={styles.insightText}>
+        <SWText variant="headingSmall">{label}</SWText>
+        <SWText variant="bodySmall" tone="textMuted">
+          {detail}
+        </SWText>
+      </View>
     </View>
   );
 }
@@ -669,7 +669,7 @@ const stylesFor = themedStyles((colors, name) => ({
     backgroundColor: colors.canvas,
     paddingHorizontal: gutter,
     paddingTop: tokens.spacing[6],
-    gap: tokens.spacing[8],
+    gap: tokens.spacing[10],
   },
   headline: {
     gap: tokens.spacing[1],
@@ -685,16 +685,23 @@ const stylesFor = themedStyles((colors, name) => ({
     alignItems: 'center',
     gap: tokens.spacing[2],
   },
+  // Highlights read as a quiet list, icon then title over one line of context, the way
+  // listing highlights do on the big marketplaces, rather than three cramped tiles.
   insights: {
-    flexDirection: 'row',
-    gap: tokens.spacing[2],
+    gap: tokens.spacing[5],
+    paddingVertical: tokens.spacing[6],
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle,
   },
   insight: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: tokens.spacing[4],
+  },
+  insightText: {
     flex: 1,
-    gap: tokens.spacing[1],
-    padding: tokens.spacing[3],
-    borderRadius: tokens.radius.large,
-    backgroundColor: colors.sunken,
+    gap: 2,
   },
   section: {
     gap: tokens.spacing[3],

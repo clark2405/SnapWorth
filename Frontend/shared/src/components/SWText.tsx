@@ -1,4 +1,4 @@
-import { Platform, StyleSheet, Text, type TextProps, type TextStyle } from 'react-native';
+import { StyleSheet, Text, type TextProps, type TextStyle } from 'react-native';
 
 import {
   resolveFontFamily,
@@ -18,9 +18,10 @@ function toTextStyle(style: TypeStyle): TextStyle {
         ? style.letterSpacing
         : undefined;
 
+  // Each weight is its own bundled face, so no `fontWeight`: setting one would make the web
+  // synthesise a fake bold and Android fall back to the system font.
   return {
-    fontFamily: resolveFontFamily(style.family, Platform.OS),
-    fontWeight: style.weight as TextStyle['fontWeight'],
+    fontFamily: resolveFontFamily(style.family, style.weight),
     fontSize: style.size,
     lineHeight: style.lineHeight,
     letterSpacing,

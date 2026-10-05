@@ -49,7 +49,7 @@ export const snapWorthNativeWindPreset = {
     extend: {
       colors: colorTheme,
       fontFamily: {
-        display: [tokens.typography.webFamily.serif],
+        display: [tokens.typography.webFamily.display],
         body: [tokens.typography.webFamily.sans],
         rounded: [tokens.typography.webFamily.rounded],
       },

@@ -1,11 +1,12 @@
 import { Camera, type LucideIcon } from 'lucide-react-native';
-import { useEffect } from 'react';
-import { View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { StyleSheet, View, type LayoutRectangle } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -44,23 +45,71 @@ export function TabBar<Key extends string>({
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
+  const reduceMotion = useReducedMotion();
+  const [slots, setSlots] = useState<Partial<Record<Key, LayoutRectangle>>>({});
+  const pillX = useSharedValue(0);
+  const pillWidth = useSharedValue(0);
+  const pillShown = useSharedValue(0);
+  const placed = useSharedValue(false);
+
+  const target = activeKey === undefined ? undefined : slots[activeKey];
+
+  // One pill for the whole bar: it slides to the chosen tab and stretches to fit, so switching
+  // tabs reads as the selection travelling rather than one tab dimming as another lights.
+  useEffect(() => {
+    if (!target) {
+      pillShown.value = withSpring(0, tokens.motion.spring.snappy);
+      return;
+    }
+    const x = target.x + 2;
+    const width = target.width - 4;
+    if (!placed.value || reduceMotion) {
+      placed.value = true;
+      pillX.value = x;
+      pillWidth.value = width;
+      pillShown.value = 1;
+      return;
+    }
+    pillX.value = withSpring(x, tokens.motion.spring.smooth);
+    pillWidth.value = withSpring(width, tokens.motion.spring.smooth);
+    pillShown.value = withSpring(1, tokens.motion.spring.snappy);
+  }, [pillShown, pillWidth, pillX, placed, reduceMotion, target]);
+
+  const pillStyle = useAnimatedStyle(() => ({
+    opacity: pillShown.value,
+    width: pillWidth.value,
+    transform: [{ translateX: pillX.value }, { scale: 0.85 + pillShown.value * 0.15 }],
+  }));
 
   const renderTab = (item: TabItem<Key>) => (
-    <Tab
+    <View
       key={item.key}
-      item={item}
-      active={item.key === activeKey}
-      onPress={() => {
-        if (item.key !== activeKey) haptic('select');
-        onSelect(item.key);
+      style={styles.tabSlot}
+      onLayout={(event) => {
+        const layout = event.nativeEvent.layout;
+        setSlots((current) =>
+          current[item.key]?.x === layout.x && current[item.key]?.width === layout.width
+            ? current
+            : { ...current, [item.key]: layout },
+        );
       }}
-    />
+    >
+      <Tab
+        item={item}
+        active={item.key === activeKey}
+        onPress={() => {
+          if (item.key !== activeKey) haptic('select');
+          onSelect(item.key);
+        }}
+      />
+    </View>
   );
 
   return (
     <View style={[styles.dock, { paddingBottom: Math.max(insets.bottom, tokens.spacing[3]) }]}>
       <GlassSurface style={styles.capsule}>
         <View accessibilityRole="tablist" style={styles.row}>
+          <Animated.View pointerEvents="none" style={[styles.pill, pillStyle]} />
           {leading.map(renderTab)}
           <View style={styles.captureSlot}>
             <PressableScale
@@ -91,23 +140,17 @@ function Tab<Key extends string>({
 }) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
-  const reduceMotion = useReducedMotion();
   const iconPop = usePop(active, { enabled: active, peak: 1.2 });
-  const lift = useSharedValue(active ? 1 : 0);
+  const tint = useSharedValue(active ? 1 : 0);
   const Icon = item.icon;
 
   useEffect(() => {
-    lift.value = reduceMotion
-      ? active
-        ? 1
-        : 0
-      : withSpring(active ? 1 : 0, tokens.motion.spring.snappy);
-  }, [active, lift, reduceMotion]);
+    tint.value = withTiming(active ? 1 : 0, { duration: tokens.motion.duration.base });
+  }, [active, tint]);
 
-  const pillStyle = useAnimatedStyle(() => ({
-    opacity: lift.value,
-    transform: [{ scale: 0.7 + lift.value * 0.3 }],
-  }));
+  // The active icon and label fade up to full ink as the pill arrives beneath them.
+  const restStyle = useAnimatedStyle(() => ({ opacity: 1 - tint.value }));
+  const activeStyle = useAnimatedStyle(() => ({ opacity: tint.value }));
 
   return (
     <PressableScale
@@ -116,20 +159,23 @@ function Tab<Key extends string>({
       accessibilityState={{ selected: active }}
       haptic="none"
       onPress={onPress}
-      containerStyle={styles.tabSlot}
+      containerStyle={styles.fill}
       style={styles.tab}
     >
-      <Animated.View style={[styles.pill, pillStyle]} />
-      <Animated.View style={iconPop}>
-        <Icon
-          size={21}
-          strokeWidth={active ? 2 : 1.6}
-          color={active ? colors.textPrimary : colors.textMuted}
-        />
+      <Animated.View style={[styles.tabFace, restStyle]}>
+        <Icon size={21} strokeWidth={1.6} color={colors.textMuted} />
+        <SWText variant="tabLabel" tone="textMuted">
+          {item.label}
+        </SWText>
       </Animated.View>
-      <SWText variant="tabLabel" tone={active ? 'textPrimary' : 'textMuted'}>
-        {item.label}
-      </SWText>
+      <Animated.View style={[styles.tabFace, styles.tabFaceActive, activeStyle]}>
+        <Animated.View style={iconPop}>
+          <Icon size={21} strokeWidth={2} color={colors.textPrimary} />
+        </Animated.View>
+        <SWText variant="tabLabel" tone="textPrimary">
+          {item.label}
+        </SWText>
+      </Animated.View>
     </PressableScale>
   );
 }
@@ -159,18 +205,27 @@ const stylesFor = themedStyles((colors) => ({
     flex: 1,
     alignSelf: 'stretch',
   },
+  fill: {
+    flex: 1,
+  },
   tab: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  tabFace: {
+    alignItems: 'center',
     gap: 2,
+  },
+  tabFaceActive: {
+    ...StyleSheet.absoluteFill,
+    justifyContent: 'center',
   },
   pill: {
     position: 'absolute',
     top: 6,
     bottom: 6,
-    left: 2,
-    right: 2,
+    left: 0,
     borderRadius: tokens.radius.full,
     backgroundColor: colors.sunken,
   },

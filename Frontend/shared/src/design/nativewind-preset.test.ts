@@ -35,7 +35,7 @@ describe('SnapWorth NativeWind preset', () => {
       expanded: `${tokens.breakpoint.expanded}px`,
     });
     expect(extension?.fontFamily).toMatchObject({
-      display: [tokens.typography.webFamily.serif],
+      display: [tokens.typography.webFamily.display],
       body: [tokens.typography.webFamily.sans],
     });
     expect(extension?.borderRadius).toMatchObject({

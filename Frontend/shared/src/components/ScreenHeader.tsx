@@ -83,7 +83,7 @@ export interface LargeTitleProps {
 }
 
 /**
- * The editorial title that opens a top-level tab, set in the serif. As the page scrolls it
+ * The bold title that opens a top-level tab. As the page scrolls it
  * drifts up a little slower than the content and fades, handing off to the compact title.
  */
 export function LargeTitle({ title, subtitle, trailing }: LargeTitleProps) {
@@ -108,17 +108,23 @@ export function LargeTitle({ title, subtitle, trailing }: LargeTitleProps) {
         register(y + height - tokens.spacing[6]);
       }}
     >
-      <Animated.View style={[styles.largeText, textStyle]}>
-        <SWText variant="displayTitle" accessibilityRole="header">
-          {title}
-        </SWText>
-        {subtitle ? (
+      {/* Title and actions share one line; the subtitle gets the full width beneath, so it
+          never wraps into a ragged second line beside the buttons. */}
+      <View style={styles.largeRow}>
+        <Animated.View style={[styles.largeText, textStyle]}>
+          <SWText variant="displayTitle" accessibilityRole="header" numberOfLines={1}>
+            {title}
+          </SWText>
+        </Animated.View>
+        {trailing}
+      </View>
+      {subtitle ? (
+        <Animated.View style={textStyle}>
           <SWText variant="bodySmall" tone="textMuted">
             {subtitle}
           </SWText>
-        ) : null}
-      </Animated.View>
-      {trailing}
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
@@ -153,15 +159,17 @@ const stylesFor = themedStyles(() => ({
     paddingHorizontal: tokens.spacing[2],
   },
   large: {
+    gap: tokens.spacing[1],
+    paddingTop: tokens.spacing[5],
+    paddingBottom: tokens.spacing[8],
+  },
+  largeRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: tokens.spacing[3],
-    paddingTop: tokens.spacing[4],
-    paddingBottom: tokens.spacing[6],
   },
   largeText: {
     flex: 1,
-    gap: tokens.spacing[1],
   },
 }));

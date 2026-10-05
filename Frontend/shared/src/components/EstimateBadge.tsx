@@ -105,7 +105,7 @@ const stylesFor = themedStyles((colors) => ({
     borderColor: colors.borderSubtle,
   },
   hero: {
-    gap: tokens.spacing[1],
+    gap: tokens.spacing[2],
   },
   inline: {
     alignItems: 'flex-end',

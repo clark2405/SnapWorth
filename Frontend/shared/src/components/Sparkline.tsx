@@ -7,7 +7,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 
 import { useTheme } from '../design';
 
@@ -16,7 +16,7 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 export interface SparklineProps {
   readonly values: readonly number[];
   readonly height?: number;
-  /** Draw the area under the line as a soft wash. */
+  /** Tint the area under the line with a flat, faint fill. */
   readonly filled?: boolean;
 }
 
@@ -67,14 +67,13 @@ export function Sparkline({ values, height = 56, filled = true }: SparklineProps
     <View style={{ height }} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
       {width > 0 ? (
         <Svg width={width} height={height}>
-          <Defs>
-            <LinearGradient id="spark-wash" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={colors.accent} stopOpacity={0.28} />
-              <Stop offset="1" stopColor={colors.accent} stopOpacity={0} />
-            </LinearGradient>
-          </Defs>
           {filled ? (
-            <AnimatedPath d={area} fill="url(#spark-wash)" animatedProps={areaProps} />
+            <AnimatedPath
+              d={area}
+              fill={colors.accent}
+              fillOpacity={0.08}
+              animatedProps={areaProps}
+            />
           ) : null}
           <AnimatedPath
             d={line}

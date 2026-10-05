@@ -28,6 +28,7 @@ import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../desi
 import { CompanionOrb, type CompanionMood } from './CompanionOrb';
 import { GlassSurface } from './GlassSurface';
 import { PressableScale } from './PressableScale';
+import { contentScrolling } from './scroll-signal';
 import { SWText, typeStyle } from './SWText';
 import { hideWebFocusOutline } from './TextField';
 
@@ -57,6 +58,8 @@ export interface CompanionProps {
 const orbSize = 50;
 const edgeGap = 16;
 const holdMs = 520;
+// Worthy introduces itself once per session; after that the orb stays quiet until asked.
+let hintShownThisSession = false;
 
 /**
  * Worthy, the AI companion. A living orb that floats above the content: tap it and it blooms
@@ -103,10 +106,13 @@ export function Companion({
     if (hidden) setOpen(false);
   }, [hidden, lift, reduceMotion]);
 
-  // One nudge per new hint, a beat after the screen settles.
+  // One nudge per session, a beat after the first screen settles.
   useEffect(() => {
-    if (!hint || hidden) return;
-    const show = setTimeout(() => setShowHint(true), 1100);
+    if (!hint || hidden || hintShownThisSession) return;
+    const show = setTimeout(() => {
+      hintShownThisSession = true;
+      setShowHint(true);
+    }, 1100);
     const hide = setTimeout(() => setShowHint(false), 5600);
     return () => {
       clearTimeout(show);
@@ -195,14 +201,20 @@ export function Companion({
 
   const gesture = Gesture.Exclusive(drag, hold, tap);
 
-  const orbStyle = useAnimatedStyle(() => ({
-    opacity: lift.value,
-    transform: [
-      { translateX: x.value },
-      { translateY: y.value + (1 - lift.value) * 80 },
-      { scale: 0.4 + lift.value * 0.6 - charge.value * 0.08 },
-    ],
-  }));
+  // While the page scrolls, the orb tucks most of the way into its edge so it never sits on
+  // top of what you are reading, then glides back out once the content settles.
+  const tuckDirection = side === 'right' ? 1 : -1;
+  const orbStyle = useAnimatedStyle(() => {
+    const tuck = contentScrolling.value;
+    return {
+      opacity: lift.value * (1 - tuck * 0.45),
+      transform: [
+        { translateX: x.value + tuck * tuckDirection * (orbSize * 0.6 + edgeGap) },
+        { translateY: y.value + (1 - lift.value) * 80 },
+        { scale: 0.4 + lift.value * 0.6 - charge.value * 0.08 - tuck * 0.12 },
+      ],
+    };
+  });
   const chargeStyle = useAnimatedStyle(() => ({
     opacity: charge.value,
     transform: [{ scale: 1 + charge.value * 0.35 }],
@@ -458,6 +470,7 @@ const stylesFor = themedStyles((colors, name) => ({
     left: 0,
     width: orbSize,
     height: orbSize,
+    borderRadius: orbSize / 2,
     shadowColor: tokens.shadow.dark,
     shadowOpacity: name === 'dark' ? 0.9 : 0.35,
     shadowRadius: 14,

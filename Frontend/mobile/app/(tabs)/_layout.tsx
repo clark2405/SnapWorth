@@ -1,6 +1,6 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 
-import { useTheme } from '@snapworth/shared/design';
+import { fontFaces, useTheme } from '@snapworth/shared/design';
 
 /**
  * The system tab bar: on iOS 26 it is Liquid Glass, floats over content, and minimises as you
@@ -12,9 +12,9 @@ export default function TabsLayout() {
 
   return (
     <NativeTabs
-      tintColor={colors.accent}
+      tintColor={colors.textPrimary}
       minimizeBehavior="onScrollDown"
-      labelStyle={{ fontSize: 10, fontWeight: '500' }}
+      labelStyle={{ fontSize: 10, fontFamily: fontFaces['500'] }}
     >
       <NativeTabs.Trigger name="feed">
         <NativeTabs.Trigger.Icon

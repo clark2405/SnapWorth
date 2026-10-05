@@ -181,11 +181,11 @@ const stylesFor = themedStyles((colors) => ({
     gap: tokens.spacing[2],
   },
   filters: {
-    marginBottom: tokens.spacing[6],
+    marginBottom: tokens.spacing[8],
   },
   highlightSection: {
-    gap: tokens.spacing[3],
-    marginBottom: tokens.spacing[6],
+    gap: tokens.spacing[4],
+    marginBottom: tokens.spacing[10],
   },
   highlightRow: {
     flexDirection: 'row',
@@ -217,7 +217,7 @@ const stylesFor = themedStyles((colors) => ({
     flexDirection: 'row',
     flexWrap: 'wrap',
     columnGap: tokens.spacing[4],
-    rowGap: tokens.spacing[6],
+    rowGap: tokens.spacing[8],
   },
   cell: {
     flexBasis: '46%',

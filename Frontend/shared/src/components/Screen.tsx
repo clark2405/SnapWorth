@@ -14,6 +14,9 @@ import Animated, {
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
+  withSequence,
+  withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,6 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../design';
 import { AmbientBackdrop, type AmbientBackdropProps } from './AmbientBackdrop';
 import { ScrollEdge } from './ScrollEdge';
+import { contentScrolling } from './scroll-signal';
 import { SWText } from './SWText';
 
 interface ScreenScrollState {
@@ -89,8 +93,23 @@ export function Screen({
   const [headerHeight, setHeaderHeight] = useState<number>(tokens.layout.headerCompact);
   const [refreshing, setRefreshing] = useState(false);
 
-  const onScroll = useAnimatedScrollHandler((event) => {
-    scrollY.value = event.contentOffset.y;
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (event, context: { lastY?: number }) => {
+      const y = event.contentOffset.y;
+      const delta = y - (context.lastY ?? y);
+      context.lastY = y;
+      scrollY.value = y;
+      // Reading on: step floating chrome aside, and bring it back ~0.7s after the page stops.
+      // Each event restarts the sequence, so it only returns once scrolling has settled.
+      if (delta > 2 && y > 40) {
+        contentScrolling.value = withSequence(
+          withTiming(1, { duration: tokens.motion.duration.base }),
+          withDelay(700, withTiming(0, { duration: tokens.motion.duration.reveal })),
+        );
+      } else if (delta < -6) {
+        contentScrolling.value = withTiming(0, { duration: tokens.motion.duration.stepTransition });
+      }
+    },
   });
 
   const refresh = useCallback(async () => {

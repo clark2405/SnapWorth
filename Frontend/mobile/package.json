@@ -12,12 +12,14 @@
     "build": "expo export --platform ios --output-dir dist/ios && expo export --platform android --output-dir dist/android"
   },
   "dependencies": {
+    "@expo-google-fonts/plus-jakarta-sans": "0.4.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-masked-view/masked-view": "0.3.2",
     "@snapworth/shared": "0.0.0",
     "expo": "57.0.26",
     "expo-blur": "57.0.3",
     "expo-constants": "57.0.20",
+    "expo-font": "57.0.4",
     "expo-glass-effect": "57.0.4",
     "expo-haptics": "57.0.3",
     "expo-linking": "57.0.11",

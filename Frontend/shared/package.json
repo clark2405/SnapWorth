@@ -10,6 +10,7 @@
   "exports": {
     "./components": "./src/components/index.ts",
     "./design": "./src/design/index.ts",
+    "./design/font-assets": "./src/design/font-assets.ts",
     "./design/nativewind-preset": "./src/design/nativewind-preset.ts",
     "./features/admin": "./src/features/admin/index.ts",
     "./features/auth": "./src/features/auth/index.ts",
@@ -29,8 +30,10 @@
     "./types": "./src/types/index.ts"
   },
   "peerDependencies": {
+    "@expo-google-fonts/plus-jakarta-sans": "0.4.2",
     "@react-native-masked-view/masked-view": "0.3.2",
     "expo-blur": "57.0.3",
+    "expo-font": "57.0.4",
     "expo-glass-effect": "57.0.4",
     "expo-haptics": "57.0.3",
     "lucide-react-native": "1.47.0",

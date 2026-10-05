@@ -1,11 +1,13 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
+import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { NavLinkProvider, RevealGate, ToastProvider } from '@snapworth/shared/components';
 import { ThemeProvider, useTheme } from '@snapworth/shared/design';
+import { useSnapWorthFonts } from '@snapworth/shared/design/font-assets';
 import { SplashView } from '@snapworth/shared/features/launch';
 
 import { CompanionHost } from '../src/CompanionHost';
@@ -33,6 +35,11 @@ function Shell() {
   // The first route mounts under the launch screen and starts its entrance as the splash clears.
   const [revealOpen, setRevealOpen] = useState(false);
   const [launched, setLaunched] = useState(false);
+  const fontsReady = useSnapWorthFonts();
+
+  // Hold on the bare canvas for the moment the bundled faces take to load, so no text ever
+  // renders in a fallback face and then jumps.
+  if (!fontsReady) return <View style={{ flex: 1, backgroundColor: colors.canvas }} />;
 
   return (
     <>

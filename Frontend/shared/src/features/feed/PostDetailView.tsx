@@ -224,8 +224,8 @@ const stylesFor = themedStyles((colors) => ({
   },
   body: {
     paddingHorizontal: tokens.layout.pageGutterCompact,
-    paddingTop: tokens.spacing[5],
-    gap: tokens.spacing[5],
+    paddingTop: tokens.spacing[6],
+    gap: tokens.spacing[8],
   },
   author: {
     flexDirection: 'row',
@@ -233,13 +233,13 @@ const stylesFor = themedStyles((colors) => ({
     gap: tokens.spacing[3],
   },
   question: {
-    gap: tokens.spacing[2],
+    gap: tokens.spacing[4],
   },
   verdict: {
-    gap: tokens.spacing[3],
+    gap: tokens.spacing[4],
   },
   discussion: {
-    gap: tokens.spacing[4],
+    gap: tokens.spacing[6],
   },
   comment: {
     flexDirection: 'row',
