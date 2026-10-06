@@ -17,7 +17,7 @@ import { SessionProvider } from '@snapworth/shared/features/session';
 import { TipsProvider } from '@snapworth/shared/features/tips';
 
 import { CompanionHost } from '../src/CompanionHost';
-import { renderNavLink, renderZoomTarget } from '../src/nav-bridge';
+import { renderNavLink, renderZoomSource, renderZoomTarget } from '../src/nav-bridge';
 import { deviceThemeStore } from '../src/theme-store';
 import { deviceTipStore } from '../src/tip-store';
 
@@ -35,7 +35,11 @@ export default function RootLayout() {
         <AppServicesProvider config={backend}>
           <ThemeProvider store={deviceThemeStore}>
             <ToastProvider>
-              <NavLinkProvider link={renderNavLink} target={renderZoomTarget}>
+              <NavLinkProvider
+                link={renderNavLink}
+                target={renderZoomTarget}
+                source={renderZoomSource}
+              >
                 <Shell />
               </NavLinkProvider>
             </ToastProvider>
