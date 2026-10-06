@@ -78,7 +78,7 @@ export function PriceRangeBar({
     <View
       style={styles.root}
       accessible
-      accessibilityLabel={`Likely between ${format(low)} and ${format(high)}. ${confidenceCopy[confidence]}.`}
+      accessibilityLabel={`Likely between ${format(low)} and ${format(high)}. ${confidenceCopy[confidence]}.${asking !== undefined ? ` Asking ${format(asking)}.` : ''}`}
     >
       <View style={styles.track} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
         <View style={styles.rail} />
@@ -126,14 +126,30 @@ export function PriceRangeBar({
             ))
           : null}
       </View>
-      {showConfidence ? (
-        <SWText
-          variant="labelSmall"
-          tone={confidence === 'low' ? 'warning' : 'textSecondary'}
-          align="center"
-        >
-          {confidenceCopy[confidence]}
-        </SWText>
+      {/* A key under the bar, aligned to its edges like the rest of the card: how sure the
+          estimate is on the left, and what the asking tick means on the right. */}
+      {showConfidence || asking !== undefined ? (
+        <View style={styles.legend}>
+          {showConfidence ? (
+            <SWText
+              variant="labelSmall"
+              tone={confidence === 'low' ? 'warning' : 'textSecondary'}
+              style={styles.legendConfidence}
+            >
+              {confidenceCopy[confidence]}
+            </SWText>
+          ) : (
+            <View />
+          )}
+          {asking !== undefined ? (
+            <View style={styles.askingKey}>
+              <View style={styles.askingSwatch} />
+              <SWText variant="labelSmall" tone="textSecondary">
+                Asking {format(asking)}
+              </SWText>
+            </View>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );
@@ -161,6 +177,26 @@ const stylesFor = themedStyles((colors) => ({
     position: 'absolute',
     top: 0,
     width: endWidth,
+  },
+  legend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: tokens.spacing[3],
+  },
+  legendConfidence: {
+    flexShrink: 1,
+  },
+  askingKey: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing[1] + 2,
+  },
+  askingSwatch: {
+    width: 2,
+    height: 12,
+    borderRadius: 1,
+    backgroundColor: colors.textPrimary,
   },
   band: {
     position: 'absolute',

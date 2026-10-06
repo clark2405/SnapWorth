@@ -7,7 +7,7 @@ import {
   BottomBar,
   Button,
   ChoiceChips,
-  CompanionOrb,
+  Worthy,
   hideWebFocusOutline,
   NavHeader,
   Overline,
@@ -91,8 +91,12 @@ function CompanionChat({ initialQuestion, onBack, onUseListing }: CompanionChatV
   const scroller = useRef<ScrollView>(null);
   const counter = useRef(0);
   const asked = useRef(false);
+  // Follow the conversation as it grows (a reply types itself out, then its card rises in),
+  // unless the person has scrolled up to reread something.
+  const following = useRef(true);
 
   const ask = useCallback((question: string) => {
+    following.current = true;
     counter.current += 1;
     const id = `${counter.current}`;
     setMessages((current) => [
@@ -115,11 +119,6 @@ function CompanionChat({ initialQuestion, onBack, onUseListing }: CompanionChatV
     asked.current = true;
     ask(initialQuestion ?? 'What can you do?');
   }, [ask, initialQuestion]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => scroller.current?.scrollToEnd({ animated: true }), 80);
-    return () => clearTimeout(timer);
-  }, [messages, thinking]);
 
   const submit = () => {
     const question = draft.trim();
@@ -144,6 +143,10 @@ function CompanionChat({ initialQuestion, onBack, onUseListing }: CompanionChatV
               selectionColor={colors.accent}
               returnKeyType="send"
               onSubmitEditing={submit}
+              onFocus={() => {
+                following.current = true;
+                scroller.current?.scrollToEnd({ animated: true });
+              }}
               style={[
                 styles.input,
                 typeStyle('bodyLarge'),
@@ -170,9 +173,18 @@ function CompanionChat({ initialQuestion, onBack, onUseListing }: CompanionChatV
         contentContainerStyle={styles.thread}
         showsVerticalScrollIndicator={false}
         keyboardDismissMode="interactive"
+        scrollEventThrottle={32}
+        onScroll={(event) => {
+          const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+          following.current =
+            contentOffset.y + layoutMeasurement.height >= contentSize.height - followSlack;
+        }}
+        onContentSizeChange={() => {
+          if (following.current) scroller.current?.scrollToEnd({ animated: true });
+        }}
       >
         <Animated.View entering={FadeIn.duration(500)} style={styles.intro}>
-          <CompanionOrb size={72} mood={thinking ? 'thinking' : 'idle'} />
+          <Worthy size={72} mood={thinking ? 'thinking' : 'idle'} />
           <SWText variant="companion" align="center">
             Worthy
           </SWText>
@@ -204,7 +216,7 @@ function CompanionChat({ initialQuestion, onBack, onUseListing }: CompanionChatV
 
         {thinking ? (
           <Animated.View entering={FadeIn} style={styles.thinking}>
-            <CompanionOrb size={28} mood="thinking" />
+            <Worthy size={28} mood="thinking" />
             <SWText variant="labelMedium" tone="textMuted">
               Checking recent sales…
             </SWText>
@@ -317,6 +329,9 @@ function ReplyCardView({
   );
 }
 
+/** How close to the bottom still counts as reading the latest reply. */
+const followSlack = 96;
+
 const stylesFor = themedStyles((colors) => ({
   noPad: {
     paddingHorizontal: 0,
@@ -343,9 +358,9 @@ const stylesFor = themedStyles((colors) => ({
     borderRadius: tokens.radius.large,
     borderBottomRightRadius: 6,
   },
+  // Replies run the full column so their cards line up with the person's bubbles on the right.
   worthy: {
     gap: tokens.spacing[3],
-    paddingRight: tokens.spacing[4],
   },
   thinking: {
     flexDirection: 'row',
