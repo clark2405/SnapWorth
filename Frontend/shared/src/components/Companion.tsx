@@ -56,6 +56,13 @@ export interface CompanionProps {
 }
 
 const orbSize = 56;
+/** Worthy's size while tucked, as a share of its resting size. */
+const tuckedScale = 0.78;
+/**
+ * How far it slides into the edge while tucked, as a share of its size: enough that the shrunken
+ * Worthy keeps 45% of itself, eye included, on screen (0.5 + 0.05 × tuckedScale).
+ */
+const tuckShift = 0.5 + 0.05 * tuckedScale;
 const edgeGap = 16;
 const holdMs = 520;
 // Worthy introduces itself once per session; after that the orb stays quiet until asked.
@@ -201,19 +208,19 @@ export function Companion({
 
   const gesture = Gesture.Exclusive(drag, hold, tap);
 
-  // While the page scrolls, Worthy tucks almost all the way behind its edge, leaning so just
-  // its eye peeks out, so it never sits on what you are reading; it slides back once the
-  // content settles.
+  // While the page scrolls, Worthy shrinks a little and tucks into its edge, but never leaves:
+  // about half of it, eye included, always peeks out, so it stays out of the way of what you
+  // are reading without disappearing. It slides back out once the content settles.
   const tuckDirection = side === 'right' ? 1 : -1;
   const orbStyle = useAnimatedStyle(() => {
     const tuck = contentScrolling.value;
     return {
       opacity: lift.value,
       transform: [
-        { translateX: x.value + tuck * tuckDirection * (orbSize * 0.78 + edgeGap) },
+        { translateX: x.value + tuck * tuckDirection * (orbSize * tuckShift + edgeGap) },
         { translateY: y.value + (1 - lift.value) * 80 },
-        { rotate: `${tuck * tuckDirection * -16}deg` },
-        { scale: 0.4 + lift.value * 0.6 - charge.value * 0.08 - tuck * 0.1 },
+        { rotate: `${tuck * tuckDirection * -10}deg` },
+        { scale: 0.4 + lift.value * 0.6 - charge.value * 0.08 - tuck * (1 - tuckedScale) },
       ],
     };
   });
