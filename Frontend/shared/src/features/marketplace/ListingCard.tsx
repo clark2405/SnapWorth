@@ -1,21 +1,18 @@
+import { CircleCheck, TrendingDown, TrendingUp, type LucideIcon } from 'lucide-react-native';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import {
   LikeButton,
   Photo,
   SWText,
+  Tag,
   ZoomLink,
   useToast,
   type NavLinkMenuItem,
+  type TagTone,
 } from '../../components';
-import {
-  themedStyles,
-  tokens,
-  useTheme,
-  useThemedStyles,
-  type SemanticColorName,
-} from '../../design';
+import { themedStyles, tokens, useThemedStyles } from '../../design';
 import type { VoteChoice } from '../../types';
 import { formatPeso, type PreviewListing } from '../preview/sample-data';
 
@@ -25,11 +22,11 @@ const verdictLabel: Record<VoteChoice, string> = {
   too_low: 'Too Low',
 };
 
-// Consistent with the vote system elsewhere: the dot and label always share one hue.
-const verdictTone: Record<VoteChoice, SemanticColorName> = {
-  too_high: 'voteHigh',
-  just_right: 'voteRight',
-  too_low: 'voteLow',
+// The community verdict is a status, so it wears a soft tonal chip, never a bright colour.
+const verdictChip: Record<VoteChoice, { tone: TagTone; icon: LucideIcon }> = {
+  too_high: { tone: 'warn', icon: TrendingUp },
+  just_right: { tone: 'mint', icon: CircleCheck },
+  too_low: { tone: 'sand', icon: TrendingDown },
 };
 
 export interface ListingCardProps {
@@ -40,7 +37,6 @@ export interface ListingCardProps {
 }
 
 export function ListingCard({ listing, onOpen, onMessageSeller }: ListingCardProps) {
-  const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
   const [saved, setSaved] = useState(false);
@@ -83,7 +79,7 @@ export function ListingCard({ listing, onOpen, onMessageSeller }: ListingCardPro
           source={listing.photo}
           label={listing.photoLabel}
           aspectRatio={4 / 5}
-          radius={tokens.radius.large}
+          radius={tokens.radius.medium}
         />
         <View style={styles.like}>
           <LikeButton
@@ -97,24 +93,40 @@ export function ListingCard({ listing, onOpen, onMessageSeller }: ListingCardPro
         </View>
       </View>
       <View style={styles.cardBody}>
-        <SWText variant="bodyCompact" tone="textSecondary" numberOfLines={2}>
+        <SWText
+          variant="bodyCompact"
+          tone="textSecondary"
+          numberOfLines={2}
+          style={styles.cardTitle}
+        >
           {listing.title}
         </SWText>
         <SWText variant="priceMedium">{formatPeso(listing.askingPrice)}</SWText>
         <View style={styles.verdictRow}>
-          <View style={[styles.dot, { backgroundColor: colors[verdictTone[listing.verdict]] }]} />
-          <SWText variant="labelSmall" tone={verdictTone[listing.verdict]}>
-            {verdict}
-          </SWText>
+          <Tag
+            label={verdict}
+            tone={verdictChip[listing.verdict].tone}
+            icon={verdictChip[listing.verdict].icon}
+          />
         </View>
       </View>
     </ZoomLink>
   );
 }
 
-const stylesFor = themedStyles(() => ({
+const stylesFor = themedStyles((colors, name) => ({
   card: {
     gap: tokens.spacing[3],
+    padding: tokens.spacing[2],
+    paddingBottom: tokens.spacing[3],
+    borderRadius: tokens.radius.large,
+    backgroundColor: colors.surface,
+    borderWidth: name === 'dark' ? StyleSheet.hairlineWidth : 0,
+    borderColor: colors.borderSubtle,
+    shadowColor: tokens.shadow[name],
+    shadowOpacity: 1,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
   },
   photoWrap: {
     position: 'relative',
@@ -126,16 +138,14 @@ const stylesFor = themedStyles(() => ({
   },
   cardBody: {
     gap: tokens.spacing['0.5'],
+    paddingHorizontal: tokens.spacing[2],
+  },
+  // Two lines reserved for every title, so prices line up across the grid.
+  cardTitle: {
+    minHeight: tokens.typography.style.bodyCompact.lineHeight * 2,
   },
   verdictRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.spacing[1],
-    marginTop: tokens.spacing['0.5'],
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    marginTop: tokens.spacing[1],
   },
 }));

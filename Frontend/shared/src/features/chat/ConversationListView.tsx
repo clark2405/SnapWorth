@@ -1,15 +1,20 @@
-import { MessageSquare } from 'lucide-react-native';
+import { Archive, MessageSquare, MessagesSquare } from 'lucide-react-native';
+import { useState } from 'react';
 import { View } from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import {
   Avatar,
   Divider,
+  Surface,
   EmptyState,
   LargeTitle,
   Photo,
   Reveal,
   Screen,
+  SegmentedControl,
   SWText,
+  Tag,
   ZoomLink,
 } from '../../components';
 import { themedStyles, tokens, useThemedStyles } from '../../design';
@@ -28,21 +33,25 @@ export function ConversationListView({
   onBrowseMarket,
 }: ConversationListViewProps) {
   const styles = useThemedStyles(stylesFor);
-  const conversations = previewConversations;
-  const unread = conversations.reduce((total, conversation) => total + conversation.unread, 0);
+  const [view, setView] = useState<'open' | 'past'>('open');
+  const open = previewConversations.filter((conversation) => !conversation.closed);
+  const past = previewConversations.filter((conversation) => conversation.closed);
+  const conversations = view === 'open' ? open : past;
+  const unread = open.reduce((total, conversation) => total + conversation.unread, 0);
 
   return (
     <Screen
       clearTabBar
-      ambient="quiet"
+      ambient="chat"
       onRefresh={() => new Promise((resolve) => setTimeout(resolve, 900))}
     >
       <LargeTitle
         title="Chats"
-        subtitle={unread > 0 ? `${unread} unread` : 'All caught up'}
+        overlineIcon={unread > 0 ? MessagesSquare : undefined}
+        overline={unread > 0 ? `${unread} unread` : undefined}
         trailing={<ProfileButton onPress={onOpenProfile} />}
       />
-      {conversations.length === 0 ? (
+      {previewConversations.length === 0 ? (
         <EmptyState
           icon={MessageSquare}
           title="No conversations yet"
@@ -51,16 +60,44 @@ export function ConversationListView({
           onAction={onBrowseMarket}
         />
       ) : (
-        <View>
-          {conversations.map((conversation, index) => (
-            <Reveal key={conversation.id} index={index}>
-              {index > 0 ? <Divider style={styles.divider} /> : null}
-              <ConversationRow
-                conversation={conversation}
-                onPress={() => onOpenConversation?.(conversation.id)}
+        <View style={styles.body}>
+          <SegmentedControl
+            options={[
+              { key: 'open', label: 'Open' },
+              { key: 'past', label: 'Past' },
+            ]}
+            value={view}
+            onChange={setView}
+          />
+          <Animated.View
+            key={view}
+            entering={FadeIn.duration(tokens.motion.duration.base)}
+            exiting={FadeOut.duration(tokens.motion.duration.fast)}
+          >
+            {conversations.length === 0 ? (
+              <EmptyState
+                icon={view === 'open' ? MessageSquare : Archive}
+                title={view === 'open' ? 'No open chats' : 'Nothing here yet'}
+                body={
+                  view === 'open'
+                    ? 'Message a seller from any listing to start one.'
+                    : 'Chats about sold or archived items move here.'
+                }
               />
-            </Reveal>
-          ))}
+            ) : (
+              <Surface padding={tokens.spacing[2]}>
+                {conversations.map((conversation, index) => (
+                  <Reveal key={conversation.id} index={index}>
+                    {index > 0 ? <Divider style={styles.divider} /> : null}
+                    <ConversationRow
+                      conversation={conversation}
+                      onPress={() => onOpenConversation?.(conversation.id)}
+                    />
+                  </Reveal>
+                ))}
+              </Surface>
+            )}
+          </Animated.View>
         </View>
       )}
     </Screen>
@@ -88,7 +125,7 @@ function ConversationRow({
       style={styles.row}
     >
       <View style={styles.media}>
-        <Avatar source={conversation.with.avatar} name={conversation.with.handle} size={52} />
+        <Avatar source={conversation.with.avatar} name={conversation.with.handle} size={48} />
         <View style={styles.itemBadge}>
           <Photo
             source={conversation.itemPhoto}
@@ -107,9 +144,14 @@ function ConversationRow({
             {conversation.sentAt}
           </SWText>
         </View>
-        <SWText variant="caption" tone="textMuted" numberOfLines={1}>
-          {conversation.itemTitle}
-        </SWText>
+        <View style={styles.itemLine}>
+          <SWText variant="caption" tone="textMuted" numberOfLines={1} style={styles.preview}>
+            {conversation.itemTitle}
+          </SWText>
+          {conversation.closed ? (
+            <Tag label={conversation.closed === 'sold' ? 'Sold' : 'Archived'} tone="grave" />
+          ) : null}
+        </View>
         <View style={styles.bottomLine}>
           <SWText
             variant={unread ? 'label' : 'bodyCompact'}
@@ -133,19 +175,28 @@ function ConversationRow({
 }
 
 const stylesFor = themedStyles((colors) => ({
+  body: {
+    gap: tokens.spacing[4],
+  },
+  itemLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing[2],
+  },
   divider: {
-    marginLeft: tokens.layout.thumbnail - tokens.spacing[2] + tokens.spacing[4],
+    marginLeft: tokens.spacing[3] + 48 + tokens.spacing[3],
+    marginRight: tokens.spacing[3],
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: tokens.spacing[4],
-    paddingVertical: tokens.spacing[4],
+    gap: tokens.spacing[3],
+    padding: tokens.spacing[3],
     borderRadius: tokens.radius.medium,
   },
   media: {
-    width: 52,
-    height: 52,
+    width: 48,
+    height: 48,
   },
   itemBadge: {
     position: 'absolute',
@@ -153,7 +204,7 @@ const stylesFor = themedStyles((colors) => ({
     bottom: -tokens.spacing[1],
     borderRadius: tokens.radius.small,
     borderWidth: tokens.border.focus,
-    borderColor: colors.canvas,
+    borderColor: colors.surface,
     overflow: 'hidden',
   },
   itemThumb: {
@@ -180,7 +231,7 @@ const stylesFor = themedStyles((colors) => ({
   preview: {
     flex: 1,
   },
-  // Unread count is informational, so it stays small; the accent marks "needs you".
+  // The unread count is the urgent number on this screen, so it alone may wear the accent.
   badge: {
     minWidth: tokens.spacing[5],
     paddingHorizontal: tokens.spacing[1],

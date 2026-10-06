@@ -1,4 +1,4 @@
-import { Camera, PackageSearch } from 'lucide-react-native';
+import { BadgePercent, Camera, PackageSearch } from 'lucide-react-native';
 import { useState } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -10,6 +10,7 @@ import {
   EmptyState,
   EstimateBadge,
   LargeTitle,
+  Overline,
   Photo,
   Reveal,
   Screen,
@@ -25,11 +26,23 @@ import {
 } from '../preview/sample-data';
 import { ProfileButton } from '../profile/ProfileButton';
 import { ListingCard } from './ListingCard';
+import {
+  areaLabel,
+  defaultMarketFilters,
+  FilterPill,
+  filterIcons,
+  LocationFilterSheet,
+  matchesPriceAndPlace,
+  PriceFilterSheet,
+  priceLabel,
+  type MarketFilters,
+} from './MarketFilters';
 
 export interface MarketplaceViewProps {
   readonly onOpenListing?: (listingId: string) => void;
   readonly onSell?: () => void;
-  readonly onFilter?: (filter: 'category' | 'price' | 'location') => void;
+  /** Every change to category, price range or location, for the listing query to follow. */
+  readonly onFiltersChange?: (filters: MarketFilters) => void;
   readonly onOpenProfile?: () => void;
 }
 
@@ -51,33 +64,46 @@ function impliedEstimate(listing: PreviewListing): number {
 export function MarketplaceView({
   onOpenListing,
   onSell,
-  onFilter,
+  onFiltersChange,
   onOpenProfile,
 }: MarketplaceViewProps) {
   const styles = useThemedStyles(stylesFor);
-  const [category, setCategory] = useState('all');
+  const [filters, setFilters] = useState<MarketFilters>(defaultMarketFilters);
+  const [openSheet, setOpenSheet] = useState<'price' | 'location' | null>(null);
 
-  const filtered =
-    category === 'all'
-      ? previewListings
-      : previewListings.filter((listing) => categoryByListing[listing.id] === category);
+  const update = (change: Partial<MarketFilters>) => {
+    const next = { ...filters, ...change };
+    setFilters(next);
+    onFiltersChange?.(next);
+  };
 
-  const underEstimate = previewListings
-    .filter((listing) => listing.verdict === 'too_low')
-    .slice(0, 2);
+  const matching = (candidate: MarketFilters) =>
+    previewListings.filter(
+      (listing) =>
+        (candidate.category === 'all' || categoryByListing[listing.id] === candidate.category) &&
+        matchesPriceAndPlace(listing, candidate),
+    );
+
+  const filtered = matching(filters);
+  const narrowed =
+    filters.minPrice !== null || filters.maxPrice !== null || filters.area !== 'anywhere';
+
+  // Steals sit above the grid only while browsing everything; once narrowed, the grid is the answer.
+  const underEstimate = narrowed
+    ? []
+    : previewListings.filter((listing) => listing.verdict === 'too_low').slice(0, 2);
 
   return (
     <Screen
       clearTabBar
-      ambient="value"
+      ambient="market"
       onRefresh={() => new Promise<void>((resolve) => setTimeout(resolve, 900))}
     >
       <LargeTitle
         title="Market"
-        subtitle="Seller-set prices, checked by the community."
         trailing={
           <View style={styles.actions}>
-            <Button label="Sell" size="small" variant="accent" icon={Camera} onPress={onSell} />
+            <Button label="Sell" size="small" variant="secondary" icon={Camera} onPress={onSell} />
             <ProfileButton onPress={onOpenProfile} />
           </View>
         }
@@ -86,20 +112,31 @@ export function MarketplaceView({
       <Reveal index={0} style={styles.filters}>
         <ChoiceChips
           options={previewMarketCategories}
-          value={category}
+          value={filters.category}
           scroll
-          onChange={(key) => {
-            setCategory(key);
-            onFilter?.('category');
-          }}
+          onChange={(key) => update({ category: key })}
         />
+        <View style={styles.pills}>
+          <FilterPill
+            icon={filterIcons.price}
+            placeholder="Price"
+            value={priceLabel(filters.minPrice, filters.maxPrice)}
+            onOpen={() => setOpenSheet('price')}
+            onClear={() => update({ minPrice: null, maxPrice: null })}
+          />
+          <FilterPill
+            icon={filterIcons.location}
+            placeholder="Location"
+            value={areaLabel(filters.area, filters.radiusKm)}
+            onOpen={() => setOpenSheet('location')}
+            onClear={() => update({ area: 'anywhere' })}
+          />
+        </View>
       </Reveal>
 
       {underEstimate.length > 0 ? (
         <Reveal index={1} style={styles.highlightSection}>
-          <SWText variant="overline" tone="textMuted">
-            Priced under estimate
-          </SWText>
+          <Overline icon={BadgePercent} label="Steals · Under estimate" />
           <View style={styles.highlightRow}>
             {underEstimate.map((listing) => (
               <UnderEstimateCard
@@ -116,7 +153,17 @@ export function MarketplaceView({
         <EmptyState
           icon={PackageSearch}
           title="Nothing here yet"
-          body="Try a different category, or check back soon."
+          body={
+            narrowed
+              ? 'Nothing matches these filters. Widen the price range or location.'
+              : 'Try a different category, or check back soon.'
+          }
+          actionLabel={narrowed ? 'Clear filters' : undefined}
+          onAction={
+            narrowed
+              ? () => update({ minPrice: null, maxPrice: null, area: 'anywhere' })
+              : undefined
+          }
         />
       ) : (
         <View style={styles.grid}>
@@ -133,8 +180,31 @@ export function MarketplaceView({
               <ListingCard listing={listing} onOpen={() => onOpenListing?.(listing.id)} />
             </Animated.View>
           ))}
+          {/* An odd count keeps its last card at half width instead of stretching. */}
+          {filtered.length % 2 === 1 ? <View style={styles.cell} /> : null}
         </View>
       )}
+
+      <PriceFilterSheet
+        visible={openSheet === 'price'}
+        filters={filters}
+        countFor={(minPrice, maxPrice) => matching({ ...filters, minPrice, maxPrice }).length}
+        onClose={() => setOpenSheet(null)}
+        onApply={(minPrice, maxPrice) => {
+          update({ minPrice, maxPrice });
+          setOpenSheet(null);
+        }}
+      />
+      <LocationFilterSheet
+        visible={openSheet === 'location'}
+        filters={filters}
+        countFor={(area, radiusKm) => matching({ ...filters, area, radiusKm }).length}
+        onClose={() => setOpenSheet(null)}
+        onApply={(area, radiusKm) => {
+          update({ area, radiusKm });
+          setOpenSheet(null);
+        }}
+      />
     </Screen>
   );
 }
@@ -181,11 +251,17 @@ const stylesFor = themedStyles((colors) => ({
     gap: tokens.spacing[2],
   },
   filters: {
-    marginBottom: tokens.spacing[6],
+    gap: tokens.spacing[3],
+    marginBottom: tokens.spacing[8],
+  },
+  pills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: tokens.spacing[2],
   },
   highlightSection: {
-    gap: tokens.spacing[3],
-    marginBottom: tokens.spacing[6],
+    gap: tokens.spacing[4],
+    marginBottom: tokens.spacing[10],
   },
   highlightRow: {
     flexDirection: 'row',
@@ -200,9 +276,9 @@ const stylesFor = themedStyles((colors) => ({
     gap: tokens.spacing[3],
     padding: tokens.spacing[3],
     borderRadius: tokens.radius.large,
-    backgroundColor: colors.estimateSurface,
+    backgroundColor: colors.surface,
     borderWidth: tokens.border.hairline,
-    borderColor: colors.estimateBorder,
+    borderColor: colors.borderSubtle,
   },
   highlightPhoto: {
     width: 64,
@@ -216,8 +292,8 @@ const stylesFor = themedStyles((colors) => ({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    columnGap: tokens.spacing[4],
-    rowGap: tokens.spacing[6],
+    columnGap: tokens.spacing[3],
+    rowGap: tokens.spacing[4],
   },
   cell: {
     flexBasis: '46%',

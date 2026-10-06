@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { themedStyles, tokens, useTheme, useThemedStyles, type SemanticColorName } from '../design';
+import { Overline } from './Overline';
 import { PressableScale } from './PressableScale';
 import { SWText } from './SWText';
 
@@ -82,19 +83,18 @@ export function ListRow({
 export function ListGroup({
   children,
   title,
+  icon,
 }: {
   readonly children: ReactNode;
   readonly title?: string;
+  /** A thin line icon leading the group's overline. */
+  readonly icon?: LucideIcon;
 }) {
   const styles = useThemedStyles(stylesFor);
   const rows = Array.isArray(children) ? children.filter(Boolean) : [children];
   return (
     <View style={styles.groupWrap}>
-      {title ? (
-        <SWText variant="overline" tone="textMuted" style={styles.groupTitle}>
-          {title}
-        </SWText>
-      ) : null}
+      {title ? <Overline label={title} icon={icon} style={styles.groupTitle} /> : null}
       <View style={styles.group}>
         {rows.map((row, index) => (
           <View key={index}>

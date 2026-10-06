@@ -49,7 +49,7 @@ export const snapWorthNativeWindPreset = {
     extend: {
       colors: colorTheme,
       fontFamily: {
-        display: [tokens.typography.webFamily.serif],
+        display: [tokens.typography.webFamily.display],
         body: [tokens.typography.webFamily.sans],
         rounded: [tokens.typography.webFamily.rounded],
       },
@@ -60,7 +60,7 @@ export const snapWorthNativeWindPreset = {
         ]),
       ),
       letterSpacing: {
-        overline: `${typography.overline.letterSpacingEm}em`,
+        overline: px(typography.overline.letterSpacing),
       },
       spacing: Object.fromEntries(
         Object.entries(tokens.spacing).map(([name, value]) => [name, px(value)]),

@@ -280,7 +280,7 @@ export function SearchView({
             onPress={leave}
             style={styles.cancel}
           >
-            <SWText variant="label" tone="accent">
+            <SWText variant="label" tone="textSecondary">
               Cancel
             </SWText>
           </PressableScale>
@@ -342,7 +342,7 @@ export function SearchView({
                       hitSlop={tokens.spacing[2]}
                       onPress={() => setRecents([])}
                     >
-                      <SWText variant="label" tone="accent">
+                      <SWText variant="label" tone="textSecondary">
                         Clear
                       </SWText>
                     </PressableScale>
@@ -637,10 +637,7 @@ const stylesFor = themedStyles((colors) => ({
     aspectRatio: 4 / 3,
   },
   tileText: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: tokens.spacing[2],
+    gap: 2,
   },
   count: {
     marginBottom: tokens.spacing[1],

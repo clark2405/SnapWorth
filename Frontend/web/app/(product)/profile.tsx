@@ -9,7 +9,10 @@ export default function ProfileRoute() {
     <ProfileView
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/feed'))}
       onOpen={(destination) => {
-        // Only moderation has a screen so far; the other settings are not built yet.
+        // Settings screens (notifications, price alerts, help) are not built yet.
+        if (destination === 'listings') router.push('/history?filter=listed');
+        if (destination === 'votes') router.push('/votes');
+        if (destination === 'conversations') router.push('/chat');
         if (destination === 'moderation') router.push('/admin/review');
         if (destination === 'introduction') router.push('/onboarding?replay=1');
       }}

@@ -7,7 +7,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 
 import { useTheme } from '../design';
 
@@ -16,13 +16,16 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 export interface SparklineProps {
   readonly values: readonly number[];
   readonly height?: number;
-  /** Draw the area under the line as a soft wash. */
+  /** Tint the area under the line with a flat, faint fill. */
   readonly filled?: boolean;
+  /** Line colour; defaults to ink. Pass the slab's ink when drawn on a feature slab. */
+  readonly color?: string;
 }
 
 /** A smooth trend line that draws itself left to right, like a pen stroke, when it appears. */
-export function Sparkline({ values, height = 56, filled = true }: SparklineProps) {
+export function Sparkline({ values, height = 56, filled = true, color }: SparklineProps) {
   const { colors } = useTheme();
+  const stroke = color ?? colors.textPrimary;
   const reduceMotion = useReducedMotion();
   const [width, setWidth] = useState(0);
   const draw = useSharedValue(reduceMotion ? 1 : 0);
@@ -67,18 +70,12 @@ export function Sparkline({ values, height = 56, filled = true }: SparklineProps
     <View style={{ height }} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
       {width > 0 ? (
         <Svg width={width} height={height}>
-          <Defs>
-            <LinearGradient id="spark-wash" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={colors.accent} stopOpacity={0.28} />
-              <Stop offset="1" stopColor={colors.accent} stopOpacity={0} />
-            </LinearGradient>
-          </Defs>
           {filled ? (
-            <AnimatedPath d={area} fill="url(#spark-wash)" animatedProps={areaProps} />
+            <AnimatedPath d={area} fill={stroke} fillOpacity={0.08} animatedProps={areaProps} />
           ) : null}
           <AnimatedPath
             d={line}
-            stroke={colors.accent}
+            stroke={stroke}
             strokeWidth={2.2}
             strokeLinecap="round"
             fill="none"

@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -14,6 +22,9 @@ import Animated, {
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
+  withSequence,
+  withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,6 +32,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../design';
 import { AmbientBackdrop, type AmbientBackdropProps } from './AmbientBackdrop';
 import { ScrollEdge } from './ScrollEdge';
+import { contentScrolling } from './scroll-signal';
 import { SWText } from './SWText';
 
 interface ScreenScrollState {
@@ -48,7 +60,7 @@ export interface ScreenProps {
   /** Extra bottom room so content can scroll clear of the floating tab bar. */
   readonly clearTabBar?: boolean;
   readonly contentStyle?: StyleProp<ViewStyle>;
-  /** A soft light behind the top of the screen. Tab roots use it; flows stay quiet. */
+  /** Which area's warm blobs drift behind the screen. Every screen has them; tabs re-tint. */
   readonly ambient?: AmbientBackdropProps['mood'];
   /** Enables pull-to-refresh. Resolve the promise when the new content is in. */
   readonly onRefresh?: () => Promise<void> | void;
@@ -59,6 +71,8 @@ export interface ScreenProps {
   readonly bleedTop?: boolean;
   /** Drops the canvas so a screen can fade its own background in over the one beneath. */
   readonly transparent?: boolean;
+  /** Lets a screen scroll itself, e.g. to bring a just-posted comment into view. */
+  readonly scrollRef?: RefObject<Animated.ScrollView | null>;
 }
 
 /**
@@ -73,10 +87,11 @@ export function Screen({
   scroll = true,
   clearTabBar = false,
   contentStyle,
-  ambient = 'quiet',
+  ambient = 'calm',
   onRefresh,
   bleedTop = false,
   transparent = false,
+  scrollRef,
 }: ScreenProps) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -89,8 +104,23 @@ export function Screen({
   const [headerHeight, setHeaderHeight] = useState<number>(tokens.layout.headerCompact);
   const [refreshing, setRefreshing] = useState(false);
 
-  const onScroll = useAnimatedScrollHandler((event) => {
-    scrollY.value = event.contentOffset.y;
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (event, context: { lastY?: number }) => {
+      const y = event.contentOffset.y;
+      const delta = y - (context.lastY ?? y);
+      context.lastY = y;
+      scrollY.value = y;
+      // Reading on: step floating chrome aside, and bring it back ~0.7s after the page stops.
+      // Each event restarts the sequence, so it only returns once scrolling has settled.
+      if (delta > 2 && y > 40) {
+        contentScrolling.value = withSequence(
+          withTiming(1, { duration: tokens.motion.duration.base }),
+          withDelay(700, withTiming(0, { duration: tokens.motion.duration.reveal })),
+        );
+      } else if (delta < -6) {
+        contentScrolling.value = withTiming(0, { duration: tokens.motion.duration.stepTransition });
+      }
+    },
   });
 
   const refresh = useCallback(async () => {
@@ -113,17 +143,20 @@ export function Screen({
   const clearance = insets.top + (header ? headerHeight : 0);
   const extraTop = Number(StyleSheet.flatten(contentStyle)?.paddingTop ?? 0);
   const topRoom = bleedTop ? extraTop : clearance + extraTop;
+  // The web draws its own floating tab bar with the Snap button above it, so it needs more room.
+  const tabBarRoom =
+    Platform.OS === 'web'
+      ? tokens.layout.floatingTabBarClearance
+      : tokens.layout.nativeTabBarClearance;
   const bottomRoom =
-    (clearTabBar ? tokens.layout.nativeTabBarClearance : 0) +
-    (footer ? footerHeight : insets.bottom) +
-    tokens.spacing[8];
+    (clearTabBar ? tabBarRoom : 0) + (footer ? footerHeight : insets.bottom) + tokens.spacing[8];
 
   const body = [styles.content, contentStyle, { paddingTop: topRoom, paddingBottom: bottomRoom }];
 
   return (
     <ScreenScrollContext.Provider value={context}>
       <View style={[styles.root, transparent ? styles.clear : null]}>
-        <AmbientBackdrop mood={ambient} />
+        {transparent ? null : <AmbientBackdrop mood={ambient} />}
         <KeyboardAvoidingView
           style={styles.fill}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -131,6 +164,7 @@ export function Screen({
           <View style={styles.column}>
             {scroll ? (
               <Animated.ScrollView
+                ref={scrollRef}
                 style={styles.fill}
                 contentContainerStyle={body}
                 onScroll={onScroll}

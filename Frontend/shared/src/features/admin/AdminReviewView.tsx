@@ -121,7 +121,7 @@ function HeldCard({
         />
         <Button
           label="Approve"
-          variant="primary"
+          variant="secondary"
           icon={Check}
           onPress={() => onDecide('approve')}
           containerStyle={styles.action}

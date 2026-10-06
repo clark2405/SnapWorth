@@ -28,6 +28,7 @@ import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../desi
 import { CompanionOrb, type CompanionMood } from './CompanionOrb';
 import { GlassSurface } from './GlassSurface';
 import { PressableScale } from './PressableScale';
+import { contentScrolling } from './scroll-signal';
 import { SWText, typeStyle } from './SWText';
 import { hideWebFocusOutline } from './TextField';
 
@@ -54,9 +55,11 @@ export interface CompanionProps {
   readonly hidden?: boolean;
 }
 
-const orbSize = 58;
+const orbSize = 50;
 const edgeGap = 16;
 const holdMs = 520;
+// Worthy introduces itself once per session; after that the orb stays quiet until asked.
+let hintShownThisSession = false;
 
 /**
  * Worthy, the AI companion. A living orb that floats above the content: tap it and it blooms
@@ -103,10 +106,13 @@ export function Companion({
     if (hidden) setOpen(false);
   }, [hidden, lift, reduceMotion]);
 
-  // One nudge per new hint, a beat after the screen settles.
+  // One nudge per session, a beat after the first screen settles.
   useEffect(() => {
-    if (!hint || hidden) return;
-    const show = setTimeout(() => setShowHint(true), 1100);
+    if (!hint || hidden || hintShownThisSession) return;
+    const show = setTimeout(() => {
+      hintShownThisSession = true;
+      setShowHint(true);
+    }, 1100);
     const hide = setTimeout(() => setShowHint(false), 5600);
     return () => {
       clearTimeout(show);
@@ -195,14 +201,20 @@ export function Companion({
 
   const gesture = Gesture.Exclusive(drag, hold, tap);
 
-  const orbStyle = useAnimatedStyle(() => ({
-    opacity: lift.value,
-    transform: [
-      { translateX: x.value },
-      { translateY: y.value + (1 - lift.value) * 80 },
-      { scale: 0.4 + lift.value * 0.6 - charge.value * 0.08 },
-    ],
-  }));
+  // While the page scrolls, the orb tucks most of the way into its edge so it never sits on
+  // top of what you are reading, then glides back out once the content settles.
+  const tuckDirection = side === 'right' ? 1 : -1;
+  const orbStyle = useAnimatedStyle(() => {
+    const tuck = contentScrolling.value;
+    return {
+      opacity: lift.value * (1 - tuck * 0.45),
+      transform: [
+        { translateX: x.value + tuck * tuckDirection * (orbSize * 0.6 + edgeGap) },
+        { translateY: y.value + (1 - lift.value) * 80 },
+        { scale: 0.4 + lift.value * 0.6 - charge.value * 0.08 - tuck * 0.12 },
+      ],
+    };
+  });
   const chargeStyle = useAnimatedStyle(() => ({
     opacity: charge.value,
     transform: [{ scale: 1 + charge.value * 0.35 }],
@@ -356,9 +368,6 @@ function CompanionPanel({
             <CompanionOrb size={30} mood="attentive" />
             <View style={styles.flex}>
               <SWText variant="companion">Worthy</SWText>
-              <SWText variant="caption" tone="textMuted">
-                Your pricing companion
-              </SWText>
             </View>
             <PressableScale accessibilityLabel="Close" onPress={onClose} style={styles.close}>
               <X size={16} strokeWidth={2.4} color={colors.textSecondary} />
@@ -368,7 +377,7 @@ function CompanionPanel({
           <SWText variant="bodyLarge" style={styles.greeting} accessibilityLabel={greeting}>
             {typed}
             {typed.length < greeting.length ? (
-              <SWText variant="bodyLarge" tone="accent">
+              <SWText variant="bodyLarge" tone="textMuted">
                 ▍
               </SWText>
             ) : null}
@@ -397,7 +406,7 @@ function CompanionPanel({
                     style={({ pressed }) => [styles.action, pressed ? styles.actionPressed : null]}
                   >
                     <View style={styles.actionIcon}>
-                      <Icon size={17} strokeWidth={2.2} color={colors.accent} />
+                      <Icon size={16} strokeWidth={1.75} color={colors.textPrimary} />
                     </View>
                     <View style={styles.flex}>
                       <SWText variant="headingSmall">{action.label}</SWText>
@@ -458,10 +467,11 @@ const stylesFor = themedStyles((colors, name) => ({
     left: 0,
     width: orbSize,
     height: orbSize,
-    shadowColor: tokens.aurora[0],
-    shadowOpacity: name === 'dark' ? 0.55 : 0.35,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
+    borderRadius: orbSize / 2,
+    shadowColor: tokens.shadow.dark,
+    shadowOpacity: name === 'dark' ? 0.9 : 0.35,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
   },
   charge: {
     position: 'absolute',
@@ -470,7 +480,7 @@ const stylesFor = themedStyles((colors, name) => ({
     right: -6,
     bottom: -6,
     borderRadius: orbSize,
-    borderWidth: 2.5,
+    borderWidth: 1.5,
     borderColor: colors.accent,
   },
   scrim: {
@@ -528,10 +538,11 @@ const stylesFor = themedStyles((colors, name) => ({
   actionIcon: {
     width: 34,
     height: 34,
-    borderRadius: 11,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.accentSoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
   },
   ask: {
     flexDirection: 'row',

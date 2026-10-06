@@ -55,6 +55,19 @@ export const previewUsers = {
   justinV: { handle: 'justin_v', avatar: image.avatarJustinV },
 } satisfies Record<string, PreviewUser>;
 
+/** Avatars for the demo accounts by handle. The backend's seed uses the same handles. */
+export const previewAvatarByHandle: Readonly<Record<string, ImageSourcePropType>> =
+  Object.fromEntries(Object.values(previewUsers).map((user) => [user.handle, user.avatar]));
+
+export interface PreviewComment {
+  readonly id: string;
+  /** The comment this one replies to, if any. */
+  readonly replyTo?: string;
+  readonly author: PreviewUser;
+  readonly body: string;
+  readonly postedAgo: string;
+}
+
 export interface PreviewPost {
   readonly id: string;
   readonly author: PreviewUser;
@@ -65,7 +78,9 @@ export interface PreviewPost {
   /** The AI estimate the author is asking the community to judge. */
   readonly estimate: number;
   readonly votes: VoteCounts;
-  readonly commentCount: number;
+  readonly comments: readonly PreviewComment[];
+  /** Set when the post is a marketplace listing reposted to ask whether its price is fair. */
+  readonly listing?: { readonly id: string; readonly askingPrice: number };
 }
 
 export const previewPosts: readonly PreviewPost[] = [
@@ -78,7 +93,20 @@ export const previewPosts: readonly PreviewPost[] = [
     photoLabel: 'Teal 90s Nike windbreaker laid flat on concrete',
     estimate: 2450,
     votes: { too_high: 12, just_right: 38, too_low: 4 },
-    commentCount: 18,
+    comments: [
+      {
+        id: 'windbreaker-c1',
+        author: previewUsers.manilaHype,
+        body: 'Teal colourways go fast. ₱2,450 is fair, maybe even a little low.',
+        postedAgo: '1m ago',
+      },
+      {
+        id: 'windbreaker-c2',
+        author: previewUsers.justinV,
+        body: 'Check the inner tag. If it says "Made in Korea" it could be worth more.',
+        postedAgo: '2m ago',
+      },
+    ],
   },
   {
     id: 'polaroid-sun-600',
@@ -89,35 +117,99 @@ export const previewPosts: readonly PreviewPost[] = [
     photoLabel: 'Vintage Polaroid Sun 600 camera on a table',
     estimate: 3500,
     votes: { too_high: 35, just_right: 12, too_low: 2 },
-    commentCount: 42,
+    listing: { id: 'polaroid-sun-600', askingPrice: 3200 },
+    comments: [
+      {
+        id: 'polaroid-c4',
+        replyTo: 'polaroid-c3',
+        author: previewUsers.mariaCruz,
+        body: 'Good to know, thanks. It does come with one sealed pack of film.',
+        postedAgo: '40m ago',
+      },
+      {
+        id: 'polaroid-c3',
+        author: previewUsers.retroCurator,
+        body: 'Agree with the others. I would list it around ₱2,900.',
+        postedAgo: '12m ago',
+      },
+      {
+        id: 'polaroid-c2',
+        author: previewUsers.manilaHype,
+        body: 'Test the flash first. A working one is worth the extra.',
+        postedAgo: '30m ago',
+      },
+      {
+        id: 'polaroid-c1',
+        author: previewUsers.justinV,
+        body: 'Sun 600s usually go for ₱2,500 to ₱3,000 here. ₱3,500 feels high unless it comes with film.',
+        postedAgo: '48m ago',
+      },
+    ],
   },
 ];
 
-export const previewPostDetail = {
+/** Older posts that have scrolled off the preview feed but can still be opened. */
+export const previewOlderPosts: readonly PreviewPost[] = [
+  {
+    id: 'retro-walkman-post',
+    author: previewUsers.justinV,
+    postedAgo: '3d ago',
+    body: 'Found my dad’s old Walkman. AI says ₱1,900. Would you pay that?',
+    photo: image.walkman,
+    photoLabel: 'Silver cassette Walkman player',
+    estimate: 1900,
+    votes: { too_high: 6, just_right: 41, too_low: 9 },
+    comments: [],
+  },
+  {
+    id: 'keychron-post',
+    author: previewUsers.manilaHype,
+    postedAgo: '5d ago',
+    body: 'Listing my Keychron at ₱4,500. Too much for a used board?',
+    photo: image.keyboard,
+    photoLabel: 'Mechanical keyboard with RGB lighting on a desk',
+    estimate: 3900,
+    votes: { too_high: 28, just_right: 14, too_low: 3 },
+    comments: [],
+  },
+];
+
+/** Every vote the viewer has cast, newest first: part of the account's running history. */
+export const previewVotesCast: readonly {
+  readonly postId: string;
+  readonly vote: VoteChoice;
+  readonly castAgo: string;
+}[] = [
+  { postId: 'polaroid-sun-600', vote: 'too_high', castAgo: '40m ago' },
+  { postId: 'retro-walkman-post', vote: 'just_right', castAgo: '2d ago' },
+  { postId: 'keychron-post', vote: 'just_right', castAgo: '4d ago' },
+];
+
+/** Shown when a post link points at a post that is not in the preview feed. */
+export const previewPostDetail: PreviewPost = {
   id: 'puffer-jacket',
   author: previewUsers.retroCurator,
-  createdAgo: 'Post created 2h ago',
+  postedAgo: '2h ago',
   body: 'Is ₱2,450 too high or just right for this pristine condition jacket? Help out!',
   photo: image.pufferBlack,
   photoLabel: 'Black puffer jacket laid flat',
-  votes: { too_high: 12, just_right: 38, too_low: 4 } satisfies VoteCounts,
+  estimate: 2450,
+  votes: { too_high: 12, just_right: 38, too_low: 4 },
   comments: [
-    {
-      id: 'c1',
-      author: previewUsers.manilaHype,
-      body: '₱2,450 is actually extremely fair. Authentic 90s Nike sells for easily ₱3k in high-end thrift shops. Buy!',
-      postedAgo: '1h ago',
-      mine: true,
-    },
     {
       id: 'c2',
       author: previewUsers.justinV,
       body: "If there's any stains or zip faults, it could fall closer to ₱1,800. Looks clean though!",
       postedAgo: '45m ago',
-      mine: false,
+    },
+    {
+      id: 'c1',
+      author: previewUsers.manilaHype,
+      body: '₱2,450 is actually extremely fair. Authentic 90s Nike sells for easily ₱3k in high-end thrift shops. Buy!',
+      postedAgo: '1h ago',
     },
   ],
-} as const;
+};
 
 export interface PreviewListing {
   readonly id: string;
@@ -194,11 +286,28 @@ export const previewItem = {
   location: 'Metro Manila, PH',
 } as const;
 
+/** A structured price offer inside a chat. `countered` means a newer offer replaced it. */
+export type PreviewOfferStatus = 'pending' | 'accepted' | 'declined' | 'countered';
+
+export interface PreviewOffer {
+  readonly amount: number;
+  readonly status: PreviewOfferStatus;
+}
+
+/** A proposed pickup or handoff: where and when, and whether the other side has agreed. */
+export interface PreviewMeetup {
+  readonly place: string;
+  readonly when: string;
+  readonly status: 'proposed' | 'confirmed';
+}
+
 export interface PreviewMessage {
   readonly id: string;
   readonly body: string;
   readonly sentAt: string;
   readonly mine: boolean;
+  readonly offer?: PreviewOffer;
+  readonly meetup?: PreviewMeetup;
 }
 
 export const previewConversation = {
@@ -211,24 +320,59 @@ export const previewConversation = {
   messages: [
     {
       id: 'm1',
-      body: 'Hi retro_curator! I saw this on the community feed. Would you accept ₱2,000 for it?',
-      sentAt: '10:24 AM',
+      body: 'Hi retro_curator! I saw this on the community feed. Is it still available?',
+      sentAt: '10:22 AM',
       mine: false,
     },
     {
       id: 'm2',
-      body: 'Hi retro_enthusiast! I can do ₱2,100 since the condition is completely pristine. Let me know if that works!',
-      sentAt: '10:26 AM',
-      mine: true,
+      body: 'Would you accept ₱2,000 for it?',
+      sentAt: '10:24 AM',
+      mine: false,
+      offer: { amount: 2000, status: 'countered' },
     },
     {
       id: 'm3',
-      body: 'Deal! Meetup in Makati works for me. What time are you available?',
+      body: 'I can do ₱2,100 since the condition is completely pristine.',
+      sentAt: '10:26 AM',
+      mine: true,
+      offer: { amount: 2100, status: 'countered' },
+    },
+    {
+      id: 'm4',
+      body: 'Meet in the middle? Makati works for me for the pickup.',
       sentAt: '10:30 AM',
       mine: false,
+      offer: { amount: 2050, status: 'pending' },
     },
   ] satisfies PreviewMessage[],
 } as const;
+
+/** Public places suggested for a handoff, and the times offered when arranging one. */
+export const previewMeetupSpots: readonly { readonly key: string; readonly label: string }[] = [
+  { key: 'greenbelt', label: 'Greenbelt 3, Makati' },
+  { key: 'ayala-triangle', label: 'Ayala Triangle Gardens' },
+  { key: 'megamall', label: 'SM Megamall' },
+];
+
+export const previewMeetupDays: readonly { readonly key: string; readonly label: string }[] = [
+  { key: 'today', label: 'Today' },
+  { key: 'tomorrow', label: 'Tomorrow' },
+  { key: 'saturday', label: 'Saturday' },
+];
+
+export const previewMeetupTimes: readonly { readonly key: string; readonly label: string }[] = [
+  { key: '10am', label: '10:00 AM' },
+  { key: '2pm', label: '2:00 PM' },
+  { key: '6pm', label: '6:00 PM' },
+];
+
+export const previewReportReasons: readonly { readonly key: string; readonly label: string }[] = [
+  { key: 'scam', label: 'Scam or fraud' },
+  { key: 'harassment', label: 'Harassment' },
+  { key: 'spam', label: 'Spam' },
+  { key: 'other', label: 'Something else' },
+];
 
 export type PreviewItemStatus = 'listed' | 'on_feed' | 'private' | 'sold';
 
@@ -282,6 +426,22 @@ export const previewHistory: readonly PreviewHistoryItem[] = [
   },
 ];
 
+/**
+ * Where each of the viewer's items is shared. An item can sit on the feed, the market, both,
+ * or neither (private, the default for a fresh capture).
+ */
+export interface PreviewSharing {
+  readonly postId?: string;
+  readonly listingId?: string;
+  readonly sold?: boolean;
+}
+
+export const previewSharingByItem: Readonly<Record<string, PreviewSharing>> = {
+  'nike-neon-windbreaker': { listingId: 'nike-neon-windbreaker' },
+  'polaroid-sun-600': { postId: 'polaroid-sun-600' },
+  'air-jordan-1-retro': { listingId: 'air-jordan-1-retro', sold: true },
+};
+
 /** The signed-in user in preview mode. `isAdmin` shows the moderation entry on the profile. */
 export const previewProfile = {
   user: previewUsers.retroCurator,
@@ -302,6 +462,8 @@ export interface PreviewConversationSummary {
   readonly lastFromMe: boolean;
   readonly sentAt: string;
   readonly unread: number;
+  /** Set once the conversation is over; it then lists under Past and can't be replied to. */
+  readonly closed?: 'sold' | 'archived';
 }
 
 export const previewConversations: readonly PreviewConversationSummary[] = [
@@ -310,7 +472,7 @@ export const previewConversations: readonly PreviewConversationSummary[] = [
     with: previewUsers.manilaHype,
     itemTitle: 'Vintage Nike Neon Windbreaker',
     itemPhoto: image.windbreakerRetro,
-    lastMessage: 'Deal! Meetup in Makati works for me. What time are you available?',
+    lastMessage: 'Offered ₱2,050 · Makati works for me for the pickup.',
     lastFromMe: false,
     sentAt: '10:30 AM',
     unread: 2,
@@ -334,6 +496,18 @@ export const previewConversations: readonly PreviewConversationSummary[] = [
     lastFromMe: false,
     sentAt: 'Sep 28',
     unread: 0,
+    closed: 'sold',
+  },
+  {
+    id: 'keyboard-chat',
+    with: previewUsers.mariaCruz,
+    itemTitle: 'Mechanical Keychron Keyboard',
+    itemPhoto: image.keyboard,
+    lastMessage: 'No worries, maybe next time!',
+    lastFromMe: false,
+    sentAt: 'Sep 14',
+    unread: 0,
+    closed: 'archived',
   },
 ];
 
@@ -546,6 +720,35 @@ export const previewMarketCategories: readonly { readonly key: string; readonly 
     { key: 'home', label: 'Home' },
   ];
 
+/** Where each preview listing is, for the location filter, until listings carry a place. */
+export const previewListingPlaces: Readonly<Record<string, { area: string; distanceKm: number }>> =
+  {
+    'polaroid-sun-600': { area: 'makati', distanceKm: 2 },
+    'air-jordan-1-bred': { area: 'quezon-city', distanceKm: 11 },
+    'retro-walkman': { area: 'pasig', distanceKm: 6 },
+    'keychron-keyboard': { area: 'cebu', distanceKm: 570 },
+  };
+
+export const previewMarketAreas: readonly { readonly key: string; readonly label: string }[] = [
+  { key: 'anywhere', label: 'Anywhere' },
+  { key: 'near-me', label: 'Near me' },
+  { key: 'makati', label: 'Makati' },
+  { key: 'quezon-city', label: 'Quezon City' },
+  { key: 'pasig', label: 'Pasig' },
+  { key: 'cebu', label: 'Cebu' },
+];
+
+export const previewPriceBrackets: readonly {
+  readonly key: string;
+  readonly label: string;
+  readonly min: number | null;
+  readonly max: number | null;
+}[] = [
+  { key: 'under-2k', label: 'Under ₱2,000', min: null, max: 2000 },
+  { key: '2k-5k', label: '₱2,000–₱5,000', min: 2000, max: 5000 },
+  { key: 'over-5k', label: '₱5,000+', min: 5000, max: null },
+];
+
 /** Market context for a listing: its AI range and quick offers a buyer can send. */
 export const previewListingInsight = {
   listingId: 'polaroid-sun-600',
@@ -555,6 +758,31 @@ export const previewListingInsight = {
   confidence: 'medium' as PreviewConfidence,
   offerSuggestions: [2800, 2950, 3100],
   watchers: 23,
+} as const;
+
+/** The viewer's own listing, so the listing screen can show what a seller sees. */
+export const previewMyListing = {
+  id: 'nike-neon-windbreaker',
+  title: 'Vintage Nike Neon Windbreaker',
+  category: 'Fashion',
+  askingPrice: 2800,
+  photo: image.windbreakerRetro,
+  photoLabel: 'Teal and purple vintage Nike windbreaker',
+  justRightShare: 71,
+  seller: { ...previewUsers.retroCurator, rating: '4.8', sales: 12 },
+  description:
+    'Early 90s Nike windbreaker in teal and purple. No tears, zip runs smoothly, light fading on the cuffs. Size L, fits true.',
+  stats: { views: 214, saves: 18, chats: 3 },
+} as const;
+
+export const previewMyListingInsight = {
+  listingId: 'nike-neon-windbreaker',
+  estimateLow: 2100,
+  estimateHigh: 2800,
+  estimate: 2450,
+  confidence: 'high' as PreviewConfidence,
+  offerSuggestions: [2450, 2600, 2700],
+  watchers: 9,
 } as const;
 
 /** Worthy's canned knowledge for preview mode, keyed by what the question is about. */

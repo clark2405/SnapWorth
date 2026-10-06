@@ -1,6 +1,6 @@
-import { ArrowDown, ArrowUp, Check, Sparkles, type LucideIcon } from 'lucide-react-native';
+import { ArrowDown, ArrowUp, Check, type LucideIcon } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { View, type LayoutChangeEvent } from 'react-native';
+import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import Animated, {
   Easing,
   Extrapolation,
@@ -24,6 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   AmbientBackdrop,
   CountUp,
+  EstimateMark,
   Photo,
   PressableScale,
   Reveal,
@@ -238,7 +239,7 @@ export function OnboardingView({
 
   return (
     <View style={styles.root}>
-      <AmbientBackdrop mood="value" />
+      <AmbientBackdrop mood="feed" />
       <View style={[styles.column, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <Reveal index={0} style={styles.topBar}>
           <SWText variant="wordmark">SnapWorth</SWText>
@@ -319,12 +320,12 @@ export function OnboardingView({
             style={({ pressed }) => [styles.primary, pressed ? styles.primaryPressed : null]}
           >
             <Animated.View style={[styles.primaryLabel, continueStyle]}>
-              <SWText variant="button" tone="onInverse">
+              <SWText variant="button" tone="onAccent">
                 Continue
               </SWText>
             </Animated.View>
             <Animated.View style={[styles.primaryLabel, startStyle]}>
-              <SWText variant="button" tone="onInverse">
+              <SWText variant="button" tone="onAccent">
                 {finishLabel}
               </SWText>
             </Animated.View>
@@ -364,7 +365,6 @@ interface StageProps {
 /** The scene behind the pager. `progress` is the raw scroll offset; pages are `width` apart. */
 function Stage({ progress, idle, width, height, index, reduceMotion }: StageProps) {
   const styles = useThemedStyles(stylesFor);
-  const { colors } = useTheme();
   const cardWidth = Math.min(width * 0.56, height * 0.5);
   const cardHeight = cardWidth * 1.25;
   const lift = height * 0.1;
@@ -465,7 +465,7 @@ function Stage({ progress, idle, width, height, index, reduceMotion }: StageProp
         </Animated.View>
         <Animated.View style={[styles.float, styles.detect, detectStyle]}>
           <View style={styles.detectIcon}>
-            <Sparkles size={14} strokeWidth={2.2} color={colors.accent} />
+            <EstimateMark size={7} />
           </View>
           <SWText variant="labelSmall">Nike windbreaker</SWText>
           <SWText variant="caption" tone="textMuted">
@@ -486,7 +486,7 @@ function Stage({ progress, idle, width, height, index, reduceMotion }: StageProp
           <SWText variant="overline" tone="textMuted">
             Fair range
           </SWText>
-          <Tag label={previewValuation.trendChange.split(' ')[0] ?? ''} tone="success" />
+          <Tag label={previewValuation.trendChange.split(' ')[0] ?? ''} tone="mint" />
         </View>
         <View style={styles.rangeRow} key={`range-${rangeRun}`}>
           <CountUp variant="priceLarge" value={previewValuation.low} format={formatPeso} />
@@ -821,7 +821,7 @@ const stylesFor = themedStyles((colors, name) => ({
     top: 0,
     height: 2,
     backgroundColor: tokens.overlay.text,
-    shadowColor: colors.accent,
+    shadowColor: tokens.overlay.text,
     shadowOpacity: 1,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 0 },
@@ -837,7 +837,7 @@ const stylesFor = themedStyles((colors, name) => ({
     position: 'absolute',
     width: bracket,
     height: bracket,
-    borderColor: colors.accent,
+    borderColor: colors.textPrimary,
   },
   topLeft: {
     top: 0,
@@ -895,7 +895,8 @@ const stylesFor = themedStyles((colors, name) => ({
     borderRadius: tokens.radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.accentSoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
   },
   range: {
     width: 290,
@@ -956,14 +957,14 @@ const stylesFor = themedStyles((colors, name) => ({
     borderRadius: tokens.radius.full,
   },
   primary: {
-    height: tokens.layout.controlHeight,
+    height: tokens.layout.primaryButton,
     borderRadius: tokens.radius.full,
-    backgroundColor: colors.inverse,
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryPressed: {
-    backgroundColor: colors.inversePressed,
+    backgroundColor: colors.accentPressed,
   },
   primaryLabel: {
     position: 'absolute',

@@ -1,5 +1,6 @@
+import { Users } from 'lucide-react-native';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Switch, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import {
@@ -8,17 +9,19 @@ import {
   ChoiceChips,
   CountUp,
   Field,
+  ListRow,
   NavHeader,
   Photo,
   PriceRangeBar,
   Reveal,
   Screen,
   SelectField,
+  Surface,
   SWText,
   TextField,
   useToast,
 } from '../../components';
-import { themedStyles, tokens, useThemedStyles } from '../../design';
+import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import {
   formatPeso,
   previewConditions,
@@ -30,8 +33,11 @@ import {
 export interface ConfirmPriceViewProps {
   readonly itemId?: string;
   readonly onBack?: () => void;
-  /** Receives the price the seller confirmed. The AI estimate is shown for reference only. */
-  readonly onPublish?: (enteredPrice: number) => void;
+  /**
+   * Receives the price the seller confirmed (the AI estimate is shown for reference only), and
+   * whether to also post the listing to the feed so the community can vote on that price.
+   */
+  readonly onPublish?: (enteredPrice: number, alsoAskFeed: boolean) => void;
 }
 
 const priceInput = /^\d{1,9}(?:\.\d{1,2})?$/;
@@ -50,9 +56,11 @@ function suggestedPrice(condition: PreviewCondition): number {
 }
 
 export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
+  const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
   const item = previewItem;
+  const [alsoAskFeed, setAlsoAskFeed] = useState(false);
   const [condition, setCondition] = useState<PreviewCondition>('good');
   // Prefilled with the live suggestion so the seller always sees a number, but once they type
   // their own it stops following the condition — the price they publish is always theirs, seen
@@ -75,8 +83,14 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
     setPublishing(true);
     setTimeout(() => {
       setPublishing(false);
-      toast.show({ title: 'Listing published', body: `Live at ${formatPeso(enteredPrice)}.` });
-      onPublish?.(enteredPrice);
+      toast.show({
+        title: 'Listing published',
+        body: alsoAskFeed
+          ? `Live at ${formatPeso(enteredPrice)}, and on the feed for a price check.`
+          : `Live at ${formatPeso(enteredPrice)}.`,
+        celebrate: true,
+      });
+      onPublish?.(enteredPrice, alsoAskFeed);
     }, 700);
   };
 
@@ -84,23 +98,23 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
     <Screen
       header={<NavHeader title="List for sale" onBack={onBack} banded />}
       footer={
-        <BottomBar style={styles.footer}>
+        <BottomBar>
           <Button
             label="Publish listing"
             disabled={enteredPrice === null}
             loading={publishing}
             onPress={handlePublish}
           />
-          <SWText
-            variant="caption"
-            tone="textMuted"
-            align="center"
-            accessibilityLiveRegion="polite"
-          >
-            {enteredPrice === null
-              ? 'Enter your asking price to publish.'
-              : `Your listing will go live at ${formatPeso(enteredPrice)}.`}
-          </SWText>
+          {enteredPrice === null ? (
+            <SWText
+              variant="caption"
+              tone="textMuted"
+              align="center"
+              accessibilityLiveRegion="polite"
+            >
+              Enter your asking price to publish.
+            </SWText>
+          ) : null}
         </BottomBar>
       }
       contentStyle={styles.content}
@@ -126,10 +140,10 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
         </SWText>
         <ChoiceChips options={previewConditions} value={condition} onChange={handleCondition} />
         <View style={styles.suggestion}>
-          <SWText variant="overline" tone="accent">
+          <SWText variant="overline" tone="textMuted">
             Suggested price
           </SWText>
-          <CountUp value={suggestion} format={formatPeso} variant="priceLarge" tone="accent" />
+          <CountUp value={suggestion} format={formatPeso} variant="priceLarge" />
           <Animated.View
             key={condition}
             entering={FadeIn.duration(160)}
@@ -154,10 +168,7 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
       </Reveal>
 
       <Reveal index={3} style={styles.fields}>
-        <Field
-          label="Your asking price"
-          helper="This is yours to set. Edit it, or publish the suggestion above."
-        >
+        <Field label="Your asking price">
           <TextField
             size="large"
             prefix="₱"
@@ -178,6 +189,27 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
         <Field label="Category (optional)">
           <SelectField value={item.category} accessibilityLabel="Category" />
         </Field>
+      </Reveal>
+
+      <Reveal index={4}>
+        <Surface>
+          <ListRow
+            label="Also ask the feed"
+            detail="Let the community vote on your price"
+            icon={Users}
+            trailing={
+              <Switch
+                value={alsoAskFeed}
+                onValueChange={(value) => {
+                  setAlsoAskFeed(value);
+                  haptic('select');
+                }}
+                trackColor={{ false: colors.sunken, true: colors.textPrimary }}
+                accessibilityLabel="Also post to the feed for a price check"
+              />
+            }
+          />
+        </Surface>
       </Reveal>
     </Screen>
   );
@@ -213,11 +245,5 @@ const stylesFor = themedStyles(() => ({
   },
   fields: {
     gap: tokens.spacing[5],
-  },
-  footer: {
-    paddingHorizontal: tokens.layout.pageGutterCompact,
-    paddingTop: tokens.spacing[4],
-    paddingBottom: tokens.spacing[4],
-    gap: tokens.spacing[3],
   },
 }));

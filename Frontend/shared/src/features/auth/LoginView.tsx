@@ -31,12 +31,10 @@ const modes = [
 const copy = {
   login: {
     title: 'Welcome back.',
-    subtitle: 'Your history, votes, and listings are where you left them.',
     submit: 'Log in',
   },
   signup: {
     title: 'Start with one photo.',
-    subtitle: 'An email and a password. Nothing else until you need it.',
     submit: 'Create account',
   },
 } as const;
@@ -70,7 +68,7 @@ export function LoginView({
     onContinueWithGoogle ? onContinueWithGoogle() : onSubmit?.({ mode, email, password });
 
   return (
-    <Screen ambient="aurora" contentStyle={styles.content}>
+    <Screen ambient="feed" contentStyle={styles.content}>
       <Reveal index={0} style={styles.brand}>
         <SWText variant="wordmark">SnapWorth</SWText>
       </Reveal>
@@ -85,9 +83,6 @@ export function LoginView({
         >
           <SWText variant="displayHero" accessibilityRole="header">
             {text.title}
-          </SWText>
-          <SWText variant="bodyLarge" tone="textSecondary">
-            {text.subtitle}
           </SWText>
         </Animated.View>
       </Reveal>
@@ -141,7 +136,7 @@ export function LoginView({
           </SWText>
           <View style={styles.rule} />
         </View>
-        <Button label="Continue with Apple" variant="primary" onPress={continueWithApple} />
+        <Button label="Continue with Apple" variant="secondary" onPress={continueWithApple} />
         <Button label="Continue with Google" variant="secondary" onPress={continueWithGoogle} />
       </Reveal>
     </Screen>

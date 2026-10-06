@@ -41,7 +41,7 @@ export function GlassSurface({
         glassEffectStyle={variant}
         isInteractive={interactive}
         tintColor={tint}
-        colorScheme={name}
+        colorScheme={isDark ? 'dark' : 'light'}
         style={style}
       >
         {children}

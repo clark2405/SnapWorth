@@ -1,10 +1,17 @@
 import {
   Bell,
+  History,
+  MessagesSquare,
+  Tag as TagIcon,
+  Vote,
   ChevronRight,
   CircleHelp,
   LogOut,
   ShieldAlert,
+  Palette,
+  Settings2,
   Sparkles,
+  Wallet,
   TrendingDown,
 } from 'lucide-react-native';
 import { View } from 'react-native';
@@ -15,7 +22,9 @@ import {
   ListGroup,
   ListRow,
   NavHeader,
+  Overline,
   PressableScale,
+  Rating,
   Reveal,
   Screen,
   SegmentedControl,
@@ -35,11 +44,16 @@ import {
   formatPeso,
   previewHeldContent,
   previewPortfolio,
+  previewConversations,
   previewProfile,
+  previewVotesCast,
 } from '../preview/sample-data';
 
 export type ProfileDestination =
   | 'edit-profile'
+  | 'listings'
+  | 'votes'
+  | 'conversations'
   | 'notifications'
   | 'price-alerts'
   | 'privacy'
@@ -86,11 +100,17 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
             <SWText variant="displayTitle" accessibilityRole="header">
               {profile.displayName}
             </SWText>
-            <SWText variant="bodySmall" tone="textSecondary">
-              @{profile.user.handle} · ★ {profile.rating}
+            <View style={styles.handleRow}>
+              <SWText variant="bodySmall" tone="textSecondary">
+                @{profile.user.handle} ·
+              </SWText>
+              <Rating value={profile.rating} variant="bodySmall" tone="textSecondary" />
+            </View>
+            <SWText variant="caption" tone="textMuted">
+              {profile.location}
             </SWText>
             <SWText variant="caption" tone="textMuted">
-              {profile.location} · {profile.joined}
+              {profile.joined}
             </SWText>
           </View>
           <ChevronRight size={18} strokeWidth={2} color={colors.textMuted} />
@@ -98,40 +118,64 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
       </Reveal>
 
       <Reveal index={1} style={styles.stats}>
-        {stats.map((stat, index) => (
-          <View
+        {stats.map((stat) => (
+          <Surface
             key={stat.label}
-            accessible
-            accessibilityLabel={`${stat.value} ${stat.label.toLowerCase()}`}
-            style={[styles.stat, index > 0 ? styles.statRule : null]}
+            padding={tokens.spacing[4]}
+            style={styles.statTile}
+            contentStyle={styles.stat}
           >
-            <CountUp
-              value={stat.value}
-              format={(value) => String(Math.round(value))}
-              variant="priceLarge"
-            />
-            <SWText variant="overline" tone="textMuted">
-              {stat.label}
-            </SWText>
-          </View>
+            <View accessible accessibilityLabel={`${stat.value} ${stat.label.toLowerCase()}`}>
+              <CountUp
+                value={stat.value}
+                format={(value) => String(Math.round(value))}
+                variant="priceMedium"
+              />
+              <SWText variant="labelSmall" tone="textSecondary">
+                {stat.label}
+              </SWText>
+            </View>
+          </Surface>
         ))}
       </Reveal>
 
       <Reveal index={2}>
-        <Surface padding={tokens.spacing[4]} contentStyle={styles.collectionCard}>
-          <View style={styles.collectionHeader}>
-            <SWText variant="overline" tone="textMuted">
-              Collection value
-            </SWText>
-            <Tag label={previewPortfolio.changeLabel} tone="success" />
-          </View>
-          <CountUp value={previewPortfolio.total} format={formatPeso} variant="priceLarge" />
-          <Sparkline values={previewPortfolio.series} height={56} />
+        <Surface tone="feature" padding={tokens.spacing[5]} contentStyle={styles.collectionCard}>
+          <Overline icon={Wallet} label="Collection value" tone="onFeatureDim" />
+          <CountUp
+            value={previewPortfolio.total}
+            format={formatPeso}
+            variant="priceLarge"
+            tone="onFeature"
+          />
+          <Tag label={previewPortfolio.changeLabel} tone="mint" />
+          <Sparkline values={previewPortfolio.series} height={56} color={colors.onFeature} />
         </Surface>
       </Reveal>
 
       <Reveal index={3} style={styles.sections}>
-        <ListGroup title="Appearance">
+        <ListGroup title="Your activity" icon={History}>
+          <ListRow
+            label="Your listings"
+            icon={TagIcon}
+            value={String(profile.stats.listed)}
+            onPress={() => onOpen?.('listings')}
+          />
+          <ListRow
+            label="Votes cast"
+            icon={Vote}
+            value={String(previewVotesCast.length)}
+            onPress={() => onOpen?.('votes')}
+          />
+          <ListRow
+            label="Conversations"
+            icon={MessagesSquare}
+            value={String(previewConversations.length)}
+            onPress={() => onOpen?.('conversations')}
+          />
+        </ListGroup>
+
+        <ListGroup title="The look" icon={Palette}>
           <View style={styles.appearanceRow}>
             <SegmentedControl
               options={appearanceOptions}
@@ -141,7 +185,7 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
           </View>
         </ListGroup>
 
-        <ListGroup title="Settings">
+        <ListGroup title="The fine print" icon={Settings2}>
           <ListRow label="Notifications" icon={Bell} onPress={() => onOpen?.('notifications')} />
           <ListRow
             label="Price alerts"
@@ -159,7 +203,6 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
           <ListRow label="Help" icon={CircleHelp} onPress={() => onOpen?.('help')} />
           <ListRow
             label="Replay introduction"
-            detail="See how SnapWorth works"
             icon={Sparkles}
             onPress={() => onOpen?.('introduction')}
           />
@@ -173,7 +216,7 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
   );
 }
 
-const stylesFor = themedStyles((colors) => ({
+const stylesFor = themedStyles(() => ({
   content: {
     paddingTop: tokens.spacing[4],
     gap: tokens.spacing[8],
@@ -187,29 +230,23 @@ const stylesFor = themedStyles((colors) => ({
     flex: 1,
     gap: tokens.spacing[1],
   },
-  stats: {
+  handleRow: {
     flexDirection: 'row',
-    paddingVertical: tokens.spacing[4],
-    borderTopWidth: tokens.border.hairline,
-    borderBottomWidth: tokens.border.hairline,
-    borderColor: colors.borderSubtle,
-  },
-  stat: {
-    flex: 1,
     alignItems: 'center',
     gap: tokens.spacing[1],
   },
-  statRule: {
-    borderLeftWidth: tokens.border.hairline,
-    borderLeftColor: colors.borderSubtle,
+  stats: {
+    flexDirection: 'row',
+    gap: tokens.spacing[3],
+  },
+  statTile: {
+    flex: 1,
+  },
+  stat: {
+    gap: tokens.spacing[1],
   },
   collectionCard: {
     gap: tokens.spacing[3],
-  },
-  collectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
   },
   sections: {
     gap: tokens.spacing[6],

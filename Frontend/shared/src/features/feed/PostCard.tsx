@@ -1,6 +1,6 @@
-import { Check, MessageCircle } from 'lucide-react-native';
+import { Check, MessageCircle, Tag as TagIcon } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
@@ -18,6 +18,7 @@ import {
   EstimateBadge,
   Photo,
   SWText,
+  Tag,
   VerdictBar,
   VoteChips,
   ZoomLink,
@@ -26,6 +27,7 @@ import {
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import type { VoteChoice } from '../../types';
 import { formatPeso, type PreviewPost } from '../preview/sample-data';
+import { useCommentCount } from './comment-thread';
 
 export interface PostCardProps {
   readonly post: PreviewPost;
@@ -38,8 +40,8 @@ export interface PostCardProps {
 }
 
 /**
- * One feed beat: photo and estimate lead, the author's question frames them, and the vote is
- * the action. No card chrome; posts are separated by space alone. The photo opens the discussion
+ * One feed beat in a soft card: photo and estimate lead, the author's question frames them, and
+ * the vote is the action. The photo opens the discussion
  * on tap and carries a long-press menu; double-tapping its estimate corner casts "Just Right"
  * without leaving the feed, the way a double-tap-to-like works elsewhere.
  */
@@ -48,6 +50,8 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
   const [burst, setBurst] = useState(0);
+  // Live from the comment service; the bundled sample count shows until it loads.
+  const commentCount = useCommentCount(post.id) ?? post.comments.length;
 
   const castJustRight = useCallback(() => {
     haptic('pop');
@@ -107,6 +111,14 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
             {post.postedAgo}
           </SWText>
         </View>
+        {/* A listing reposted for a price check: the vote is on what the seller is asking. */}
+        {post.listing ? (
+          <Tag
+            label={`For sale · ${formatPeso(post.listing.askingPrice)}`}
+            tone="mint"
+            icon={TagIcon}
+          />
+        ) : null}
       </View>
 
       <ZoomLink
@@ -120,7 +132,7 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
             source={post.photo}
             label={post.photoLabel}
             aspectRatio={4 / 3}
-            radius={tokens.radius.large}
+            radius={tokens.radius.medium}
           />
           <JustRightBurst trigger={burst} />
           <GestureDetector gesture={doubleTap}>
@@ -137,10 +149,10 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
 
       <View style={styles.meta}>
         <VerdictBar tally={post.votes} />
-        <View style={styles.comments} accessibilityLabel={`${post.commentCount} comments`}>
+        <View style={styles.comments} accessibilityLabel={`${commentCount} comments`}>
           <MessageCircle size={16} strokeWidth={1.75} color={colors.textMuted} />
           <SWText variant="labelMedium" tone="textMuted">
-            {post.commentCount}
+            {commentCount}
           </SWText>
         </View>
       </View>
@@ -196,6 +208,15 @@ function JustRightBurst({ trigger }: { readonly trigger: number }) {
 const stylesFor = themedStyles((colors, name) => ({
   post: {
     gap: tokens.spacing[4],
+    padding: tokens.spacing[4],
+    borderRadius: tokens.radius.large,
+    backgroundColor: colors.surface,
+    borderWidth: name === 'dark' ? StyleSheet.hairlineWidth : 0,
+    borderColor: colors.borderSubtle,
+    shadowColor: tokens.shadow[name],
+    shadowOpacity: 1,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
   },
   header: {
     flexDirection: 'row',
@@ -207,7 +228,7 @@ const stylesFor = themedStyles((colors, name) => ({
   },
   photoWrap: {
     position: 'relative',
-    borderRadius: tokens.radius.large,
+    borderRadius: tokens.radius.medium,
     overflow: 'hidden',
   },
   badgeOverlay: {

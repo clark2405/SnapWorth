@@ -1,8 +1,10 @@
+import { Flame } from 'lucide-react-native';
 import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 
 import {
   LargeTitle,
+  Overline,
   Photo,
   PressableScale,
   Reveal,
@@ -37,12 +39,11 @@ export function FeedView({ onOpenPost, onSearch, onOpenProfile }: FeedViewProps)
   return (
     <Screen
       clearTabBar
-      ambient="value"
+      ambient="feed"
       onRefresh={() => new Promise<void>((resolve) => setTimeout(resolve, 900))}
     >
       <LargeTitle
-        title="Feed"
-        subtitle="Vote on whether the AI got the price right."
+        title="Price check"
         trailing={
           <View style={styles.actions}>
             <SearchButton label="Search the feed" onOpen={onSearch} />
@@ -52,14 +53,7 @@ export function FeedView({ onOpenPost, onSearch, onOpenProfile }: FeedViewProps)
       />
 
       <Reveal index={0} style={styles.trending}>
-        <SWText
-          variant="overline"
-          tone="textMuted"
-          style={styles.trendingTitle}
-          accessibilityRole="header"
-        >
-          Trending this month
-        </SWText>
+        <Overline icon={Flame} label="Hot this month" style={styles.trendingTitle} />
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -127,12 +121,10 @@ const stylesFor = themedStyles(() => ({
     gap: tokens.spacing[2],
   },
   trending: {
-    gap: tokens.spacing[3],
-    marginBottom: tokens.spacing[8],
+    gap: tokens.spacing[4],
+    marginBottom: tokens.spacing[10],
   },
-  trendingTitle: {
-    paddingHorizontal: tokens.spacing['0.5'],
-  },
+  trendingTitle: {},
   trendingBleed: {
     marginHorizontal: -tokens.layout.pageGutterCompact,
     flexGrow: 0,
@@ -142,14 +134,15 @@ const stylesFor = themedStyles(() => ({
     paddingHorizontal: tokens.layout.pageGutterCompact,
   },
   tile: {
-    width: 112,
-    gap: tokens.spacing[1],
+    width: 120,
+    gap: tokens.spacing['0.5'],
   },
   tilePhoto: {
-    width: 112,
-    height: 112,
+    width: 120,
+    height: 120,
+    marginBottom: tokens.spacing[2],
   },
   list: {
-    gap: tokens.spacing[8],
+    gap: tokens.spacing[4],
   },
 }));

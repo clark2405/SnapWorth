@@ -18,8 +18,8 @@ export interface ScrollEdgeProps {
 
 /**
  * The soft scroll edge iOS 26 puts under floating bars: a progressive blur, strongest at the
- * top of the screen and easing to nothing below the bar, with a light wash of the canvas so a
- * title stays legible over whatever scrolls beneath. There is no line where the bar ends. The
+ * top of the screen and easing to nothing below the bar, over a near-solid wash of the canvas
+ * so nothing that scrolls beneath ever competes with the title. There is no line where the bar ends. The
  * web, without native blur masking, gets the wash alone.
  */
 export function ScrollEdge({ solid, fade = 44, style, blurTarget }: ScrollEdgeProps) {
@@ -34,8 +34,8 @@ export function ScrollEdge({ solid, fade = 44, style, blurTarget }: ScrollEdgePr
     <Svg width="100%" height={height} style={StyleSheet.absoluteFill}>
       <Defs>
         <LinearGradient id={`${id}-wash`} x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={colors.canvas} stopOpacity={0.78} />
-          <Stop offset={washEnd} stopColor={colors.canvas} stopOpacity={0.5} />
+          <Stop offset="0" stopColor={colors.canvas} stopOpacity={0.97} />
+          <Stop offset={washEnd} stopColor={colors.canvas} stopOpacity={0.92} />
           <Stop offset="1" stopColor={colors.canvas} stopOpacity={0} />
         </LinearGradient>
       </Defs>

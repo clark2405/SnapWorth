@@ -1,4 +1,4 @@
-import { ArrowUp } from 'lucide-react-native';
+import { ArrowUp, PenLine } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-reanimated';
@@ -8,18 +8,19 @@ import {
   Button,
   ChoiceChips,
   CompanionOrb,
+  hideWebFocusOutline,
   NavHeader,
+  Overline,
   PressableScale,
   PriceRangeBar,
   Screen,
   Sparkline,
-  SWText,
   Surface,
-  hideWebFocusOutline,
+  SWText,
   typeStyle,
   useToast,
 } from '../../components';
-import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import { NightRoom, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import {
   formatPeso,
   previewCompanionReplies,
@@ -67,14 +68,20 @@ export interface CompanionChatViewProps {
 }
 
 /**
- * A conversation with Worthy. Answers arrive the way a person speaks: the orb thinks, the words
- * type themselves out, then the evidence (a range, a draft, a trend) rises into place beneath.
+ * A conversation with Worthy, set in the app's one "night room": a plum-dark palette that makes
+ * talking to the AI feel like stepping into a different space. Answers arrive the way a person
+ * speaks: the orb thinks, the words type themselves out, then the evidence (a range, a draft, a
+ * trend) rises into place beneath.
  */
-export function CompanionChatView({
-  initialQuestion,
-  onBack,
-  onUseListing,
-}: CompanionChatViewProps) {
+export function CompanionChatView(props: CompanionChatViewProps) {
+  return (
+    <NightRoom>
+      <CompanionChat {...props} />
+    </NightRoom>
+  );
+}
+
+function CompanionChat({ initialQuestion, onBack, onUseListing }: CompanionChatViewProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
@@ -168,9 +175,6 @@ export function CompanionChatView({
           <CompanionOrb size={72} mood={thinking ? 'thinking' : 'idle'} />
           <SWText variant="companion" align="center">
             Worthy
-          </SWText>
-          <SWText variant="caption" tone="textMuted" align="center">
-            Preview answers use sample market data
           </SWText>
         </Animated.View>
 
@@ -289,9 +293,7 @@ function ReplyCardView({
     const draft = previewCompanionReplies.listingDraft;
     return (
       <Surface padding={tokens.spacing[4]} contentStyle={styles.card}>
-        <SWText variant="overline" tone="accent">
-          Draft listing
-        </SWText>
+        <Overline icon={PenLine} label="Draft listing" />
         <SWText variant="headingMedium">{draft.title}</SWText>
         <SWText variant="bodyMedium" tone="textSecondary">
           {draft.body}
@@ -360,9 +362,7 @@ const stylesFor = themedStyles((colors) => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing[2],
-    paddingLeft: tokens.spacing[4],
-    paddingRight: tokens.spacing[2],
-    paddingVertical: tokens.spacing[2],
+    paddingLeft: tokens.spacing[1],
   },
   input: {
     flex: 1,

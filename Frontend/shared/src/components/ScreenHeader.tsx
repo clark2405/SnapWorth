@@ -1,4 +1,4 @@
-import { ChevronLeft } from 'lucide-react-native';
+import { ChevronLeft, type LucideIcon } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
 import Animated, { Extrapolation, interpolate, useAnimatedStyle } from 'react-native-reanimated';
@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { themedStyles, tokens, useThemedStyles } from '../design';
 import { IconButton } from './IconButton';
+import { Overline } from './Overline';
 import { useRegisterLargeTitle, useScreenScroll } from './Screen';
 import { ScrollEdge } from './ScrollEdge';
 import { SWText } from './SWText';
@@ -77,16 +78,20 @@ export function NavHeader({ title, onBack, trailing, banded = false }: NavHeader
 
 export interface LargeTitleProps {
   readonly title: string;
+  /** The small uppercase line above the title, e.g. "Community · Is the AI right?". */
+  readonly overline?: string;
+  /** A thin line icon that leads the overline. */
+  readonly overlineIcon?: LucideIcon;
   /** A short line under the title that states what the screen is for. */
   readonly subtitle?: string;
   readonly trailing?: ReactNode;
 }
 
 /**
- * The editorial title that opens a top-level tab, set in the serif. As the page scrolls it
+ * The bold title that opens a top-level tab. As the page scrolls it
  * drifts up a little slower than the content and fades, handing off to the compact title.
  */
-export function LargeTitle({ title, subtitle, trailing }: LargeTitleProps) {
+export function LargeTitle({ title, overline, overlineIcon, subtitle, trailing }: LargeTitleProps) {
   const scroll = useScreenScroll();
   const register = useRegisterLargeTitle(title);
   const styles = useThemedStyles(stylesFor);
@@ -108,17 +113,28 @@ export function LargeTitle({ title, subtitle, trailing }: LargeTitleProps) {
         register(y + height - tokens.spacing[6]);
       }}
     >
-      <Animated.View style={[styles.largeText, textStyle]}>
-        <SWText variant="displayTitle" accessibilityRole="header">
-          {title}
-        </SWText>
-        {subtitle ? (
+      {/* Overline, then the huge title sharing a line with its circular actions; any subtitle
+          gets the full width beneath, so nothing wraps into a ragged line beside the buttons. */}
+      {overline ? (
+        <Animated.View style={[styles.overlineRow, textStyle]}>
+          <Overline label={overline} icon={overlineIcon} />
+        </Animated.View>
+      ) : null}
+      <View style={styles.largeRow}>
+        <Animated.View style={[styles.largeText, textStyle]}>
+          <SWText variant="displayTitle" accessibilityRole="header" numberOfLines={1}>
+            {title}
+          </SWText>
+        </Animated.View>
+        {trailing}
+      </View>
+      {subtitle ? (
+        <Animated.View style={textStyle}>
           <SWText variant="bodySmall" tone="textMuted">
             {subtitle}
           </SWText>
-        ) : null}
-      </Animated.View>
-      {trailing}
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
@@ -153,15 +169,20 @@ const stylesFor = themedStyles(() => ({
     paddingHorizontal: tokens.spacing[2],
   },
   large: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: tokens.spacing[3],
+    gap: tokens.spacing[1],
     paddingTop: tokens.spacing[4],
     paddingBottom: tokens.spacing[6],
   },
+  overlineRow: {
+    marginBottom: tokens.spacing[1],
+  },
+  largeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: tokens.spacing[3],
+  },
   largeText: {
     flex: 1,
-    gap: tokens.spacing[1],
   },
 }));
