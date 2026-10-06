@@ -126,6 +126,7 @@ export function HistoryView({
       onRefresh={() => new Promise((resolve) => setTimeout(resolve, 900))}
     >
       <LargeTitle
+        brand
         title="History"
         overlineIcon={Archive}
         overline={`${previewHistory.length} items`}

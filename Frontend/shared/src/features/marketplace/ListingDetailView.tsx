@@ -5,7 +5,6 @@ import {
   Heart,
   MessageSquare,
   PencilLine,
-  Share2,
   Users,
 } from 'lucide-react-native';
 import { useState } from 'react';
@@ -18,7 +17,6 @@ import {
   BottomBar,
   Button,
   ChoiceChips,
-  Photo,
   IconButton,
   LikeButton,
   ListRow,
@@ -34,7 +32,9 @@ import {
   useToast,
   VerdictBar,
   TextField,
-  ZoomTarget,
+  shareIcon,
+  DetailHero,
+  DetailSheet,
 } from '../../components';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import type { VoteCounts } from '../../types';
@@ -139,7 +139,7 @@ export function ListingDetailView({
           trailing={
             <View style={styles.headerActions}>
               <IconButton
-                icon={Share2}
+                icon={shareIcon}
                 label="Share this listing"
                 appearance="glass"
                 onPress={() => toast.show({ title: 'Link copied' })}
@@ -206,13 +206,11 @@ export function ListingDetailView({
       }
       contentStyle={styles.content}
     >
-      <ZoomTarget>
-        <Reveal index={0}>
-          <Photo source={listing.photo} label={listing.photoLabel} aspectRatio={4 / 3} radius={0} />
-        </Reveal>
-      </ZoomTarget>
+      {/* The zoom lands on the hero photo, which has no entrance of its own: a fade or slide on
+          top of the zoom made opening and closing a listing stutter. */}
+      <DetailHero source={listing.photo} label={listing.photoLabel} />
 
-      <View style={styles.body}>
+      <DetailSheet style={styles.body}>
         <Reveal index={1} style={styles.titleBlock}>
           <Tag label={listing.category} tone="sand" />
           <SWText variant="headingLarge" accessibilityRole="header">
@@ -231,6 +229,7 @@ export function ListingDetailView({
               confidence={insight.confidence}
               asking={listing.askingPrice}
               format={formatPeso}
+              animate={false}
             />
             <VerdictBar tally={tally} />
           </Surface>
@@ -316,7 +315,7 @@ export function ListingDetailView({
             </>
           )}
         </Reveal>
-      </View>
+      </DetailSheet>
 
       <Sheet visible={offerOpen} onClose={() => setOfferOpen(false)} title="Make an offer">
         <ChoiceChips
@@ -411,7 +410,6 @@ const stylesFor = themedStyles((colors) => ({
     gap: tokens.spacing[2],
   },
   body: {
-    paddingHorizontal: tokens.layout.pageGutterCompact,
     gap: tokens.spacing[5],
   },
   titleBlock: {

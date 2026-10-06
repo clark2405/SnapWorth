@@ -29,6 +29,7 @@
     "./features/search": "./src/features/search/index.ts",
     "./features/session": "./src/features/session/index.ts",
     "./features/tips": "./src/features/tips/index.ts",
+    "./features/trends": "./src/features/trends/index.ts",
     "./ports": "./src/ports/index.ts",
     "./types": "./src/types/index.ts"
   },

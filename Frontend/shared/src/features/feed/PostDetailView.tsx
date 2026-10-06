@@ -1,7 +1,6 @@
 import {
   ArrowUp,
   ChevronRight,
-  Share as ShareIcon,
   ShieldX,
   ShoppingBag,
   Tag as TagIcon,
@@ -18,7 +17,6 @@ import {
   EstimateBadge,
   IconButton,
   NavHeader,
-  Photo,
   PressableScale,
   Reveal,
   Screen,
@@ -27,10 +25,12 @@ import {
   Tag,
   VerdictBar,
   VoteChips,
-  ZoomTarget,
   hideWebFocusOutline,
   typeStyle,
   useToast,
+  shareIcon,
+  DetailHero,
+  DetailSheet,
 } from '../../components';
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import { commentBodyMaxLength, type ThreadComment } from '../../types/entities';
@@ -202,7 +202,7 @@ export function PostDetailView({
           onBack={onBack}
           trailing={
             <IconButton
-              icon={ShareIcon}
+              icon={shareIcon}
               label="Share this post"
               appearance="glass"
               onPress={onShare}
@@ -305,11 +305,9 @@ export function PostDetailView({
       }
       contentStyle={styles.content}
     >
-      <ZoomTarget>
-        <Photo source={post.photo} label={post.photoLabel} aspectRatio={4 / 3} radius={0} />
-      </ZoomTarget>
+      <DetailHero source={post.photo} label={post.photoLabel} />
 
-      <View
+      <DetailSheet
         style={styles.body}
         onLayout={(event) => {
           bodyY.current = event.nativeEvent.layout.y;
@@ -382,7 +380,7 @@ export function PostDetailView({
             />
           )}
         </View>
-      </View>
+      </DetailSheet>
     </Screen>
   );
 }
@@ -455,8 +453,6 @@ const stylesFor = themedStyles((colors) => ({
     paddingHorizontal: 0,
   },
   body: {
-    paddingHorizontal: tokens.layout.pageGutterCompact,
-    paddingTop: tokens.spacing[6],
     gap: tokens.spacing[8],
   },
   author: {

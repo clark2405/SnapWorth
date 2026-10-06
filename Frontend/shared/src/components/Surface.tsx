@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { themedStyles, tokens, useThemedStyles } from '../design';
 import { GlassSurface } from './GlassSurface';
@@ -59,9 +60,13 @@ export function BottomBar({
   readonly style?: StyleProp<ViewStyle>;
 }) {
   const styles = useThemedStyles(stylesFor);
+  const insets = useSafeAreaInsets();
+  // On a phone with rounded screen corners the bar floats as far from the bottom as from the
+  // sides, and its corners follow the screen's: concentric, like iOS 26's own floating bars.
+  const rounded = insets.bottom > 0;
   return (
-    <View style={styles.bottomWrap}>
-      <GlassSurface style={styles.bottomBar}>
+    <View style={[styles.bottomWrap, rounded ? styles.bottomWrapRounded : null]}>
+      <GlassSurface style={[styles.bottomBar, rounded ? styles.bottomBarRounded : null]}>
         <View style={[styles.bottomContent, style]}>{children}</View>
       </GlassSurface>
     </View>
@@ -78,6 +83,10 @@ export function Divider({ style }: { readonly style?: StyleProp<ViewStyle> }) {
     />
   );
 }
+
+/** Roughly the display corner radius of Face ID iPhones, which the bottom bar nests inside. */
+const screenCornerRadius = 55;
+const bottomBarMargin = tokens.spacing[4];
 
 const stylesFor = themedStyles((colors, name) => ({
   card: {
@@ -108,10 +117,17 @@ const stylesFor = themedStyles((colors, name) => ({
   },
   bottomWrap: {
     paddingHorizontal: tokens.spacing[3],
-    paddingBottom: tokens.spacing[2],
+    paddingBottom: tokens.spacing[3],
+  },
+  bottomWrapRounded: {
+    paddingHorizontal: bottomBarMargin,
+    paddingBottom: bottomBarMargin,
   },
   bottomBar: {
     borderRadius: tokens.radius.xlarge,
+  },
+  bottomBarRounded: {
+    borderRadius: screenCornerRadius - bottomBarMargin,
   },
   bottomContent: {
     padding: tokens.spacing[3],

@@ -12,6 +12,7 @@ export default function FeedRoute() {
       onOpenPost={(postId) => router.push(`/post/${postId}`)}
       onSearch={() => router.push('/search?scope=feed')}
       onOpenProfile={() => router.push('/profile')}
+      onOpenTrend={(trend) => router.push(`/trend/${trend}`)}
       onSnap={() => requireAccount('snap', () => router.push('/capture'))}
     />
   );

@@ -710,6 +710,79 @@ export const previewTrending: readonly {
   { key: 'keyboards', label: 'Keyboards', change: '−3%', photo: image.keyboard },
 ];
 
+/** The story behind each "Hot this month" category, for its trend screen. */
+export interface PreviewTrendDetail {
+  /** One line in the app's voice, set big at the top. */
+  readonly headline: string;
+  readonly why: string;
+  readonly typicalPrice: number;
+  readonly low: number;
+  readonly high: number;
+  readonly soldThisMonth: number;
+  /** Typical price over the last 12 weeks, oldest first. */
+  readonly series: readonly number[];
+  readonly listingIds: readonly string[];
+  readonly postIds: readonly string[];
+}
+
+export const previewTrendDetails: Readonly<Record<string, PreviewTrendDetail>> = {
+  'film-cameras': {
+    headline: 'Film is back in frame.',
+    why: 'Instant and point-and-shoot cameras keep climbing as film photos trend again. Working flashes and sealed film packs fetch the most.',
+    typicalPrice: 3000,
+    low: 2500,
+    high: 3600,
+    soldThisMonth: 42,
+    series: [2400, 2450, 2500, 2480, 2600, 2650, 2700, 2750, 2820, 2880, 2950, 3000],
+    listingIds: ['polaroid-sun-600'],
+    postIds: ['polaroid-sun-600'],
+  },
+  sneakers: {
+    headline: 'Grails hold their heat.',
+    why: 'Classic colourways like the Jordan 1 Bred stay in demand. Original boxes and clean soles add the most value.',
+    typicalPrice: 9200,
+    low: 7800,
+    high: 10500,
+    soldThisMonth: 57,
+    series: [8300, 8350, 8500, 8450, 8600, 8700, 8650, 8800, 8900, 9000, 9100, 9200],
+    listingIds: ['air-jordan-1-bred'],
+    postIds: [],
+  },
+  '90s-sportswear': {
+    headline: 'The 90s never left.',
+    why: 'Bold windbreakers and track jackets are back. Bright teal and purple colourways and original tags push prices up.',
+    typicalPrice: 2450,
+    low: 2100,
+    high: 2850,
+    soldThisMonth: 36,
+    series: [2150, 2180, 2200, 2190, 2250, 2280, 2300, 2330, 2360, 2390, 2420, 2450],
+    listingIds: [],
+    postIds: ['retro-windbreaker'],
+  },
+  'retro-audio': {
+    headline: 'Press play on the past.',
+    why: 'Cassette players and Walkmans are steady sellers. Ones that still play, with the original belt clip, sell fastest.',
+    typicalPrice: 1900,
+    low: 1500,
+    high: 2400,
+    soldThisMonth: 18,
+    series: [1780, 1800, 1790, 1820, 1830, 1850, 1840, 1860, 1870, 1880, 1890, 1900],
+    listingIds: ['retro-walkman'],
+    postIds: ['retro-walkman-post'],
+  },
+  keyboards: {
+    headline: 'Cooling off, for now.',
+    why: 'Mechanical keyboards dipped as new models launched. A good time to buy; if you are selling, include the original keycaps.',
+    typicalPrice: 4300,
+    low: 3600,
+    high: 5000,
+    soldThisMonth: 24,
+    series: [4500, 4480, 4460, 4470, 4420, 4400, 4410, 4380, 4350, 4340, 4320, 4300],
+    listingIds: ['keychron-keyboard'],
+    postIds: ['keychron-post'],
+  },
+};
+
 export const previewMarketCategories: readonly { readonly key: string; readonly label: string }[] =
   [
     { key: 'all', label: 'All' },

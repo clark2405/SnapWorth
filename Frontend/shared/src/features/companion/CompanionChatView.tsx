@@ -183,11 +183,9 @@ function CompanionChat({ initialQuestion, onBack, onUseListing }: CompanionChatV
           if (following.current) scroller.current?.scrollToEnd({ animated: true });
         }}
       >
+        {/* The header already names Worthy; the intro is just Worthy itself. */}
         <Animated.View entering={FadeIn.duration(500)} style={styles.intro}>
           <Worthy size={72} mood={thinking ? 'thinking' : 'idle'} />
-          <SWText variant="companion" align="center">
-            Worthy
-          </SWText>
         </Animated.View>
 
         {messages.map((message) =>

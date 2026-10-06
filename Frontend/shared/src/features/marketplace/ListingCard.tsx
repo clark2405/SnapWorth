@@ -8,6 +8,7 @@ import {
   SWText,
   Tag,
   ZoomLink,
+  ZoomSource,
   useToast,
   type NavLinkMenuItem,
   type TagTone,
@@ -79,15 +80,19 @@ export function ListingCard({ listing, onOpen, onMessageSeller }: ListingCardPro
       label={`${listing.title}, asking ${formatPeso(listing.askingPrice)}, community says ${verdict}`}
       onPress={onOpen}
       menu={menu}
+      zoomFromSource
       style={styles.card}
     >
       <View style={styles.photoWrap}>
-        <Photo
-          source={listing.photo}
-          label={listing.photoLabel}
-          aspectRatio={4 / 5}
-          radius={tokens.radius.medium}
-        />
+        {/* The photo zooms into the listing's photo; the text stays put. */}
+        <ZoomSource>
+          <Photo
+            source={listing.photo}
+            label={listing.photoLabel}
+            aspectRatio={4 / 5}
+            radius={tokens.radius.medium}
+          />
+        </ZoomSource>
         <View style={styles.like}>
           <LikeButton
             liked={saved}

@@ -35,7 +35,7 @@ export function AccountGateView({ title, intent, onBack }: AccountGateViewProps)
       clearTabBar={!onBack}
       header={onBack ? <NavHeader title={title} onBack={onBack} /> : undefined}
     >
-      {onBack ? null : <LargeTitle title={title} />}
+      {onBack ? null : <LargeTitle brand title={title} />}
       <EmptyState icon={icons[intent]} title={copy.title} body={copy.body} />
       <Reveal index={1} style={styles.actions}>
         <Button label="Create free account" onPress={createAccount} />

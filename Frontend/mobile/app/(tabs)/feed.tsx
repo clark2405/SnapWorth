@@ -9,6 +9,7 @@ export default function FeedRoute() {
     <FeedView
       onOpenPost={(postId) => router.push(`/post/${postId}`)}
       onOpenProfile={() => router.push('/profile')}
+      onOpenTrend={(trend) => router.push(`/trend/${trend}`)}
     />
   );
 }

@@ -101,6 +101,7 @@ export function MarketplaceView({
       onRefresh={() => new Promise<void>((resolve) => setTimeout(resolve, 900))}
     >
       <LargeTitle
+        brand
         title="Market"
         trailing={
           <View style={styles.actions}>

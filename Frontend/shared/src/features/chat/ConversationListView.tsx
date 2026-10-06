@@ -46,6 +46,7 @@ export function ConversationListView({
       onRefresh={() => new Promise((resolve) => setTimeout(resolve, 900))}
     >
       <LargeTitle
+        brand
         title="Chats"
         overlineIcon={unread > 0 ? MessagesSquare : undefined}
         overline={unread > 0 ? `${unread} unread` : undefined}

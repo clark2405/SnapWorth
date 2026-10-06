@@ -8,7 +8,6 @@ import {
   Handshake,
   Lock,
   RotateCw,
-  Share2,
   ShoppingBag,
   Tag as TagIcon,
   Target,
@@ -17,7 +16,7 @@ import {
   WifiOff,
 } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollView, Share, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { ScrollView, Share, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -51,13 +50,15 @@ import {
   Sheet,
   Sparkline,
   SWText,
+  shareIcon,
   Wordmark,
   LogoMark,
   Surface,
   Tag,
   TextField,
-  ZoomTarget,
   useToast,
+  DetailHero,
+  DetailSheet,
 } from '../../components';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import {
@@ -124,7 +125,6 @@ export function EstimateResultView({
   // A fresh capture is private until the owner shares it; History items carry their own state.
   const placement: PreviewSharing = (itemId ? previewSharingByItem[itemId] : undefined) ?? {};
   const styles = useThemedStyles(stylesFor);
-  const { height } = useWindowDimensions();
   const [title, setTitle] = useState<string>(item.title);
   const [condition, setCondition] = useState<PreviewCondition>(previewValuation.condition);
   const [sharing, setSharing] = useState(false);
@@ -152,7 +152,7 @@ export function EstimateResultView({
           trailing={
             estimated ? (
               <IconButton
-                icon={Share2}
+                icon={shareIcon}
                 label="Share this estimate"
                 appearance="glass"
                 onPress={() => {
@@ -185,20 +185,20 @@ export function EstimateResultView({
       contentStyle={styles.content}
     >
       {asSheet ? null : (
-        <View style={[styles.hero, { height: Math.round(height * (estimated ? 0.5 : 0.62)) }]}>
-          <ZoomTarget>
-            <Photo
-              source={item.photo}
-              label={item.photoLabel}
-              radius={0}
-              style={StyleSheet.absoluteFill}
-            />
-          </ZoomTarget>
+        <DetailHero
+          source={item.photo}
+          label={item.photoLabel}
+          heightRatio={estimated ? 0.5 : 0.62}
+        >
           {status === 'estimating' ? <ScanOverlay /> : null}
-        </View>
+        </DetailHero>
       )}
 
-      <View style={[styles.sheet, asSheet ? styles.inSheet : null]}>
+      {/* Only an estimate that resolves here gets the reveal; one opened from History is known. */}
+      <DetailSheet
+        reveal={resolvedHere.current}
+        style={[styles.sheet, asSheet ? styles.inSheet : null]}
+      >
         {status === 'estimating' ? <EstimatingStatus /> : null}
         {status === 'failed' ? (
           <Problem
@@ -240,7 +240,8 @@ export function EstimateResultView({
                 variant="priceHero"
                 value={value}
                 format={formatPeso}
-                durationMs={resolvedHere.current ? 1100 : 500}
+                from={resolvedHere.current ? undefined : value}
+                durationMs={1100}
                 accessibilityLiveRegion="polite"
               />
               <SWText variant="bodyMedium" tone="textMuted">
@@ -256,6 +257,7 @@ export function EstimateResultView({
                 confidence={previewValuation.confidence}
                 format={formatPeso}
                 showConfidence={false}
+                animate={resolvedHere.current}
               />
             </Reveal>
 
@@ -362,7 +364,7 @@ export function EstimateResultView({
         ) : null}
 
         <SavedNote sharing={placement} />
-      </View>
+      </DetailSheet>
 
       <ShareCardSheet
         visible={sharing}
@@ -676,10 +678,8 @@ function Destinations({
 
   return (
     <BottomBar>
-      <Animated.View
-        entering={FadeInDown.delay(500).springify().damping(18)}
-        style={styles.destinations}
-      >
+      {/* The actions arrive with their bar, not after it. */}
+      <View style={styles.destinations}>
         {postId || listingId ? null : (
           <IconButton
             icon={EyeOff}
@@ -690,7 +690,7 @@ function Destinations({
         )}
         {feedAction}
         {marketAction}
-      </Animated.View>
+      </View>
     </BottomBar>
   );
 }
@@ -742,7 +742,7 @@ function ShareCardSheet({
       </View>
       <Button
         label="Share card"
-        icon={Share2}
+        icon={shareIcon}
         onPress={() => {
           void Share.share({ message: `${title} — worth about ${formatPeso(value)} on SnapWorth.` })
             .then((result) => {
@@ -764,22 +764,11 @@ const stylesFor = themedStyles((colors, name) => ({
     paddingTop: 0,
     paddingHorizontal: 0,
   },
-  hero: {
-    width: '100%',
-    overflow: 'hidden',
-    backgroundColor: colors.sunken,
-  },
   inSheet: {
     marginTop: 0,
     paddingTop: tokens.spacing[2],
   },
   sheet: {
-    marginTop: -tokens.radius.xlarge,
-    borderTopLeftRadius: tokens.radius.xlarge,
-    borderTopRightRadius: tokens.radius.xlarge,
-    backgroundColor: colors.canvas,
-    paddingHorizontal: gutter,
-    paddingTop: tokens.spacing[6],
     gap: tokens.spacing[10],
   },
   headline: {
