@@ -75,6 +75,11 @@ function Shell() {
               animation: 'default',
               gestureEnabled: true,
               fullScreenGestureEnabled: true,
+              // iOS 26 clips scroll views at the screen edges on its own. Its automatic style drew
+              // a hard cut line above the bottom bars; a soft edge lets content blur away under the
+              // floating bar like the system's toolbars. The top is ours: each header draws its own
+              // soft fade, so the system one stays off rather than doubling it.
+              scrollEdgeEffects: { top: 'hidden', bottom: 'soft', left: 'hidden', right: 'hidden' },
             }}
           >
             <Stack.Screen name="index" options={{ animation: 'none' }} />

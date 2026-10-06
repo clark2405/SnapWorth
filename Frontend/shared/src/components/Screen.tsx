@@ -143,13 +143,18 @@ export function Screen({
   const clearance = insets.top + (header ? headerHeight : 0);
   const extraTop = Number(StyleSheet.flatten(contentStyle)?.paddingTop ?? 0);
   const topRoom = bleedTop ? extraTop : clearance + extraTop;
-  // The web draws its own floating tab bar; native tabs carry the Snap bar above theirs.
-  const tabBarRoom =
-    Platform.OS === 'web'
-      ? tokens.layout.floatingTabBarClearance
-      : tokens.layout.nativeTabBarClearance;
-  const bottomRoom =
-    (clearTabBar ? tabBarRoom : 0) + (footer ? footerHeight : insets.bottom) + tokens.spacing[8];
+  // Exactly the room the bottom chrome takes, plus a little air: iOS 26's floating tab bar and
+  // its Snap accessory sit a fixed distance from the screen edge; Android's navigation bar sits
+  // on the inset with the Snap bar above it; the web draws its own floating bar. A footer
+  // (BottomBar) measures itself and keeps clear of the home indicator on its own.
+  const tabBarRoom = Platform.select({
+    ios: tokens.layout.nativeTabBarClearance,
+    android: insets.bottom + tokens.layout.androidTabBarClearance,
+    default: insets.bottom + tokens.layout.floatingTabBarClearance + tokens.spacing[4],
+  });
+  const bottomRoom = clearTabBar
+    ? tabBarRoom + tokens.spacing[4]
+    : (footer ? footerHeight : insets.bottom) + tokens.spacing[8];
 
   const body = [styles.content, contentStyle, { paddingTop: topRoom, paddingBottom: bottomRoom }];
 
@@ -191,7 +196,7 @@ export function Screen({
             )}
             {footer ? (
               <View
-                style={[styles.footer, { paddingBottom: insets.bottom }]}
+                style={styles.footer}
                 onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
               >
                 {footer}

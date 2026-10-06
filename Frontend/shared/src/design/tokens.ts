@@ -442,10 +442,12 @@ export const tokens = deepFreeze({
     sectionGap: 40,
     tabBarHeight: 60,
     /**
-     * Room above the native tab bar and the Snap bar riding on it (the iOS bottom accessory, or
-     * its Android counterpart), so content and the companion clear both.
+     * iOS: room from the screen's bottom edge to the top of the floating tab bar and the Snap
+     * accessory riding on it, so the last item scrolls clear of both and no further.
      */
-    nativeTabBarClearance: 160,
+    nativeTabBarClearance: 140,
+    /** Android: Material's navigation bar plus the Snap bar floating above it, over the inset. */
+    androidTabBarClearance: 152,
     /** Room above the web's floating tab bar, so content and the companion clear it. */
     floatingTabBarClearance: 112,
     floatingTabBar: 74,
