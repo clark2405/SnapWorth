@@ -1,4 +1,4 @@
-import { Camera, type LucideIcon } from 'lucide-react-native';
+import type { LucideIcon } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View, type LayoutRectangle } from 'react-native';
 import Animated, {
@@ -23,26 +23,17 @@ export interface TabItem<Key extends string> {
 }
 
 export interface TabBarProps<Key extends string> {
-  /** Two tabs sit either side of the capture button. */
-  readonly leading: readonly [TabItem<Key>, TabItem<Key>];
-  readonly trailing: readonly [TabItem<Key>, TabItem<Key>];
+  readonly tabs: readonly TabItem<Key>[];
   readonly activeKey?: Key;
   readonly onSelect: (key: Key) => void;
-  readonly onCapture: () => void;
 }
 
 /**
- * A floating glass capsule for platforms without the native tab bar (the web): four tabs with
- * thin line icons, the active one in ink with a bold label on a soft gliding pill, either side
- * of the Snap button, the core action, in the accent.
+ * A floating glass capsule for platforms without the native tab bar (the web): tabs with thin
+ * line icons, the active one in ink with a bold label on a soft gliding pill. Tabs are places
+ * only; actions such as Snap live on the screens they belong to.
  */
-export function TabBar<Key extends string>({
-  leading,
-  trailing,
-  activeKey,
-  onSelect,
-  onCapture,
-}: TabBarProps<Key>) {
+export function TabBar<Key extends string>({ tabs, activeKey, onSelect }: TabBarProps<Key>) {
   const insets = useSafeAreaInsets();
   const styles = useThemedStyles(stylesFor);
   const reduceMotion = useReducedMotion();
@@ -111,35 +102,10 @@ export function TabBar<Key extends string>({
         <GlassSurface style={styles.capsule}>
           <View accessibilityRole="tablist" style={styles.row}>
             <Animated.View pointerEvents="none" style={[styles.pill, pillStyle]} />
-            {leading.map(renderTab)}
-            <SnapButton onPress={onCapture} />
-            {trailing.map(renderTab)}
+            {tabs.map(renderTab)}
           </View>
         </GlassSurface>
       </View>
-    </View>
-  );
-}
-
-/**
- * The screen's one primary action, set in the middle of the bar: a vermilion pill with the
- * camera, so capturing is always one thumb-reach away whichever tab you are on.
- */
-function SnapButton({ onPress }: { readonly onPress: () => void }) {
-  const { colors } = useTheme();
-  const styles = useThemedStyles(stylesFor);
-
-  return (
-    <View style={styles.snapSlot}>
-      <PressableScale
-        accessibilityLabel="Snap it"
-        accessibilityHint="Opens the camera to photograph something and get an estimate"
-        onPress={onPress}
-        haptic="pop"
-        style={({ pressed }) => [styles.snap, pressed ? styles.snapPressed : null]}
-      >
-        <Camera size={22} strokeWidth={2} color={colors.onAccent} />
-      </PressableScale>
     </View>
   );
 }
@@ -252,24 +218,5 @@ const stylesFor = themedStyles((colors, name) => ({
     left: 0,
     borderRadius: tokens.radius.full,
     backgroundColor: colors.sunken,
-  },
-  snapSlot: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  snap: {
-    width: 60,
-    height: 48,
-    borderRadius: tokens.radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.accent,
-    shadowColor: tokens.lifted[name],
-    shadowOpacity: 1,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-  },
-  snapPressed: {
-    backgroundColor: colors.accentPressed,
   },
 }));

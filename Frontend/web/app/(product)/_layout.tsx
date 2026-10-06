@@ -13,13 +13,12 @@ const tabRoutes: Record<TabKey, Href> = {
   history: '/history',
 };
 
-const leading = [
+// Places only: Snap is an action, so it lives in the Feed and History headers (and as Sell in
+// Market), not in the bar.
+const tabs = [
   { key: 'feed', label: 'Feed', icon: Newspaper },
   { key: 'marketplace', label: 'Market', icon: ShoppingBag },
-] as const satisfies readonly TabItem<TabKey>[];
-
-const trailing = [
-  { key: 'chat', label: 'Chat', icon: MessageSquare },
+  { key: 'chat', label: 'Chats', icon: MessageSquare },
   { key: 'history', label: 'History', icon: Clock },
 ] as const satisfies readonly TabItem<TabKey>[];
 
@@ -33,11 +32,9 @@ export default function ProductLayout() {
       <Slot />
       {activeKey ? (
         <TabBar
-          leading={leading}
-          trailing={trailing}
+          tabs={tabs}
           activeKey={activeKey}
           onSelect={(key) => router.replace(tabRoutes[key])}
-          onCapture={() => router.push('/capture')}
         />
       ) : null}
     </View>

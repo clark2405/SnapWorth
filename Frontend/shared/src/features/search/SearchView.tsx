@@ -54,6 +54,12 @@ export interface SearchViewProps {
   readonly origin?: SearchOrigin;
   readonly onBack?: () => void;
   readonly onOpenResult?: (result: { kind: PreviewSearchResult['kind']; id: string }) => void;
+  /**
+   * `overlay` grows out of a search button and Cancel closes it (the web). `tab` is the app's one
+   * search place, a tab of its own on iOS: the field is simply there, and Cancel only appears
+   * while typing, to clear and put the keyboard away.
+   */
+  readonly mode?: 'overlay' | 'tab';
 }
 
 const scopes: readonly { key: SearchScope; label: string }[] = [
@@ -110,7 +116,9 @@ export function SearchView({
   origin,
   onBack,
   onOpenResult,
+  mode = 'overlay',
 }: SearchViewProps) {
+  const tab = mode === 'tab';
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const insets = useSafeAreaInsets();
@@ -118,22 +126,23 @@ export function SearchView({
   const input = useRef<TextInput>(null);
   const slotRef = useRef<View>(null);
   const [query, setQuery] = useState('');
+  const [focused, setFocused] = useState(false);
   const [scope, setScope] = useState<SearchScope>(initialScope);
   const [recents, setRecents] = useState<readonly string[]>(previewRecentSearches);
   // The field's resting frame in window coordinates, measured so it can start on the button.
   const [slot, setSlot] = useState<SearchOrigin | null>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
   // 0: sitting on the search button. 1: the full bar, page faded in.
-  const morph = useSharedValue(reduceMotion ? 1 : 0);
+  const morph = useSharedValue(reduceMotion || tab ? 1 : 0);
   const ready = slot !== null;
   const trimmed = query.trim().toLowerCase();
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || tab) return;
     if (!reduceMotion) morph.value = withSpring(1, stretch);
     const timer = setTimeout(() => input.current?.focus(), reduceMotion ? 0 : focusDelayMs);
     return () => clearTimeout(timer);
-  }, [morph, ready, reduceMotion]);
+  }, [morph, ready, reduceMotion, tab]);
 
   const measureSlot = () =>
     slotRef.current?.measureInWindow((x, y, width, height) => {
@@ -200,6 +209,10 @@ export function SearchView({
 
   const leave = () => {
     Keyboard.dismiss();
+    if (tab) {
+      setQuery('');
+      return;
+    }
     if (reduceMotion || !ready) {
       onBack?.();
       return;
@@ -238,6 +251,8 @@ export function SearchView({
                 placeholderTextColor={colors.textMuted}
                 selectionColor={colors.accent}
                 returnKeyType="search"
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
                 autoCapitalize="none"
                 autoCorrect={false}
                 accessibilityLabel="Search"
@@ -271,20 +286,22 @@ export function SearchView({
             ) : null}
           </Animated.View>
         </View>
-        <Animated.View style={cancelStyle}>
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityLabel="Cancel search"
-            haptic="none"
-            hitSlop={tokens.spacing[2]}
-            onPress={leave}
-            style={styles.cancel}
-          >
-            <SWText variant="label" tone="textSecondary">
-              Cancel
-            </SWText>
-          </PressableScale>
-        </Animated.View>
+        {tab && !focused && query.length === 0 ? null : (
+          <Animated.View style={cancelStyle}>
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel="Cancel search"
+              haptic="none"
+              hitSlop={tokens.spacing[2]}
+              onPress={leave}
+              style={styles.cancel}
+            >
+              <SWText variant="label" tone="textSecondary">
+                Cancel
+              </SWText>
+            </PressableScale>
+          </Animated.View>
+        )}
       </View>
 
       <Animated.View style={followStyle}>
@@ -325,7 +342,7 @@ export function SearchView({
   return (
     <View style={styles.root}>
       <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]} />
-      <Screen transparent header={header} contentStyle={styles.content}>
+      <Screen transparent clearTabBar={tab} header={header} contentStyle={styles.content}>
         <Animated.View style={followStyle}>
           {trimmed.length === 0 ? (
             <View style={styles.sections}>

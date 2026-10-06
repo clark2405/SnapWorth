@@ -441,8 +441,11 @@ export const tokens = deepFreeze({
     gridGap: 16,
     sectionGap: 40,
     tabBarHeight: 60,
-    /** Room above the native floating tab bar, so content and the companion clear it. */
-    nativeTabBarClearance: 96,
+    /**
+     * Room above the native tab bar and the Snap bar riding on it (the iOS bottom accessory, or
+     * its Android counterpart), so content and the companion clear both.
+     */
+    nativeTabBarClearance: 160,
     /** Room above the web's floating tab bar, so content and the companion clear it. */
     floatingTabBarClearance: 112,
     floatingTabBar: 74,
