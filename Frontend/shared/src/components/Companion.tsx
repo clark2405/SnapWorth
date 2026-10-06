@@ -25,7 +25,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../design';
-import { CompanionOrb, type CompanionMood } from './CompanionOrb';
+import { Worthy, type CompanionMood } from './Worthy';
 import { GlassSurface } from './GlassSurface';
 import { PressableScale } from './PressableScale';
 import { contentScrolling } from './scroll-signal';
@@ -55,7 +55,7 @@ export interface CompanionProps {
   readonly hidden?: boolean;
 }
 
-const orbSize = 50;
+const orbSize = 56;
 const edgeGap = 16;
 const holdMs = 520;
 // Worthy introduces itself once per session; after that the orb stays quiet until asked.
@@ -201,20 +201,26 @@ export function Companion({
 
   const gesture = Gesture.Exclusive(drag, hold, tap);
 
-  // While the page scrolls, the orb tucks most of the way into its edge so it never sits on
-  // top of what you are reading, then glides back out once the content settles.
+  // While the page scrolls, Worthy tucks almost all the way behind its edge, leaning so just
+  // its eye peeks out, so it never sits on what you are reading; it slides back once the
+  // content settles.
   const tuckDirection = side === 'right' ? 1 : -1;
   const orbStyle = useAnimatedStyle(() => {
     const tuck = contentScrolling.value;
     return {
-      opacity: lift.value * (1 - tuck * 0.45),
+      opacity: lift.value,
       transform: [
-        { translateX: x.value + tuck * tuckDirection * (orbSize * 0.6 + edgeGap) },
+        { translateX: x.value + tuck * tuckDirection * (orbSize * 0.78 + edgeGap) },
         { translateY: y.value + (1 - lift.value) * 80 },
-        { scale: 0.4 + lift.value * 0.6 - charge.value * 0.08 - tuck * 0.12 },
+        { rotate: `${tuck * tuckDirection * -16}deg` },
+        { scale: 0.4 + lift.value * 0.6 - charge.value * 0.08 - tuck * 0.1 },
       ],
     };
   });
+  // The hint rides off with it. Transform only: fading would leave its glass unrendered on iOS.
+  const hintTuckStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: contentScrolling.value * tuckDirection * (width * 0.9) }],
+  }));
   const chargeStyle = useAnimatedStyle(() => ({
     opacity: charge.value,
     transform: [{ scale: 1 + charge.value * 0.35 }],
@@ -239,6 +245,7 @@ export function Companion({
           exiting={FadeOut.duration(160)}
           style={[
             styles.hint,
+            hintTuckStyle,
             side === 'right'
               ? { right: edgeGap + orbSize + tokens.spacing[2] }
               : { left: edgeGap + orbSize + tokens.spacing[2] },
@@ -268,7 +275,7 @@ export function Companion({
           style={[styles.orb, orbStyle]}
         >
           <Animated.View style={[styles.charge, chargeStyle]} />
-          <CompanionOrb size={orbSize} mood={open ? 'attentive' : mood} />
+          <Worthy size={orbSize} mood={open ? 'attentive' : mood} />
         </Animated.View>
       </GestureDetector>
     </View>
@@ -365,7 +372,7 @@ function CompanionPanel({
       >
         <GlassSurface style={styles.panel}>
           <View style={styles.panelHeader}>
-            <CompanionOrb size={30} mood="attentive" />
+            <Worthy size={30} mood="attentive" />
             <View style={styles.flex}>
               <SWText variant="companion">Worthy</SWText>
             </View>

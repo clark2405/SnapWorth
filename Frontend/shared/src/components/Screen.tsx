@@ -110,14 +110,14 @@ export function Screen({
       const delta = y - (context.lastY ?? y);
       context.lastY = y;
       scrollY.value = y;
-      // Reading on: step floating chrome aside, and bring it back ~0.7s after the page stops.
-      // Each event restarts the sequence, so it only returns once scrolling has settled.
-      if (delta > 2 && y > 40) {
+      // Any scroll steps floating chrome (Worthy) aside, and brings it back ~1s after the page
+      // stops. Each event restarts the sequence, so it only returns once scrolling has settled.
+      if (Math.abs(delta) > 2 && y > 40) {
         contentScrolling.value = withSequence(
           withTiming(1, { duration: tokens.motion.duration.base }),
-          withDelay(700, withTiming(0, { duration: tokens.motion.duration.reveal })),
+          withDelay(1000, withTiming(0, { duration: tokens.motion.duration.reveal })),
         );
-      } else if (delta < -6) {
+      } else if (y <= 40) {
         contentScrolling.value = withTiming(0, { duration: tokens.motion.duration.stepTransition });
       }
     },
@@ -143,7 +143,7 @@ export function Screen({
   const clearance = insets.top + (header ? headerHeight : 0);
   const extraTop = Number(StyleSheet.flatten(contentStyle)?.paddingTop ?? 0);
   const topRoom = bleedTop ? extraTop : clearance + extraTop;
-  // The web draws its own floating tab bar with the Snap button above it, so it needs more room.
+  // The web draws its own floating tab bar; native tabs carry the Snap bar above theirs.
   const tabBarRoom =
     Platform.OS === 'web'
       ? tokens.layout.floatingTabBarClearance

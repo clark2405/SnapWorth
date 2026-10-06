@@ -11,5 +11,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ...config.web,
     bundler: 'metro',
     output: 'static',
+    // The tag-and-lens mark, same as the app icon.
+    favicon: './assets/favicon.png',
   },
 });
