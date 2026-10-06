@@ -53,6 +53,7 @@ export function FeedView({ onOpenPost, onSearch, onOpenProfile, onSnap }: FeedVi
       onRefresh={() => new Promise<void>((resolve) => setTimeout(resolve, 900))}
     >
       <LargeTitle
+        brand
         title="Feed"
         trailing={
           <View style={styles.actions}>

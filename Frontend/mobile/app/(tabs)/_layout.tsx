@@ -18,7 +18,8 @@ export default function TabsLayout() {
 
   const tabs = (
     <NativeTabs
-      tintColor={colors.textPrimary}
+      // The brand's one accent marks where you are, as Apple suggests for the tint colour.
+      tintColor={colors.accent}
       minimizeBehavior="onScrollDown"
       labelStyle={{ fontSize: 10, fontFamily: fontFaces['500'] }}
     >

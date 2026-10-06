@@ -5,6 +5,7 @@ import Animated, { Extrapolation, interpolate, useAnimatedStyle } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { themedStyles, tokens, useThemedStyles } from '../design';
+import { Wordmark } from './Brand';
 import { IconButton } from './IconButton';
 import { Overline } from './Overline';
 import { useRegisterLargeTitle, useScreenScroll } from './Screen';
@@ -54,7 +55,9 @@ export function NavHeader({ title, onBack, trailing, banded = false }: NavHeader
       <Animated.View style={[styles.barLayer, { top: -insets.top }, barStyle]}>
         <ScrollEdge solid={insets.top + tokens.layout.headerCompact} />
       </Animated.View>
-      <View style={styles.nav}>
+      {/* In a sheet there is no status bar above the header, so it brings its own top margin
+          rather than sitting on the sheet's rounded edge. */}
+      <View style={[styles.nav, insets.top < sheetTopInset ? styles.navInSheet : null]}>
         <View style={styles.side}>
           {onBack ? (
             <IconButton icon={ChevronLeft} label="Go back" appearance="glass" onPress={onBack} />
@@ -85,13 +88,22 @@ export interface LargeTitleProps {
   /** A short line under the title that states what the screen is for. */
   readonly subtitle?: string;
   readonly trailing?: ReactNode;
+  /** Sets the wordmark, centred, above the title: the main tabs carry the brand at their top. */
+  readonly brand?: boolean;
 }
 
 /**
  * The bold title that opens a top-level tab. As the page scrolls it
  * drifts up a little slower than the content and fades, handing off to the compact title.
  */
-export function LargeTitle({ title, overline, overlineIcon, subtitle, trailing }: LargeTitleProps) {
+export function LargeTitle({
+  title,
+  overline,
+  overlineIcon,
+  subtitle,
+  trailing,
+  brand = false,
+}: LargeTitleProps) {
   const scroll = useScreenScroll();
   const register = useRegisterLargeTitle(title);
   const styles = useThemedStyles(stylesFor);
@@ -115,6 +127,11 @@ export function LargeTitle({ title, overline, overlineIcon, subtitle, trailing }
     >
       {/* Overline, then the huge title sharing a line with its circular actions; any subtitle
           gets the full width beneath, so nothing wraps into a ragged line beside the buttons. */}
+      {brand ? (
+        <Animated.View style={[styles.brandRow, textStyle]}>
+          <Wordmark height={22} />
+        </Animated.View>
+      ) : null}
       {overline ? (
         <Animated.View style={[styles.overlineRow, textStyle]}>
           <Overline label={overline} icon={overlineIcon} />
@@ -139,6 +156,9 @@ export function LargeTitle({ title, overline, overlineIcon, subtitle, trailing }
   );
 }
 
+/** Below this, the screen has no status bar over it: it is presented as a sheet. */
+const sheetTopInset = tokens.spacing[5];
+
 const stylesFor = themedStyles(() => ({
   wrap: {
     position: 'relative',
@@ -149,11 +169,19 @@ const stylesFor = themedStyles(() => ({
     right: 0,
     pointerEvents: 'none',
   },
+  // The controls sit on the page gutter, so the back button lines up with the content below.
   nav: {
     minHeight: tokens.layout.headerCompact,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: tokens.spacing[3],
+    paddingHorizontal: tokens.layout.pageGutterCompact,
+  },
+  // Concentric with the sheet's corner: the button sits as far from the top edge as from the
+  // side, so it follows the curve instead of crowding it.
+  navInSheet: {
+    paddingTop:
+      tokens.layout.pageGutterCompact -
+      (tokens.layout.headerCompact - tokens.focus.minimumTarget) / 2,
   },
   side: {
     minWidth: tokens.focus.minimumTarget + tokens.spacing[2],
@@ -172,6 +200,10 @@ const stylesFor = themedStyles(() => ({
     gap: tokens.spacing[1],
     paddingTop: tokens.spacing[4],
     paddingBottom: tokens.spacing[6],
+  },
+  brandRow: {
+    alignItems: 'center',
+    marginBottom: tokens.spacing[3],
   },
   overlineRow: {
     marginBottom: tokens.spacing[1],
