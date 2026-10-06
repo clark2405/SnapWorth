@@ -7,7 +7,8 @@ import {
   LargeTitle,
   Overline,
   Photo,
-  PressableScale,
+  ZoomLink,
+  ZoomSource,
   Reveal,
   Screen,
   SearchButton,
@@ -31,6 +32,8 @@ export interface FeedViewProps {
    * on iOS, Snap rides above the tab bar instead.
    */
   readonly onSnap?: () => void;
+  /** Opens a "Hot this month" category's trend screen, by its key (where links need a hand). */
+  readonly onOpenTrend?: (trendKey: string) => void;
 }
 
 type PreviewTrend = (typeof previewTrending)[number];
@@ -39,7 +42,13 @@ type PreviewTrend = (typeof previewTrending)[number];
  * The community's front page: what is trending this month, then every open question, newest
  * first. Nothing here is a hard card; posts are set apart by air, not rules.
  */
-export function FeedView({ onOpenPost, onSearch, onOpenProfile, onSnap }: FeedViewProps) {
+export function FeedView({
+  onOpenPost,
+  onSearch,
+  onOpenProfile,
+  onSnap,
+  onOpenTrend,
+}: FeedViewProps) {
   const styles = useThemedStyles(stylesFor);
   // Local until VoteService exists: tapping the same vote again withdraws it.
   const [votes, setVotes] = useState<Record<string, VoteChoice | null>>({});
@@ -83,7 +92,7 @@ export function FeedView({ onOpenPost, onSearch, onOpenProfile, onSnap }: FeedVi
           contentContainerStyle={styles.trendingRow}
         >
           {previewTrending.map((trend) => (
-            <TrendingTile key={trend.key} trend={trend} />
+            <TrendingTile key={trend.key} trend={trend} onOpen={() => onOpenTrend?.(trend.key)} />
           ))}
         </ScrollView>
       </Reveal>
@@ -112,30 +121,40 @@ export function FeedView({ onOpenPost, onSearch, onOpenProfile, onSnap }: FeedVi
   );
 }
 
-function TrendingTile({ trend }: { readonly trend: PreviewTrend }) {
+function TrendingTile({
+  trend,
+  onOpen,
+}: {
+  readonly trend: PreviewTrend;
+  readonly onOpen: () => void;
+}) {
   const styles = useThemedStyles(stylesFor);
   const rising = trend.change.trim().startsWith('+');
 
+  // Zooms open into the trend's own screen on iOS, the photo carrying straight across.
   return (
-    <PressableScale
-      accessibilityRole="button"
-      accessibilityLabel={`${trend.label}, ${trend.change} this month`}
-      depth="surface"
+    <ZoomLink
+      href={`/trend/${trend.key}`}
+      label={`${trend.label}, ${trend.change} this month. See what's selling`}
+      onPress={onOpen}
+      zoomFromSource
       style={styles.tile}
     >
-      <Photo
-        source={trend.photo}
-        label={trend.label}
-        radius={tokens.radius.large}
-        style={styles.tilePhoto}
-      />
+      <ZoomSource>
+        <Photo
+          source={trend.photo}
+          label={trend.label}
+          radius={tokens.radius.large}
+          style={styles.tilePhoto}
+        />
+      </ZoomSource>
       <SWText variant="labelSmall" numberOfLines={1}>
         {trend.label}
       </SWText>
       <SWText variant="caption" tone={rising ? 'success' : 'danger'}>
         {trend.change}
       </SWText>
-    </PressableScale>
+    </ZoomLink>
   );
 }
 
