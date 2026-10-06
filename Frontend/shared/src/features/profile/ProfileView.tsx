@@ -13,11 +13,14 @@ import {
   Sparkles,
   Wallet,
   TrendingDown,
+  UserX,
 } from 'lucide-react-native';
+import { useState } from 'react';
 import { View } from 'react-native';
 
 import {
   Avatar,
+  Button,
   CountUp,
   ListGroup,
   ListRow,
@@ -28,6 +31,7 @@ import {
   Reveal,
   Screen,
   SegmentedControl,
+  Sheet,
   Sparkline,
   Surface,
   SWText,
@@ -66,6 +70,11 @@ export interface ProfileViewProps {
   readonly onBack?: () => void;
   readonly onOpen?: (destination: ProfileDestination) => void;
   readonly onLogOut?: () => void;
+  /**
+   * Permanently deletes the account and its data. Apple requires apps that create accounts to
+   * offer deletion in the app, not just deactivation.
+   */
+  readonly onDeleteAccount?: () => void;
 }
 
 const appearanceOptions: readonly { readonly key: ThemePreference; readonly label: string }[] = [
@@ -74,9 +83,10 @@ const appearanceOptions: readonly { readonly key: ThemePreference; readonly labe
   { key: 'dark', label: 'Dark' },
 ];
 
-export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
+export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: ProfileViewProps) {
   const { colors, preference, setPreference } = useTheme();
   const styles = useThemedStyles(stylesFor);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const profile = previewProfile;
   const stats = [
     { label: 'Checked', value: profile.stats.checked },
@@ -210,8 +220,43 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
 
         <ListGroup>
           <ListRow label="Log out" icon={LogOut} destructive onPress={onLogOut} />
+          <ListRow
+            label="Delete account"
+            icon={UserX}
+            destructive
+            onPress={() => setConfirmingDelete(true)}
+          />
         </ListGroup>
       </Reveal>
+
+      {/* Deleting can't be undone, so this is the one place the app stops to confirm. */}
+      <Sheet
+        visible={confirmingDelete}
+        onClose={() => setConfirmingDelete(false)}
+        title="Delete your account?"
+      >
+        <View style={styles.deleteSheet}>
+          <SWText variant="bodyMedium" tone="textSecondary">
+            This permanently removes your profile, items, listings, votes, comments and chats. It
+            can&apos;t be undone. You can still look around SnapWorth without an account.
+          </SWText>
+          <View style={styles.deleteActions}>
+            <Button
+              label="Delete account"
+              variant="danger"
+              onPress={() => {
+                setConfirmingDelete(false);
+                onDeleteAccount?.();
+              }}
+            />
+            <Button
+              label="Keep my account"
+              variant="secondary"
+              onPress={() => setConfirmingDelete(false)}
+            />
+          </View>
+        </View>
+      </Sheet>
     </Screen>
   );
 }
@@ -254,5 +299,11 @@ const stylesFor = themedStyles(() => ({
   appearanceRow: {
     paddingHorizontal: tokens.spacing[4],
     paddingVertical: tokens.spacing[3],
+  },
+  deleteSheet: {
+    gap: tokens.spacing[5],
+  },
+  deleteActions: {
+    gap: tokens.spacing[2],
   },
 }));

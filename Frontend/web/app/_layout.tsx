@@ -16,6 +16,10 @@ import { companionConfigFor } from '@snapworth/shared/features/companion';
 import { AppServicesProvider, type BackendConfig } from '@snapworth/shared/composition';
 import { useSnapWorthFonts } from '@snapworth/shared/design/font-assets';
 import { SplashView } from '@snapworth/shared/features/launch';
+import { SessionProvider } from '@snapworth/shared/features/session';
+import { TipsProvider } from '@snapworth/shared/features/tips';
+
+import { browserTipStore } from '../src/tip-store';
 
 const appearanceKey = 'snapworth.appearance';
 
@@ -64,6 +68,7 @@ export default function RootLayout() {
 }
 
 function Shell() {
+  const router = useRouter();
   const { colors, isDark } = useTheme();
   // The first route mounts under the launch screen and starts its entrance as the splash clears.
   const [revealOpen, setRevealOpen] = useState(false);
@@ -75,22 +80,28 @@ function Shell() {
   if (!fontsReady) return <View style={{ flex: 1, backgroundColor: colors.canvas }} />;
 
   return (
-    <>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
-      <RevealGate open={revealOpen}>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.canvas },
-            animation: 'fade',
-          }}
-        />
-        <WebCompanion ready={launched} />
-      </RevealGate>
-      {launched ? null : (
-        <SplashView ready onExit={() => setRevealOpen(true)} onDone={() => setLaunched(true)} />
-      )}
-    </>
+    // Guests can look around; acting asks for an account and comes back here afterwards.
+    <SessionProvider
+      onCreateAccount={() => router.push('/signup?return=1')}
+      onSignIn={() => router.push('/login?return=1')}
+    >
+      <TipsProvider store={browserTipStore}>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+        <RevealGate open={revealOpen}>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.canvas },
+              animation: 'fade',
+            }}
+          />
+          <WebCompanion ready={launched} />
+        </RevealGate>
+        {launched ? null : (
+          <SplashView ready onExit={() => setRevealOpen(true)} onDone={() => setLaunched(true)} />
+        )}
+      </TipsProvider>
+    </SessionProvider>
   );
 }
 

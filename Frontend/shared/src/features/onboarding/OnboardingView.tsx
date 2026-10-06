@@ -30,6 +30,7 @@ import {
   Reveal,
   Sparkline,
   SWText,
+  Wordmark,
   Tag,
 } from '../../components';
 import {
@@ -53,7 +54,7 @@ export interface OnboardingViewProps {
   readonly onGetStarted?: () => void;
   /** For returning users on any step. */
   readonly onSignIn?: () => void;
-  /** Leaves the introduction early. */
+  /** Leaves the introduction to browse as a guest; replay closes it instead. */
   readonly onSkip?: () => void;
   /**
    * `replay` is the introduction reopened from Settings by someone already signed in: it closes
@@ -225,8 +226,9 @@ export function OnboardingView({
   const last = index === lastIndex;
   const stageHeight = Math.max(0, size.height - copyHeight);
 
+  // Looking around stays on offer to the end; only replay's Close gives way to Done.
   const skipStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(scrollX.value / Math.max(width, 1), [1, 2], [1, 0], clamp),
+    opacity: replay ? interpolate(scrollX.value / Math.max(width, 1), [1, 2], [1, 0], clamp) : 1,
   }));
   const continueStyle = useAnimatedStyle(() => {
     const t = interpolate(scrollX.value / Math.max(width, 1), [1, 2], [0, 1], clamp);
@@ -242,17 +244,19 @@ export function OnboardingView({
       <AmbientBackdrop mood="feed" />
       <View style={[styles.column, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <Reveal index={0} style={styles.topBar}>
-          <SWText variant="wordmark">SnapWorth</SWText>
-          <Animated.View style={skipStyle} pointerEvents={last ? 'none' : 'auto'}>
+          <Wordmark />
+          <Animated.View style={skipStyle} pointerEvents={last && replay ? 'none' : 'auto'}>
             <PressableScale
               accessibilityRole="button"
-              accessibilityLabel={replay ? 'Close the introduction' : 'Skip the introduction'}
+              accessibilityLabel={
+                replay ? 'Close the introduction' : 'Look around without an account'
+              }
               onPress={onSkip}
               hitSlop={tokens.spacing[2]}
               style={styles.skip}
             >
               <SWText variant="label" tone="textSecondary">
-                {replay ? 'Close' : 'Skip'}
+                {replay ? 'Close' : 'Look around'}
               </SWText>
             </PressableScale>
           </Animated.View>
@@ -369,6 +373,10 @@ function Stage({ progress, idle, width, height, index, reduceMotion }: StageProp
   const cardHeight = cardWidth * 1.25;
   const lift = height * 0.1;
   const heroBottomOnRange = -lift + (cardHeight * 0.78) / 2;
+  // The range sizes to the screen, not a fixed width, so the large price never runs off the card;
+  // only the narrowest phones drop to the medium price size.
+  const rangeWidth = Math.min(width - gutter * 2, rangeMaxWidth);
+  const priceVariant = rangeWidth >= rangeLargeMinWidth ? 'priceLarge' : 'priceMedium';
 
   // Replay the range's count and trend line each time the second step is reached.
   const [rangeRun, setRangeRun] = useState(0);
@@ -478,7 +486,7 @@ function Stage({ progress, idle, width, height, index, reduceMotion }: StageProp
         style={[
           styles.float,
           styles.range,
-          { top: height / 2 + heroBottomOnRange - tokens.spacing[4] },
+          { width: rangeWidth, top: height / 2 + heroBottomOnRange - tokens.spacing[4] },
           rangeStyle,
         ]}
       >
@@ -489,12 +497,12 @@ function Stage({ progress, idle, width, height, index, reduceMotion }: StageProp
           <Tag label={previewValuation.trendChange.split(' ')[0] ?? ''} tone="mint" />
         </View>
         <View style={styles.rangeRow} key={`range-${rangeRun}`}>
-          <CountUp variant="priceLarge" value={previewValuation.low} format={formatPeso} />
-          <SWText variant="priceLarge" tone="textMuted">
+          <CountUp variant={priceVariant} value={previewValuation.low} format={formatPeso} />
+          <SWText variant={priceVariant} tone="textMuted">
             –
           </SWText>
           <CountUp
-            variant="priceLarge"
+            variant={priceVariant}
             value={previewValuation.high}
             format={formatPeso}
             delayMs={80}
@@ -744,6 +752,9 @@ const bracket = tokens.layout.viewfinderBracket * 1.3;
 const stroke = tokens.layout.progressSegment;
 const gutter = tokens.layout.pageGutterCompact;
 const finderGap = tokens.spacing[3];
+const rangeMaxWidth = 340;
+/** "₱2,100 – ₱2,850" in priceLarge is about 275pt; this leaves room for the card's padding. */
+const rangeLargeMinWidth = 312;
 
 const stylesFor = themedStyles((colors, name) => ({
   root: {
@@ -899,7 +910,6 @@ const stylesFor = themedStyles((colors, name) => ({
     borderColor: colors.borderStrong,
   },
   range: {
-    width: 290,
     alignSelf: 'center',
     gap: tokens.spacing[1],
     paddingTop: tokens.spacing[4],

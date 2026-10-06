@@ -45,6 +45,8 @@ import {
   previewMyListing,
   previewMyListingInsight,
 } from '../preview/sample-data';
+import { useAccountGate, useSession } from '../session';
+import { useTip } from '../tips';
 
 export interface ListingDetailViewProps {
   readonly listingId?: string;
@@ -80,8 +82,10 @@ export function ListingDetailView({
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
+  const { isGuest } = useSession();
+  const requireAccount = useAccountGate();
   // The seller sees their own listing with its numbers and controls instead of buy actions.
-  const owned = listingId === previewMyListing.id;
+  const owned = !isGuest && listingId === previewMyListing.id;
   const listing = owned ? previewMyListing : previewListingDetail;
   const insight = owned ? previewMyListingInsight : previewListingInsight;
   const [markingSold, setMarkingSold] = useState(false);
@@ -92,7 +96,12 @@ export function ListingDetailView({
   const [offerText, setOfferText] = useState('');
   const [sendingOffer, setSendingOffer] = useState(false);
 
-  const toggleSaved = () => setSaved((value) => !value);
+  const saveTip = useTip('save');
+  const toggleSaved = () =>
+    requireAccount('save', () => {
+      saveTip.done();
+      setSaved((value) => !value);
+    });
   const tally = communityTally(listing.justRightShare);
   const offerAmount = Number(offerText.replace(/,/g, '')) || 0;
 
@@ -182,13 +191,13 @@ export function ListingDetailView({
               <Button
                 label="Make offer"
                 variant="secondary"
-                onPress={() => setOfferOpen(true)}
+                onPress={() => requireAccount('offer', () => setOfferOpen(true))}
                 containerStyle={styles.footerButton}
               />
               <Button
                 label="Message"
                 icon={MessageSquare}
-                onPress={onMessageSeller}
+                onPress={() => requireAccount('message', onMessageSeller)}
                 containerStyle={styles.footerButton}
               />
             </View>
@@ -283,16 +292,18 @@ export function ListingDetailView({
                   trailing={
                     <Switch
                       value={priceAlert}
-                      onValueChange={(value) => {
-                        setPriceAlert(value);
-                        if (value) {
-                          haptic('select');
-                          toast.show({
-                            title: 'Alert set',
-                            body: "We'll notify you if the price drops.",
-                          });
-                        }
-                      }}
+                      onValueChange={(value) =>
+                        requireAccount('alert', () => {
+                          setPriceAlert(value);
+                          if (value) {
+                            haptic('select');
+                            toast.show({
+                              title: 'Alert set',
+                              body: "We'll notify you if the price drops.",
+                            });
+                          }
+                        })
+                      }
                       trackColor={{ false: colors.sunken, true: colors.textPrimary }}
                       accessibilityLabel="Alert me if the price drops"
                     />

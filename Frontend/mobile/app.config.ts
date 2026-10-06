@@ -13,10 +13,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     bundleIdentifier: 'com.snapworth.app',
     supportsTablet: false,
-    icon: {
-      light: './assets/icon.png',
-      dark: './assets/icon-dark.png',
-    },
+    // A layered Icon Composer icon: iOS 26 gives the tag and its lens Liquid Glass depth, and
+    // draws the light, dark, tinted and clear appearances from it.
+    icon: './assets/SnapWorth.icon',
     infoPlist: {
       CFBundleDisplayName: 'SnapWorth',
       ITSAppUsesNonExemptEncryption: false,
@@ -26,7 +25,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     package: 'com.snapworth.app',
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
-      backgroundColor: '#0B0B0D',
+      // Android 13+ themed icons tint this one-colour mark to the wallpaper, like iOS's tinted mode.
+      monochromeImage: './assets/adaptive-icon-monochrome.png',
+      // The light icon's paper, so the tag sits on the same ground on Android.
+      backgroundColor: '#FFFBF5',
     },
   },
   plugins: [
@@ -38,8 +40,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       {
         image: './assets/splash-mark.png',
         imageWidth: 96,
-        backgroundColor: '#F5F4F0',
-        dark: { image: './assets/splash-mark-dark.png', backgroundColor: '#0B0B0D' },
+        // The app's own paper and charcoal, so the launch hands over to the first screen seamlessly.
+        backgroundColor: '#FFFBF5',
+        dark: { image: './assets/splash-mark-dark.png', backgroundColor: '#17120D' },
       },
     ],
   ],

@@ -1,6 +1,6 @@
 import { Check, MessageCircle, Tag as TagIcon } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
@@ -206,17 +206,11 @@ function JustRightBurst({ trigger }: { readonly trigger: number }) {
 }
 
 const stylesFor = themedStyles((colors, name) => ({
+  // An edge-to-edge row, not a floating card: the photo carries each post, and a hairline
+  // between posts (drawn by the feed) does the separating, so the page scans like a list.
   post: {
     gap: tokens.spacing[4],
-    padding: tokens.spacing[4],
-    borderRadius: tokens.radius.large,
-    backgroundColor: colors.surface,
-    borderWidth: name === 'dark' ? StyleSheet.hairlineWidth : 0,
-    borderColor: colors.borderSubtle,
-    shadowColor: tokens.shadow[name],
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
+    paddingVertical: tokens.spacing[5],
   },
   header: {
     flexDirection: 'row',

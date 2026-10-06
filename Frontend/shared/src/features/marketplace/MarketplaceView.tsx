@@ -25,6 +25,7 @@ import {
   type PreviewListing,
 } from '../preview/sample-data';
 import { ProfileButton } from '../profile/ProfileButton';
+import { Tip } from '../tips';
 import { ListingCard } from './ListingCard';
 import {
   areaLabel,
@@ -103,11 +104,22 @@ export function MarketplaceView({
         title="Market"
         trailing={
           <View style={styles.actions}>
-            <Button label="Sell" size="small" variant="secondary" icon={Camera} onPress={onSell} />
+            {/* On iOS, Snap rides above the tab bar; shells without it pass onSell. */}
+            {onSell ? (
+              <Button
+                label="Sell"
+                size="small"
+                variant="secondary"
+                icon={Camera}
+                onPress={onSell}
+              />
+            ) : null}
             <ProfileButton onPress={onOpenProfile} />
           </View>
         }
       />
+
+      <Tip id="save" style={styles.tip} />
 
       <Reveal index={0} style={styles.filters}>
         <ChoiceChips
@@ -298,5 +310,8 @@ const stylesFor = themedStyles((colors) => ({
   cell: {
     flexBasis: '46%',
     flexGrow: 1,
+  },
+  tip: {
+    marginBottom: tokens.spacing[4],
   },
 }));

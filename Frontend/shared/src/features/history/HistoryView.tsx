@@ -1,5 +1,6 @@
 import {
   Archive,
+  Camera,
   ChevronRight,
   Handshake,
   Lock,
@@ -14,6 +15,7 @@ import { Share, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import {
+  Button,
   ChoiceChips,
   CountUp,
   Divider,
@@ -50,6 +52,8 @@ export interface HistoryViewProps {
   readonly onListItem?: (itemId: string) => void;
   readonly onSearch?: (origin?: SearchOrigin) => void;
   readonly onOpenProfile?: () => void;
+  /** Opens the camera from the header, for shells without a persistent Snap control. */
+  readonly onSnap?: () => void;
   /** Opens on one status, e.g. `listed` from the profile's "Your listings". */
   readonly initialFilter?: string;
 }
@@ -79,6 +83,7 @@ export function HistoryView({
   onListItem,
   onSearch,
   onOpenProfile,
+  onSnap,
   initialFilter,
 }: HistoryViewProps) {
   const styles = useThemedStyles(stylesFor);
@@ -121,12 +126,22 @@ export function HistoryView({
       onRefresh={() => new Promise((resolve) => setTimeout(resolve, 900))}
     >
       <LargeTitle
-        title="Your stash"
+        title="History"
         overlineIcon={Archive}
         overline={`${previewHistory.length} items`}
         trailing={
           <View style={styles.actions}>
-            <SearchButton label="Search your history" onOpen={onSearch} />
+            {onSnap ? (
+              <Button
+                label="Snap"
+                size="small"
+                variant="secondary"
+                icon={Camera}
+                onPress={onSnap}
+              />
+            ) : null}
+            {/* On iOS, search is a tab of its own; shells without one pass onSearch. */}
+            {onSearch ? <SearchButton label="Search your history" onOpen={onSearch} /> : null}
             <ProfileButton onPress={onOpenProfile} />
           </View>
         }

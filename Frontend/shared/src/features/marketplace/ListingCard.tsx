@@ -15,6 +15,8 @@ import {
 import { themedStyles, tokens, useThemedStyles } from '../../design';
 import type { VoteChoice } from '../../types';
 import { formatPeso, type PreviewListing } from '../preview/sample-data';
+import { useAccountGate } from '../session';
+import { useTip } from '../tips';
 
 const verdictLabel: Record<VoteChoice, string> = {
   too_high: 'Too High',
@@ -40,16 +42,20 @@ export function ListingCard({ listing, onOpen, onMessageSeller }: ListingCardPro
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
   const [saved, setSaved] = useState(false);
+  const requireAccount = useAccountGate();
+  const saveTip = useTip('save');
   const verdict = `${listing.verdictShare}% ${verdictLabel[listing.verdict]}`;
 
   const menu: readonly NavLinkMenuItem[] = [
     {
       title: saved ? 'Unsave' : 'Save',
       symbol: 'heart',
-      onPress: () => {
-        setSaved((value) => !value);
-        toast.show({ title: saved ? 'Removed from saved' : 'Saved' });
-      },
+      onPress: () =>
+        requireAccount('save', () => {
+          saveTip.done();
+          setSaved((value) => !value);
+          toast.show({ title: saved ? 'Removed from saved' : 'Saved' });
+        }),
     },
     {
       title: 'Share',
@@ -59,10 +65,11 @@ export function ListingCard({ listing, onOpen, onMessageSeller }: ListingCardPro
     {
       title: 'Message seller',
       symbol: 'bubble.left',
-      onPress: () => {
-        if (onMessageSeller) onMessageSeller();
-        else toast.show({ title: 'Open the listing to message the seller' });
-      },
+      onPress: () =>
+        requireAccount('message', () => {
+          if (onMessageSeller) onMessageSeller();
+          else toast.show({ title: 'Open the listing to message the seller' });
+        }),
     },
   ];
 
@@ -84,7 +91,12 @@ export function ListingCard({ listing, onOpen, onMessageSeller }: ListingCardPro
         <View style={styles.like}>
           <LikeButton
             liked={saved}
-            onToggle={() => setSaved((value) => !value)}
+            onToggle={() =>
+              requireAccount('save', () => {
+                saveTip.done();
+                setSaved((value) => !value);
+              })
+            }
             likeLabel="Save listing"
             unlikeLabel="Remove from saved"
             appearance="glass"

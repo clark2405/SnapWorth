@@ -12,7 +12,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { CompanionOrb, SWText } from '../../components';
+import { SWText, Wordmark, Worthy } from '../../components';
 import { themedStyles, tokens, useThemedStyles } from '../../design';
 
 const exitCurve = tokens.motion.bezier.exit;
@@ -116,12 +116,10 @@ export function SplashView({ ready, onExit, onDone }: SplashViewProps) {
       >
         <View style={styles.center}>
           <Animated.View style={orbStyle}>
-            <CompanionOrb size={96} />
+            <Worthy size={96} />
           </Animated.View>
           <Animated.View style={[styles.words, wordStyle]}>
-            <SWText variant="displayTitle" align="center">
-              SnapWorth
-            </SWText>
+            <Wordmark height={40} style={styles.wordmark} />
             <SWText variant="bodySmall" tone="textMuted" align="center">
               Know what it&apos;s worth.
             </SWText>
@@ -149,5 +147,8 @@ const stylesFor = themedStyles((colors) => ({
   },
   words: {
     gap: tokens.spacing[2],
+  },
+  wordmark: {
+    alignSelf: 'center',
   },
 }));
