@@ -15,6 +15,7 @@ import {
 import { themedStyles, tokens, useThemedStyles } from '../../design';
 import { ListingCard } from '../marketplace/ListingCard';
 import { previewListings, previewSellers } from '../preview/sample-data';
+import { useAccountGate } from '../session';
 
 export interface SellerProfileViewProps {
   readonly handle?: string;
@@ -31,6 +32,7 @@ export function SellerProfileView({
   onReport,
 }: SellerProfileViewProps) {
   const styles = useThemedStyles(stylesFor);
+  const requireAccount = useAccountGate();
   const seller = handle ? previewSellers[handle] : undefined;
 
   if (!seller) {
@@ -56,7 +58,11 @@ export function SellerProfileView({
           title={`@${seller.user.handle}`}
           onBack={onBack}
           trailing={
-            <IconButton icon={Flag} label="Report or block this seller" onPress={onReport} />
+            <IconButton
+              icon={Flag}
+              label="Report or block this seller"
+              onPress={() => requireAccount('report', onReport)}
+            />
           }
         />
       }

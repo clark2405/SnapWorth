@@ -5,11 +5,13 @@ import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanim
 import {
   Button,
   Field,
+  PressableScale,
   Reveal,
   Screen,
   SegmentedControl,
   SWText,
   TextField,
+  Wordmark,
 } from '../../components';
 import { themedStyles, tokens, useThemedStyles } from '../../design';
 
@@ -21,6 +23,8 @@ export interface LoginViewProps {
   readonly onForgotPassword?: () => void;
   readonly onContinueWithApple?: () => void;
   readonly onContinueWithGoogle?: () => void;
+  /** Shown when the screen was opened from an account prompt, so a guest can change their mind. */
+  readonly onClose?: () => void;
 }
 
 const modes = [
@@ -31,10 +35,12 @@ const modes = [
 const copy = {
   login: {
     title: 'Welcome back.',
+    why: 'Pick up your items, listings and chats where you left them.',
     submit: 'Log in',
   },
   signup: {
     title: 'Start with one photo.',
+    why: 'A free account lets you snap your own things, vote on prices and talk to sellers.',
     submit: 'Create account',
   },
 } as const;
@@ -45,6 +51,7 @@ export function LoginView({
   onForgotPassword,
   onContinueWithApple,
   onContinueWithGoogle,
+  onClose,
 }: LoginViewProps) {
   const styles = useThemedStyles(stylesFor);
   const [mode, setMode] = useState<AuthMode>(initialMode);
@@ -70,7 +77,21 @@ export function LoginView({
   return (
     <Screen ambient="feed" contentStyle={styles.content}>
       <Reveal index={0} style={styles.brand}>
-        <SWText variant="wordmark">SnapWorth</SWText>
+        <Wordmark />
+        {onClose ? (
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel="Not now. Keep looking around"
+            haptic="select"
+            onPress={onClose}
+            hitSlop={tokens.spacing[2]}
+            style={styles.close}
+          >
+            <SWText variant="label" tone="textSecondary">
+              Not now
+            </SWText>
+          </PressableScale>
+        ) : null}
       </Reveal>
 
       <Reveal index={1} style={styles.intro}>
@@ -84,10 +105,27 @@ export function LoginView({
           <SWText variant="displayHero" accessibilityRole="header">
             {text.title}
           </SWText>
+          <SWText variant="bodyLarge" tone="textSecondary">
+            {text.why}
+          </SWText>
         </Animated.View>
       </Reveal>
 
-      <Reveal index={2} style={styles.form}>
+      {/* One tap first: Sign in with Apple is the fastest, most private way in, so it leads;
+          email is there for anyone who prefers it. */}
+      <Reveal index={2} style={styles.quick}>
+        <Button label="Continue with Apple" onPress={continueWithApple} />
+        <Button label="Continue with Google" variant="secondary" onPress={continueWithGoogle} />
+        <View style={styles.or}>
+          <View style={styles.rule} />
+          <SWText variant="caption" tone="textMuted">
+            or use email
+          </SWText>
+          <View style={styles.rule} />
+        </View>
+      </Reveal>
+
+      <Reveal index={3} style={styles.form}>
         <SegmentedControl options={modes} value={mode} onChange={setMode} />
 
         <View style={styles.fields}>
@@ -127,17 +165,8 @@ export function LoginView({
         </View>
       </Reveal>
 
-      <Reveal index={3} style={styles.actions}>
-        <Button label={text.submit} loading={submitting} onPress={submit} />
-        <View style={styles.or}>
-          <View style={styles.rule} />
-          <SWText variant="caption" tone="textMuted">
-            or
-          </SWText>
-          <View style={styles.rule} />
-        </View>
-        <Button label="Continue with Apple" variant="secondary" onPress={continueWithApple} />
-        <Button label="Continue with Google" variant="secondary" onPress={continueWithGoogle} />
+      <Reveal index={4} style={styles.actions}>
+        <Button label={text.submit} variant="secondary" loading={submitting} onPress={submit} />
       </Reveal>
     </Screen>
   );
@@ -149,7 +178,13 @@ const stylesFor = themedStyles((colors) => ({
   },
   brand: {
     minHeight: tokens.layout.headerHeight,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  close: {
+    paddingVertical: tokens.spacing[2],
+    paddingLeft: tokens.spacing[3],
   },
   intro: {
     marginTop: tokens.spacing[10],
@@ -157,8 +192,12 @@ const stylesFor = themedStyles((colors) => ({
   introText: {
     gap: tokens.spacing[3],
   },
+  quick: {
+    marginTop: tokens.spacing[8],
+    gap: tokens.spacing[3],
+  },
   form: {
-    marginTop: tokens.spacing[10],
+    marginTop: tokens.spacing[4],
     gap: tokens.spacing[6],
   },
   fields: {
@@ -170,7 +209,7 @@ const stylesFor = themedStyles((colors) => ({
     marginRight: -tokens.spacing[2],
   },
   actions: {
-    marginTop: tokens.spacing[8],
+    marginTop: tokens.spacing[6],
     gap: tokens.spacing[4],
   },
   or: {

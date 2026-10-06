@@ -27,6 +27,8 @@
     "./features/placeholder-views": "./src/features/placeholder-views/index.tsx",
     "./features/profile": "./src/features/profile/index.ts",
     "./features/search": "./src/features/search/index.ts",
+    "./features/session": "./src/features/session/index.ts",
+    "./features/tips": "./src/features/tips/index.ts",
     "./ports": "./src/ports/index.ts",
     "./types": "./src/types/index.ts"
   },
