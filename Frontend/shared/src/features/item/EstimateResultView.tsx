@@ -37,7 +37,7 @@ import {
   BottomBar,
   Button,
   ChoiceChips,
-  CompanionOrb,
+  Worthy,
   CountUp,
   EstimateMark,
   Field,
@@ -51,6 +51,8 @@ import {
   Sheet,
   Sparkline,
   SWText,
+  Wordmark,
+  LogoMark,
   Surface,
   Tag,
   TextField,
@@ -67,6 +69,7 @@ import {
   type PreviewCondition,
   type PreviewSharing,
 } from '../preview/sample-data';
+import { Tip, useTip } from '../tips';
 
 /**
  * Where the estimate stands. The photo is already saved in every state, because the item is
@@ -88,6 +91,12 @@ export interface EstimateResultViewProps {
   readonly onViewPost?: (postId: string) => void;
   /** Opens the marketplace listing for this item. */
   readonly onViewListing?: (listingId: string) => void;
+  /**
+   * `sheet` is the answer to a fresh snap, risen over the frozen camera the way Visual
+   * Intelligence answers: the photo is already behind it, so the price leads, and the sheet is
+   * swiped away rather than backed out of. `screen` is an item opened from History.
+   */
+  readonly presentation?: 'screen' | 'sheet';
 }
 
 const conditionFactor = (key: PreviewCondition) =>
@@ -107,7 +116,10 @@ export function EstimateResultView({
   onKeepPrivate,
   onViewPost,
   onViewListing,
+  presentation = 'screen',
 }: EstimateResultViewProps) {
+  const asSheet = presentation === 'sheet';
+  const listTip = useTip('list');
   const item = previewItem;
   // A fresh capture is private until the owner shares it; History items carry their own state.
   const placement: PreviewSharing = (itemId ? previewSharingByItem[itemId] : undefined) ?? {};
@@ -132,11 +144,11 @@ export function EstimateResultView({
 
   return (
     <Screen
-      bleedTop
+      bleedTop={!asSheet}
       header={
         <NavHeader
           title={estimated ? title : 'Estimating'}
-          onBack={onBack}
+          onBack={asSheet ? undefined : onBack}
           trailing={
             estimated ? (
               <IconButton
@@ -156,8 +168,14 @@ export function EstimateResultView({
         estimated ? (
           <Destinations
             sharing={placement}
-            onListForSale={onListForSale}
-            onPostToFeed={onPostToFeed}
+            onListForSale={() => {
+              listTip.done();
+              onListForSale?.();
+            }}
+            onPostToFeed={(source) => {
+              listTip.done();
+              onPostToFeed?.(source);
+            }}
             onKeepPrivate={onKeepPrivate}
             onViewPost={onViewPost}
             onViewListing={onViewListing}
@@ -166,19 +184,21 @@ export function EstimateResultView({
       }
       contentStyle={styles.content}
     >
-      <View style={[styles.hero, { height: Math.round(height * (estimated ? 0.5 : 0.62)) }]}>
-        <ZoomTarget>
-          <Photo
-            source={item.photo}
-            label={item.photoLabel}
-            radius={0}
-            style={StyleSheet.absoluteFill}
-          />
-        </ZoomTarget>
-        {status === 'estimating' ? <ScanOverlay /> : null}
-      </View>
+      {asSheet ? null : (
+        <View style={[styles.hero, { height: Math.round(height * (estimated ? 0.5 : 0.62)) }]}>
+          <ZoomTarget>
+            <Photo
+              source={item.photo}
+              label={item.photoLabel}
+              radius={0}
+              style={StyleSheet.absoluteFill}
+            />
+          </ZoomTarget>
+          {status === 'estimating' ? <ScanOverlay /> : null}
+        </View>
+      )}
 
-      <View style={styles.sheet}>
+      <View style={[styles.sheet, asSheet ? styles.inSheet : null]}>
         {status === 'estimating' ? <EstimatingStatus /> : null}
         {status === 'failed' ? (
           <Problem
@@ -238,6 +258,8 @@ export function EstimateResultView({
                 showConfidence={false}
               />
             </Reveal>
+
+            <Tip id="list" />
 
             <Reveal index={2} style={styles.insights}>
               <Insight
@@ -546,7 +568,7 @@ function EstimatingStatus() {
 
   return (
     <View style={styles.status} accessibilityLiveRegion="polite">
-      <CompanionOrb size={44} mood="thinking" />
+      <Worthy size={44} mood="thinking" />
       <View style={styles.flex}>
         {visible ? (
           <Animated.View entering={FadeIn.duration(300)} exiting={FadeOut}>
@@ -714,8 +736,8 @@ function ShareCardSheet({
           </SWText>
         </View>
         <View style={styles.shareMark}>
-          <CompanionOrb size={22} />
-          <SWText variant="wordmark">SnapWorth</SWText>
+          <LogoMark size={24} />
+          <Wordmark height={18} />
         </View>
       </View>
       <Button
@@ -746,6 +768,10 @@ const stylesFor = themedStyles((colors, name) => ({
     width: '100%',
     overflow: 'hidden',
     backgroundColor: colors.sunken,
+  },
+  inSheet: {
+    marginTop: 0,
+    paddingTop: tokens.spacing[2],
   },
   sheet: {
     marginTop: -tokens.radius.xlarge,

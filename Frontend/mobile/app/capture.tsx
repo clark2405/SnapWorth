@@ -5,6 +5,8 @@ import { CaptureView } from '@snapworth/shared/features/capture';
 import { AccountGateView, useSession } from '@snapworth/shared/features/session';
 import { useTip } from '@snapworth/shared/features/tips';
 
+// The camera is an action, not a place: it opens full screen over whatever screen asked for it
+// and closes back to it, instead of living in the tab bar.
 export default function CaptureRoute() {
   const router = useRouter();
   const [flashOn, setFlashOn] = useState(false);
@@ -22,11 +24,12 @@ export default function CaptureRoute() {
       onClose={close}
       // Preview wiring: capture and estimation services are not built yet, so the shutter
       // opens the sample estimate.
+      afterCapture="freeze"
       onCapture={() => {
         snapTip.done();
-        router.push('/item/nike-neon-windbreaker?fresh=1');
+        router.push('/estimate/nike-neon-windbreaker');
       }}
-      onOpenHistory={() => router.push('/history')}
+      onOpenHistory={() => router.dismissTo('/history')}
     />
   );
 }
