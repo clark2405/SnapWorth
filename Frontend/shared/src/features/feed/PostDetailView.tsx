@@ -2,6 +2,7 @@ import {
   ArrowUp,
   ChevronRight,
   Share as ShareIcon,
+  ShieldX,
   ShoppingBag,
   Tag as TagIcon,
   X,
@@ -59,6 +60,9 @@ export interface PostDetailViewProps {
 function failureCopy(error: AppError): string {
   switch (error.kind) {
     case 'validation':
+      if (error.code === 'blocked') {
+        return 'This breaks a community guideline, so it was not posted. Edit it and try again.';
+      }
       return error.code === 'too_long'
         ? `Keep it under ${commentBodyMaxLength} characters.`
         : 'Write something first.';
@@ -97,6 +101,7 @@ export function PostDetailView({
   const [draft, setDraft] = useState('');
   const [replyingTo, setReplyingTo] = useState<ThreadComment | null>(null);
   const [sending, setSending] = useState(false);
+  const [blockedNote, setBlockedNote] = useState(false);
   const input = useRef<TextInput>(null);
   const scrollRef = useRef<Animated.ScrollView>(null);
   // Where the discussion starts in the scroll content, so a new comment can be scrolled to.
@@ -120,6 +125,10 @@ export function PostDetailView({
         title: target ? 'Reply not posted' : 'Comment not posted',
         body: failureCopy(result.error),
       });
+      // A blocked comment keeps its text so the author can fix it, with the reason on screen.
+      if (result.error.kind === 'validation' && result.error.code === 'blocked') {
+        setBlockedNote(true);
+      }
       return;
     }
     setDraft('');
@@ -217,11 +226,27 @@ export function PostDetailView({
               </PressableScale>
             </Animated.View>
           ) : null}
+          {blockedNote ? (
+            <Animated.View
+              entering={FadeIn.duration(tokens.motion.duration.base)}
+              exiting={FadeOut.duration(tokens.motion.duration.fast)}
+              style={styles.blockedRow}
+              accessibilityLiveRegion="polite"
+            >
+              <ShieldX size={14} strokeWidth={2.2} color={colors.danger} />
+              <SWText variant="labelSmall" tone="danger" style={styles.replyingLabel}>
+                Not posted: it breaks a community guideline
+              </SWText>
+            </Animated.View>
+          ) : null}
           <View style={styles.composerRow}>
             <TextInput
               ref={input}
               value={draft}
-              onChangeText={setDraft}
+              onChangeText={(text) => {
+                setDraft(text);
+                setBlockedNote(false);
+              }}
               placeholder={
                 replyingTo ? `Reply to @${replyingTo.author.handle}` : 'Add your take on the price'
               }
@@ -442,6 +467,12 @@ const stylesFor = themedStyles((colors) => ({
   // (the companion orb) could cover it.
   replyingLabel: {
     flexShrink: 1,
+  },
+  blockedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing[2],
+    paddingLeft: tokens.spacing[2],
   },
   replyingRow: {
     flexDirection: 'row',

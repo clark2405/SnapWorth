@@ -1,5 +1,7 @@
+import { ShieldX, Tag as TagIcon } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { TextInput } from 'react-native';
+import { TextInput, View } from 'react-native';
+import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 
 import {
   BottomBar,
@@ -11,15 +13,26 @@ import {
   Reveal,
   Screen,
   SWText,
+  Tag,
   hideWebFocusOutline,
   typeStyle,
   useToast,
 } from '../../components';
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
-import { formatPeso, previewItem } from '../preview/sample-data';
+import { formatPeso, previewItem, previewMyListing } from '../preview/sample-data';
+
+/**
+ * What moderation decided about a new post. `approved` goes live; `pending` is live once
+ * checked; `held` waits for a human moderator; `blocked` is refused outright and never posted.
+ */
+export type PostModerationOutcome = 'approved' | 'pending' | 'held' | 'blocked';
 
 export interface CreatePostViewProps {
   readonly itemId?: string;
+  /** `listing` reposts a marketplace listing so the community can judge its asking price. */
+  readonly source?: 'item' | 'listing';
+  /** The moderation result to show; until moderation is wired the post is approved. */
+  readonly outcome?: PostModerationOutcome;
   readonly onBack?: () => void;
   readonly onPublish?: (question: string) => void;
 }
@@ -32,15 +45,24 @@ const publishDelayMs = 900;
  * given, so voters judge the AI's number, not a number the author edited. Publishing pulses
  * briefly, then hands off with a toast so the moment reads as landed, not just dismissed.
  */
-export function CreatePostView({ onBack, onPublish }: CreatePostViewProps) {
+export function CreatePostView({
+  source = 'item',
+  outcome = 'approved',
+  onBack,
+  onPublish,
+}: CreatePostViewProps) {
   const item = previewItem;
+  const asking = source === 'listing' ? previewMyListing.askingPrice : null;
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
   const [question, setQuestion] = useState(
-    `Is ${formatPeso(item.estimate)} right for this ${item.title.toLowerCase()}?`,
+    asking === null
+      ? `Is ${formatPeso(item.estimate)} right for this ${item.title.toLowerCase()}?`
+      : `I'm asking ${formatPeso(asking)} for this ${item.title.toLowerCase()}. Fair price?`,
   );
   const [publishing, setPublishing] = useState(false);
+  const [blocked, setBlocked] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const trimmed = question.trim();
   const canPost = trimmed.length > 0 && trimmed.length <= maxLength;
@@ -57,7 +79,20 @@ export function CreatePostView({ onBack, onPublish }: CreatePostViewProps) {
     setPublishing(true);
     timer.current = setTimeout(() => {
       setPublishing(false);
-      toast.show({ title: 'Posted to the feed', celebrate: true });
+      if (outcome === 'blocked') {
+        setBlocked(true);
+        return;
+      }
+      if (outcome === 'held') {
+        toast.show({
+          title: 'Held for review',
+          body: 'A moderator will check it before it appears on the feed.',
+        });
+      } else if (outcome === 'pending') {
+        toast.show({ title: 'Posted', body: 'Others will see it once it has been checked.' });
+      } else {
+        toast.show({ title: 'Posted to the feed', celebrate: true });
+      }
       onPublish?.(trimmed);
     }, publishDelayMs);
   };
@@ -82,14 +117,40 @@ export function CreatePostView({ onBack, onPublish }: CreatePostViewProps) {
           aspectRatio={4 / 3}
           radius={tokens.radius.large}
         />
-        <EstimateBadge value={formatPeso(item.estimate)} />
+        <View style={styles.badges}>
+          <EstimateBadge value={formatPeso(item.estimate)} />
+          {asking === null ? null : (
+            <Tag label={`For sale · ${formatPeso(asking)}`} tone="mint" icon={TagIcon} />
+          )}
+        </View>
       </Reveal>
+
+      {blocked ? (
+        <Animated.View
+          entering={FadeInDown.springify().damping(18)}
+          exiting={FadeOut.duration(tokens.motion.duration.fast)}
+          style={styles.blocked}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="assertive"
+        >
+          <ShieldX size={18} strokeWidth={2} color={colors.danger} />
+          <View style={styles.blockedText}>
+            <SWText variant="label">Not posted</SWText>
+            <SWText variant="bodySmall" tone="textSecondary">
+              This breaks a community guideline. Edit your question and try again.
+            </SWText>
+          </View>
+        </Animated.View>
+      ) : null}
 
       <Reveal index={1}>
         <Field label="Your question" helper={`${trimmed.length}/${maxLength}`}>
           <TextInput
             value={question}
-            onChangeText={setQuestion}
+            onChangeText={(text) => {
+              setQuestion(text);
+              setBlocked(false);
+            }}
             multiline
             maxLength={maxLength}
             placeholderTextColor={colors.textMuted}
@@ -115,6 +176,23 @@ const stylesFor = themedStyles((colors) => ({
   },
   lockup: {
     gap: tokens.spacing[3],
+  },
+  badges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: tokens.spacing[2],
+  },
+  blocked: {
+    flexDirection: 'row',
+    gap: tokens.spacing[3],
+    padding: tokens.spacing[4],
+    borderRadius: tokens.radius.medium,
+    backgroundColor: colors.dangerSoft,
+  },
+  blockedText: {
+    flex: 1,
+    gap: tokens.spacing['0.5'],
   },
   input: {
     minHeight: tokens.spacing[16] + tokens.spacing[8],
