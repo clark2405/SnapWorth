@@ -15,6 +15,21 @@ const curve = tokens.motion.bezier.expressive;
 const expressive = Easing.bezier(curve[0] ?? 0, curve[1] ?? 0, curve[2] ?? 1, curve[3] ?? 1);
 
 const RevealGateContext = createContext(true);
+const RevealStillContext = createContext(false);
+
+/**
+ * Shows every `Reveal` beneath it already in place, with no entrance. For screens whose arrival
+ * is already a motion (a zoom from the tapped card), so their content does not move twice.
+ */
+export function RevealStill({
+  still = true,
+  children,
+}: {
+  readonly still?: boolean;
+  readonly children: ReactNode;
+}) {
+  return <RevealStillContext.Provider value={still}>{children}</RevealStillContext.Provider>;
+}
 
 /**
  * Holds every `Reveal` beneath it at its start state until `open` is true. The launch screen
@@ -47,10 +62,11 @@ export interface RevealProps {
 export function Reveal({ children, index = 0, style, delay = 0 }: RevealProps) {
   const reduceMotion = useReducedMotion();
   const gateOpen = useContext(RevealGateContext);
-  const progress = useSharedValue(0);
+  const still = useContext(RevealStillContext);
+  const progress = useSharedValue(still ? 1 : 0);
 
   useEffect(() => {
-    if (!gateOpen) return;
+    if (!gateOpen || still) return;
     const { limits, recipe } = tokens.motion;
     const slot = Math.min(index, limits.maximumStaggerItems - 1);
     progress.value = reduceMotion
@@ -59,7 +75,7 @@ export function Reveal({ children, index = 0, style, delay = 0 }: RevealProps) {
           delay + slot * limits.staggerInterval,
           withTiming(1, { duration: recipe.entrance.durationMs, easing: expressive }),
         );
-  }, [delay, gateOpen, index, progress, reduceMotion]);
+  }, [delay, gateOpen, index, progress, reduceMotion, still]);
 
   const animated = useAnimatedStyle(() => ({
     opacity: progress.value,

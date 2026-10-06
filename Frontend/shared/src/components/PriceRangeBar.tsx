@@ -25,6 +25,8 @@ export interface PriceRangeBarProps {
   readonly asking?: number;
   /** Hide the confidence label when the screen already states it (e.g. as a chip). */
   readonly showConfidence?: boolean;
+  /** Draw the band out and drop the marker in; off where the range is already known. */
+  readonly animate?: boolean;
 }
 
 const confidenceCopy: Record<EstimateConfidence, string> = {
@@ -46,9 +48,10 @@ export function PriceRangeBar({
   format,
   asking,
   showConfidence = true,
+  animate = true,
 }: PriceRangeBarProps) {
   const styles = useThemedStyles(stylesFor);
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useReducedMotion() || !animate;
   const [width, setWidth] = useState(0);
   const band = useSharedValue(reduceMotion ? 1 : 0);
   const marker = useSharedValue(reduceMotion ? 1 : 0);

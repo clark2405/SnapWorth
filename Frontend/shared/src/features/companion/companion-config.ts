@@ -7,14 +7,13 @@ import {
   PencilLine,
   Scale,
   ScanSearch,
-  Share2,
   Sparkles,
   Tag,
   TrendingUp,
   Wallet,
 } from 'lucide-react-native';
 
-import type { CompanionAction } from '../../components';
+import { shareIcon, type CompanionAction } from '../../components';
 import { formatPeso, previewListingDetail, previewPortfolio } from '../preview/sample-data';
 
 export interface CompanionConfig {
@@ -126,7 +125,7 @@ export function companionConfigFor(pathname: string, host: CompanionHost): Compa
           key: 'share',
           label: 'Share a valuation card',
           detail: 'Send the estimate to a friend',
-          icon: Share2,
+          icon: shareIcon,
           onPress: () => notify('Valuation card ready', 'Saved to your photos.'),
         },
       ],
