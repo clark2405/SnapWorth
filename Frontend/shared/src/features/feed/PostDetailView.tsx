@@ -45,6 +45,8 @@ import {
   previewVotesCast,
   type PreviewPost,
 } from '../preview/sample-data';
+import { useAccountGate, useSession } from '../session';
+import { Tip, useTip } from '../tips';
 import { CommentList } from './CommentList';
 import { useCommentThread } from './comment-thread';
 
@@ -101,8 +103,11 @@ export function PostDetailView({
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
   const thread = useCommentThread(post.id);
-  const [vote, setVote] = useState<VoteChoice | null>(
-    () => previewVotesCast.find((entry) => entry.postId === post.id)?.vote ?? null,
+  const { isGuest } = useSession();
+  const requireAccount = useAccountGate();
+  const voteTip = useTip('vote');
+  const [vote, setVote] = useState<VoteChoice | null>(() =>
+    isGuest ? null : (previewVotesCast.find((entry) => entry.postId === post.id)?.vote ?? null),
   );
   const [draft, setDraft] = useState('');
   const [replyingTo, setReplyingTo] = useState<ThreadComment | null>(null);
@@ -245,39 +250,57 @@ export function PostDetailView({
               </SWText>
             </Animated.View>
           ) : null}
-          <View style={styles.composerRow}>
-            <TextInput
-              ref={input}
-              value={draft}
-              onChangeText={(text) => {
-                setDraft(text);
-                setBlockedNote(false);
-              }}
-              placeholder={
-                replyingTo ? `Reply to @${replyingTo.author.handle}` : 'Add your take on the price'
-              }
-              placeholderTextColor={colors.textMuted}
-              selectionColor={colors.accent}
-              accessibilityLabel={replyingTo ? 'Write a reply' : 'Write a comment'}
-              maxLength={commentBodyMaxLength}
-              multiline
-              style={[
-                styles.composerInput,
-                typeStyle('bodyLarge'),
-                { color: colors.textPrimary, lineHeight: undefined },
-                hideWebFocusOutline,
-              ]}
-            />
-            <IconButton
-              icon={ArrowUp}
-              label={replyingTo ? 'Post reply' : 'Post comment'}
-              appearance="accent"
-              size={18}
-              haptic="pop"
-              disabled={!canSend}
-              onPress={() => void submit()}
-            />
-          </View>
+          {isGuest ? (
+            // A guest sees where their take would go; tapping it asks for an account first.
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel="Add your take on the price"
+              accessibilityHint="Asks you to sign in or create an account"
+              haptic="select"
+              onPress={() => requireAccount('comment', () => input.current?.focus())}
+              style={styles.composerRow}
+            >
+              <SWText variant="bodyLarge" tone="textMuted" style={styles.guestComposer}>
+                Add your take on the price
+              </SWText>
+            </PressableScale>
+          ) : (
+            <View style={styles.composerRow}>
+              <TextInput
+                ref={input}
+                value={draft}
+                onChangeText={(text) => {
+                  setDraft(text);
+                  setBlockedNote(false);
+                }}
+                placeholder={
+                  replyingTo
+                    ? `Reply to @${replyingTo.author.handle}`
+                    : 'Add your take on the price'
+                }
+                placeholderTextColor={colors.textMuted}
+                selectionColor={colors.accent}
+                accessibilityLabel={replyingTo ? 'Write a reply' : 'Write a comment'}
+                maxLength={commentBodyMaxLength}
+                multiline
+                style={[
+                  styles.composerInput,
+                  typeStyle('bodyLarge'),
+                  { color: colors.textPrimary, lineHeight: undefined },
+                  hideWebFocusOutline,
+                ]}
+              />
+              <IconButton
+                icon={ArrowUp}
+                label={replyingTo ? 'Post reply' : 'Post comment'}
+                appearance="accent"
+                size={18}
+                haptic="pop"
+                disabled={!canSend}
+                onPress={() => void submit()}
+              />
+            </View>
+          )}
         </BottomBar>
       }
       contentStyle={styles.content}
@@ -310,10 +333,16 @@ export function PostDetailView({
 
         <Reveal index={2} style={styles.verdict}>
           <VerdictBar tally={post.votes} />
+          <Tip id="vote" />
           <VoteChips
             tally={post.votes}
             selected={vote}
-            onVote={(choice) => setVote((current) => (current === choice ? null : choice))}
+            onVote={(choice) =>
+              requireAccount('vote', () => {
+                voteTip.done();
+                setVote((current) => (current === choice ? null : choice));
+              })
+            }
           />
         </Reveal>
 
@@ -347,9 +376,9 @@ export function PostDetailView({
           ) : (
             <CommentList
               groups={thread.groups}
-              onReply={startReply}
+              onReply={(comment) => requireAccount('comment', () => startReply(comment))}
               onDelete={(comment) => void remove(comment)}
-              onReport={(comment) => void report(comment)}
+              onReport={(comment) => requireAccount('report', () => void report(comment))}
             />
           )}
         </View>
@@ -371,7 +400,8 @@ function CrossPost({
 } & Pick<PostDetailViewProps, 'onOpenListing' | 'onListForSale'>) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
-  const mine = post.author.handle === previewProfile.user.handle;
+  const { isGuest } = useSession();
+  const mine = !isGuest && post.author.handle === previewProfile.user.handle;
   const { listing } = post;
 
   if (listing) {
@@ -509,5 +539,16 @@ const stylesFor = themedStyles((colors) => ({
     borderWidth: tokens.border.hairline,
     borderColor: colors.borderStrong,
     backgroundColor: colors.sunken,
+  },
+  guestComposer: {
+    flex: 1,
+    minHeight: tokens.focus.minimumTarget,
+    paddingHorizontal: tokens.spacing[4],
+    paddingVertical: tokens.spacing[3],
+    borderRadius: tokens.radius.medium,
+    borderWidth: tokens.border.hairline,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.sunken,
+    overflow: 'hidden',
   },
 }));
