@@ -1,5 +1,7 @@
-import { MessageSquare, MessagesSquare } from 'lucide-react-native';
+import { Archive, MessageSquare, MessagesSquare } from 'lucide-react-native';
+import { useState } from 'react';
 import { View } from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import {
   Avatar,
@@ -10,7 +12,9 @@ import {
   Photo,
   Reveal,
   Screen,
+  SegmentedControl,
   SWText,
+  Tag,
   ZoomLink,
 } from '../../components';
 import { themedStyles, tokens, useThemedStyles } from '../../design';
@@ -29,8 +33,11 @@ export function ConversationListView({
   onBrowseMarket,
 }: ConversationListViewProps) {
   const styles = useThemedStyles(stylesFor);
-  const conversations = previewConversations;
-  const unread = conversations.reduce((total, conversation) => total + conversation.unread, 0);
+  const [view, setView] = useState<'open' | 'past'>('open');
+  const open = previewConversations.filter((conversation) => !conversation.closed);
+  const past = previewConversations.filter((conversation) => conversation.closed);
+  const conversations = view === 'open' ? open : past;
+  const unread = open.reduce((total, conversation) => total + conversation.unread, 0);
 
   return (
     <Screen
@@ -44,7 +51,7 @@ export function ConversationListView({
         overline={unread > 0 ? `${unread} unread` : undefined}
         trailing={<ProfileButton onPress={onOpenProfile} />}
       />
-      {conversations.length === 0 ? (
+      {previewConversations.length === 0 ? (
         <EmptyState
           icon={MessageSquare}
           title="No conversations yet"
@@ -53,17 +60,45 @@ export function ConversationListView({
           onAction={onBrowseMarket}
         />
       ) : (
-        <Surface padding={tokens.spacing[2]}>
-          {conversations.map((conversation, index) => (
-            <Reveal key={conversation.id} index={index}>
-              {index > 0 ? <Divider style={styles.divider} /> : null}
-              <ConversationRow
-                conversation={conversation}
-                onPress={() => onOpenConversation?.(conversation.id)}
+        <View style={styles.body}>
+          <SegmentedControl
+            options={[
+              { key: 'open', label: 'Open' },
+              { key: 'past', label: 'Past' },
+            ]}
+            value={view}
+            onChange={setView}
+          />
+          <Animated.View
+            key={view}
+            entering={FadeIn.duration(tokens.motion.duration.base)}
+            exiting={FadeOut.duration(tokens.motion.duration.fast)}
+          >
+            {conversations.length === 0 ? (
+              <EmptyState
+                icon={view === 'open' ? MessageSquare : Archive}
+                title={view === 'open' ? 'No open chats' : 'Nothing here yet'}
+                body={
+                  view === 'open'
+                    ? 'Message a seller from any listing to start one.'
+                    : 'Chats about sold or archived items move here.'
+                }
               />
-            </Reveal>
-          ))}
-        </Surface>
+            ) : (
+              <Surface padding={tokens.spacing[2]}>
+                {conversations.map((conversation, index) => (
+                  <Reveal key={conversation.id} index={index}>
+                    {index > 0 ? <Divider style={styles.divider} /> : null}
+                    <ConversationRow
+                      conversation={conversation}
+                      onPress={() => onOpenConversation?.(conversation.id)}
+                    />
+                  </Reveal>
+                ))}
+              </Surface>
+            )}
+          </Animated.View>
+        </View>
       )}
     </Screen>
   );
@@ -109,9 +144,14 @@ function ConversationRow({
             {conversation.sentAt}
           </SWText>
         </View>
-        <SWText variant="caption" tone="textMuted" numberOfLines={1}>
-          {conversation.itemTitle}
-        </SWText>
+        <View style={styles.itemLine}>
+          <SWText variant="caption" tone="textMuted" numberOfLines={1} style={styles.preview}>
+            {conversation.itemTitle}
+          </SWText>
+          {conversation.closed ? (
+            <Tag label={conversation.closed === 'sold' ? 'Sold' : 'Archived'} tone="grave" />
+          ) : null}
+        </View>
         <View style={styles.bottomLine}>
           <SWText
             variant={unread ? 'label' : 'bodyCompact'}
@@ -135,6 +175,14 @@ function ConversationRow({
 }
 
 const stylesFor = themedStyles((colors) => ({
+  body: {
+    gap: tokens.spacing[4],
+  },
+  itemLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing[2],
+  },
   divider: {
     marginLeft: tokens.spacing[3] + 48 + tokens.spacing[3],
     marginRight: tokens.spacing[3],
