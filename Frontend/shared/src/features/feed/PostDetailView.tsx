@@ -38,9 +38,11 @@ import type { AppError } from '../../types/errors';
 import type { VoteChoice } from '../../types';
 import {
   formatPeso,
+  previewOlderPosts,
   previewPostDetail,
   previewPosts,
   previewProfile,
+  previewVotesCast,
   type PreviewPost,
 } from '../preview/sample-data';
 import { CommentList } from './CommentList';
@@ -92,12 +94,16 @@ export function PostDetailView({
   onListForSale,
 }: PostDetailViewProps) {
   // The post the user tapped; a link to a post outside the preview feed falls back to a sample.
-  const post = previewPosts.find((entry) => entry.id === postId) ?? previewPostDetail;
+  const post =
+    [...previewPosts, ...previewOlderPosts].find((entry) => entry.id === postId) ??
+    previewPostDetail;
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
   const thread = useCommentThread(post.id);
-  const [vote, setVote] = useState<VoteChoice | null>(null);
+  const [vote, setVote] = useState<VoteChoice | null>(
+    () => previewVotesCast.find((entry) => entry.postId === post.id)?.vote ?? null,
+  );
   const [draft, setDraft] = useState('');
   const [replyingTo, setReplyingTo] = useState<ThreadComment | null>(null);
   const [sending, setSending] = useState(false);

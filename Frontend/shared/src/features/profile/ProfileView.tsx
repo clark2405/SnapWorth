@@ -1,5 +1,9 @@
 import {
   Bell,
+  History,
+  MessagesSquare,
+  Tag as TagIcon,
+  Vote,
   ChevronRight,
   CircleHelp,
   LogOut,
@@ -40,11 +44,16 @@ import {
   formatPeso,
   previewHeldContent,
   previewPortfolio,
+  previewConversations,
   previewProfile,
+  previewVotesCast,
 } from '../preview/sample-data';
 
 export type ProfileDestination =
   | 'edit-profile'
+  | 'listings'
+  | 'votes'
+  | 'conversations'
   | 'notifications'
   | 'price-alerts'
   | 'privacy'
@@ -145,6 +154,27 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
       </Reveal>
 
       <Reveal index={3} style={styles.sections}>
+        <ListGroup title="Your activity" icon={History}>
+          <ListRow
+            label="Your listings"
+            icon={TagIcon}
+            value={String(profile.stats.listed)}
+            onPress={() => onOpen?.('listings')}
+          />
+          <ListRow
+            label="Votes cast"
+            icon={Vote}
+            value={String(previewVotesCast.length)}
+            onPress={() => onOpen?.('votes')}
+          />
+          <ListRow
+            label="Conversations"
+            icon={MessagesSquare}
+            value={String(previewConversations.length)}
+            onPress={() => onOpen?.('conversations')}
+          />
+        </ListGroup>
+
         <ListGroup title="The look" icon={Palette}>
           <View style={styles.appearanceRow}>
             <SegmentedControl

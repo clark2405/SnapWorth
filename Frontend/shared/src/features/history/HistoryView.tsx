@@ -9,7 +9,7 @@ import {
   Wallet,
   type LucideIcon,
 } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Share, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
 
@@ -50,6 +50,8 @@ export interface HistoryViewProps {
   readonly onListItem?: (itemId: string) => void;
   readonly onSearch?: (origin?: SearchOrigin) => void;
   readonly onOpenProfile?: () => void;
+  /** Opens on one status, e.g. `listed` from the profile's "Your listings". */
+  readonly initialFilter?: string;
 }
 
 type FilterKey = 'all' | PreviewItemStatus;
@@ -77,12 +79,19 @@ export function HistoryView({
   onListItem,
   onSearch,
   onOpenProfile,
+  initialFilter,
 }: HistoryViewProps) {
   const styles = useThemedStyles(stylesFor);
   const { colors } = useTheme();
   const toast = useToast();
   const [items, setItems] = useState<readonly PreviewHistoryItem[]>(previewHistory);
   const [filter, setFilter] = useState<FilterKey>('all');
+
+  // The tab stays mounted, so follow a new deep link's filter as well as the first one.
+  useEffect(() => {
+    const match = filters.find((entry) => entry.key === initialFilter);
+    if (match) setFilter(match.key);
+  }, [initialFilter]);
 
   const visible = useMemo(
     () => (filter === 'all' ? items : items.filter((item) => item.status === filter)),
