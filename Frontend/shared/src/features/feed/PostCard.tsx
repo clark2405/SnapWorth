@@ -1,4 +1,4 @@
-import { Check, MessageCircle } from 'lucide-react-native';
+import { Check, MessageCircle, Tag as TagIcon } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -18,6 +18,7 @@ import {
   EstimateBadge,
   Photo,
   SWText,
+  Tag,
   VerdictBar,
   VoteChips,
   ZoomLink,
@@ -110,6 +111,14 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
             {post.postedAgo}
           </SWText>
         </View>
+        {/* A listing reposted for a price check: the vote is on what the seller is asking. */}
+        {post.listing ? (
+          <Tag
+            label={`For sale · ${formatPeso(post.listing.askingPrice)}`}
+            tone="mint"
+            icon={TagIcon}
+          />
+        ) : null}
       </View>
 
       <ZoomLink

@@ -1,5 +1,6 @@
+import { Users } from 'lucide-react-native';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Switch, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import {
@@ -8,17 +9,19 @@ import {
   ChoiceChips,
   CountUp,
   Field,
+  ListRow,
   NavHeader,
   Photo,
   PriceRangeBar,
   Reveal,
   Screen,
   SelectField,
+  Surface,
   SWText,
   TextField,
   useToast,
 } from '../../components';
-import { themedStyles, tokens, useThemedStyles } from '../../design';
+import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import {
   formatPeso,
   previewConditions,
@@ -30,8 +33,11 @@ import {
 export interface ConfirmPriceViewProps {
   readonly itemId?: string;
   readonly onBack?: () => void;
-  /** Receives the price the seller confirmed. The AI estimate is shown for reference only. */
-  readonly onPublish?: (enteredPrice: number) => void;
+  /**
+   * Receives the price the seller confirmed (the AI estimate is shown for reference only), and
+   * whether to also post the listing to the feed so the community can vote on that price.
+   */
+  readonly onPublish?: (enteredPrice: number, alsoAskFeed: boolean) => void;
 }
 
 const priceInput = /^\d{1,9}(?:\.\d{1,2})?$/;
@@ -50,9 +56,11 @@ function suggestedPrice(condition: PreviewCondition): number {
 }
 
 export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
+  const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
   const item = previewItem;
+  const [alsoAskFeed, setAlsoAskFeed] = useState(false);
   const [condition, setCondition] = useState<PreviewCondition>('good');
   // Prefilled with the live suggestion so the seller always sees a number, but once they type
   // their own it stops following the condition — the price they publish is always theirs, seen
@@ -77,10 +85,12 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
       setPublishing(false);
       toast.show({
         title: 'Listing published',
-        body: `Live at ${formatPeso(enteredPrice)}.`,
+        body: alsoAskFeed
+          ? `Live at ${formatPeso(enteredPrice)}, and on the feed for a price check.`
+          : `Live at ${formatPeso(enteredPrice)}.`,
         celebrate: true,
       });
-      onPublish?.(enteredPrice);
+      onPublish?.(enteredPrice, alsoAskFeed);
     }, 700);
   };
 
@@ -179,6 +189,27 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
         <Field label="Category (optional)">
           <SelectField value={item.category} accessibilityLabel="Category" />
         </Field>
+      </Reveal>
+
+      <Reveal index={4}>
+        <Surface>
+          <ListRow
+            label="Also ask the feed"
+            detail="Let the community vote on your price"
+            icon={Users}
+            trailing={
+              <Switch
+                value={alsoAskFeed}
+                onValueChange={(value) => {
+                  setAlsoAskFeed(value);
+                  haptic('select');
+                }}
+                trackColor={{ false: colors.sunken, true: colors.textPrimary }}
+                accessibilityLabel="Also post to the feed for a price check"
+              />
+            }
+          />
+        </Surface>
       </Reveal>
     </Screen>
   );

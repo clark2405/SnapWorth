@@ -14,6 +14,10 @@ export default function ListingDetailRoute() {
       onMessageSeller={() => router.push(`/chat/${listingId ?? ''}`)}
       // Preview wiring: every sample listing detail belongs to the one sample seller.
       onOpenSeller={() => router.push('/seller/mariacruz')}
+      // Owner actions on the seller's own listing.
+      onAskFeed={() => router.push(`/ask/${listingId ?? ''}?from=listing`)}
+      onEditPrice={() => router.push(`/list/${listingId ?? ''}`)}
+      onMarkSold={() => router.replace('/history')}
     />
   );
 }

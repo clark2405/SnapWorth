@@ -5,9 +5,12 @@ import {
   EyeOff,
   Flame,
   Gem,
+  Handshake,
+  Lock,
   RotateCw,
   Share2,
   ShoppingBag,
+  Tag as TagIcon,
   Target,
   type LucideIcon,
   Users,
@@ -59,8 +62,10 @@ import {
   formatPeso,
   previewConditions,
   previewItem,
+  previewSharingByItem,
   previewValuation,
   type PreviewCondition,
+  type PreviewSharing,
 } from '../preview/sample-data';
 
 /**
@@ -75,9 +80,14 @@ export interface EstimateResultViewProps {
   readonly onBack?: () => void;
   readonly onShare?: () => void;
   readonly onRetry?: () => void;
-  readonly onPostToFeed?: () => void;
+  /** `listing` when the item is already for sale, so the post asks about its asking price. */
+  readonly onPostToFeed?: (source: 'item' | 'listing') => void;
   readonly onListForSale?: () => void;
   readonly onKeepPrivate?: () => void;
+  /** Opens the feed post this item is already shared in. */
+  readonly onViewPost?: (postId: string) => void;
+  /** Opens the marketplace listing for this item. */
+  readonly onViewListing?: (listingId: string) => void;
 }
 
 const conditionFactor = (key: PreviewCondition) =>
@@ -87,6 +97,7 @@ const baseValue = previewItem.estimate / conditionFactor(previewValuation.condit
 const roundTo50 = (value: number) => Math.round(value / 50) * 50;
 
 export function EstimateResultView({
+  itemId,
   status = 'estimated',
   onBack,
   onShare,
@@ -94,8 +105,12 @@ export function EstimateResultView({
   onPostToFeed,
   onListForSale,
   onKeepPrivate,
+  onViewPost,
+  onViewListing,
 }: EstimateResultViewProps) {
   const item = previewItem;
+  // A fresh capture is private until the owner shares it; History items carry their own state.
+  const placement: PreviewSharing = (itemId ? previewSharingByItem[itemId] : undefined) ?? {};
   const styles = useThemedStyles(stylesFor);
   const { height } = useWindowDimensions();
   const [title, setTitle] = useState<string>(item.title);
@@ -140,9 +155,12 @@ export function EstimateResultView({
       footer={
         estimated ? (
           <Destinations
+            sharing={placement}
             onListForSale={onListForSale}
             onPostToFeed={onPostToFeed}
             onKeepPrivate={onKeepPrivate}
+            onViewPost={onViewPost}
+            onViewListing={onViewListing}
           />
         ) : null
       }
@@ -321,7 +339,7 @@ export function EstimateResultView({
           </>
         ) : null}
 
-        <SavedNote />
+        <SavedNote sharing={placement} />
       </View>
 
       <ShareCardSheet
@@ -390,15 +408,30 @@ function Insight({
   );
 }
 
-function SavedNote() {
+/** Saved to history always; then wherever else the item lives. */
+function SavedNote({ sharing }: { readonly sharing: PreviewSharing }) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
+  const shared = sharing.postId !== undefined || sharing.listingId !== undefined;
   return (
     <View style={styles.saved}>
-      <CircleCheck size={15} strokeWidth={2} color={colors.success} />
-      <SWText variant="labelMedium" tone="textSecondary">
-        Photo saved to your history
-      </SWText>
+      <View style={styles.savedLine}>
+        <CircleCheck size={15} strokeWidth={2} color={colors.success} />
+        <SWText variant="labelMedium" tone="textSecondary">
+          Photo saved to your history
+        </SWText>
+      </View>
+      <View style={styles.sharedTags}>
+        {shared ? null : <Tag label="Private" tone="sand" icon={Lock} />}
+        {sharing.postId ? <Tag label="On feed" tone="sand" icon={Users} /> : null}
+        {sharing.listingId ? (
+          sharing.sold ? (
+            <Tag label="Sold" tone="grave" icon={Handshake} />
+          ) : (
+            <Tag label="Listed" tone="mint" icon={TagIcon} />
+          )
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -561,38 +594,80 @@ function Problem({
   );
 }
 
+/**
+ * The ways forward from an estimate. Sharing is never either/or: an item on the feed can be
+ * listed too, and a listing can go to the feed to ask whether its price is fair.
+ */
 function Destinations({
+  sharing,
   onListForSale,
   onPostToFeed,
   onKeepPrivate,
-}: Pick<EstimateResultViewProps, 'onListForSale' | 'onPostToFeed' | 'onKeepPrivate'>) {
+  onViewPost,
+  onViewListing,
+}: { readonly sharing: PreviewSharing } & Pick<
+  EstimateResultViewProps,
+  'onListForSale' | 'onPostToFeed' | 'onKeepPrivate' | 'onViewPost' | 'onViewListing'
+>) {
   const styles = useThemedStyles(stylesFor);
+  const { postId, listingId, sold } = sharing;
+
+  const feedAction = postId ? (
+    <Button
+      label="View post"
+      variant="secondary"
+      icon={Users}
+      onPress={() => onViewPost?.(postId)}
+      containerStyle={styles.flex}
+    />
+  ) : (
+    <Button
+      label="Ask the feed"
+      variant={listingId && !sold ? 'accent' : 'secondary'}
+      icon={Users}
+      accessibilityHint={
+        listingId ? 'Reposts your listing so the community can vote on its price.' : undefined
+      }
+      onPress={() => onPostToFeed?.(listingId && !sold ? 'listing' : 'item')}
+      containerStyle={styles.flex}
+    />
+  );
+
+  const marketAction = listingId ? (
+    <Button
+      label={sold ? 'View sale' : 'View listing'}
+      variant="secondary"
+      icon={sold ? Handshake : TagIcon}
+      onPress={() => onViewListing?.(listingId)}
+      containerStyle={styles.flex}
+    />
+  ) : (
+    <Button
+      label={postId ? 'Sell it too' : 'Sell'}
+      variant="accent"
+      icon={ShoppingBag}
+      accessibilityHint="Opens price confirmation. You set the asking price yourself."
+      onPress={onListForSale}
+      containerStyle={postId ? styles.flex : undefined}
+    />
+  );
+
   return (
     <BottomBar>
       <Animated.View
         entering={FadeInDown.delay(500).springify().damping(18)}
         style={styles.destinations}
       >
-        <IconButton
-          icon={EyeOff}
-          label="Keep private"
-          appearance="tinted"
-          onPress={onKeepPrivate}
-        />
-        <Button
-          label="Ask the feed"
-          variant="secondary"
-          icon={Users}
-          onPress={onPostToFeed}
-          containerStyle={styles.flex}
-        />
-        <Button
-          label="Sell"
-          variant="accent"
-          icon={ShoppingBag}
-          accessibilityHint="Opens price confirmation. You set the asking price yourself."
-          onPress={onListForSale}
-        />
+        {postId || listingId ? null : (
+          <IconButton
+            icon={EyeOff}
+            label="Keep private"
+            appearance="tinted"
+            onPress={onKeepPrivate}
+          />
+        )}
+        {feedAction}
+        {marketAction}
       </Animated.View>
     </BottomBar>
   );
@@ -743,9 +818,16 @@ const stylesFor = themedStyles((colors, name) => ({
     marginTop: tokens.spacing[1],
   },
   saved: {
+    alignItems: 'center',
+    gap: tokens.spacing[3],
+  },
+  savedLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: tokens.spacing[2],
+  },
+  sharedTags: {
+    flexDirection: 'row',
     gap: tokens.spacing[2],
   },
   status: {

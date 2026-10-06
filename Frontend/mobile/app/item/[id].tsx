@@ -27,9 +27,13 @@ export default function ItemDetailRoute() {
       status={status}
       onBack={() => router.back()}
       onRetry={() => setStatus('estimating')}
-      onPostToFeed={() => router.push(`/ask/${itemId ?? ''}`)}
+      onPostToFeed={(source) =>
+        router.push(`/ask/${itemId ?? ''}${source === 'listing' ? '?from=listing' : ''}`)
+      }
       onListForSale={() => router.push(`/list/${itemId ?? ''}`)}
       onKeepPrivate={() => router.push('/history')}
+      onViewPost={(postId) => router.push(`/post/${postId}`)}
+      onViewListing={(listingId) => router.push(`/listing/${listingId}`)}
     />
   );
 }

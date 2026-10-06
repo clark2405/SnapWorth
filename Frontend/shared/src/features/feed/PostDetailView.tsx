@@ -1,4 +1,11 @@
-import { ArrowUp, Share as ShareIcon, X } from 'lucide-react-native';
+import {
+  ArrowUp,
+  ChevronRight,
+  Share as ShareIcon,
+  ShoppingBag,
+  Tag as TagIcon,
+  X,
+} from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
 import { TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -15,6 +22,8 @@ import {
   Reveal,
   Screen,
   SWText,
+  Surface,
+  Tag,
   VerdictBar,
   VoteChips,
   ZoomTarget,
@@ -26,7 +35,13 @@ import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import { commentBodyMaxLength, type ThreadComment } from '../../types/entities';
 import type { AppError } from '../../types/errors';
 import type { VoteChoice } from '../../types';
-import { formatPeso, previewPostDetail, previewPosts } from '../preview/sample-data';
+import {
+  formatPeso,
+  previewPostDetail,
+  previewPosts,
+  previewProfile,
+  type PreviewPost,
+} from '../preview/sample-data';
 import { CommentList } from './CommentList';
 import { useCommentThread } from './comment-thread';
 
@@ -34,6 +49,10 @@ export interface PostDetailViewProps {
   readonly postId?: string;
   readonly onBack?: () => void;
   readonly onShare?: () => void;
+  /** Opens the marketplace listing a reposted post links to. */
+  readonly onOpenListing?: (listingId: string) => void;
+  /** The author only: list the item from this post on the marketplace. */
+  readonly onListForSale?: (postId: string) => void;
 }
 
 /** What to tell someone when posting, deleting or reporting did not go through. */
@@ -61,7 +80,13 @@ function failureCopy(error: AppError): string {
  * Replying puts the composer into reply mode for that person; new comments land in the thread
  * as moderation left them, approved or visibly pending.
  */
-export function PostDetailView({ postId, onBack, onShare }: PostDetailViewProps) {
+export function PostDetailView({
+  postId,
+  onBack,
+  onShare,
+  onOpenListing,
+  onListForSale,
+}: PostDetailViewProps) {
   // The post the user tapped; a link to a post outside the preview feed falls back to a sample.
   const post = previewPosts.find((entry) => entry.id === postId) ?? previewPostDetail;
   const { colors } = useTheme();
@@ -249,6 +274,7 @@ export function PostDetailView({ postId, onBack, onShare }: PostDetailViewProps)
         <Reveal index={1} style={styles.question}>
           <EstimateBadge value={formatPeso(post.estimate)} size="hero" />
           <SWText variant="bodyLarge">{post.body}</SWText>
+          <CrossPost post={post} onOpenListing={onOpenListing} onListForSale={onListForSale} />
         </Reveal>
 
         <Reveal index={2} style={styles.verdict}>
@@ -301,6 +327,67 @@ export function PostDetailView({ postId, onBack, onShare }: PostDetailViewProps)
   );
 }
 
+/**
+ * The link between a post and the marketplace. A reposted listing points back to it; the
+ * author's own unlisted post offers to list it. Everyone else sees nothing here.
+ */
+function CrossPost({
+  post,
+  onOpenListing,
+  onListForSale,
+}: {
+  readonly post: PreviewPost;
+} & Pick<PostDetailViewProps, 'onOpenListing' | 'onListForSale'>) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(stylesFor);
+  const mine = post.author.handle === previewProfile.user.handle;
+  const { listing } = post;
+
+  if (listing) {
+    return (
+      <PressableScale
+        accessibilityRole="link"
+        accessibilityLabel={`For sale, asking ${formatPeso(listing.askingPrice)}. View listing`}
+        haptic="select"
+        depth="surface"
+        onPress={() => onOpenListing?.(listing.id)}
+      >
+        <Surface padding={tokens.spacing[3]} contentStyle={styles.crossPost}>
+          <View style={styles.crossIcon}>
+            <TagIcon size={18} strokeWidth={2} color={colors.mintInk} />
+          </View>
+          <View style={styles.crossText}>
+            <SWText variant="label">For sale on the market</SWText>
+            <SWText variant="caption" tone="textSecondary">
+              Asking {formatPeso(listing.askingPrice)}
+            </SWText>
+          </View>
+          <ChevronRight size={18} strokeWidth={2} color={colors.textMuted} />
+        </Surface>
+      </PressableScale>
+    );
+  }
+
+  if (!mine) return null;
+  return (
+    <Surface padding={tokens.spacing[4]} contentStyle={styles.ownerCard}>
+      <View style={styles.ownerHead}>
+        <Tag label="Your post" tone="sand" />
+      </View>
+      <SWText variant="bodySmall" tone="textSecondary">
+        Happy with what the community thinks? List it and set your own price.
+      </SWText>
+      <Button
+        label="List on the market"
+        variant="secondary"
+        icon={ShoppingBag}
+        accessibilityHint="Opens price confirmation. You set the asking price yourself."
+        onPress={() => onListForSale?.(post.id)}
+      />
+    </Surface>
+  );
+}
+
 const stylesFor = themedStyles((colors) => ({
   content: {
     paddingTop: 0,
@@ -318,6 +405,28 @@ const stylesFor = themedStyles((colors) => ({
   },
   question: {
     gap: tokens.spacing[4],
+  },
+  crossPost: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing[3],
+  },
+  crossIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: tokens.radius.small,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.mint,
+  },
+  crossText: {
+    flex: 1,
+  },
+  ownerCard: {
+    gap: tokens.spacing[3],
+  },
+  ownerHead: {
+    flexDirection: 'row',
   },
   verdict: {
     gap: tokens.spacing[4],
