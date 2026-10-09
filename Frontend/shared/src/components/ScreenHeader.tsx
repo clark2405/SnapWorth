@@ -1,7 +1,18 @@
 import { ChevronLeft, type LucideIcon } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
-import Animated, { Extrapolation, interpolate, useAnimatedStyle } from 'react-native-reanimated';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  Extrapolation,
+  interpolate,
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { themedStyles, tokens, useThemedStyles } from '../design';
@@ -33,9 +44,10 @@ export function NavHeader({ title, onBack, trailing, banded = false }: NavHeader
   const insets = useSafeAreaInsets();
   const styles = useThemedStyles(stylesFor);
 
-  const barStyle = useAnimatedStyle(() => {
+  // The edge's blur and wash grow in with the scroll (see ScrollEdge's `progress`).
+  const presence = useDerivedValue(() => {
     const y = scroll?.scrollY.value ?? 0;
-    return { opacity: interpolate(y, [0, 36], [banded ? 1 : 0, 1], Extrapolation.CLAMP) };
+    return interpolate(y, [0, 64], [banded ? 1 : 0, 1], Extrapolation.CLAMP);
   });
   const titleStyle = useAnimatedStyle(() => {
     const y = scroll?.scrollY.value ?? 0;
@@ -52,9 +64,9 @@ export function NavHeader({ title, onBack, trailing, banded = false }: NavHeader
 
   return (
     <View style={styles.wrap}>
-      <Animated.View style={[styles.barLayer, { top: -insets.top }, barStyle]}>
-        <ScrollEdge solid={insets.top + tokens.layout.headerCompact} />
-      </Animated.View>
+      <View style={[styles.barLayer, { top: -insets.top }]}>
+        <ScrollEdge solid={insets.top + tokens.layout.headerCompact} progress={presence} />
+      </View>
       {/* In a sheet there is no status bar above the header, so it brings its own top margin
           rather than sitting on the sheet's rounded edge. */}
       <View style={[styles.nav, insets.top < sheetTopInset ? styles.navInSheet : null]}>
@@ -127,11 +139,7 @@ export function LargeTitle({
     >
       {/* Overline, then the huge title sharing a line with its circular actions; any subtitle
           gets the full width beneath, so nothing wraps into a ragged line beside the buttons. */}
-      {brand ? (
-        <Animated.View style={[styles.brandRow, textStyle]}>
-          <Wordmark height={22} />
-        </Animated.View>
-      ) : null}
+      {brand ? <BrandRefresh /> : null}
       {overline ? (
         <Animated.View style={[styles.overlineRow, textStyle]}>
           <Overline label={overline} icon={overlineIcon} />
@@ -153,6 +161,62 @@ export function LargeTitle({
         </Animated.View>
       ) : null}
     </View>
+  );
+}
+
+/** How far a pull goes before the page reloads; the lens's glint makes one full turn by then. */
+const refreshPull = 96;
+
+/**
+ * The wordmark atop a main tab, which doubles as its pull-to-refresh indicator. Pulled, it stays
+ * put while the page stretches away beneath it, and the glint in its lens turns with the pull;
+ * while the page reloads the glint keeps circling, like a lens finding focus.
+ */
+function BrandRefresh() {
+  const scroll = useScreenScroll();
+  const styles = useThemedStyles(stylesFor);
+  const turning = useSharedValue(0);
+  const refreshing = scroll?.refreshing;
+
+  useAnimatedReaction(
+    () => refreshing?.value ?? 0,
+    (now, before) => {
+      if (now === before) return;
+      if (now === 1) {
+        turning.value = 0;
+        turning.value = withRepeat(
+          withTiming(360, { duration: 900, easing: Easing.linear }),
+          -1,
+          false,
+        );
+      } else {
+        cancelAnimation(turning);
+        turning.value = 0;
+      }
+    },
+  );
+
+  const spin = useDerivedValue(() => {
+    const pull = Math.max(0, -(scroll?.scrollY.value ?? 0));
+    const pulled = Math.min(pull / refreshPull, 1) * 360;
+    return (refreshing?.value ?? 0) === 1 ? pulled + turning.value : pulled;
+  });
+
+  const rowStyle = useAnimatedStyle(() => {
+    const y = scroll?.scrollY.value ?? 0;
+    const edge = scroll?.titleEdge.value ?? 80;
+    return {
+      opacity: interpolate(y, [0, edge * 0.8], [1, 0], Extrapolation.CLAMP),
+      // Pulled down, the wordmark holds its place and the page stretches beneath it; scrolled
+      // up, it drifts away with the title.
+      transform: [{ translateY: y < 0 ? y : interpolate(y, [0, edge], [0, edge * 0.3]) }],
+    };
+  });
+
+  return (
+    <Animated.View style={[styles.brandRow, rowStyle]}>
+      <Wordmark height={22} spin={scroll?.refreshable ? spin : undefined} />
+    </Animated.View>
   );
 }
 
