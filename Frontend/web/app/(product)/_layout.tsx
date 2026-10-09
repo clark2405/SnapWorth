@@ -2,7 +2,7 @@ import { Slot, usePathname, useRouter, type Href } from 'expo-router';
 import { Clock, MessageSquare, Newspaper, ShoppingBag } from 'lucide-react-native';
 import { View } from 'react-native';
 
-import { TabBar, type TabItem } from '@snapworth/shared/components';
+import { requestScrollToTop, TabBar, type TabItem } from '@snapworth/shared/components';
 
 type TabKey = 'feed' | 'marketplace' | 'chat' | 'history';
 
@@ -34,7 +34,10 @@ export default function ProductLayout() {
         <TabBar
           tabs={tabs}
           activeKey={activeKey}
-          onSelect={(key) => router.replace(tabRoutes[key])}
+          // Tapping the tab you are on takes its page back to the top.
+          onSelect={(key) =>
+            key === activeKey ? requestScrollToTop() : router.replace(tabRoutes[key])
+          }
         />
       ) : null}
     </View>

@@ -2,6 +2,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { ConfirmPriceView } from '@snapworth/shared/features/marketplace';
 
+import { pickItemPhotos } from '../../../src/photo-picker';
+
 export default function CreateListingRoute() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
@@ -12,6 +14,7 @@ export default function CreateListingRoute() {
       itemId={itemId}
       onBack={() => router.back()}
       onPublish={() => router.replace('/marketplace')}
+      onAddPhotos={pickItemPhotos}
     />
   );
 }

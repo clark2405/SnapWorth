@@ -16,6 +16,7 @@ import Animated, {
   interpolate,
   runOnJS,
   useAnimatedStyle,
+  useDerivedValue,
   useReducedMotion,
   useSharedValue,
   withSpring,
@@ -198,6 +199,8 @@ export function SearchView({
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: interpolate(morph.value, [0, 0.6], [0, 1], 'clamp'),
   }));
+  // The scroll edge grows its own blur in; fading its parent would stop the blur drawing.
+  const edgePresence = useDerivedValue(() => interpolate(morph.value, [0, 0.6], [0, 1], 'clamp'));
   const cancelStyle = useAnimatedStyle(() => ({
     opacity: interpolate(morph.value, [0.4, 1], [0, 1], 'clamp'),
     transform: [{ translateX: (1 - morph.value) * tokens.spacing[8] }],
@@ -229,9 +232,9 @@ export function SearchView({
       onLayout={(event: LayoutChangeEvent) => setHeaderHeight(event.nativeEvent.layout.height)}
     >
       {headerHeight > 0 ? (
-        <Animated.View style={[styles.edge, { top: -insets.top }, backdropStyle]}>
-          <ScrollEdge solid={insets.top + headerHeight} />
-        </Animated.View>
+        <View style={[styles.edge, { top: -insets.top }]}>
+          <ScrollEdge solid={insets.top + headerHeight} progress={edgePresence} />
+        </View>
       ) : null}
       <View style={styles.searchRow}>
         <View ref={slotRef} collapsable={false} style={styles.slot} onLayout={measureSlot}>

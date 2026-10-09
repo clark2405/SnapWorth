@@ -16,12 +16,15 @@ export default function ProfileRoute() {
     <ProfileView
       onBack={back}
       onOpen={(destination) => {
-        // Settings screens (notifications, price alerts, help) are not built yet.
+        if (destination === 'edit-profile') router.push('/settings/profile');
         if (destination === 'listings') router.push('/history?filter=listed');
         if (destination === 'votes') router.push('/votes');
         if (destination === 'conversations') router.push('/chat');
         if (destination === 'moderation') router.push('/admin/review');
         if (destination === 'introduction') router.push('/onboarding?replay=1');
+        if (destination === 'notifications') router.push('/settings/notifications');
+        if (destination === 'price-alerts') router.push('/settings/price-alerts');
+        if (destination === 'help') router.push('/settings/help');
       }}
       // Logging out leaves a guest who can keep looking around.
       onLogOut={() => {

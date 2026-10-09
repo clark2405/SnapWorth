@@ -68,6 +68,26 @@ export interface PreviewComment {
   readonly postedAgo: string;
 }
 
+/** One of an item's photos (an item can carry up to `maxItemPhotos`), cover first. */
+export interface PreviewPhoto {
+  readonly source: ImageSourcePropType;
+  readonly label: string;
+}
+
+/** How many photos an item can carry: the cover plus three more angles. */
+export const maxItemPhotos = 4;
+
+/** Every photo of an entry, cover first: its `photos` when it has several, else its one photo. */
+export function photosOf(entry: {
+  readonly photo: ImageSourcePropType;
+  readonly photoLabel: string;
+  readonly photos?: readonly PreviewPhoto[];
+}): readonly PreviewPhoto[] {
+  return entry.photos?.length
+    ? entry.photos.slice(0, maxItemPhotos)
+    : [{ source: entry.photo, label: entry.photoLabel }];
+}
+
 export interface PreviewPost {
   readonly id: string;
   readonly author: PreviewUser;
@@ -75,6 +95,8 @@ export interface PreviewPost {
   readonly body: string;
   readonly photo: ImageSourcePropType;
   readonly photoLabel: string;
+  /** More angles of the item, cover first, when the author added them. */
+  readonly photos?: readonly PreviewPhoto[];
   /** The AI estimate the author is asking the community to judge. */
   readonly estimate: number;
   readonly votes: VoteCounts;
@@ -115,6 +137,10 @@ export const previewPosts: readonly PreviewPost[] = [
     body: 'Is a vintage polaroid camera worth ₱3,500? Help me out please!',
     photo: image.polaroidCamera,
     photoLabel: 'Vintage Polaroid Sun 600 camera on a table',
+    photos: [
+      { source: image.polaroidCamera, label: 'Vintage Polaroid Sun 600 camera on a table' },
+      { source: image.polaroidScene, label: 'The same Polaroid on a sunlit shelf' },
+    ],
     estimate: 3500,
     votes: { too_high: 35, just_right: 12, too_low: 2 },
     listing: { id: 'polaroid-sun-600', askingPrice: 3200 },
@@ -148,7 +174,7 @@ export const previewPosts: readonly PreviewPost[] = [
   },
 ];
 
-/** Older posts that have scrolled off the preview feed but can still be opened. */
+/** Older posts, further down the preview feed below `previewPosts`. */
 export const previewOlderPosts: readonly PreviewPost[] = [
   {
     id: 'retro-walkman-post',
@@ -258,6 +284,42 @@ export const previewListings: readonly PreviewListing[] = [
     verdict: 'too_high',
     verdictShare: 60,
   },
+  {
+    id: 'nike-teal-windbreaker',
+    title: 'Retro Nike Teal Windbreaker',
+    askingPrice: 2600,
+    photo: image.windbreakerTeal,
+    photoLabel: 'Teal Nike half-zip windbreaker on concrete',
+    verdict: 'too_high',
+    verdictShare: 58,
+  },
+  {
+    id: 'colour-block-windbreaker',
+    title: '90s Colour-Block Windbreaker',
+    askingPrice: 1950,
+    photo: image.windbreakerRetro,
+    photoLabel: 'Teal and purple colour-block windbreaker',
+    verdict: 'too_low',
+    verdictShare: 66,
+  },
+  {
+    id: 'black-puffer-jacket',
+    title: 'Black Quilted Puffer Jacket',
+    askingPrice: 2900,
+    photo: image.pufferBlack,
+    photoLabel: 'Black quilted puffer jacket',
+    verdict: 'just_right',
+    verdictShare: 74,
+  },
+  {
+    id: 'polaroid-film-bundle',
+    title: 'Polaroid Camera and Film Bundle',
+    askingPrice: 3800,
+    photo: image.polaroidScene,
+    photoLabel: 'Polaroid camera on a shelf beside a plant',
+    verdict: 'just_right',
+    verdictShare: 69,
+  },
 ];
 
 export const previewListingDetail = {
@@ -267,6 +329,10 @@ export const previewListingDetail = {
   askingPrice: 3200,
   photo: image.polaroidScene,
   photoLabel: 'Vintage Polaroid Sun 600 camera on a sunlit shelf',
+  photos: [
+    { source: image.polaroidScene, label: 'Vintage Polaroid Sun 600 camera on a sunlit shelf' },
+    { source: image.polaroidCamera, label: 'The Polaroid from the front, lens and flash' },
+  ],
   justRightShare: 85,
   assessmentNote:
     'This listing is set ₱750 above initial AI price estimate due to community vote suggestions.',
@@ -424,6 +490,96 @@ export const previewHistory: readonly PreviewHistoryItem[] = [
     photo: image.jordanBred,
     photoLabel: 'Red and black Air Jordan sneaker',
   },
+  {
+    id: 'black-puffer-jacket',
+    title: 'Black Quilted Puffer Jacket',
+    estimate: 2700,
+    status: 'private',
+    capturedOn: 'Sep 21, 2026',
+    photo: image.pufferBlack,
+    photoLabel: 'Black quilted puffer jacket',
+  },
+  {
+    id: 'sony-walkman-wm',
+    title: 'Sony Walkman Cassette Player',
+    estimate: 2100,
+    status: 'on_feed',
+    capturedOn: 'Sep 15, 2026',
+    photo: image.walkman,
+    photoLabel: 'Silver cassette Walkman player',
+  },
+  {
+    id: 'keychron-k2',
+    title: 'Keychron K2 Mechanical Keyboard',
+    estimate: 3900,
+    status: 'sold',
+    capturedOn: 'Sep 02, 2026',
+    photo: image.keyboard,
+    photoLabel: 'Mechanical keyboard with RGB lighting on a desk',
+  },
+  {
+    id: 'teal-half-zip',
+    title: 'Nike Teal Half-Zip Windbreaker',
+    estimate: 2350,
+    status: 'listed',
+    capturedOn: 'Aug 27, 2026',
+    photo: image.windbreakerTeal,
+    photoLabel: 'Teal Nike half-zip windbreaker on concrete',
+  },
+  {
+    id: 'polaroid-onestep',
+    title: 'Polaroid OneStep Camera',
+    estimate: 2900,
+    status: 'private',
+    capturedOn: 'Aug 19, 2026',
+    photo: image.polaroidScene,
+    photoLabel: 'Polaroid camera on a shelf beside a plant',
+  },
+  {
+    id: 'jordan-1-mid',
+    title: 'Air Jordan 1 Mid',
+    estimate: 5200,
+    status: 'sold',
+    capturedOn: 'Aug 03, 2026',
+    photo: image.jordanBred,
+    photoLabel: 'Red and black Air Jordan sneaker',
+  },
+  {
+    id: 'polaroid-600-instant',
+    title: 'Polaroid 600 Instant Camera',
+    estimate: 3100,
+    status: 'private',
+    capturedOn: 'Jul 28, 2026',
+    photo: image.polaroidCamera,
+    photoLabel: 'Vintage Polaroid instant camera',
+  },
+  {
+    id: 'colour-block-track-jacket',
+    title: 'Nike Colour-Block Track Jacket',
+    estimate: 2200,
+    status: 'on_feed',
+    capturedOn: 'Jul 20, 2026',
+    photo: image.windbreakerRetro,
+    photoLabel: 'Teal and purple colour-block track jacket',
+  },
+  {
+    id: 'jordan-1-high-og',
+    title: 'Air Jordan 1 High OG Bred',
+    estimate: 8800,
+    status: 'private',
+    capturedOn: 'Jul 11, 2026',
+    photo: image.jordanBred,
+    photoLabel: 'Red and black Air Jordan sneaker',
+  },
+  {
+    id: 'cassette-walkman',
+    title: 'Vintage Cassette Walkman',
+    estimate: 1700,
+    status: 'sold',
+    capturedOn: 'Jul 02, 2026',
+    photo: image.walkman,
+    photoLabel: 'Silver cassette Walkman player',
+  },
 ];
 
 /**
@@ -440,6 +596,12 @@ export const previewSharingByItem: Readonly<Record<string, PreviewSharing>> = {
   'nike-neon-windbreaker': { listingId: 'nike-neon-windbreaker' },
   'polaroid-sun-600': { postId: 'polaroid-sun-600' },
   'air-jordan-1-retro': { listingId: 'air-jordan-1-retro', sold: true },
+  'sony-walkman-wm': { postId: 'retro-walkman-post' },
+  'keychron-k2': { listingId: 'keychron-k2', sold: true },
+  'teal-half-zip': { listingId: 'teal-half-zip' },
+  'jordan-1-mid': { listingId: 'jordan-1-mid', sold: true },
+  'colour-block-track-jacket': { postId: 'retro-windbreaker' },
+  'cassette-walkman': { listingId: 'cassette-walkman', sold: true },
 };
 
 /** The signed-in user in preview mode. `isAdmin` shows the moderation entry on the profile. */
@@ -448,10 +610,25 @@ export const previewProfile = {
   displayName: 'Rico Santos',
   joined: 'Joined March 2026',
   location: 'Makati, Metro Manila',
+  bio: 'Thrifting 90s sportswear and film cameras around Manila. Everything I sell is tested.',
   rating: '4.8',
   stats: { checked: previewHistory.length, listed: 1, sold: 12 },
   isAdmin: true,
 } as const;
+
+/** A saved listing the viewer is watching, and the price that would set off an alert. */
+export interface PreviewPriceAlert {
+  readonly listingId: string;
+  readonly alertBelow: number;
+  readonly on: boolean;
+}
+
+export const previewPriceAlerts: readonly PreviewPriceAlert[] = [
+  // Alert prices are a set step under the asking price (5, 10, 15 or 20%), rounded to ₱50.
+  { listingId: 'air-jordan-1-bred', alertBelow: 8100, on: true },
+  { listingId: 'nike-teal-windbreaker', alertBelow: 2350, on: true },
+  { listingId: 'polaroid-film-bundle', alertBelow: 3400, on: false },
+];
 
 export interface PreviewConversationSummary {
   readonly id: string;
@@ -508,6 +685,188 @@ export const previewConversations: readonly PreviewConversationSummary[] = [
     sentAt: 'Sep 14',
     unread: 0,
     closed: 'archived',
+  },
+  {
+    id: 'puffer-chat',
+    with: previewUsers.justinV,
+    itemTitle: 'Black Quilted Puffer Jacket',
+    itemPhoto: image.pufferBlack,
+    lastMessage: 'Is it a size M? I can meet at Glorietta on Saturday.',
+    lastFromMe: false,
+    sentAt: '9:12 AM',
+    unread: 0,
+  },
+  {
+    id: 'walkman-chat',
+    with: previewUsers.manilaHype,
+    itemTitle: 'Retro Walkman Player',
+    itemPhoto: image.walkman,
+    lastMessage: 'Does it still play both sides of the tape?',
+    lastFromMe: true,
+    sentAt: 'Yesterday',
+    unread: 0,
+  },
+  {
+    id: 'teal-windbreaker-chat',
+    with: previewUsers.mariaCruz,
+    itemTitle: 'Retro Nike Teal Windbreaker',
+    itemPhoto: image.windbreakerTeal,
+    lastMessage: 'Would you take ₱2,300? I can pay through GCash.',
+    lastFromMe: false,
+    sentAt: 'Mon',
+    unread: 0,
+  },
+  {
+    id: 'film-bundle-chat',
+    with: previewUsers.justinV,
+    itemTitle: 'Polaroid Camera and Film Bundle',
+    itemPhoto: image.polaroidScene,
+    lastMessage: 'How many film packs are left in the bundle?',
+    lastFromMe: true,
+    sentAt: 'Sun',
+    unread: 0,
+  },
+  {
+    id: 'colour-block-chat',
+    with: previewUsers.manilaHype,
+    itemTitle: '90s Colour-Block Windbreaker',
+    itemPhoto: image.windbreakerRetro,
+    lastMessage: 'Sent you the measurements. Pit to pit is 24 inches.',
+    lastFromMe: false,
+    sentAt: 'Oct 2',
+    unread: 0,
+  },
+  {
+    id: 'polaroid-justin-chat',
+    with: previewUsers.justinV,
+    itemTitle: 'Vintage Polaroid Sun 600',
+    itemPhoto: image.polaroidCamera,
+    lastMessage: 'Does the flash still work? I mostly shoot indoors.',
+    lastFromMe: false,
+    sentAt: 'Sep 30',
+    unread: 0,
+  },
+  {
+    id: 'walkman-maria-chat',
+    with: previewUsers.mariaCruz,
+    itemTitle: 'Retro Walkman Player',
+    itemPhoto: image.walkman,
+    lastMessage: 'I can bring spare batteries so you can test it.',
+    lastFromMe: true,
+    sentAt: 'Sep 26',
+    unread: 0,
+  },
+  {
+    id: 'keychron-hype-chat',
+    with: previewUsers.manilaHype,
+    itemTitle: 'Mechanical Keychron Keyboard',
+    itemPhoto: image.keyboard,
+    lastMessage: 'Which switches are on it, brown or red?',
+    lastFromMe: false,
+    sentAt: 'Sep 22',
+    unread: 0,
+  },
+  {
+    id: 'jordan-bred-chat',
+    with: previewUsers.manilaHype,
+    itemTitle: 'Air Jordan 1 High Bred',
+    itemPhoto: image.jordanBred,
+    lastMessage: 'Box and extra laces included. ₱8,500 is firm, sorry.',
+    lastFromMe: true,
+    sentAt: 'Sep 18',
+    unread: 0,
+  },
+  {
+    id: 'puffer-maria-chat',
+    with: previewUsers.mariaCruz,
+    itemTitle: 'Black Quilted Puffer Jacket',
+    itemPhoto: image.pufferBlack,
+    lastMessage: 'Perfect for my trip to Baguio. Is it still available?',
+    lastFromMe: false,
+    sentAt: 'Sep 15',
+    unread: 0,
+  },
+  {
+    id: 'teal-justin-chat',
+    with: previewUsers.justinV,
+    itemTitle: 'Retro Nike Teal Windbreaker',
+    itemPhoto: image.windbreakerTeal,
+    lastMessage: 'Any stains or tears? Can you send a photo of the tag?',
+    lastFromMe: false,
+    sentAt: 'Sep 12',
+    unread: 0,
+  },
+  {
+    id: 'film-bundle-hype-chat',
+    with: previewUsers.manilaHype,
+    itemTitle: 'Polaroid Camera and Film Bundle',
+    itemPhoto: image.polaroidScene,
+    lastMessage: 'I can do ₱3,500 if you pick up this week.',
+    lastFromMe: true,
+    sentAt: 'Sep 9',
+    unread: 0,
+  },
+  {
+    id: 'colour-block-justin-chat',
+    with: previewUsers.justinV,
+    itemTitle: '90s Colour-Block Windbreaker',
+    itemPhoto: image.windbreakerRetro,
+    lastMessage: 'Would this fit someone who is 5 foot 9?',
+    lastFromMe: false,
+    sentAt: 'Sep 6',
+    unread: 0,
+  },
+  {
+    id: 'walkman-justin-chat',
+    with: previewUsers.justinV,
+    itemTitle: 'Retro Walkman Player',
+    itemPhoto: image.walkman,
+    lastMessage: 'Does it come with the original headphones?',
+    lastFromMe: false,
+    sentAt: 'Sep 3',
+    unread: 0,
+  },
+  {
+    id: 'polaroid-hype-chat',
+    with: previewUsers.manilaHype,
+    itemTitle: 'Vintage Polaroid Sun 600',
+    itemPhoto: image.polaroidCamera,
+    lastMessage: 'Let me know if the price drops. Still interested!',
+    lastFromMe: false,
+    sentAt: 'Aug 29',
+    unread: 0,
+  },
+  {
+    id: 'keychron-maria-chat',
+    with: previewUsers.mariaCruz,
+    itemTitle: 'Mechanical Keychron Keyboard',
+    itemPhoto: image.keyboard,
+    lastMessage: 'I can meet at SM Megamall after work on Friday.',
+    lastFromMe: true,
+    sentAt: 'Aug 25',
+    unread: 0,
+  },
+  {
+    id: 'jordan-mid-chat',
+    with: previewUsers.mariaCruz,
+    itemTitle: 'Air Jordan 1 Mid',
+    itemPhoto: image.jordanBred,
+    lastMessage: 'Payment sent. Thanks for the quick meetup!',
+    lastFromMe: false,
+    sentAt: 'Aug 30',
+    unread: 0,
+    closed: 'sold',
+  },
+  {
+    id: 'keychron-k2-chat',
+    with: previewUsers.justinV,
+    itemTitle: 'Keychron K2 Mechanical Keyboard',
+    itemPhoto: image.keyboard,
+    lastMessage: 'Got it, the keycaps are all there. Salamat!',
+    lastFromMe: false,
+    sentAt: 'Sep 5',
+    unread: 0,
+    closed: 'sold',
   },
 ];
 
@@ -756,7 +1115,7 @@ export const previewTrendDetails: Readonly<Record<string, PreviewTrendDetail>> =
     high: 2850,
     soldThisMonth: 36,
     series: [2150, 2180, 2200, 2190, 2250, 2280, 2300, 2330, 2360, 2390, 2420, 2450],
-    listingIds: [],
+    listingIds: ['nike-teal-windbreaker', 'colour-block-windbreaker'],
     postIds: ['retro-windbreaker'],
   },
   'retro-audio': {
@@ -800,6 +1159,10 @@ export const previewListingPlaces: Readonly<Record<string, { area: string; dista
     'air-jordan-1-bred': { area: 'quezon-city', distanceKm: 11 },
     'retro-walkman': { area: 'pasig', distanceKm: 6 },
     'keychron-keyboard': { area: 'cebu', distanceKm: 570 },
+    'nike-teal-windbreaker': { area: 'quezon-city', distanceKm: 9 },
+    'colour-block-windbreaker': { area: 'pasig', distanceKm: 5 },
+    'black-puffer-jacket': { area: 'makati', distanceKm: 3 },
+    'polaroid-film-bundle': { area: 'makati', distanceKm: 4 },
   };
 
 export const previewMarketAreas: readonly { readonly key: string; readonly label: string }[] = [

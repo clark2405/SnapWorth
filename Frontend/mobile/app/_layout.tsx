@@ -4,7 +4,7 @@ import 'react-native-url-polyfill/auto';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { LogBox, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -23,6 +23,10 @@ import { deviceTipStore } from '../src/tip-store';
 
 // A Supabase project's URL and public anon key, from EXPO_PUBLIC_* environment variables
 // (see Backend/README.md). Without them, comments are kept on this device instead.
+// A known, harmless warning from React Native's animated module when a native-driven value
+// updates after its last listener has gone; it carries no action, so it stays out of the way.
+LogBox.ignoreLogs(['Sending `onAnimatedValueUpdate` with no listeners registered.']);
+
 const backend: BackendConfig = {
   supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
   supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,

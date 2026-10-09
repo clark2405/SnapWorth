@@ -33,6 +33,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   plugins: [
     'expo-router',
+    [
+      'expo-image-picker',
+      {
+        photosPermission:
+          'SnapWorth uses the photos you choose to show more angles of an item you list or ask about.',
+        cameraPermission: false,
+        microphonePermission: false,
+      },
+    ],
     'expo-status-bar',
     'expo-system-ui',
     [

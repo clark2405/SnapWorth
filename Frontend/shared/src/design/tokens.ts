@@ -228,14 +228,16 @@ export const tokens = deepFreeze({
     },
   },
   /**
-   * Translucent layers for controls that sit over live media (the camera viewfinder), where a
-   * solid surface would hide what the user is aiming at. Nowhere else.
+   * Translucent layers for controls that sit over live media (the camera viewfinder, a photo
+   * opened full screen), where a solid surface would hide what the user is looking at.
    */
   overlay: {
     chrome: 'rgba(11, 11, 13, 0.46)',
     border: 'rgba(255, 255, 255, 0.22)',
     scrim: 'rgba(0, 0, 0, 0.42)',
     text: '#FFFFFF',
+    /** The near-black a photo sits on when opened full screen, in either appearance. */
+    stage: '#0A0A0B',
   },
   /** Warm-tinted, light from the top. `shadow` is the resting card; `lifted` floats. */
   shadow: {
