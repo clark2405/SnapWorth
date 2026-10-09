@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CreatePostView } from '@snapworth/shared/features/feed';
 
 import { ModalSafeArea } from '../../src/ModalSafeArea';
+import { pickItemPhotos } from '../../src/photo-picker';
 
 export default function CreatePostRoute() {
   const router = useRouter();
@@ -27,6 +28,7 @@ export default function CreatePostRoute() {
         onBack={() => router.back()}
         // Preview wiring: there is no post service yet, so publishing just opens the feed.
         onPublish={() => router.replace('/feed')}
+        onAddPhotos={pickItemPhotos}
       />
     </ModalSafeArea>
   );

@@ -63,6 +63,7 @@ import {
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import {
   formatPeso,
+  photosOf,
   previewConditions,
   previewItem,
   previewSharingByItem,
@@ -185,11 +186,7 @@ export function EstimateResultView({
       contentStyle={styles.content}
     >
       {asSheet ? null : (
-        <DetailHero
-          source={item.photo}
-          label={item.photoLabel}
-          heightRatio={estimated ? 0.5 : 0.62}
-        >
+        <DetailHero photos={photosOf(item)} heightRatio={estimated ? 0.5 : 0.62}>
           {status === 'estimating' ? <ScanOverlay /> : null}
         </DetailHero>
       )}

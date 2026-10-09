@@ -12,6 +12,7 @@ import {
   ListRow,
   NavHeader,
   Photo,
+  PhotoSetField,
   PriceRangeBar,
   Reveal,
   Screen,
@@ -20,10 +21,13 @@ import {
   SWText,
   TextField,
   useToast,
+  type ItemPhoto,
 } from '../../components';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import {
   formatPeso,
+  maxItemPhotos,
+  photosOf,
   previewConditions,
   previewItem,
   previewValuation,
@@ -38,6 +42,8 @@ export interface ConfirmPriceViewProps {
    * whether to also post the listing to the feed so the community can vote on that price.
    */
   readonly onPublish?: (enteredPrice: number, alsoAskFeed: boolean) => void;
+  /** Opens the photo picker for up to `room` more photos of the item (the shell supplies it). */
+  readonly onAddPhotos?: (room: number) => Promise<readonly ItemPhoto[]>;
 }
 
 const priceInput = /^\d{1,9}(?:\.\d{1,2})?$/;
@@ -55,9 +61,11 @@ function suggestedPrice(condition: PreviewCondition): number {
   return Math.round((previewItem.estimate * factor) / 10) * 10;
 }
 
-export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
+export function ConfirmPriceView({ onBack, onPublish, onAddPhotos }: ConfirmPriceViewProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
+  // Buyers want more than the snap: the listing can carry the cover plus three more angles.
+  const [photos, setPhotos] = useState<readonly ItemPhoto[]>(() => photosOf(previewItem));
   const toast = useToast();
   const item = previewItem;
   const [alsoAskFeed, setAlsoAskFeed] = useState(false);
@@ -121,8 +129,8 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
     >
       <Reveal index={0} style={styles.item}>
         <Photo
-          source={item.photo}
-          label={item.photoLabel}
+          source={photos[0]?.source ?? item.photo}
+          label={photos[0]?.label ?? item.photoLabel}
           radius={tokens.radius.medium}
           style={styles.thumb}
         />
@@ -132,6 +140,15 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
             {item.subtitle}
           </SWText>
         </View>
+      </Reveal>
+
+      <Reveal index={1}>
+        <PhotoSetField
+          photos={photos}
+          onChange={setPhotos}
+          onAddPhotos={onAddPhotos}
+          max={maxItemPhotos}
+        />
       </Reveal>
 
       <Reveal index={1} style={styles.conditionSection}>

@@ -68,6 +68,26 @@ export interface PreviewComment {
   readonly postedAgo: string;
 }
 
+/** One of an item's photos (an item can carry up to `maxItemPhotos`), cover first. */
+export interface PreviewPhoto {
+  readonly source: ImageSourcePropType;
+  readonly label: string;
+}
+
+/** How many photos an item can carry: the cover plus three more angles. */
+export const maxItemPhotos = 4;
+
+/** Every photo of an entry, cover first: its `photos` when it has several, else its one photo. */
+export function photosOf(entry: {
+  readonly photo: ImageSourcePropType;
+  readonly photoLabel: string;
+  readonly photos?: readonly PreviewPhoto[];
+}): readonly PreviewPhoto[] {
+  return entry.photos?.length
+    ? entry.photos.slice(0, maxItemPhotos)
+    : [{ source: entry.photo, label: entry.photoLabel }];
+}
+
 export interface PreviewPost {
   readonly id: string;
   readonly author: PreviewUser;
@@ -75,6 +95,8 @@ export interface PreviewPost {
   readonly body: string;
   readonly photo: ImageSourcePropType;
   readonly photoLabel: string;
+  /** More angles of the item, cover first, when the author added them. */
+  readonly photos?: readonly PreviewPhoto[];
   /** The AI estimate the author is asking the community to judge. */
   readonly estimate: number;
   readonly votes: VoteCounts;
@@ -115,6 +137,10 @@ export const previewPosts: readonly PreviewPost[] = [
     body: 'Is a vintage polaroid camera worth ₱3,500? Help me out please!',
     photo: image.polaroidCamera,
     photoLabel: 'Vintage Polaroid Sun 600 camera on a table',
+    photos: [
+      { source: image.polaroidCamera, label: 'Vintage Polaroid Sun 600 camera on a table' },
+      { source: image.polaroidScene, label: 'The same Polaroid on a sunlit shelf' },
+    ],
     estimate: 3500,
     votes: { too_high: 35, just_right: 12, too_low: 2 },
     listing: { id: 'polaroid-sun-600', askingPrice: 3200 },
@@ -303,6 +329,10 @@ export const previewListingDetail = {
   askingPrice: 3200,
   photo: image.polaroidScene,
   photoLabel: 'Vintage Polaroid Sun 600 camera on a sunlit shelf',
+  photos: [
+    { source: image.polaroidScene, label: 'Vintage Polaroid Sun 600 camera on a sunlit shelf' },
+    { source: image.polaroidCamera, label: 'The Polaroid from the front, lens and flash' },
+  ],
   justRightShare: 85,
   assessmentNote:
     'This listing is set ₱750 above initial AI price estimate due to community vote suggestions.',

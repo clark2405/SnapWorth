@@ -38,6 +38,7 @@ import type { AppError } from '../../types/errors';
 import type { VoteChoice } from '../../types';
 import {
   formatPeso,
+  photosOf,
   previewOlderPosts,
   previewPostDetail,
   previewPosts,
@@ -305,7 +306,7 @@ export function PostDetailView({
       }
       contentStyle={styles.content}
     >
-      <DetailHero source={post.photo} label={post.photoLabel} />
+      <DetailHero photos={photosOf(post)} />
 
       <DetailSheet
         style={styles.body}

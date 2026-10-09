@@ -40,6 +40,7 @@ import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../d
 import type { VoteCounts } from '../../types';
 import {
   formatPeso,
+  photosOf,
   previewListingDetail,
   previewListingInsight,
   previewMyListing,
@@ -208,7 +209,7 @@ export function ListingDetailView({
     >
       {/* The zoom lands on the hero photo, which has no entrance of its own: a fade or slide on
           top of the zoom made opening and closing a listing stutter. */}
-      <DetailHero source={listing.photo} label={listing.photoLabel} />
+      <DetailHero photos={photosOf(listing)} />
 
       <DetailSheet style={styles.body}>
         <Reveal index={1} style={styles.titleBlock}>

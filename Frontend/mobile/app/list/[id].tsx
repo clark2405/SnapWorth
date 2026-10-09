@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ConfirmPriceView } from '@snapworth/shared/features/marketplace';
 
 import { ModalSafeArea } from '../../src/ModalSafeArea';
+import { pickItemPhotos } from '../../src/photo-picker';
 
 export default function CreateListingRoute() {
   const router = useRouter();
@@ -15,6 +16,7 @@ export default function CreateListingRoute() {
         itemId={itemId}
         onBack={() => router.back()}
         onPublish={() => router.replace('/marketplace')}
+        onAddPhotos={pickItemPhotos}
       />
     </ModalSafeArea>
   );
