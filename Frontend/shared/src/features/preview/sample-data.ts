@@ -610,10 +610,25 @@ export const previewProfile = {
   displayName: 'Rico Santos',
   joined: 'Joined March 2026',
   location: 'Makati, Metro Manila',
+  bio: 'Thrifting 90s sportswear and film cameras around Manila. Everything I sell is tested.',
   rating: '4.8',
   stats: { checked: previewHistory.length, listed: 1, sold: 12 },
   isAdmin: true,
 } as const;
+
+/** A saved listing the viewer is watching, and the price that would set off an alert. */
+export interface PreviewPriceAlert {
+  readonly listingId: string;
+  readonly alertBelow: number;
+  readonly on: boolean;
+}
+
+export const previewPriceAlerts: readonly PreviewPriceAlert[] = [
+  // Alert prices are a set step under the asking price (5, 10, 15 or 20%), rounded to ₱50.
+  { listingId: 'air-jordan-1-bred', alertBelow: 8100, on: true },
+  { listingId: 'nike-teal-windbreaker', alertBelow: 2350, on: true },
+  { listingId: 'polaroid-film-bundle', alertBelow: 3400, on: false },
+];
 
 export interface PreviewConversationSummary {
   readonly id: string;
