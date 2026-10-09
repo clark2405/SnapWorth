@@ -17,7 +17,7 @@ import {
 } from '../../components';
 import { themedStyles, tokens, useThemedStyles } from '../../design';
 import type { VoteChoice } from '../../types';
-import { previewPosts, previewTrending } from '../preview/sample-data';
+import { previewOlderPosts, previewPosts, previewTrending } from '../preview/sample-data';
 import { ProfileButton } from '../profile/ProfileButton';
 import { useAccountGate } from '../session';
 import { Tip, useTip } from '../tips';
@@ -37,6 +37,9 @@ export interface FeedViewProps {
 }
 
 type PreviewTrend = (typeof previewTrending)[number];
+
+/** Newest first, the older ones further down, as the feed reads once it has history. */
+const feedPosts = [...previewPosts, ...previewOlderPosts];
 
 /**
  * The community's front page: what is trending this month, then every open question, newest
@@ -98,7 +101,7 @@ export function FeedView({
       </Reveal>
 
       <View style={styles.list}>
-        {previewPosts.map((post, index) => (
+        {feedPosts.map((post, index) => (
           <Reveal key={post.id} index={index + 1} style={index > 0 ? styles.divided : null}>
             <PostCard
               post={post}

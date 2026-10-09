@@ -54,6 +54,10 @@ const categoryByListing: Readonly<Record<string, string>> = {
   'air-jordan-1-bred': 'sneakers',
   'retro-walkman': 'electronics',
   'keychron-keyboard': 'electronics',
+  'nike-teal-windbreaker': 'fashion',
+  'colour-block-windbreaker': 'fashion',
+  'black-puffer-jacket': 'fashion',
+  'polaroid-film-bundle': 'collectibles',
 };
 
 /** A rough read on whether a listing sits under its likely fair value, from its community verdict. */
@@ -276,15 +280,14 @@ const stylesFor = themedStyles((colors) => ({
     gap: tokens.spacing[4],
     marginBottom: tokens.spacing[10],
   },
+  // Stacked, so each steal gets the full width for its asking price and estimate side by side.
   highlightRow: {
-    flexDirection: 'row',
     gap: tokens.spacing[3],
   },
   highlightSlot: {
-    flex: 1,
+    alignSelf: 'stretch',
   },
   highlightCard: {
-    flex: 1,
     flexDirection: 'row',
     gap: tokens.spacing[3],
     padding: tokens.spacing[3],

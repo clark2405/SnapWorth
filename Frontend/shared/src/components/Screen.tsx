@@ -1,8 +1,11 @@
+import { useIsPreview, useScrollToTop } from 'expo-router';
 import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
   type RefObject,
@@ -12,6 +15,7 @@ import {
   Platform,
   RefreshControl,
   StyleSheet,
+  useWindowDimensions,
   View,
   type StyleProp,
   type ViewStyle,
@@ -21,6 +25,7 @@ import Animated, {
   interpolate,
   useAnimatedScrollHandler,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withDelay,
   withSequence,
@@ -32,7 +37,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../design';
 import { AmbientBackdrop, type AmbientBackdropProps } from './AmbientBackdrop';
 import { ScrollEdge } from './ScrollEdge';
-import { contentScrolling } from './scroll-signal';
+import { contentScrolling, onScrollToTopRequest } from './scroll-signal';
 import { SWText } from './SWText';
 
 interface ScreenScrollState {
@@ -41,6 +46,12 @@ interface ScreenScrollState {
   readonly titleEdge: SharedValue<number>;
   readonly setCompactTitle: (title: string | null) => void;
   readonly hasHeader: boolean;
+  /** How far the content sits below offset zero, where iOS insets it (see `bare` below). */
+  readonly offsetBase: number;
+  /** 1 while a pull-to-refresh is reloading the page, for the wordmark that shows it. */
+  readonly refreshing: SharedValue<number>;
+  /** Whether the page can be pulled to refresh. */
+  readonly refreshable: boolean;
 }
 
 const ScreenScrollContext = createContext<ScreenScrollState | null>(null);
@@ -103,10 +114,47 @@ export function Screen({
   // Headers vary (a search field plus scopes is taller than a title bar), so measure it.
   const [headerHeight, setHeaderHeight] = useState<number>(tokens.layout.headerCompact);
   const [refreshing, setRefreshing] = useState(false);
+  const refreshingValue = useSharedValue(0);
+  const ownScrollRef = useRef<Animated.ScrollView>(null);
+  const scrollerRef = scrollRef ?? ownScrollRef;
+
+  // iOS 26 only minimises the tab bar over a scroll view that is the tab's top-level view and
+  // lets iOS manage its insets. So on iOS a tab page renders its scroll view bare, with the
+  // floating header beside it rather than a wrapper around both, and iOS insets it from the
+  // status bar and the tab bar. Offsets then start at minus the top inset; `offsetBase` brings
+  // them back to zero at rest for everything that reads the scroll position.
+  const bare = Platform.OS === 'ios' && scroll && !transparent && clearTabBar && !footer;
+  const offsetBase = bare ? insets.top : 0;
+  const base = useSharedValue(offsetBase);
+  useEffect(() => {
+    base.value = offsetBase;
+  }, [base, offsetBase]);
+
+  // Tapping the tab you are already on brings its page back to the top, as in every system app.
+  // Native tabs announce the repeat tap through the navigator; the web's tab bar asks directly.
+  const topTarget = useMemo(
+    () => ({
+      get current() {
+        const node = scrollerRef.current;
+        if (!node) return null;
+        return {
+          scrollTo: (to: { y?: number; animated?: boolean }) =>
+            node.scrollTo({ ...to, y: (to.y ?? 0) - offsetBase }),
+        };
+      },
+    }),
+    [offsetBase, scrollerRef],
+  );
+  // A screen shown as a link preview is not in the navigator, so it doesn't listen for taps.
+  const isPreview = useIsPreview();
+  useEffect(() => {
+    if (!clearTabBar || Platform.OS !== 'web') return;
+    return onScrollToTopRequest(() => scrollerRef.current?.scrollTo({ y: 0, animated: true }));
+  }, [clearTabBar, scrollerRef]);
 
   const onScroll = useAnimatedScrollHandler({
     onScroll: (event, context: { lastY?: number }) => {
-      const y = event.contentOffset.y;
+      const y = event.contentOffset.y + base.value;
       const delta = y - (context.lastY ?? y);
       context.lastY = y;
       scrollY.value = y;
@@ -127,17 +175,27 @@ export function Screen({
     if (!onRefresh) return;
     haptic('select');
     setRefreshing(true);
+    refreshingValue.value = 1;
     try {
       await onRefresh();
     } finally {
       setRefreshing(false);
+      refreshingValue.value = 0;
       haptic('success');
     }
-  }, [onRefresh]);
+  }, [onRefresh, refreshingValue]);
 
   const context = useMemo<ScreenScrollState>(
-    () => ({ scrollY, titleEdge, setCompactTitle, hasHeader: Boolean(header) }),
-    [header, scrollY, titleEdge],
+    () => ({
+      scrollY,
+      titleEdge,
+      setCompactTitle,
+      hasHeader: Boolean(header),
+      offsetBase,
+      refreshing: refreshingValue,
+      refreshable: Boolean(onRefresh),
+    }),
+    [header, offsetBase, onRefresh, refreshingValue, scrollY, titleEdge],
   );
 
   const clearance = insets.top + (header ? headerHeight : 0);
@@ -152,48 +210,89 @@ export function Screen({
     android: insets.bottom + tokens.layout.androidTabBarClearance,
     default: insets.bottom + tokens.layout.floatingTabBarClearance + tokens.spacing[4],
   });
-  const bottomRoom = clearTabBar
-    ? tabBarRoom + tokens.spacing[4]
-    : (footer ? footerHeight : insets.bottom) + tokens.spacing[8];
+  const bottomRoom = bare
+    ? tokens.spacing[4]
+    : clearTabBar
+      ? tabBarRoom + tokens.spacing[4]
+      : (footer ? footerHeight : insets.bottom) + tokens.spacing[8];
 
-  const body = [styles.content, contentStyle, { paddingTop: topRoom, paddingBottom: bottomRoom }];
+  const body = [
+    styles.content,
+    contentStyle,
+    { paddingTop: topRoom - offsetBase, paddingBottom: bottomRoom },
+  ];
+
+  // A bare tab page carries its backdrop inside the scroll view, held still against it, so the
+  // scroll view can come first. Only there: inside a form sheet the same layer covers the content.
+  const backdropInScroll = bare;
+
+  const scroller = scroll ? (
+    <Animated.ScrollView
+      ref={scrollerRef}
+      style={bare ? [styles.column, styles.canvas] : styles.fill}
+      contentContainerStyle={body}
+      onScroll={onScroll}
+      scrollEventThrottle={16}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="interactive"
+      contentInsetAdjustmentBehavior={bare ? 'automatic' : 'never'}
+      refreshControl={
+        onRefresh ? (
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={refresh}
+            // On iOS the wordmark's lens is the indicator (see LargeTitle), so the system spinner
+            // stays out of sight; Android's spinner takes the brand accent.
+            tintColor={Platform.OS === 'ios' ? 'transparent' : colors.textMuted}
+            colors={[colors.accent]}
+            progressViewOffset={clearance - offsetBase}
+          />
+        ) : undefined
+      }
+    >
+      {backdropInScroll ? <PinnedBackdrop mood={ambient} scrollY={scrollY} base={base} /> : null}
+      {children}
+    </Animated.ScrollView>
+  ) : (
+    <View style={[styles.fill, body]}>{children}</View>
+  );
+
+  const top = header ? (
+    <View
+      style={[styles.header, { paddingTop: insets.top }]}
+      onLayout={(event) =>
+        setHeaderHeight(Math.round(event.nativeEvent.layout.height - insets.top))
+      }
+    >
+      {header}
+    </View>
+  ) : (
+    <CompactTitleBar title={compactTitle} topInset={insets.top} />
+  );
+
+  const tabTap = isPreview ? null : <ScrollToTopOnTabTap target={topTarget} />;
+
+  if (bare) {
+    return (
+      <ScreenScrollContext.Provider value={context}>
+        {scroller}
+        {top}
+        {tabTap}
+      </ScreenScrollContext.Provider>
+    );
+  }
 
   return (
     <ScreenScrollContext.Provider value={context}>
       <View style={[styles.root, transparent ? styles.clear : null]}>
-        {transparent ? null : <AmbientBackdrop mood={ambient} />}
+        {transparent || backdropInScroll ? null : <AmbientBackdrop mood={ambient} />}
         <KeyboardAvoidingView
           style={styles.fill}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <View style={styles.column}>
-            {scroll ? (
-              <Animated.ScrollView
-                ref={scrollRef}
-                style={styles.fill}
-                contentContainerStyle={body}
-                onScroll={onScroll}
-                scrollEventThrottle={16}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                keyboardDismissMode="interactive"
-                contentInsetAdjustmentBehavior="never"
-                refreshControl={
-                  onRefresh ? (
-                    <RefreshControl
-                      refreshing={refreshing}
-                      onRefresh={refresh}
-                      tintColor={colors.textMuted}
-                      progressViewOffset={clearance}
-                    />
-                  ) : undefined
-                }
-              >
-                {children}
-              </Animated.ScrollView>
-            ) : (
-              <View style={[styles.fill, body]}>{children}</View>
-            )}
+            {scroller}
             {footer ? (
               <View
                 style={styles.footer}
@@ -204,20 +303,42 @@ export function Screen({
             ) : null}
           </View>
         </KeyboardAvoidingView>
-        {header ? (
-          <View
-            style={[styles.header, { paddingTop: insets.top }]}
-            onLayout={(event) =>
-              setHeaderHeight(Math.round(event.nativeEvent.layout.height - insets.top))
-            }
-          >
-            {header}
-          </View>
-        ) : (
-          <CompactTitleBar title={compactTitle} topInset={insets.top} />
-        )}
+        {top}
+        {tabTap}
       </View>
     </ScreenScrollContext.Provider>
+  );
+}
+
+/** Listens for a tap on the tab that is already open; it draws nothing. */
+function ScrollToTopOnTabTap({
+  target,
+}: {
+  readonly target: Parameters<typeof useScrollToTop>[0];
+}) {
+  useScrollToTop(target);
+  return null;
+}
+
+/** The ambient backdrop laid inside a scroll view, moved with the offset so it stays put. */
+function PinnedBackdrop({
+  mood,
+  scrollY,
+  base,
+}: {
+  readonly mood: AmbientBackdropProps['mood'];
+  readonly scrollY: SharedValue<number>;
+  readonly base: SharedValue<number>;
+}) {
+  const styles = useThemedStyles(stylesFor);
+  const { height } = useWindowDimensions();
+  const pinned = useAnimatedStyle(() => ({
+    transform: [{ translateY: scrollY.value - base.value }],
+  }));
+  return (
+    <Animated.View pointerEvents="none" style={[styles.pinned, { height }, pinned]}>
+      <AmbientBackdrop mood={mood} />
+    </Animated.View>
   );
 }
 
@@ -232,10 +353,12 @@ function CompactTitleBar({
   const scroll = useScreenScroll();
   const styles = useThemedStyles(stylesFor);
 
-  const barStyle = useAnimatedStyle(() => {
+  // The edge grows in over the last stretch before the large title slips under it, rather than
+  // switching on as it passes.
+  const presence = useDerivedValue(() => {
     const edge = scroll?.titleEdge.value ?? 64;
     const y = scroll?.scrollY.value ?? 0;
-    return { opacity: interpolate(y, [edge - 24, edge], [0, 1], Extrapolation.CLAMP) };
+    return interpolate(y, [edge - 72, edge + 8], [0, 1], Extrapolation.CLAMP);
   });
   const titleStyle = useAnimatedStyle(() => {
     const edge = scroll?.titleEdge.value ?? 64;
@@ -251,14 +374,14 @@ function CompactTitleBar({
   if (!title) return null;
 
   return (
-    <Animated.View style={[styles.compact, barStyle]}>
-      <ScrollEdge solid={topInset + tokens.layout.headerCompact} />
+    <View style={styles.compact}>
+      <ScrollEdge solid={topInset + tokens.layout.headerCompact} progress={presence} />
       <Animated.View style={[styles.compactTitle, { marginTop: topInset }, titleStyle]}>
         <SWText variant="headingMedium" numberOfLines={1}>
           {title}
         </SWText>
       </Animated.View>
-    </Animated.View>
+    </View>
   );
 }
 
@@ -269,7 +392,8 @@ export function useRegisterLargeTitle(title: string) {
   return useCallback(
     (bottom: number) => {
       if (!scroll || !setCompactTitle) return;
-      scroll.titleEdge.value = bottom;
+      // Layout is in content coordinates; the scroll position is measured from the resting top.
+      scroll.titleEdge.value = bottom + scroll.offsetBase;
       setCompactTitle(title);
     },
     [scroll, setCompactTitle, title],
@@ -283,6 +407,15 @@ const stylesFor = themedStyles((colors) => ({
   },
   clear: {
     backgroundColor: 'transparent',
+  },
+  canvas: {
+    backgroundColor: colors.canvas,
+  },
+  pinned: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
   },
   column: {
     flex: 1,
