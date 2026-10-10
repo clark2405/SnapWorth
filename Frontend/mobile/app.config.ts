@@ -42,6 +42,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         microphonePermission: false,
       },
     ],
+    // Local notifications only for now (an estimate finishing while you're away); push needs a
+    // backend to send from.
+    'expo-notifications',
     'expo-status-bar',
     'expo-system-ui',
     [
