@@ -34,6 +34,8 @@ export interface FeedViewProps {
   readonly onSnap?: () => void;
   /** Opens a "Hot this month" category's trend screen, by its key (where links need a hand). */
   readonly onOpenTrend?: (trendKey: string) => void;
+  /** Shares a link to a post, from its press-and-hold menu. */
+  readonly onSharePost?: (postId: string) => void;
 }
 
 type PreviewTrend = (typeof previewTrending)[number];
@@ -51,6 +53,7 @@ export function FeedView({
   onOpenProfile,
   onSnap,
   onOpenTrend,
+  onSharePost,
 }: FeedViewProps) {
   const styles = useThemedStyles(stylesFor);
   // Local until VoteService exists: tapping the same vote again withdraws it.
@@ -116,6 +119,7 @@ export function FeedView({
                 })
               }
               onOpen={() => onOpenPost?.(post.id)}
+              onShare={onSharePost ? () => onSharePost(post.id) : undefined}
             />
           </Reveal>
         ))}

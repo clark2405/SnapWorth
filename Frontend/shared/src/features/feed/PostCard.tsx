@@ -70,16 +70,10 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
     [castJustRight],
   );
 
+  // Share is only offered where the shell can make a link, and the shell reports how it went.
   const menu = useMemo(
     () => [
-      {
-        title: 'Share',
-        symbol: 'square.and.arrow.up',
-        onPress: () => {
-          onShare?.();
-          toast.show({ title: 'Link copied' });
-        },
-      },
+      ...(onShare ? [{ title: 'Share', symbol: 'square.and.arrow.up', onPress: onShare }] : []),
       {
         title: 'Save',
         symbol: 'bookmark',
