@@ -4,6 +4,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -32,13 +33,17 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../design';
 import { AmbientBackdrop, type AmbientBackdropProps } from './AmbientBackdrop';
 import { ScrollEdge } from './ScrollEdge';
 import { contentScrolling, onScrollToTopRequest } from './scroll-signal';
 import { SWText } from './SWText';
+
+/** The shortest a pull-to-refresh shows itself reloading: one pass of the wordmark's wave. */
+const minimumRefreshMs = 1200;
 
 interface ScreenScrollState {
   readonly scrollY: SharedValue<number>;
@@ -84,6 +89,12 @@ export interface ScreenProps {
   readonly transparent?: boolean;
   /** Lets a screen scroll itself, e.g. to bring a just-posted comment into view. */
   readonly scrollRef?: RefObject<Animated.ScrollView | null>;
+  /**
+   * The screen is the content of a sheet. There is no status bar above it, so nothing inside
+   * keeps clear of one, and the footer rests on the sheet's own colour so the page never shows
+   * through beneath the floating bar.
+   */
+  readonly sheet?: boolean;
 }
 
 /**
@@ -103,8 +114,13 @@ export function Screen({
   bleedTop = false,
   transparent = false,
   scrollRef,
+  sheet = false,
 }: ScreenProps) {
-  const insets = useSafeAreaInsets();
+  const deviceInsets = useSafeAreaInsets();
+  const insets = useMemo(
+    () => (sheet ? { ...deviceInsets, top: 0 } : deviceInsets),
+    [deviceInsets, sheet],
+  );
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const scrollY = useSharedValue(0);
@@ -177,7 +193,12 @@ export function Screen({
     setRefreshing(true);
     refreshingValue.value = 1;
     try {
-      await onRefresh();
+      // The wordmark's reload wave runs through the word at least once, so even a quick reload
+      // reads as one rather than a flicker.
+      await Promise.all([
+        onRefresh(),
+        new Promise((resolve) => setTimeout(resolve, minimumRefreshMs)),
+      ]);
     } finally {
       setRefreshing(false);
       refreshingValue.value = 0;
@@ -283,7 +304,7 @@ export function Screen({
     );
   }
 
-  return (
+  const page = (
     <ScreenScrollContext.Provider value={context}>
       <View style={[styles.root, transparent ? styles.clear : null]}>
         {transparent || backdropInScroll ? null : <AmbientBackdrop mood={ambient} />}
@@ -298,6 +319,7 @@ export function Screen({
                 style={styles.footer}
                 onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
               >
+                {sheet ? <SheetFooterBase /> : null}
                 {footer}
               </View>
             ) : null}
@@ -307,6 +329,36 @@ export function Screen({
         {tabTap}
       </View>
     </ScreenScrollContext.Provider>
+  );
+
+  // Headers and bars inside read the insets themselves, so a sheet hands them its own.
+  return sheet ? (
+    <SafeAreaInsetsContext.Provider value={insets}>{page}</SafeAreaInsetsContext.Provider>
+  ) : (
+    page
+  );
+}
+
+/**
+ * The sheet's colour under its footer, fading in from above the bar, so content scrolling past
+ * disappears behind the bar instead of showing in the margin beneath and beside it.
+ */
+function SheetFooterBase() {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(stylesFor);
+  const id = `footer-${useId().replace(/:/g, '')}`;
+  return (
+    <View pointerEvents="none" style={styles.footerBase}>
+      <Svg width="100%" height="100%" preserveAspectRatio="none">
+        <Defs>
+          <LinearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={colors.canvas} stopOpacity={0} />
+            <Stop offset="0.45" stopColor={colors.canvas} stopOpacity={1} />
+          </LinearGradient>
+        </Defs>
+        <Rect width="100%" height="100%" fill={`url(#${id})`} />
+      </Svg>
+    </View>
   );
 }
 
@@ -438,6 +490,13 @@ const stylesFor = themedStyles((colors) => ({
   },
   footer: {
     position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  footerBase: {
+    position: 'absolute',
+    top: -tokens.spacing[6],
     left: 0,
     right: 0,
     bottom: 0,

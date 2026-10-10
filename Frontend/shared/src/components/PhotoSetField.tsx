@@ -71,6 +71,7 @@ export function PhotoSetField({ photos, onChange, onAddPhotos, max = 4 }: PhotoS
         </SWText>
       </View>
       <View
+        testID="photo-row"
         style={styles.row}
         onLayout={(event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width)}
       >

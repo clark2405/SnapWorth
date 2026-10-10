@@ -32,6 +32,7 @@ export * from './Surface';
 export * from './SWText';
 export * from './TabBar';
 export * from './Tag';
+export * from './Toggle';
 export * from './TipCard';
 export * from './TextField';
 export * from './Toast';

@@ -1,5 +1,7 @@
 import {
   BellOff,
+  BellRing,
+  Settings,
   Flame,
   Handshake,
   Lightbulb,
@@ -11,17 +13,37 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import { useState } from 'react';
-import { Switch } from 'react-native';
 
-import { ListGroup, ListRow, NavHeader, Reveal, Screen, SWText } from '../../components';
-import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import { ListGroup, ListRow, NavHeader, Reveal, Screen, SWText, Toggle } from '../../components';
+import { haptic, themedStyles, tokens, useThemedStyles } from '../../design';
+
+/** What a notification is about, which is what each switch on the screen turns on or off. */
+export type NotificationKey =
+  'estimates' | 'votes' | 'comments' | 'messages' | 'offers' | 'price-drops' | 'trends' | 'tips';
+
+export interface NotificationPreferences {
+  /** Silences everything without losing the choices underneath. */
+  readonly paused: boolean;
+  readonly enabled: Readonly<Record<NotificationKey, boolean>>;
+}
+
+/**
+ * Whether the system lets SnapWorth notify at all. `unsupported` is a browser without
+ * notifications.
+ */
+export type NotificationAccess = 'granted' | 'denied' | 'undetermined' | 'unsupported';
 
 export interface NotificationsViewProps {
   readonly onBack?: () => void;
+  /** The saved choices; without them the screen keeps its own, for previews. */
+  readonly preferences?: NotificationPreferences;
+  readonly onChange?: (preferences: NotificationPreferences) => void;
+  readonly access?: NotificationAccess;
+  /** Asks the system for permission, the first time. */
+  readonly onAllow?: () => void;
+  /** Opens the system settings, where a refused permission can be turned back on. */
+  readonly onOpenSettings?: () => void;
 }
-
-type NotificationKey =
-  'estimates' | 'votes' | 'comments' | 'messages' | 'offers' | 'price-drops' | 'trends' | 'tips';
 
 interface NotificationOption {
   readonly key: NotificationKey;
@@ -100,31 +122,52 @@ const groups: readonly {
 
 // Everything about your own items and deals is on; news from SnapWorth is opt-in apart from
 // the monthly trends note.
-const defaults: Record<NotificationKey, boolean> = {
-  estimates: true,
-  votes: true,
-  comments: true,
-  messages: true,
-  offers: true,
-  'price-drops': true,
-  trends: true,
-  tips: false,
+export const defaultNotificationPreferences: NotificationPreferences = {
+  paused: false,
+  enabled: {
+    estimates: true,
+    votes: true,
+    comments: true,
+    messages: true,
+    offers: true,
+    'price-drops': true,
+    trends: true,
+    tips: false,
+  },
 };
+
+/** Whether the person wants to hear about `key` right now. */
+export function wantsNotification(preferences: NotificationPreferences, key: NotificationKey) {
+  return !preferences.paused && preferences.enabled[key];
+}
 
 /**
  * What SnapWorth may tap you on the shoulder about, grouped by why it would: your items, your
  * deals, and the occasional note from us. Pausing silences everything without losing the
  * choices underneath.
  */
-export function NotificationsView({ onBack }: NotificationsViewProps) {
-  const { colors } = useTheme();
+export function NotificationsView({
+  onBack,
+  preferences,
+  onChange,
+  access = 'granted',
+  onAllow,
+  onOpenSettings,
+}: NotificationsViewProps) {
   const styles = useThemedStyles(stylesFor);
-  const [paused, setPaused] = useState(false);
-  const [enabled, setEnabled] = useState(defaults);
+  const [own, setOwn] = useState(defaultNotificationPreferences);
+  const current = preferences ?? own;
+  const { paused, enabled } = current;
 
-  const toggle = (key: NotificationKey, value: boolean) => {
+  const change = (next: NotificationPreferences) => {
     haptic('select');
-    setEnabled((current) => ({ ...current, [key]: value }));
+    setOwn(next);
+    onChange?.(next);
+  };
+  const toggle = (key: NotificationKey, value: boolean) => {
+    change({ ...current, enabled: { ...enabled, [key]: value } });
+    // Turning something on is the moment to ask, when the reason is obvious.
+    if (value && access === 'undetermined') onAllow?.();
   };
 
   return (
@@ -132,6 +175,28 @@ export function NotificationsView({ onBack }: NotificationsViewProps) {
       header={<NavHeader title="Notifications" onBack={onBack} banded />}
       contentStyle={styles.content}
     >
+      {access === 'undetermined' || (access === 'denied' && onOpenSettings) ? (
+        <Reveal index={0}>
+          <ListGroup>
+            {access === 'undetermined' ? (
+              <ListRow
+                label="Allow notifications"
+                detail="So the ones you choose below can reach you"
+                icon={BellRing}
+                onPress={onAllow}
+              />
+            ) : (
+              <ListRow
+                label="Notifications are off"
+                detail="Turn them on for SnapWorth in Settings"
+                icon={Settings}
+                onPress={onOpenSettings}
+              />
+            )}
+          </ListGroup>
+        </Reveal>
+      ) : null}
+
       <Reveal index={0}>
         <ListGroup>
           <ListRow
@@ -139,13 +204,9 @@ export function NotificationsView({ onBack }: NotificationsViewProps) {
             detail={paused ? 'Nothing will notify you until you turn this off' : undefined}
             icon={BellOff}
             trailing={
-              <Switch
+              <Toggle
                 value={paused}
-                onValueChange={(value) => {
-                  haptic('select');
-                  setPaused(value);
-                }}
-                trackColor={{ false: colors.sunken, true: colors.textPrimary }}
+                onValueChange={(value) => change({ ...current, paused: value })}
                 accessibilityLabel="Pause all notifications"
               />
             }
@@ -163,11 +224,10 @@ export function NotificationsView({ onBack }: NotificationsViewProps) {
                 detail={option.detail}
                 icon={option.icon}
                 trailing={
-                  <Switch
+                  <Toggle
                     value={enabled[option.key]}
                     disabled={paused}
                     onValueChange={(value) => toggle(option.key, value)}
-                    trackColor={{ false: colors.sunken, true: colors.textPrimary }}
                     accessibilityLabel={option.label}
                   />
                 }
@@ -178,7 +238,9 @@ export function NotificationsView({ onBack }: NotificationsViewProps) {
       ))}
 
       <SWText variant="caption" tone="textMuted" style={styles.footnote}>
-        You can also turn SnapWorth's notifications off entirely in your phone's Settings.
+        {access === 'unsupported'
+          ? 'This browser can’t show notifications; your choices still apply in the app.'
+          : 'You can also turn SnapWorth’s notifications off entirely in your phone’s Settings.'}
       </SWText>
     </Screen>
   );

@@ -1,9 +1,9 @@
 // supabase-js needs a complete URL implementation, which React Native does not ship.
 import 'react-native-url-polyfill/auto';
 
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, type Href } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { LogBox, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -18,6 +18,7 @@ import { TipsProvider } from '@snapworth/shared/features/tips';
 
 import { CompanionHost } from '../src/CompanionHost';
 import { renderNavLink, renderZoomSource, renderZoomTarget } from '../src/nav-bridge';
+import { useOpenTappedNotifications } from '../src/notifications';
 import { deviceThemeStore } from '../src/theme-store';
 import { deviceTipStore } from '../src/tip-store';
 
@@ -61,6 +62,16 @@ function Shell() {
   const [revealOpen, setRevealOpen] = useState(false);
   const [launched, setLaunched] = useState(false);
   const fontsReady = useSnapWorthFonts();
+  // A tapped notification starts from the tabs: whatever sheet or camera was open closes first,
+  // so its page doesn't stack on top of them.
+  const openPath = useCallback(
+    (path: string) => {
+      if (router.canDismiss()) router.dismissAll();
+      router.push(path as Href);
+    },
+    [router],
+  );
+  useOpenTappedNotifications(launched, openPath);
 
   // Hold on the bare canvas for the moment the bundled faces take to load, so no text ever
   // renders in a fallback face and then jumps.
@@ -104,7 +115,8 @@ function Shell() {
                 sheetAllowedDetents: [0.56, 1],
                 sheetInitialDetentIndex: 0,
                 sheetGrabberVisible: true,
-                sheetCornerRadius: 28,
+                // No corner radius of our own: iOS 26 rounds the sheet's corners to follow the
+                // screen's, which a fixed radius would flatten at the bottom.
                 sheetExpandsWhenScrolledToEdge: true,
                 contentStyle: { backgroundColor: colors.canvas },
               }}

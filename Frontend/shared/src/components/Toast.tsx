@@ -3,6 +3,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -53,6 +54,14 @@ export function ToastProvider({ children }: { readonly children: ReactNode }) {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => setCurrent(null), 2400);
   }, []);
+
+  // A toast still showing when the app's shell goes away has nowhere left to hide.
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
 
   const api = useMemo(() => ({ show }), [show]);
 

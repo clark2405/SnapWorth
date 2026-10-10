@@ -27,7 +27,9 @@ export default function CreatePostRoute() {
         }
         onBack={() => router.back()}
         // Preview wiring: there is no post service yet, so publishing just opens the feed.
-        onPublish={() => router.replace('/feed')}
+        // Dismissing back to it closes the whole snap flow (camera, estimate, this composer),
+        // where replacing would leave them stacked behind the feed.
+        onPublish={() => router.dismissTo('/feed')}
         onAddPhotos={pickItemPhotos}
       />
     </ModalSafeArea>

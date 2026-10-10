@@ -123,8 +123,10 @@ export function EstimateResultView({
   const asSheet = presentation === 'sheet';
   const listTip = useTip('list');
   const item = previewItem;
-  // A fresh capture is private until the owner shares it; History items carry their own state.
-  const placement: PreviewSharing = (itemId ? previewSharingByItem[itemId] : undefined) ?? {};
+  // A fresh capture (the sheet) is private until the owner shares it; History items carry their
+  // own state. The preview reuses a History item for the capture, so the sheet ignores its state.
+  const placement: PreviewSharing =
+    (asSheet || !itemId ? undefined : previewSharingByItem[itemId]) ?? {};
   const styles = useThemedStyles(stylesFor);
   const [title, setTitle] = useState<string>(item.title);
   const [condition, setCondition] = useState<PreviewCondition>(previewValuation.condition);
@@ -146,9 +148,13 @@ export function EstimateResultView({
   return (
     <Screen
       bleedTop={!asSheet}
+      sheet={asSheet}
       header={
+        // In the sheet the title stays up from the start: the photo is behind the sheet, so the
+        // name is what tells you what was recognised.
         <NavHeader
-          title={estimated ? title : 'Estimating'}
+          title={estimated ? title : asSheet ? 'New snap' : 'Estimating'}
+          banded={asSheet}
           onBack={asSheet ? undefined : onBack}
           trailing={
             estimated ? (
@@ -761,9 +767,14 @@ const stylesFor = themedStyles((colors, name) => ({
     paddingTop: 0,
     paddingHorizontal: 0,
   },
+  // The sheet is already the page's surface, so the body sits flat on it rather than as a
+  // second rounded card.
   inSheet: {
     marginTop: 0,
-    paddingTop: tokens.spacing[2],
+    paddingTop: tokens.spacing[5],
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    backgroundColor: 'transparent',
   },
   sheet: {
     gap: tokens.spacing[10],
@@ -829,8 +840,12 @@ const stylesFor = themedStyles((colors, name) => ({
     minHeight: tokens.typography.style.caption.lineHeight * 2,
     marginTop: tokens.spacing[1],
   },
+  // On the content's left edge like everything above it, with where the item lives at the end.
   saved: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
     gap: tokens.spacing[3],
   },
   savedLine: {

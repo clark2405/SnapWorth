@@ -1,4 +1,9 @@
-const { motionHookProject, propertyProject, pureUnitProject } = require('./jest.projects.cjs');
+const {
+  motionHookProject,
+  screenProject,
+  propertyProject,
+  pureUnitProject,
+} = require('./jest.projects.cjs');
 
 module.exports = {
   collectCoverageFrom: [
@@ -7,5 +12,5 @@ module.exports = {
     'web/src/**/*.{ts,tsx}',
     '!web/src/**/*.d.ts',
   ],
-  projects: [pureUnitProject, motionHookProject, propertyProject],
+  projects: [pureUnitProject, motionHookProject, screenProject, propertyProject],
 };

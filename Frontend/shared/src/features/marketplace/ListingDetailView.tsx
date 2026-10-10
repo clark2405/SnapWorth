@@ -8,7 +8,7 @@ import {
   Users,
 } from 'lucide-react-native';
 import { useState } from 'react';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 
 import {
   Tag,
@@ -35,6 +35,7 @@ import {
   shareIcon,
   DetailHero,
   DetailSheet,
+  Toggle,
 } from '../../components';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import type { VoteCounts } from '../../types';
@@ -60,6 +61,8 @@ export interface ListingDetailViewProps {
   readonly onEditPrice?: () => void;
   /** Owner only: close the listing as sold. */
   readonly onMarkSold?: () => void;
+  /** Shares a link to this listing. */
+  readonly onShare?: () => void;
 }
 
 function communityTally(justRightShare: number): VoteCounts {
@@ -79,6 +82,7 @@ export function ListingDetailView({
   onAskFeed,
   onEditPrice,
   onMarkSold,
+  onShare,
 }: ListingDetailViewProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
@@ -139,12 +143,14 @@ export function ListingDetailView({
           onBack={onBack}
           trailing={
             <View style={styles.headerActions}>
-              <IconButton
-                icon={shareIcon}
-                label="Share this listing"
-                appearance="glass"
-                onPress={() => toast.show({ title: 'Link copied' })}
-              />
+              {onShare ? (
+                <IconButton
+                  icon={shareIcon}
+                  label="Share this listing"
+                  appearance="glass"
+                  onPress={onShare}
+                />
+              ) : null}
               {owned ? null : (
                 <LikeButton
                   liked={saved}
@@ -290,7 +296,7 @@ export function ListingDetailView({
                 <ListRow
                   label="Alert me if the price drops"
                   trailing={
-                    <Switch
+                    <Toggle
                       value={priceAlert}
                       onValueChange={(value) =>
                         requireAccount('alert', () => {
@@ -304,7 +310,6 @@ export function ListingDetailView({
                           }
                         })
                       }
-                      trackColor={{ false: colors.sunken, true: colors.textPrimary }}
                       accessibilityLabel="Alert me if the price drops"
                     />
                   }
