@@ -43,11 +43,17 @@ export function NavHeader({ title, onBack, trailing, banded = false }: NavHeader
   const scroll = useScreenScroll();
   const insets = useSafeAreaInsets();
   const styles = useThemedStyles(stylesFor);
+  const inSheet = insets.top < sheetTopInset;
+  // A sheet's header is taller by the margin under the sheet's top edge.
+  const barHeight = tokens.layout.headerCompact + (inSheet ? sheetNavMargin : 0);
 
-  // The edge's blur and wash grow in with the scroll (see ScrollEdge's `progress`).
+  // The edge's blur and wash grow in with the scroll (see ScrollEdge's `progress`). A banded
+  // bar keeps its edge from the start, except in a sheet: nothing lies under the bar there
+  // until the content scrolls, and an edge at rest would only blur the first line.
+  const edgeAtRest = banded && !inSheet;
   const presence = useDerivedValue(() => {
     const y = scroll?.scrollY.value ?? 0;
-    return interpolate(y, [0, 64], [banded ? 1 : 0, 1], Extrapolation.CLAMP);
+    return interpolate(y, [0, 64], [edgeAtRest ? 1 : 0, 1], Extrapolation.CLAMP);
   });
   const titleStyle = useAnimatedStyle(() => {
     const y = scroll?.scrollY.value ?? 0;
@@ -65,11 +71,11 @@ export function NavHeader({ title, onBack, trailing, banded = false }: NavHeader
   return (
     <View style={styles.wrap}>
       <View style={[styles.barLayer, { top: -insets.top }]}>
-        <ScrollEdge solid={insets.top + tokens.layout.headerCompact} progress={presence} />
+        <ScrollEdge solid={insets.top + barHeight} progress={presence} />
       </View>
       {/* In a sheet there is no status bar above the header, so it brings its own top margin
           rather than sitting on the sheet's rounded edge. */}
-      <View style={[styles.nav, insets.top < sheetTopInset ? styles.navInSheet : null]}>
+      <View style={[styles.nav, inSheet ? styles.navInSheet : null]}>
         <View style={styles.side}>
           {onBack ? (
             <IconButton icon={ChevronLeft} label="Go back" appearance="glass" onPress={onBack} />
@@ -222,6 +228,10 @@ function BrandRefresh() {
 
 /** Below this, the screen has no status bar over it: it is presented as a sheet. */
 const sheetTopInset = tokens.spacing[5];
+// Concentric with the sheet's corner: the button sits as far from the top edge as from the
+// side, so it follows the curve instead of crowding it.
+const sheetNavMargin =
+  tokens.layout.pageGutterCompact - (tokens.layout.headerCompact - tokens.focus.minimumTarget) / 2;
 
 const stylesFor = themedStyles(() => ({
   wrap: {
@@ -240,12 +250,8 @@ const stylesFor = themedStyles(() => ({
     alignItems: 'center',
     paddingHorizontal: tokens.layout.pageGutterCompact,
   },
-  // Concentric with the sheet's corner: the button sits as far from the top edge as from the
-  // side, so it follows the curve instead of crowding it.
   navInSheet: {
-    paddingTop:
-      tokens.layout.pageGutterCompact -
-      (tokens.layout.headerCompact - tokens.focus.minimumTarget) / 2,
+    paddingTop: sheetNavMargin,
   },
   side: {
     minWidth: tokens.focus.minimumTarget + tokens.spacing[2],

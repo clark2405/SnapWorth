@@ -104,7 +104,8 @@ function Shell() {
                 sheetAllowedDetents: [0.56, 1],
                 sheetInitialDetentIndex: 0,
                 sheetGrabberVisible: true,
-                sheetCornerRadius: 28,
+                // No corner radius of our own: iOS 26 rounds the sheet's corners to follow the
+                // screen's, which a fixed radius would flatten at the bottom.
                 sheetExpandsWhenScrolledToEdge: true,
                 contentStyle: { backgroundColor: colors.canvas },
               }}
