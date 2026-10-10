@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { haptic, tokens } from '../design';
 import { IconButton } from './IconButton';
+import { clampOffset, doubleTapZoom, offsetAround, pinchZoom, settledZoom } from './photo-zoom';
 import { SWText } from './SWText';
 
 /** One photo of an item, with the words a screen reader says for it. */
@@ -41,8 +42,6 @@ export interface PhotoViewerProps {
   readonly onClose: () => void;
 }
 
-const maxZoom = 4;
-const doubleTapZoom = 2.5;
 /** How far a photo is dragged down before letting go closes the viewer. */
 const dismissDistance = 120;
 const settle = { damping: 22, stiffness: 220 };
@@ -157,6 +156,8 @@ function ZoomablePhoto({
   const y = useSharedValue(0);
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
+  const focusX = useSharedValue(0);
+  const focusY = useSharedValue(0);
 
   // Leaving a photo resets it, so coming back to it starts from the whole picture.
   useEffect(() => {
@@ -172,25 +173,32 @@ function ZoomablePhoto({
     onZoomChange(next);
   };
 
-  // Keeps a zoomed photo's edges from pulling away from the screen's edges.
-  const clamp = (value: number, zoom: number, extent: number) => {
-    'worklet';
-    const room = (extent * (zoom - 1)) / 2;
-    return Math.min(room, Math.max(-room, value));
-  };
-
+  // The photo zooms around the point between the fingers, as Photos does, so what you are
+  // reaching for stays under them.
   const pinch = Gesture.Pinch()
-    .onStart(() => {
+    .onStart((event) => {
       startScale.value = scale.value;
+      startX.value = x.value;
+      startY.value = y.value;
+      focusX.value = event.focalX;
+      focusY.value = event.focalY;
     })
     .onUpdate((event) => {
-      scale.value = Math.min(maxZoom, Math.max(0.8, startScale.value * event.scale));
+      const zoom = pinchZoom(startScale.value, event.scale);
+      scale.value = zoom;
+      // Moving the fingers together while pinching carries the photo along with them.
+      x.value =
+        offsetAround(focusX.value, width, startX.value, startScale.value, zoom) +
+        (event.focalX - focusX.value);
+      y.value =
+        offsetAround(focusY.value, height, startY.value, startScale.value, zoom) +
+        (event.focalY - focusY.value);
     })
     .onEnd(() => {
-      const next = Math.min(maxZoom, Math.max(1, scale.value));
+      const next = settledZoom(scale.value);
       scale.value = withSpring(next, settle);
-      x.value = withSpring(clamp(x.value, next, width), settle);
-      y.value = withSpring(clamp(y.value, next, height), settle);
+      x.value = withSpring(clampOffset(x.value, next, width), settle);
+      y.value = withSpring(clampOffset(y.value, next, height), settle);
       runOnJS(report)(next > 1.01);
     });
 
@@ -204,8 +212,16 @@ function ZoomablePhoto({
         runOnJS(report)(false);
       } else {
         // Zoom in on the spot that was tapped.
-        const toX = clamp((width / 2 - event.x) * (doubleTapZoom - 1), doubleTapZoom, width);
-        const toY = clamp((height / 2 - event.y) * (doubleTapZoom - 1), doubleTapZoom, height);
+        const toX = clampOffset(
+          offsetAround(event.x, width, 0, 1, doubleTapZoom),
+          doubleTapZoom,
+          width,
+        );
+        const toY = clampOffset(
+          offsetAround(event.y, height, 0, 1, doubleTapZoom),
+          doubleTapZoom,
+          height,
+        );
         scale.value = withTiming(doubleTapZoom, { duration: tokens.motion.duration.base });
         x.value = withTiming(toX, { duration: tokens.motion.duration.base });
         y.value = withTiming(toY, { duration: tokens.motion.duration.base });
@@ -217,13 +233,15 @@ function ZoomablePhoto({
   // away; sideways movement is left to the pager so the next photo can come in.
   const pan = zoomed
     ? Gesture.Pan()
+        // Two fingers are the pinch's; it moves the photo itself.
+        .maxPointers(1)
         .onStart(() => {
           startX.value = x.value;
           startY.value = y.value;
         })
         .onUpdate((event) => {
-          x.value = clamp(startX.value + event.translationX, scale.value, width);
-          y.value = clamp(startY.value + event.translationY, scale.value, height);
+          x.value = clampOffset(startX.value + event.translationX, scale.value, width);
+          y.value = clampOffset(startY.value + event.translationY, scale.value, height);
         })
     : Gesture.Pan()
         .activeOffsetY([-12, 12])
