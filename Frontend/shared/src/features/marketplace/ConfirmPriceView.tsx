@@ -1,6 +1,6 @@
 import { Users } from 'lucide-react-native';
 import { useState } from 'react';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import {
@@ -22,8 +22,9 @@ import {
   TextField,
   useToast,
   type ItemPhoto,
+  Toggle,
 } from '../../components';
-import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import { haptic, themedStyles, tokens, useThemedStyles } from '../../design';
 import {
   formatPeso,
   maxItemPhotos,
@@ -62,7 +63,6 @@ function suggestedPrice(condition: PreviewCondition): number {
 }
 
 export function ConfirmPriceView({ onBack, onPublish, onAddPhotos }: ConfirmPriceViewProps) {
-  const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   // Buyers want more than the snap: the listing can carry the cover plus three more angles.
   const [photos, setPhotos] = useState<readonly ItemPhoto[]>(() => photosOf(previewItem));
@@ -215,13 +215,12 @@ export function ConfirmPriceView({ onBack, onPublish, onAddPhotos }: ConfirmPric
             detail="Let the community vote on your price"
             icon={Users}
             trailing={
-              <Switch
+              <Toggle
                 value={alsoAskFeed}
                 onValueChange={(value) => {
                   setAlsoAskFeed(value);
                   haptic('select');
                 }}
-                trackColor={{ false: colors.sunken, true: colors.textPrimary }}
                 accessibilityLabel="Also post to the feed for a price check"
               />
             }

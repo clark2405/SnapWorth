@@ -1,6 +1,6 @@
 import { BellRing, ChevronRight, Heart, Pencil, TrendingDown } from 'lucide-react-native';
 import { useState } from 'react';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 
 import {
   Button,
@@ -15,6 +15,7 @@ import {
   Sheet,
   SWText,
   useToast,
+  Toggle,
 } from '../../components';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import {
@@ -217,10 +218,9 @@ function AlertRow({
           </SWText>
           <Pencil size={13} strokeWidth={2.2} color={colors.textMuted} />
         </PressableScale>
-        <Switch
+        <Toggle
           value={alert.on}
           onValueChange={onToggle}
-          trackColor={{ false: colors.sunken, true: colors.textPrimary }}
           accessibilityLabel={`Alert for ${listing.title}`}
         />
       </View>

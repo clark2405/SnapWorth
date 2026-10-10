@@ -8,7 +8,7 @@ import {
   Users,
 } from 'lucide-react-native';
 import { useState } from 'react';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 
 import {
   Tag,
@@ -35,6 +35,7 @@ import {
   shareIcon,
   DetailHero,
   DetailSheet,
+  Toggle,
 } from '../../components';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import type { VoteCounts } from '../../types';
@@ -295,7 +296,7 @@ export function ListingDetailView({
                 <ListRow
                   label="Alert me if the price drops"
                   trailing={
-                    <Switch
+                    <Toggle
                       value={priceAlert}
                       onValueChange={(value) =>
                         requireAccount('alert', () => {
@@ -309,7 +310,6 @@ export function ListingDetailView({
                           }
                         })
                       }
-                      trackColor={{ false: colors.sunken, true: colors.textPrimary }}
                       accessibilityLabel="Alert me if the price drops"
                     />
                   }
