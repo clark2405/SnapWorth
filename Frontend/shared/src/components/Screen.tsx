@@ -42,6 +42,9 @@ import { ScrollEdge } from './ScrollEdge';
 import { contentScrolling, onScrollToTopRequest } from './scroll-signal';
 import { SWText } from './SWText';
 
+/** The shortest a pull-to-refresh shows itself reloading: one pass of the wordmark's wave. */
+const minimumRefreshMs = 1200;
+
 interface ScreenScrollState {
   readonly scrollY: SharedValue<number>;
   /** Content offset where the large title has fully passed under the compact bar. */
@@ -190,7 +193,12 @@ export function Screen({
     setRefreshing(true);
     refreshingValue.value = 1;
     try {
-      await onRefresh();
+      // The wordmark's reload wave runs through the word at least once, so even a quick reload
+      // reads as one rather than a flicker.
+      await Promise.all([
+        onRefresh(),
+        new Promise((resolve) => setTimeout(resolve, minimumRefreshMs)),
+      ]);
     } finally {
       setRefreshing(false);
       refreshingValue.value = 0;

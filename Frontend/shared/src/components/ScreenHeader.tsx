@@ -1,5 +1,5 @@
 import { ChevronLeft, type LucideIcon } from 'lucide-react-native';
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { View } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -9,6 +9,7 @@ import Animated, {
   useAnimatedReaction,
   useAnimatedStyle,
   useDerivedValue,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -170,58 +171,83 @@ export function LargeTitle({
   );
 }
 
-/** How far a pull goes before the page reloads; the lens's glint makes one full turn by then. */
+/** How far a pull goes before the page reloads; the lens makes one full turn by then. */
 const refreshPull = 96;
+/** One reload wave, through the whole word and the lens's turn. */
+const waveMs = 1100;
 
 /**
- * The wordmark atop a main tab, which doubles as its pull-to-refresh indicator. Pulled, it stays
- * put while the page stretches away beneath it, and the glint in its lens turns with the pull;
- * while the page reloads the glint keeps circling, like a lens finding focus.
+ * The wordmark atop a main tab, which doubles as its pull-to-refresh indicator, the way Threads
+ * and Instagram turn their marks into theirs. Pulled, it holds its place while the page stretches
+ * away beneath it, growing a little and turning its lens with the pull. While the page reloads a
+ * wave keeps rolling through the word until the new content is in, then the letters settle back
+ * into the wordmark.
  */
 function BrandRefresh() {
   const scroll = useScreenScroll();
   const styles = useThemedStyles(stylesFor);
-  const turning = useSharedValue(0);
+  const cycle = useSharedValue(0);
+  const wave = useSharedValue(0);
+  const dim = useSharedValue(1);
   const refreshing = scroll?.refreshing;
+  // With Reduce Motion on, nothing moves on its own: the wordmark dims and brightens instead.
+  const reduceMotion = useReducedMotion();
 
   useAnimatedReaction(
     () => refreshing?.value ?? 0,
     (now, before) => {
-      if (now === before) return;
+      if (now === before || before === null) return;
+      if (reduceMotion) {
+        dim.value =
+          now === 1
+            ? withRepeat(withTiming(0.4, { duration: waveMs / 2 }), -1, true)
+            : withTiming(1, { duration: tokens.motion.duration.base });
+        return;
+      }
       if (now === 1) {
-        turning.value = 0;
-        turning.value = withRepeat(
-          withTiming(360, { duration: 900, easing: Easing.linear }),
+        cancelAnimation(cycle);
+        cycle.value = 0;
+        cycle.value = withRepeat(
+          withTiming(360, { duration: waveMs, easing: Easing.linear }),
           -1,
           false,
         );
+        wave.value = withTiming(1, { duration: tokens.motion.duration.base });
       } else {
-        cancelAnimation(turning);
-        turning.value = 0;
+        // Finish the wave in flight rather than cutting it, so the letters land together.
+        const settle = {
+          duration: tokens.motion.duration.reveal,
+          easing: Easing.out(Easing.cubic),
+        };
+        cycle.value = withTiming(Math.ceil(cycle.value / 360) * 360, settle, (finished) => {
+          if (finished) cycle.value = 0;
+        });
+        wave.value = withTiming(0, settle);
       }
     },
+    [reduceMotion],
   );
 
-  const spin = useDerivedValue(() => {
-    const pull = Math.max(0, -(scroll?.scrollY.value ?? 0));
-    const pulled = Math.min(pull / refreshPull, 1) * 360;
-    return (refreshing?.value ?? 0) === 1 ? pulled + turning.value : pulled;
-  });
+  const pull = useDerivedValue(() => Math.max(0, -(scroll?.scrollY.value ?? 0)) / refreshPull);
+  const motion = useMemo(() => ({ pull, cycle, wave }), [cycle, pull, wave]);
 
   const rowStyle = useAnimatedStyle(() => {
     const y = scroll?.scrollY.value ?? 0;
     const edge = scroll?.titleEdge.value ?? 80;
     return {
-      opacity: interpolate(y, [0, edge * 0.8], [1, 0], Extrapolation.CLAMP),
-      // Pulled down, the wordmark holds its place and the page stretches beneath it; scrolled
-      // up, it drifts away with the title.
-      transform: [{ translateY: y < 0 ? y : interpolate(y, [0, edge], [0, edge * 0.3]) }],
+      opacity: interpolate(y, [0, edge * 0.8], [1, 0], Extrapolation.CLAMP) * dim.value,
+      // Pulled down, the wordmark holds its place and the page stretches beneath it, the mark
+      // growing a little as it goes; scrolled up, it drifts away with the title.
+      transform: [
+        { translateY: y < 0 ? y : interpolate(y, [0, edge], [0, edge * 0.3]) },
+        { scale: 1 + 0.14 * Math.min(pull.value, 1) },
+      ],
     };
   });
 
   return (
     <Animated.View style={[styles.brandRow, rowStyle]}>
-      <Wordmark height={22} spin={scroll?.refreshable ? spin : undefined} />
+      <Wordmark height={22} motion={scroll?.refreshable ? motion : undefined} />
     </Animated.View>
   );
 }
