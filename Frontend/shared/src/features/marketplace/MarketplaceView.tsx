@@ -1,4 +1,4 @@
-import { BadgePercent, Camera, PackageSearch } from 'lucide-react-native';
+import { BadgePercent, PackageSearch } from 'lucide-react-native';
 import { useState } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -14,6 +14,7 @@ import {
   Photo,
   Reveal,
   Screen,
+  SnapIcon,
   Sticker,
   SWText,
   ZoomLink,
@@ -116,7 +117,7 @@ export function MarketplaceView({
                 label="Sell"
                 size="small"
                 variant="secondary"
-                icon={Camera}
+                icon={SnapIcon}
                 onPress={onSell}
               />
             ) : null}

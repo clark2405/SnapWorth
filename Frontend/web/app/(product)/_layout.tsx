@@ -1,8 +1,15 @@
 import { Slot, usePathname, useRouter, type Href } from 'expo-router';
-import { Clock, MessageSquare, Newspaper, ShoppingBag } from 'lucide-react-native';
 import { View } from 'react-native';
 
-import { requestScrollToTop, TabBar, type TabItem } from '@snapworth/shared/components';
+import {
+  ChatsIcon,
+  FeedIcon,
+  HistoryIcon,
+  MarketIcon,
+  requestScrollToTop,
+  TabBar,
+  type TabItem,
+} from '@snapworth/shared/components';
 
 type TabKey = 'feed' | 'marketplace' | 'chat' | 'history';
 
@@ -16,10 +23,10 @@ const tabRoutes: Record<TabKey, Href> = {
 // Places only: Snap is an action, so it lives in the Feed and History headers (and as Sell in
 // Market), not in the bar.
 const tabs = [
-  { key: 'feed', label: 'Feed', icon: Newspaper },
-  { key: 'marketplace', label: 'Market', icon: ShoppingBag },
-  { key: 'chat', label: 'Chats', icon: MessageSquare },
-  { key: 'history', label: 'History', icon: Clock },
+  { key: 'feed', label: 'Feed', icon: FeedIcon },
+  { key: 'marketplace', label: 'Market', icon: MarketIcon },
+  { key: 'chat', label: 'Chats', icon: ChatsIcon },
+  { key: 'history', label: 'History', icon: HistoryIcon },
 ] as const satisfies readonly TabItem<TabKey>[];
 
 export default function ProductLayout() {

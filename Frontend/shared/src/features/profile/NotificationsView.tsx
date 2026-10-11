@@ -7,14 +7,22 @@ import {
   Lightbulb,
   MessageCircle,
   MessagesSquare,
-  Sparkles,
   TrendingDown,
   Vote,
   type LucideIcon,
 } from 'lucide-react-native';
 import { useState } from 'react';
 
-import { ListGroup, ListRow, NavHeader, Reveal, Screen, SWText, Toggle } from '../../components';
+import {
+  EstimateIcon,
+  ListGroup,
+  ListRow,
+  NavHeader,
+  Reveal,
+  Screen,
+  SWText,
+  Toggle,
+} from '../../components';
 import { haptic, themedStyles, tokens, useThemedStyles } from '../../design';
 
 /** What a notification is about, which is what each switch on the screen turns on or off. */
@@ -59,13 +67,13 @@ const groups: readonly {
 }[] = [
   {
     title: 'Your items',
-    icon: Sparkles,
+    icon: EstimateIcon,
     options: [
       {
         key: 'estimates',
         label: 'Estimate ready',
         detail: 'When a snap has been valued',
-        icon: Sparkles,
+        icon: EstimateIcon,
       },
       {
         key: 'votes',

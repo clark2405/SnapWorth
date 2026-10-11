@@ -1,4 +1,4 @@
-import { Camera, Flame } from 'lucide-react-native';
+import { Flame } from 'lucide-react-native';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
@@ -7,6 +7,7 @@ import {
   LargeTitle,
   Overline,
   Photo,
+  SnapIcon,
   ZoomLink,
   ZoomSource,
   Reveal,
@@ -77,7 +78,7 @@ export function FeedView({
                 label="Snap"
                 size="small"
                 variant="secondary"
-                icon={Camera}
+                icon={SnapIcon}
                 onPress={onSnap}
               />
             ) : null}

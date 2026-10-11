@@ -1,6 +1,7 @@
 export * from './AmbientBackdrop';
 export * from './AskingPriceBadge';
 export * from './Brand';
+export * from './BrandIcons';
 export * from './Button';
 export * from './ChoiceChips';
 export * from './Companion';

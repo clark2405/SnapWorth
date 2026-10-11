@@ -1,4 +1,4 @@
-import { Check, MessageCircle, Tag as TagIcon } from 'lucide-react-native';
+import { Check, MessageCircle } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -17,6 +17,7 @@ import {
   Avatar,
   EstimateBadge,
   Photo,
+  PriceTagIcon,
   Sticker,
   SWText,
   Tag,
@@ -113,7 +114,7 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
           <Tag
             label={`For sale · ${formatPeso(post.listing.askingPrice)}`}
             tone="mint"
-            icon={TagIcon}
+            icon={PriceTagIcon}
           />
         ) : null}
       </View>

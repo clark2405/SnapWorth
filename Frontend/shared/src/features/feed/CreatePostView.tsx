@@ -1,4 +1,4 @@
-import { ShieldX, Tag as TagIcon } from 'lucide-react-native';
+import { ShieldX } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { TextInput, View } from 'react-native';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
@@ -10,6 +10,7 @@ import {
   Field,
   NavHeader,
   Photo,
+  PriceTagIcon,
   Reveal,
   Screen,
   SWText,
@@ -133,7 +134,7 @@ export function CreatePostView({
         <View style={styles.badges}>
           <EstimateBadge value={formatPeso(item.estimate)} />
           {asking === null ? null : (
-            <Tag label={`For sale · ${formatPeso(asking)}`} tone="mint" icon={TagIcon} />
+            <Tag label={`For sale · ${formatPeso(asking)}`} tone="mint" icon={PriceTagIcon} />
           )}
         </View>
       </Reveal>

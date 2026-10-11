@@ -9,7 +9,6 @@ import {
   Lock,
   RotateCw,
   ShoppingBag,
-  Tag as TagIcon,
   type LucideIcon,
   Users,
   WifiOff,
@@ -35,6 +34,7 @@ import {
   BottomBar,
   Button,
   ChoiceChips,
+  PriceTagIcon,
   Stamp,
   TagShape,
   Worthy,
@@ -459,7 +459,7 @@ function SavedNote({ sharing }: { readonly sharing: PreviewSharing }) {
           sharing.sold ? (
             <Tag label="Sold" tone="grave" icon={Handshake} />
           ) : (
-            <Tag label="Listed" tone="mint" icon={TagIcon} />
+            <Tag label="Listed" tone="mint" icon={PriceTagIcon} />
           )
         ) : null}
       </View>
@@ -668,7 +668,7 @@ function Destinations({
     <Button
       label={sold ? 'View sale' : 'View listing'}
       variant="secondary"
-      icon={sold ? Handshake : TagIcon}
+      icon={sold ? Handshake : PriceTagIcon}
       onPress={() => onViewListing?.(listingId)}
       containerStyle={styles.flex}
     />

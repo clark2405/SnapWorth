@@ -1,4 +1,4 @@
-import { Camera, ChevronRight, Flame, TrendingDown, TrendingUp } from 'lucide-react-native';
+import { ChevronRight, Flame, TrendingDown, TrendingUp } from 'lucide-react-native';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
@@ -13,6 +13,7 @@ import {
   Reveal,
   Screen,
   ShareButton,
+  SnapIcon,
   Sparkline,
   Surface,
   SWText,
@@ -220,7 +221,7 @@ export function TrendView({
               Snap it to see what yours is worth while {trend.label.toLowerCase()} are{' '}
               {rising ? 'up' : 'moving'}.
             </SWText>
-            <Button label="Snap it" variant="accent" icon={Camera} onPress={onSnap} />
+            <Button label="Snap it" variant="accent" icon={SnapIcon} onPress={onSnap} />
           </Surface>
         </Reveal>
       </DetailSheet>

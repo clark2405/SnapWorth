@@ -1,11 +1,4 @@
-import {
-  ArrowUp,
-  ChevronRight,
-  ShieldX,
-  ShoppingBag,
-  Tag as TagIcon,
-  X,
-} from 'lucide-react-native';
+import { ArrowUp, ChevronRight, ShieldX, ShoppingBag, X } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
 import { TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -18,6 +11,7 @@ import {
   IconButton,
   NavHeader,
   PressableScale,
+  PriceTagIcon,
   Reveal,
   Screen,
   SWText,
@@ -414,7 +408,7 @@ function CrossPost({
       >
         <Surface padding={tokens.spacing[3]} contentStyle={styles.crossPost}>
           <View style={styles.crossIcon}>
-            <TagIcon size={18} strokeWidth={2} color={colors.mintInk} />
+            <PriceTagIcon size={18} strokeWidth={2} color={colors.mintInk} />
           </View>
           <View style={styles.crossText}>
             <SWText variant="label">For sale on the market</SWText>
