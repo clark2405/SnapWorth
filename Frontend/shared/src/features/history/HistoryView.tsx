@@ -173,8 +173,8 @@ export function HistoryView({
         <Animated.View entering={FadeIn} exiting={FadeOut}>
           <EmptyState
             icon={PackageSearch}
-            title="Nothing here"
-            body="Nothing matches this filter yet. Try a different one, or check something new."
+            title="Nothing in this pile"
+            body="Nothing matches this filter yet. Try another, or snap something new."
             actionLabel={filter === 'all' ? undefined : 'Show all'}
             onAction={filter === 'all' ? undefined : () => setFilter('all')}
           />
