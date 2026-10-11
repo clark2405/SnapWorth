@@ -11,6 +11,8 @@
     "typecheck": "tsc --project ./tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@expo-google-fonts/bricolage-grotesque": "0.4.1",
+    "@expo-google-fonts/dm-mono": "0.4.2",
     "@expo-google-fonts/plus-jakarta-sans": "0.4.2",
     "@expo/metro-runtime": "57.0.16",
     "@react-native-async-storage/async-storage": "2.2.0",
