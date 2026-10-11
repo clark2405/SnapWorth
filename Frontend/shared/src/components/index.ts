@@ -18,6 +18,7 @@ export * from './PhotoSetField';
 export * from './PhotoViewer';
 export * from './PressableScale';
 export * from './PriceRangeBar';
+export * from './PriceTag';
 export * from './Reveal';
 export * from './Screen';
 export * from './scroll-signal';
