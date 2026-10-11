@@ -1,4 +1,4 @@
-import { ChevronRight, Flame, TrendingDown, TrendingUp } from 'lucide-react-native';
+import { ChevronRight, Flame } from 'lucide-react-native';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
@@ -15,9 +15,8 @@ import {
   ShareButton,
   SnapIcon,
   Sparkline,
-  Surface,
+  Sticker,
   SWText,
-  Tag,
   ZoomTarget,
 } from '../../components';
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
@@ -114,10 +113,11 @@ export function TrendView({
           <SWText variant="displayHero" accessibilityRole="header">
             {trend.label}
           </SWText>
-          <Tag
+          <Sticker
             label={`${trend.change} this month`}
-            tone={rising ? 'mint' : 'sand'}
-            icon={rising ? TrendingUp : TrendingDown}
+            tone={rising ? 'marigold' : 'cobalt'}
+            tilt={-3}
+            style={styles.heroSticker}
           />
         </View>
       </View>
@@ -130,20 +130,23 @@ export function TrendView({
         </Reveal>
 
         <Reveal index={1}>
-          <Surface padding={tokens.spacing[5]} contentStyle={styles.priceCard}>
-            <SWText variant="overline" tone="textMuted">
+          {/* The month's number gets the loudest colour in the brand: this is what's hot. */}
+          <View style={styles.priceCard}>
+            <SWText variant="overline" color={colors.onMarigold}>
               Typical price
             </SWText>
-            <SWText variant="priceHero">{formatPeso(detail.typicalPrice)}</SWText>
-            <SWText variant="bodySmall" tone="textSecondary">
+            <SWText variant="priceHero" color={colors.onMarigold}>
+              {formatPeso(detail.typicalPrice)}
+            </SWText>
+            <SWText variant="bodySmall" color={colors.onMarigold}>
               Most sell between {formatPeso(detail.low)} and {formatPeso(detail.high)}
             </SWText>
-            <Sparkline values={detail.series} height={72} />
+            <Sparkline values={detail.series} height={72} color={colors.onMarigold} />
             <View style={styles.statRow}>
               <Stat label="Sold this month" value={String(detail.soldThisMonth)} />
               <Stat label="12-week change" value={trend.change} />
             </View>
-          </Surface>
+          </View>
         </Reveal>
 
         <Reveal index={2} style={styles.section}>
@@ -213,16 +216,16 @@ export function TrendView({
         ) : null}
 
         <Reveal index={5}>
-          <Surface tone="feature" padding={tokens.spacing[5]} contentStyle={styles.cta}>
-            <SWText variant="headingLarge" tone="onFeature">
+          <View style={styles.cta}>
+            <SWText variant="headingLarge" color={colors.onCobalt}>
               Got one?
             </SWText>
-            <SWText variant="bodyMedium" tone="onFeatureDim">
+            <SWText variant="bodyMedium" color={colors.onCobalt} style={styles.ctaBody}>
               Snap it to see what yours is worth while {trend.label.toLowerCase()} are{' '}
               {rising ? 'up' : 'moving'}.
             </SWText>
             <Button label="Snap it" variant="accent" icon={SnapIcon} onPress={onSnap} />
-          </Surface>
+          </View>
         </Reveal>
       </DetailSheet>
     </Screen>
@@ -231,10 +234,13 @@ export function TrendView({
 
 function Stat({ label, value }: { readonly label: string; readonly value: string }) {
   const styles = useThemedStyles(stylesFor);
+  const { colors } = useTheme();
   return (
     <View style={styles.stat}>
-      <SWText variant="priceSmall">{value}</SWText>
-      <SWText variant="caption" tone="textMuted">
+      <SWText variant="priceSmall" color={colors.onMarigold}>
+        {value}
+      </SWText>
+      <SWText variant="caption" color={colors.onMarigold} style={styles.dim}>
         {label}
       </SWText>
     </View>
@@ -269,8 +275,17 @@ const stylesFor = themedStyles((colors) => ({
     paddingTop: tokens.spacing[5],
     gap: tokens.spacing[8],
   },
+  heroSticker: {
+    marginTop: tokens.spacing[1],
+  },
   priceCard: {
     gap: tokens.spacing[2],
+    padding: tokens.spacing[5],
+    borderRadius: tokens.radius.large,
+    backgroundColor: colors.marigold,
+  },
+  dim: {
+    opacity: 0.72,
   },
   statRow: {
     flexDirection: 'row',
@@ -313,5 +328,11 @@ const stylesFor = themedStyles((colors) => ({
   },
   cta: {
     gap: tokens.spacing[3],
+    padding: tokens.spacing[5],
+    borderRadius: tokens.radius.large,
+    backgroundColor: colors.cobalt,
+  },
+  ctaBody: {
+    opacity: 0.86,
   },
 }));
