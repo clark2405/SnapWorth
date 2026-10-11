@@ -229,7 +229,7 @@ export function EstimateResultView({
                 {item.category}
               </SWText>
               <View style={styles.tagRow}>
-                <TagShape hanging tilt={-1.5} style={styles.priceTag}>
+                <TagShape hanging tilt={-1.5} swing={resolvedHere.current} style={styles.priceTag}>
                   <SWText variant="stamp" color={colors.kraftInk}>
                     AI Estimate
                   </SWText>
@@ -246,6 +246,8 @@ export function EstimateResultView({
                 <Stamp
                   label={`${previewValuation.confidence} confidence`}
                   tilt={-8}
+                  // Stamped once the count has landed on the price.
+                  land={resolvedHere.current ? { delay: 1250 } : undefined}
                   style={styles.confidence}
                 />
               </View>
