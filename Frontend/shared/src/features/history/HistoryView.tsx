@@ -1,11 +1,9 @@
 import {
   Archive,
-  Camera,
   ChevronRight,
   Handshake,
   Lock,
   PackageSearch,
-  Tag as TagIcon,
   Vote,
   Wallet,
   type LucideIcon,
@@ -23,9 +21,11 @@ import {
   LargeTitle,
   Overline,
   Photo,
+  PriceTagIcon,
   Reveal,
   Screen,
   SearchButton,
+  SnapIcon,
   Sparkline,
   Surface,
   SWText,
@@ -63,7 +63,7 @@ type FilterKey = 'all' | PreviewItemStatus;
 // Statuses are soft tonal chips with a line icon: live states lean positive, private is
 // neutral, and sold is archived.
 const statusTag: Record<PreviewItemStatus, { label: string; tone: TagTone; icon: LucideIcon }> = {
-  listed: { label: 'Listed', tone: 'mint', icon: TagIcon },
+  listed: { label: 'Listed', tone: 'mint', icon: PriceTagIcon },
   on_feed: { label: 'On feed', tone: 'sand', icon: Vote },
   private: { label: 'Private', tone: 'sand', icon: Lock },
   sold: { label: 'Sold', tone: 'grave', icon: Handshake },
@@ -137,7 +137,7 @@ export function HistoryView({
                 label="Snap"
                 size="small"
                 variant="secondary"
-                icon={Camera}
+                icon={SnapIcon}
                 onPress={onSnap}
               />
             ) : null}
@@ -173,8 +173,8 @@ export function HistoryView({
         <Animated.View entering={FadeIn} exiting={FadeOut}>
           <EmptyState
             icon={PackageSearch}
-            title="Nothing here"
-            body="Nothing matches this filter yet. Try a different one, or check something new."
+            title="Nothing in this pile"
+            body="Nothing matches this filter yet. Try another, or snap something new."
             actionLabel={filter === 'all' ? undefined : 'Show all'}
             onAction={filter === 'all' ? undefined : () => setFilter('all')}
           />

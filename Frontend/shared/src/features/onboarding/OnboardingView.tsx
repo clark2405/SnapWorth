@@ -29,9 +29,10 @@ import {
   PressableScale,
   Reveal,
   Sparkline,
+  Sticker,
   SWText,
+  TagShape,
   Wordmark,
-  Tag,
 } from '../../components';
 import {
   haptic,
@@ -369,6 +370,7 @@ interface StageProps {
 /** The scene behind the pager. `progress` is the raw scroll offset; pages are `width` apart. */
 function Stage({ progress, idle, width, height, index, reduceMotion }: StageProps) {
   const styles = useThemedStyles(stylesFor);
+  const { colors } = useTheme();
   const cardWidth = Math.min(width * 0.56, height * 0.5);
   const cardHeight = cardWidth * 1.25;
   const lift = height * 0.1;
@@ -425,6 +427,25 @@ function Stage({ progress, idle, width, height, index, reduceMotion }: StageProp
     };
   });
 
+  // A block of colour behind the item, like the card a shop pins its stock to. It changes with
+  // the story, marigold to cobalt to the price-gun red, and follows the item as it moves.
+  const blockStyle = useAnimatedStyle(() => {
+    const p = progress.value / width;
+    return {
+      backgroundColor: interpolateColor(
+        p,
+        [0, 1, 2],
+        [colors.marigold, colors.cobalt, colors.accent],
+      ),
+      transform: [
+        { translateX: interpolate(p, [0, 1, 2], [0, 0, -width * 0.1], clamp) },
+        { translateY: interpolate(p, [0, 1, 2], [0, -lift * 0.9, -height * 0.03], clamp) },
+        { rotateZ: `${interpolate(p, [0, 1, 2], [-5, 4, -9], clamp)}deg` },
+        { scale: interpolate(p, [0, 1, 2], [1, 0.84, 0.88], clamp) },
+      ],
+    };
+  });
+
   const priceStyle = useAnimatedStyle(() => {
     const p = progress.value / width;
     return {
@@ -443,6 +464,14 @@ function Stage({ progress, idle, width, height, index, reduceMotion }: StageProp
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
+      <Animated.View
+        style={[
+          styles.block,
+          { width: cardWidth * 1.42, height: cardHeight * 1.12, borderRadius: cardWidth * 0.2 },
+          blockStyle,
+        ]}
+      />
+
       {satellites.map((satellite) => (
         <Satellite
           key={satellite.key}
@@ -482,35 +511,47 @@ function Stage({ progress, idle, width, height, index, reduceMotion }: StageProp
         </Animated.View>
       </Animated.View>
 
+      {/* The AI's range, so it wears the estimate's kraft tag. */}
       <Animated.View
         style={[
-          styles.float,
-          styles.range,
+          styles.rangeSpot,
           { width: rangeWidth, top: height / 2 + heroBottomOnRange - tokens.spacing[4] },
           rangeStyle,
         ]}
       >
-        <View style={styles.rangeHead}>
-          <SWText variant="overline" tone="textMuted">
-            Fair range
-          </SWText>
-          <Tag label={previewValuation.trendChange.split(' ')[0] ?? ''} tone="mint" />
-        </View>
-        <View style={styles.rangeRow} key={`range-${rangeRun}`}>
-          <CountUp variant={priceVariant} value={previewValuation.low} format={formatPeso} />
-          <SWText variant={priceVariant} tone="textMuted">
-            –
-          </SWText>
-          <CountUp
-            variant={priceVariant}
-            value={previewValuation.high}
-            format={formatPeso}
-            delayMs={80}
-          />
-        </View>
-        <View key={`trend-${rangeRun}`}>
-          <Sparkline values={previewValuation.trend} height={40} />
-        </View>
+        <TagShape style={styles.range}>
+          <View style={styles.rangeHead}>
+            <SWText variant="stamp" color={colors.kraftInk}>
+              Fair range
+            </SWText>
+            <Sticker
+              label={previewValuation.trendChange.split(' ')[0] ?? ''}
+              tone="marigold"
+              tilt={6}
+            />
+          </View>
+          <View style={styles.rangeRow} key={`range-${rangeRun}`}>
+            <CountUp
+              variant={priceVariant}
+              color={colors.kraftInk}
+              value={previewValuation.low}
+              format={formatPeso}
+            />
+            <SWText variant={priceVariant} color={colors.kraftEdge}>
+              –
+            </SWText>
+            <CountUp
+              variant={priceVariant}
+              color={colors.kraftInk}
+              value={previewValuation.high}
+              format={formatPeso}
+              delayMs={80}
+            />
+          </View>
+          <View key={`trend-${rangeRun}`}>
+            <Sparkline values={previewValuation.trend} height={40} color={colors.kraftInk} />
+          </View>
+        </TagShape>
       </Animated.View>
 
       {bubbles.map((bubble, slot) => (
@@ -617,10 +658,23 @@ function VoteBubble({
     };
   });
   const Icon = bubble.icon;
+  // The community's pick is slapped on as a sticker; the rest are quieter.
+  if (bubble.key === 'just_right') {
+    return (
+      <Animated.View style={[styles.pickSpot, style]}>
+        <View style={[styles.bubble, styles.pick]}>
+          <Icon size={14} strokeWidth={2.6} color={colors.onMarigold} />
+          <SWText variant="sticker" color={colors.onMarigold}>
+            {bubble.label} · {bubble.count}
+          </SWText>
+        </View>
+      </Animated.View>
+    );
+  }
   return (
     <Animated.View style={[styles.float, styles.bubble, style]}>
       <Icon size={14} strokeWidth={2.4} color={colors[bubble.tone]} />
-      <SWText variant="labelSmall" tone={bubble.tone === 'success' ? 'success' : 'textPrimary'}>
+      <SWText variant="labelSmall" tone="textPrimary">
         {bubble.label}
       </SWText>
       <SWText variant="labelSmall" tone="textMuted">
@@ -752,9 +806,12 @@ const bracket = tokens.layout.viewfinderBracket * 1.3;
 const stroke = tokens.layout.progressSegment;
 const gutter = tokens.layout.pageGutterCompact;
 const finderGap = tokens.spacing[3];
-const rangeMaxWidth = 340;
-/** "₱2,100 – ₱2,850" in priceLarge is about 275pt; this leaves room for the card's padding. */
-const rangeLargeMinWidth = 312;
+const rangeMaxWidth = 364;
+/**
+ * "₱2,100 – ₱2,850" in priceLarge is about 300pt; this leaves room for the tag's eyelet end and
+ * its padding.
+ */
+const rangeLargeMinWidth = 358;
 
 const stylesFor = themedStyles((colors, name) => ({
   root: {
@@ -909,13 +966,22 @@ const stylesFor = themedStyles((colors, name) => ({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
   },
-  range: {
+  block: {
+    position: 'absolute',
+  },
+  rangeSpot: {
+    position: 'absolute',
     alignSelf: 'center',
+    shadowColor: tokens.shadow[name],
+    shadowOpacity: 1,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+  },
+  range: {
     gap: tokens.spacing[1],
     paddingTop: tokens.spacing[4],
-    paddingHorizontal: tokens.spacing[4],
+    paddingRight: tokens.spacing[4],
     paddingBottom: tokens.spacing[3],
-    borderRadius: tokens.radius.xlarge,
   },
   rangeHead: {
     flexDirection: 'row',
@@ -935,6 +1001,19 @@ const stylesFor = themedStyles((colors, name) => ({
     paddingVertical: tokens.spacing[2] + 2,
     paddingHorizontal: tokens.spacing[3] + 2,
     borderRadius: tokens.radius.full,
+  },
+  pickSpot: {
+    position: 'absolute',
+  },
+  pick: {
+    backgroundColor: colors.marigold,
+    borderWidth: 2,
+    borderColor: colors.stickerOutline,
+    shadowColor: colors.stickerOutline,
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    shadowOffset: { width: 2, height: 2 },
+    transform: [{ rotate: '-4deg' }],
   },
   priceTag: {
     paddingVertical: tokens.spacing[2],

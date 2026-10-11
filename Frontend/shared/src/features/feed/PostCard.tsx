@@ -1,4 +1,4 @@
-import { Check, MessageCircle, Tag as TagIcon } from 'lucide-react-native';
+import { Check, MessageCircle } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -17,6 +17,8 @@ import {
   Avatar,
   EstimateBadge,
   Photo,
+  PriceTagIcon,
+  Sticker,
   SWText,
   Tag,
   VerdictBar,
@@ -28,6 +30,7 @@ import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../d
 import type { VoteChoice } from '../../types';
 import { formatPeso, type PreviewPost } from '../preview/sample-data';
 import { useCommentCount } from './comment-thread';
+import { verdictFor } from './verdict';
 
 export interface PostCardProps {
   readonly post: PreviewPost;
@@ -52,6 +55,7 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
   const [burst, setBurst] = useState(0);
   // Live from the comment service; the bundled sample count shows until it loads.
   const commentCount = useCommentCount(post.id) ?? post.comments.length;
+  const verdict = verdictFor(post.votes);
 
   const castJustRight = useCallback(() => {
     haptic('pop');
@@ -110,7 +114,7 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
           <Tag
             label={`For sale · ${formatPeso(post.listing.askingPrice)}`}
             tone="mint"
-            icon={TagIcon}
+            icon={PriceTagIcon}
           />
         ) : null}
       </View>
@@ -129,6 +133,11 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
             radius={tokens.radius.medium}
           />
           <JustRightBurst trigger={burst} />
+          {verdict ? (
+            <View style={styles.stickerSpot} pointerEvents="none">
+              <Sticker label={verdict.label} tone={verdict.tone} tilt={5} />
+            </View>
+          ) : null}
           <GestureDetector gesture={doubleTap}>
             <Animated.View style={styles.badgeOverlay}>
               <EstimateBadge value={formatPeso(post.estimate)} />
@@ -218,6 +227,12 @@ const stylesFor = themedStyles((colors, name) => ({
     position: 'relative',
     borderRadius: tokens.radius.medium,
     overflow: 'hidden',
+  },
+  // The crowd's verdict, slapped on the photo's top corner once there is one.
+  stickerSpot: {
+    position: 'absolute',
+    top: tokens.spacing[3],
+    right: tokens.spacing[3],
   },
   badgeOverlay: {
     position: 'absolute',

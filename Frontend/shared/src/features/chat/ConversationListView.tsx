@@ -55,8 +55,8 @@ export function ConversationListView({
       {previewConversations.length === 0 ? (
         <EmptyState
           icon={MessageSquare}
-          title="No conversations yet"
-          body="Message a seller from any listing and the conversation appears here."
+          title="No chats yet"
+          body="Message a seller from any listing and the conversation lands here."
           actionLabel="Browse the market"
           onAction={onBrowseMarket}
         />

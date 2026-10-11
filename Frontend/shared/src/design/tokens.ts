@@ -105,6 +105,16 @@ export const colorLight = {
   feature: ink,
   onFeature: '#FFFFFF',
   onFeatureDim: '#A89E92',
+  // The price tag: manila card stock, the ink printed on it, its reinforced eyelet and string.
+  kraft: '#E2C595',
+  kraftInk: '#4E3A1C',
+  kraftEdge: '#B8935C',
+  // Stickers, slapped on photos for the community's verdict: market-sign yellow and cobalt.
+  marigold: '#FFC21A',
+  onMarigold: ink,
+  cobalt: '#2343C4',
+  onCobalt: '#FFFFFF',
+  stickerOutline: ink,
 } as const;
 
 export const colorDark = {
@@ -144,6 +154,15 @@ export const colorDark = {
   feature: '#2C2218',
   onFeature: cream,
   onFeatureDim: '#B4A99A',
+  // A tag is a physical thing, so it stays manila at night, only dimmed.
+  kraft: '#CDAE7C',
+  kraftInk: '#3A2A12',
+  kraftEdge: '#8E6E3F',
+  marigold: '#F5B915',
+  onMarigold: charcoal,
+  cobalt: '#4A68E8',
+  onCobalt: '#FFFFFF',
+  stickerOutline: '#0B0805',
 } as const satisfies Record<keyof typeof colorLight, string>;
 
 /**
@@ -187,6 +206,14 @@ export const colorNight = {
   feature: '#2C2040',
   onFeature: '#F3ECDD',
   onFeatureDim: '#B9AFC2',
+  kraft: '#CDAE7C',
+  kraftInk: '#3A2A12',
+  kraftEdge: '#8E6E3F',
+  marigold: '#F5B915',
+  onMarigold: '#15101B',
+  cobalt: '#4A68E8',
+  onCobalt: '#FFFFFF',
+  stickerOutline: '#0B0710',
 } as const satisfies Record<keyof typeof colorLight, string>;
 
 export const tokens = deepFreeze({
@@ -270,18 +297,24 @@ export const tokens = deepFreeze({
   },
   typography: {
     /**
-     * Semantic families, all resolved to the one bundled typeface in `fonts.ts`: `display` for
-     * titles, `sans` for everything else, and `rounded` for the companion's voice.
+     * Semantic families, resolved to bundled faces in `fonts.ts`: `display` for titles, `price`
+     * for every ₱ figure, `mono` for what is printed on a tag, `sans` for everything else, and
+     * `rounded` for the companion's voice.
      */
     family: {
       sans: 'sans',
       display: 'display',
+      price: 'price',
+      mono: 'mono',
       rounded: 'rounded',
     },
     webFamily: {
       sans: 'PlusJakartaSans_400Regular, -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif',
       display:
-        'PlusJakartaSans_600SemiBold, -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif',
+        'BricolageGrotesque_700Bold, -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif',
+      price:
+        'BricolageGrotesque_800ExtraBold, -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif',
+      mono: 'DMMono_500Medium, ui-monospace, "SF Mono", Menlo, monospace',
       rounded:
         'PlusJakartaSans_500Medium, -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif',
     },
@@ -299,32 +332,39 @@ export const tokens = deepFreeze({
         size: 44,
         lineHeight: 46,
         weight: '800',
-        letterSpacing: -1.2,
+        letterSpacing: -1,
       },
       displayTitle: {
         family: 'display',
-        size: 32,
-        lineHeight: 36,
+        size: 34,
+        lineHeight: 38,
         weight: '800',
-        letterSpacing: -1.2,
+        letterSpacing: -0.9,
       },
-      priceHero: { family: 'sans', size: 48, lineHeight: 50, weight: '800', letterSpacing: -1.8 },
-      priceLarge: { family: 'sans', size: 40, lineHeight: 42, weight: '800', letterSpacing: -1.5 },
-      priceMedium: { family: 'sans', size: 22, lineHeight: 26, weight: '800', letterSpacing: -0.6 },
-      priceSmall: { family: 'sans', size: 16, lineHeight: 20, weight: '700', letterSpacing: -0.2 },
+      // Prices are the product, so they get the display face at its heaviest.
+      priceHero: { family: 'price', size: 52, lineHeight: 54, weight: '800', letterSpacing: -1.4 },
+      priceLarge: { family: 'price', size: 40, lineHeight: 42, weight: '800', letterSpacing: -1 },
+      priceMedium: {
+        family: 'price',
+        size: 23,
+        lineHeight: 26,
+        weight: '800',
+        letterSpacing: -0.4,
+      },
+      priceSmall: { family: 'price', size: 16, lineHeight: 20, weight: '700', letterSpacing: -0.1 },
       headingLarge: {
-        family: 'sans',
+        family: 'display',
         size: 24,
         lineHeight: 28,
         weight: '800',
-        letterSpacing: -0.6,
+        letterSpacing: -0.5,
       },
       headingMedium: {
-        family: 'sans',
-        size: 18,
-        lineHeight: 22,
+        family: 'display',
+        size: 19,
+        lineHeight: 23,
         weight: '700',
-        letterSpacing: -0.3,
+        letterSpacing: -0.2,
       },
       headingSmall: {
         family: 'sans',
@@ -358,13 +398,31 @@ export const tokens = deepFreeze({
         weight: '800',
         letterSpacing: 0.1,
       },
+      // Section labels read like the printing on a price tag.
       overline: {
-        family: 'sans',
+        family: 'mono',
         size: 12,
         lineHeight: 14,
-        weight: '700',
-        letterSpacing: 1.6,
+        weight: '500',
+        letterSpacing: 1.2,
         textTransform: 'uppercase',
+      },
+      /** The small print on a tag or a stamp. */
+      stamp: {
+        family: 'mono',
+        size: 11,
+        lineHeight: 13,
+        weight: '500',
+        letterSpacing: 1,
+        textTransform: 'uppercase',
+      },
+      /** A sticker slapped on a photo: short, loud, display face. */
+      sticker: {
+        family: 'display',
+        size: 13,
+        lineHeight: 15,
+        weight: '800',
+        letterSpacing: 0.2,
       },
       wordmark: { family: 'display', size: 22, lineHeight: 26, weight: '800', letterSpacing: -0.6 },
       companion: {

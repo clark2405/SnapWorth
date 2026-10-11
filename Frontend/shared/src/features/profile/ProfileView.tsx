@@ -2,7 +2,6 @@ import {
   Bell,
   History,
   MessagesSquare,
-  Tag as TagIcon,
   Vote,
   ChevronRight,
   CircleHelp,
@@ -27,6 +26,7 @@ import {
   NavHeader,
   Overline,
   PressableScale,
+  PriceTagIcon,
   Rating,
   Reveal,
   Screen,
@@ -167,7 +167,7 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
         <ListGroup title="Your activity" icon={History}>
           <ListRow
             label="Your listings"
-            icon={TagIcon}
+            icon={PriceTagIcon}
             value={String(profile.stats.listed)}
             onPress={() => onOpen?.('listings')}
           />

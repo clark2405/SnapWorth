@@ -1,13 +1,21 @@
-import { Camera, Clock, MessageSquare, UserRound, type LucideIcon } from 'lucide-react-native';
+import { Clock, MessageSquare, UserRound, type LucideIcon } from 'lucide-react-native';
 
-import { Button, EmptyState, LargeTitle, NavHeader, Reveal, Screen } from '../../components';
+import {
+  Button,
+  EmptyState,
+  LargeTitle,
+  NavHeader,
+  Reveal,
+  Screen,
+  SnapIcon,
+} from '../../components';
 import { themedStyles, tokens, useThemedStyles } from '../../design';
 import { accountIntentCopy, useSession, type AccountIntent } from './session';
 
 type GatedScreen = Extract<AccountIntent, 'snap' | 'chats' | 'history' | 'profile'>;
 
 const icons: Record<GatedScreen, LucideIcon> = {
-  snap: Camera,
+  snap: SnapIcon,
   chats: MessageSquare,
   history: Clock,
   profile: UserRound,

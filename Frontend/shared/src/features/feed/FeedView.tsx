@@ -1,4 +1,4 @@
-import { Camera, Flame } from 'lucide-react-native';
+import { Flame } from 'lucide-react-native';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
@@ -7,6 +7,8 @@ import {
   LargeTitle,
   Overline,
   Photo,
+  SnapIcon,
+  Sticker,
   ZoomLink,
   ZoomSource,
   Reveal,
@@ -77,7 +79,7 @@ export function FeedView({
                 label="Snap"
                 size="small"
                 variant="secondary"
-                icon={Camera}
+                icon={SnapIcon}
                 onPress={onSnap}
               />
             ) : null}
@@ -147,19 +149,25 @@ function TrendingTile({
       zoomFromSource
       style={styles.tile}
     >
-      <ZoomSource>
-        <Photo
-          source={trend.photo}
-          label={trend.label}
-          radius={tokens.radius.large}
-          style={styles.tilePhoto}
+      <View>
+        <ZoomSource>
+          <Photo
+            source={trend.photo}
+            label={trend.label}
+            radius={tokens.radius.large}
+            style={styles.tilePhoto}
+          />
+        </ZoomSource>
+        {/* The month's move, slapped on like a market sticker. */}
+        <Sticker
+          label={trend.change}
+          tone={rising ? 'marigold' : 'cobalt'}
+          tilt={rising ? -6 : 5}
+          style={styles.tileSticker}
         />
-      </ZoomSource>
+      </View>
       <SWText variant="labelSmall" numberOfLines={1}>
         {trend.label}
-      </SWText>
-      <SWText variant="caption" tone={rising ? 'success' : 'danger'}>
-        {trend.change}
       </SWText>
     </ZoomLink>
   );
@@ -192,6 +200,11 @@ const stylesFor = themedStyles((colors) => ({
     width: 120,
     height: 120,
     marginBottom: tokens.spacing[2],
+  },
+  tileSticker: {
+    position: 'absolute',
+    left: tokens.spacing[2],
+    bottom: tokens.spacing[4],
   },
   list: {
     gap: 0,

@@ -70,7 +70,7 @@ export function VotesView({ onBack, onOpenPost, onBrowseFeed }: VotesViewProps) 
         <EmptyState
           icon={Vote}
           title="No votes yet"
-          body="Vote on a price in the feed and it shows up here."
+          body="Tell the feed whether a price is right. Every vote you cast collects here."
           actionLabel="Open the feed"
           onAction={onBrowseFeed}
         />

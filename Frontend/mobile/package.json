@@ -12,6 +12,8 @@
     "build": "expo export --platform ios --output-dir dist/ios && expo export --platform android --output-dir dist/android"
   },
   "dependencies": {
+    "@expo-google-fonts/bricolage-grotesque": "0.4.1",
+    "@expo-google-fonts/dm-mono": "0.4.2",
     "@expo-google-fonts/plus-jakarta-sans": "0.4.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-masked-view/masked-view": "0.3.2",

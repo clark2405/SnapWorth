@@ -1,6 +1,5 @@
 import {
   Bell,
-  Camera,
   ChartLine,
   HandCoins,
   MessageSquareText,
@@ -8,12 +7,11 @@ import {
   Scale,
   ScanSearch,
   Sparkles,
-  Tag,
   TrendingUp,
   Wallet,
 } from 'lucide-react-native';
 
-import { shareIcon, type CompanionAction } from '../../components';
+import { shareIcon, type CompanionAction, SnapIcon, PriceTagIcon } from '../../components';
 import { formatPeso, previewListingDetail, previewPortfolio } from '../preview/sample-data';
 
 export interface CompanionConfig {
@@ -56,7 +54,7 @@ export function companionConfigFor(pathname: string, host: CompanionHost): Compa
     key: 'snap',
     label: 'Snap something to value',
     detail: 'Point, shoot, get a price in seconds',
-    icon: Camera,
+    icon: SnapIcon,
     onPress: () => go('/capture'),
   };
 
@@ -167,14 +165,14 @@ export function companionConfigFor(pathname: string, host: CompanionHost): Compa
           key: 'deals',
           label: 'Find underpriced deals',
           detail: 'Listings below their AI estimate',
-          icon: Tag,
+          icon: PriceTagIcon,
           onPress: () => go('/search?scope=market'),
         },
         {
           key: 'sell',
           label: 'Sell something',
           detail: 'Snap it and I will price it',
-          icon: Camera,
+          icon: SnapIcon,
           onPress: () => go('/capture'),
         },
         {

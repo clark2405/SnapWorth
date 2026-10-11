@@ -9,8 +9,6 @@ import {
   Lock,
   RotateCw,
   ShoppingBag,
-  Tag as TagIcon,
-  Target,
   type LucideIcon,
   Users,
   WifiOff,
@@ -36,9 +34,11 @@ import {
   BottomBar,
   Button,
   ChoiceChips,
+  PriceTagIcon,
+  Stamp,
+  TagShape,
   Worthy,
   CountUp,
-  EstimateMark,
   Field,
   IconButton,
   NavHeader,
@@ -128,6 +128,7 @@ export function EstimateResultView({
   const placement: PreviewSharing =
     (asSheet || !itemId ? undefined : previewSharingByItem[itemId]) ?? {};
   const styles = useThemedStyles(stylesFor);
+  const { colors } = useTheme();
   const [title, setTitle] = useState<string>(item.title);
   const [condition, setCondition] = useState<PreviewCondition>(previewValuation.condition);
   const [sharing, setSharing] = useState(false);
@@ -222,31 +223,34 @@ export function EstimateResultView({
 
         {estimated ? (
           <>
+            {/* The appraisal hangs on its price tag, stamped with how sure the AI is. */}
             <Reveal index={0} style={styles.headline}>
-              <View style={styles.titleRow}>
-                <SWText variant="caption" tone="textMuted">
-                  {item.category}
-                </SWText>
-                <Tag
-                  label={`${previewValuation.confidence.charAt(0).toUpperCase()}${previewValuation.confidence.slice(1)} confidence`}
-                  tone="mint"
-                  icon={Target}
+              <SWText variant="caption" tone="textMuted">
+                {item.category}
+              </SWText>
+              <View style={styles.tagRow}>
+                <TagShape hanging tilt={-1.5} swing={resolvedHere.current} style={styles.priceTag}>
+                  <SWText variant="stamp" color={colors.kraftInk}>
+                    AI Estimate
+                  </SWText>
+                  <CountUp
+                    variant="priceHero"
+                    color={colors.kraftInk}
+                    value={value}
+                    format={formatPeso}
+                    from={resolvedHere.current ? undefined : value}
+                    durationMs={1100}
+                    accessibilityLiveRegion="polite"
+                  />
+                </TagShape>
+                <Stamp
+                  label={`${previewValuation.confidence} confidence`}
+                  tilt={-8}
+                  // Stamped once the count has landed on the price.
+                  land={resolvedHere.current ? { delay: 1250 } : undefined}
+                  style={styles.confidence}
                 />
               </View>
-              <View style={styles.estimateLabel}>
-                <EstimateMark />
-                <SWText variant="overline" tone="textSecondary">
-                  AI Estimate
-                </SWText>
-              </View>
-              <CountUp
-                variant="priceHero"
-                value={value}
-                format={formatPeso}
-                from={resolvedHere.current ? undefined : value}
-                durationMs={1100}
-                accessibilityLiveRegion="polite"
-              />
               <SWText variant="bodyMedium" tone="textMuted">
                 AI estimate, not a sale price
               </SWText>
@@ -455,7 +459,7 @@ function SavedNote({ sharing }: { readonly sharing: PreviewSharing }) {
           sharing.sold ? (
             <Tag label="Sold" tone="grave" icon={Handshake} />
           ) : (
-            <Tag label="Listed" tone="mint" icon={TagIcon} />
+            <Tag label="Listed" tone="mint" icon={PriceTagIcon} />
           )
         ) : null}
       </View>
@@ -664,7 +668,7 @@ function Destinations({
     <Button
       label={sold ? 'View sale' : 'View listing'}
       variant="secondary"
-      icon={sold ? Handshake : TagIcon}
+      icon={sold ? Handshake : PriceTagIcon}
       onPress={() => onViewListing?.(listingId)}
       containerStyle={styles.flex}
     />
@@ -715,6 +719,7 @@ function ShareCardSheet({
   readonly high: number;
 }) {
   const styles = useThemedStyles(stylesFor);
+  const { colors } = useTheme();
   const toast = useToast();
 
   return (
@@ -728,12 +733,15 @@ function ShareCardSheet({
         />
         <View style={styles.shareBody}>
           <SWText variant="headingMedium">{title}</SWText>
-          <View style={styles.estimateLabel}>
-            <SWText variant="overline" tone="textMuted">
+          {/* The card people post carries the same tag as the app, so it is recognisably ours. */}
+          <TagShape tilt={-2} style={styles.shareTag}>
+            <SWText variant="stamp" color={colors.kraftInk}>
               Worth about
             </SWText>
-          </View>
-          <SWText variant="priceLarge">{formatPeso(value)}</SWText>
+            <SWText variant="priceLarge" color={colors.kraftInk}>
+              {formatPeso(value)}
+            </SWText>
+          </TagShape>
           <SWText variant="caption" tone="textMuted">
             Range {formatPeso(low)} – {formatPeso(high)} · valued with SnapWorth
           </SWText>
@@ -780,7 +788,22 @@ const stylesFor = themedStyles((colors, name) => ({
     gap: tokens.spacing[10],
   },
   headline: {
+    gap: tokens.spacing[3],
+  },
+  tagRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    flexWrap: 'wrap',
+    gap: tokens.spacing[3],
+    paddingTop: tokens.spacing[5],
+  },
+  priceTag: {
+    paddingRight: tokens.spacing[6],
+    paddingVertical: tokens.spacing[4],
     gap: tokens.spacing[1],
+  },
+  confidence: {
+    marginBottom: tokens.spacing[2],
   },
   titleRow: {
     flexDirection: 'row',
@@ -960,6 +983,12 @@ const stylesFor = themedStyles((colors, name) => ({
     shadowOpacity: 1,
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 8 },
+  },
+  shareTag: {
+    alignSelf: 'flex-start',
+    paddingRight: tokens.spacing[5],
+    paddingVertical: tokens.spacing[3],
+    marginVertical: tokens.spacing[2],
   },
   shareBody: {
     gap: 2,

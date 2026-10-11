@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 
-import { themedStyles, tokens, useThemedStyles } from '../design';
+import { themedStyles, tokens, useTheme, useThemedStyles } from '../design';
+import { TagShape } from './PriceTag';
 import { SWText } from './SWText';
 
 const estimateCaption = 'AI estimate, not a sale price';
@@ -18,11 +19,12 @@ export interface EstimateBadgeProps {
 }
 
 /**
- * The AI's number always wears the same mark: a small sand diamond and a quiet "Est." label.
- * It is set apart from asking prices, which are the seller's and are always bare. The accent
- * is never spent here: it belongs to the screen's primary action.
+ * The AI's number always hangs on a price tag: a manila tag with an eyelet, its label printed
+ * in mono. It sets the estimate apart from asking prices, which are the seller's and always
+ * bare. Text on the tag uses the tag's own ink in either appearance, since the tag stays manila.
  */
 export function EstimateBadge({ value, size = 'compact', range }: EstimateBadgeProps) {
+  const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
 
   if (size === 'inline') {
@@ -34,8 +36,8 @@ export function EstimateBadge({ value, size = 'compact', range }: EstimateBadgeP
       >
         <SWText variant="priceSmall">{value}</SWText>
         <View style={styles.heroLabel}>
-          <EstimateMark size={5} />
-          <SWText variant="tag" tone="textMuted">
+          <EstimateMark size={7} />
+          <SWText variant="stamp" tone="textMuted">
             AI Est.
           </SWText>
         </View>
@@ -45,16 +47,15 @@ export function EstimateBadge({ value, size = 'compact', range }: EstimateBadgeP
 
   if (size === 'compact') {
     return (
-      <View
-        accessible
-        accessibilityLabel={`AI estimate ${value}. ${estimateCaption}`}
-        style={styles.pill}
-      >
-        <EstimateMark />
-        <SWText variant="tag" tone="textSecondary">
-          AI Est.
-        </SWText>
-        <SWText variant="priceSmall">{value}</SWText>
+      <View accessible accessibilityLabel={`AI estimate ${value}. ${estimateCaption}`}>
+        <TagShape style={styles.compact}>
+          <SWText variant="stamp" color={colors.kraftInk}>
+            AI Est.
+          </SWText>
+          <SWText variant="priceSmall" color={colors.kraftInk}>
+            {value}
+          </SWText>
+        </TagShape>
       </View>
     );
   }
@@ -65,46 +66,62 @@ export function EstimateBadge({ value, size = 'compact', range }: EstimateBadgeP
       accessibilityLabel={`AI estimate ${value}${range ? `, range ${range}` : ''}. ${estimateCaption}`}
       style={styles.hero}
     >
-      <View style={styles.heroLabel}>
-        <EstimateMark />
-        <SWText variant="overline" tone="textSecondary">
+      <TagShape hanging tilt={-1.5} style={styles.heroTag}>
+        <SWText variant="stamp" color={colors.kraftInk}>
           AI Estimate
         </SWText>
-      </View>
-      <SWText variant="priceHero">{value}</SWText>
+        <SWText variant="priceHero" color={colors.kraftInk}>
+          {value}
+        </SWText>
+        {range ? (
+          <SWText variant="caption" color={colors.kraftInk}>
+            {range}
+          </SWText>
+        ) : null}
+      </TagShape>
       <SWText variant="caption" tone="textMuted">
-        {range ?? estimateCaption}
+        {estimateCaption}
       </SWText>
     </View>
   );
 }
 
-/** The estimate's signature: a small sand diamond, used wherever the AI's number appears. */
-export function EstimateMark({ size = 6 }: { readonly size?: number }) {
+/**
+ * The estimate's signature: the tag's reinforced eyelet, which is also the lens in the logo.
+ * Used wherever the AI's number appears without its full tag.
+ */
+export function EstimateMark({ size = 8 }: { readonly size?: number }) {
   const styles = useThemedStyles(stylesFor);
   return (
     <View
       accessibilityElementsHidden
       importantForAccessibility="no"
-      style={[styles.mark, { width: size, height: size }]}
+      style={[
+        styles.mark,
+        { width: size, height: size, borderRadius: size / 2, borderWidth: Math.max(1.5, size / 4) },
+      ]}
     />
   );
 }
 
 const stylesFor = themedStyles((colors) => ({
-  pill: {
+  compact: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing[2],
-    paddingLeft: tokens.spacing[3],
     paddingRight: tokens.spacing[3],
     paddingVertical: tokens.spacing[1] + 2,
-    borderRadius: tokens.radius.full,
-    backgroundColor: colors.surface,
   },
   hero: {
-    gap: tokens.spacing[2],
+    gap: tokens.spacing[3],
+  },
+  heroTag: {
+    alignSelf: 'flex-start',
+    paddingRight: tokens.spacing[6],
+    paddingVertical: tokens.spacing[4],
+    gap: tokens.spacing[1],
+    marginTop: tokens.spacing[4],
   },
   inline: {
     alignItems: 'flex-end',
@@ -116,8 +133,7 @@ const stylesFor = themedStyles((colors) => ({
     gap: tokens.spacing[2],
   },
   mark: {
-    backgroundColor: colors.sandInk,
-    transform: [{ rotate: '45deg' }],
-    borderRadius: 1,
+    borderColor: colors.kraftEdge,
+    backgroundColor: colors.kraft,
   },
 }));

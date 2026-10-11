@@ -17,7 +17,9 @@ describe('SnapWorth font contract', () => {
   });
 
   it('resolves every family to the face for its weight', () => {
-    expect(resolveFontFamily('display', '700')).toBe('PlusJakartaSans_700Bold');
+    expect(resolveFontFamily('display', '700')).toBe('BricolageGrotesque_700Bold');
+    expect(resolveFontFamily('price', '800')).toBe('BricolageGrotesque_800ExtraBold');
+    expect(resolveFontFamily('mono', '700')).toBe('DMMono_500Medium');
     expect(resolveFontFamily('sans', '400')).toBe('PlusJakartaSans_400Regular');
     expect(resolveFontFamily('rounded', '600')).toBe('PlusJakartaSans_600SemiBold');
     expect(resolveFontFace('900')).toBe(fontFaces['400']);

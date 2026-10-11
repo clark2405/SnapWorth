@@ -1,6 +1,7 @@
 export * from './AmbientBackdrop';
 export * from './AskingPriceBadge';
 export * from './Brand';
+export * from './BrandIcons';
 export * from './Button';
 export * from './ChoiceChips';
 export * from './Companion';
@@ -18,6 +19,7 @@ export * from './PhotoSetField';
 export * from './PhotoViewer';
 export * from './PressableScale';
 export * from './PriceRangeBar';
+export * from './PriceTag';
 export * from './Reveal';
 export * from './Screen';
 export * from './scroll-signal';

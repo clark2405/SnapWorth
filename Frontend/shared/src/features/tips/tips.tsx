@@ -1,4 +1,4 @@
-import { Camera, Heart, ShoppingBag, Vote, type LucideIcon } from 'lucide-react-native';
+import { Heart, ShoppingBag, Vote, type LucideIcon } from 'lucide-react-native';
 import {
   createContext,
   useCallback,
@@ -11,7 +11,7 @@ import {
 
 import type { StyleProp, ViewStyle } from 'react-native';
 
-import { TipCard } from '../../components';
+import { TipCard, SnapIcon } from '../../components';
 
 /**
  * The few things worth teaching, each where it happens. A tip retires for good once the person
@@ -21,7 +21,7 @@ export type TipId = 'snap' | 'vote' | 'list' | 'save';
 
 const tipCopy: Record<TipId, { icon: LucideIcon; title: string; message: string }> = {
   snap: {
-    icon: Camera,
+    icon: SnapIcon,
     title: 'Snap anything',
     message: 'Tap Snap it and photograph something. You get a fair price range in seconds.',
   },

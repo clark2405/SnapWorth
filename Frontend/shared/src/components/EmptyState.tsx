@@ -5,6 +5,7 @@ import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../design';
 import { Button } from './Button';
 import { SWText } from './SWText';
+import { Worthy } from './Worthy';
 
 export interface EmptyStateProps {
   readonly icon: LucideIcon;
@@ -30,13 +31,20 @@ export function EmptyState({
 
   return (
     <View style={styles.root} accessibilityLiveRegion="polite">
-      <Animated.View entering={ZoomIn.springify().damping(14)} style={styles.icon}>
-        <Icon
-          size={24}
-          strokeWidth={1.75}
-          color={tone === 'error' ? colors.danger : colors.textSecondary}
-        />
-      </Animated.View>
+      {/* An empty screen is Worthy's to explain, holding up a tag with what belongs here. A
+          failure keeps the plain red mark: nothing about it should look cheerful. */}
+      {tone === 'error' ? (
+        <Animated.View entering={ZoomIn.springify().damping(14)} style={styles.icon}>
+          <Icon size={24} strokeWidth={1.75} color={colors.danger} />
+        </Animated.View>
+      ) : (
+        <Animated.View entering={ZoomIn.springify().damping(14)} style={styles.worthy}>
+          <Worthy size={84} mood="attentive" />
+          <View style={styles.held}>
+            <Icon size={16} strokeWidth={2} color={colors.kraftInk} />
+          </View>
+        </Animated.View>
+      )}
       <Animated.View entering={FadeInDown.delay(80).duration(420)} style={styles.text}>
         <SWText variant="headingLarge" align="center">
           {title}
@@ -68,6 +76,27 @@ const stylesFor = themedStyles((colors) => ({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.sunken,
+  },
+  worthy: {
+    width: 104,
+    height: 96,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // A little manila tag tucked against Worthy, carrying the screen's own icon.
+  held: {
+    position: 'absolute',
+    right: 0,
+    bottom: 4,
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.kraft,
+    borderWidth: 2,
+    borderColor: colors.canvas,
+    transform: [{ rotate: '12deg' }],
   },
   text: {
     gap: tokens.spacing[2],

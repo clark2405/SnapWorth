@@ -1,4 +1,4 @@
-import { BadgePercent, Camera, PackageSearch } from 'lucide-react-native';
+import { BadgePercent, PackageSearch } from 'lucide-react-native';
 import { useState } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -14,6 +14,8 @@ import {
   Photo,
   Reveal,
   Screen,
+  SnapIcon,
+  Sticker,
   SWText,
   ZoomLink,
 } from '../../components';
@@ -115,7 +117,7 @@ export function MarketplaceView({
                 label="Sell"
                 size="small"
                 variant="secondary"
-                icon={Camera}
+                icon={SnapIcon}
                 onPress={onSell}
               />
             ) : null}
@@ -235,6 +237,7 @@ function UnderEstimateCard({
 }) {
   const styles = useThemedStyles(stylesFor);
   const estimate = impliedEstimate(listing);
+  const under = Math.round((1 - listing.askingPrice / estimate) * 100);
   return (
     <ZoomLink
       href={`/listing/${listing.id}`}
@@ -250,6 +253,11 @@ function UnderEstimateCard({
         radius={tokens.radius.medium}
         style={styles.highlightPhoto}
       />
+      {under > 0 ? (
+        <View style={styles.underSpot} pointerEvents="none">
+          <Sticker label={`${under}% under`} tone="marigold" tilt={4} />
+        </View>
+      ) : null}
       <View style={styles.highlightText}>
         <SWText variant="bodyCompact" tone="textSecondary" numberOfLines={1}>
           {listing.title}
@@ -262,6 +270,13 @@ function UnderEstimateCard({
 }
 
 const stylesFor = themedStyles((colors) => ({
+  // How far under the AI's estimate a steal is asking, stuck on its photo.
+  // Bottom right, where the card has room: the title and prices run along the top and left.
+  underSpot: {
+    position: 'absolute',
+    bottom: tokens.spacing[4],
+    right: tokens.spacing[4],
+  },
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
