@@ -20,6 +20,12 @@ export const wordmarkPaths = {
 export const tagPath =
   'M45.2 8.6Q50 4.4 54.8 8.6L74.6 27Q78 30.2 78 35L78 86Q78 95 69 95L31 95Q22 95 22 86L22 35Q22 30.2 25.4 27Z';
 
+/**
+ * The tag's string in the same box: threaded through the eyelet, out over the point, and looped
+ * off to one side. Drawn as a stroke, beneath the tag.
+ */
+export const tagStringPath = 'M50 31C50 18 50 6 47.5 -1C45 -8 38 -11 33.5 -6.5';
+
 /** Worthy's body: the same tag, a little wider so a face fits. */
 export const worthyBodyPath =
   'M44.6 9.4Q50 4.6 55.4 9.4L79.2 30.3Q83 33.6 83 38.8L83 82Q83 92 73 92L27 92Q17 92 17 82L17 38.8Q17 33.6 20.8 30.3Z';

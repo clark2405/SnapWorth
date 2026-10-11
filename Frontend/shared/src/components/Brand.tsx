@@ -4,7 +4,7 @@ import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reani
 import Svg, { Circle, G, Path } from 'react-native-svg';
 
 import { tokens, useTheme } from '../design';
-import { tagPath, wordmarkPaths } from './brand-paths';
+import { tagPath, tagStringPath, wordmarkPaths } from './brand-paths';
 
 // The lens reads the same in both appearances: a cream ring around an ink pupil.
 const lensRing = tokens.color.dark.textPrimary;
@@ -225,8 +225,8 @@ export interface LogoMarkProps {
 }
 
 /**
- * The SnapWorth mark: a price tag hung at an angle, its eyelet a camera lens. Worth and the snap
- * that finds it, in one shape.
+ * The SnapWorth mark, as on the app icon: a kraft price tag hung at an angle, its eyelet a camera
+ * lens and its string looping free. Worth and the snap that finds it, in one shape.
  */
 export function LogoMark({ size = 48, style }: LogoMarkProps) {
   const { colors } = useTheme();
@@ -237,12 +237,20 @@ export function LogoMark({ size = 48, style }: LogoMarkProps) {
       accessibilityLabel="SnapWorth"
       style={[{ width: size, height: size }, style]}
     >
-      <Svg width={size} height={size} viewBox="0 0 100 100">
+      {/* Framed on the tag and its string together, so the loop is not cut off. */}
+      <Svg width={size} height={size} viewBox="-1.8 6.2 100 100">
         <G transform="rotate(-45 50 50)">
-          <Path d={tagPath} fill={colors.accent} />
-          <Circle cx={50} cy={31} r={10.5} fill={lensRing} />
-          <Circle cx={50} cy={31} r={7.2} fill={lensPupil} />
-          <Circle cx={52.8} cy={28.2} r={2.1} fill={lensRing} />
+          <Path
+            d={tagStringPath}
+            fill="none"
+            stroke={colors.textPrimary}
+            strokeWidth={2.6}
+            strokeLinecap="round"
+          />
+          <Path d={tagPath} fill={colors.kraft} />
+          <Circle cx={50} cy={31} r={10.5} fill={colors.accent} />
+          <Circle cx={50} cy={31} r={6.6} fill={lensPupil} />
+          <Circle cx={52.6} cy={28.4} r={2} fill={lensRing} />
         </G>
       </Svg>
     </View>

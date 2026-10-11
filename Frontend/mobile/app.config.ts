@@ -13,8 +13,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     bundleIdentifier: 'com.snapworth.app',
     supportsTablet: false,
-    // A layered Icon Composer icon: iOS 26 gives the tag and its lens Liquid Glass depth, and
-    // draws the light, dark, tinted and clear appearances from it.
+    // A layered Icon Composer icon: the kraft price tag on the brand red, its eyelet a lens and
+    // its string looping free. iOS 26 gives the tag and lens Liquid Glass depth, and draws the
+    // light, dark, tinted and clear appearances from it.
     icon: './assets/SnapWorth.icon',
     infoPlist: {
       CFBundleDisplayName: 'SnapWorth',
@@ -27,8 +28,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       foregroundImage: './assets/adaptive-icon.png',
       // Android 13+ themed icons tint this one-colour mark to the wallpaper, like iOS's tinted mode.
       monochromeImage: './assets/adaptive-icon-monochrome.png',
-      // The light icon's paper, so the tag sits on the same ground on Android.
-      backgroundColor: '#FFFBF5',
+      // The light icon's red, so the kraft tag sits on the same ground on Android.
+      backgroundColor: '#D63A14',
     },
   },
   plugins: [
@@ -51,7 +52,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'expo-splash-screen',
       {
         image: './assets/splash-mark.png',
-        imageWidth: 96,
+        imageWidth: 112,
         // The app's own paper and charcoal, so the launch hands over to the first screen seamlessly.
         backgroundColor: '#FFFBF5',
         dark: { image: './assets/splash-mark-dark.png', backgroundColor: '#17120D' },
