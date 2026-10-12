@@ -5,15 +5,18 @@ import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanim
 import {
   Button,
   Field,
+  PlaceHero,
   PressableScale,
   Reveal,
   Screen,
   SegmentedControl,
+  Surface,
   SWText,
   TextField,
   Wordmark,
+  Worthy,
 } from '../../components';
-import { themedStyles, tokens, useThemedStyles } from '../../design';
+import { placeColors, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 
 export type AuthMode = 'login' | 'signup';
 
@@ -54,6 +57,9 @@ export function LoginView({
   onClose,
 }: LoginViewProps) {
   const styles = useThemedStyles(stylesFor);
+  const { colors } = useTheme();
+  // The door to the app wears its front colour: the feed's price-gun red.
+  const brand = placeColors(colors, 'feed');
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -75,98 +81,106 @@ export function LoginView({
     onContinueWithGoogle ? onContinueWithGoogle() : onSubmit?.({ mode, email, password });
 
   return (
-    <Screen ambient="feed" contentStyle={styles.content}>
-      <Reveal index={0} style={styles.brand}>
-        <Wordmark />
-        {onClose ? (
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityLabel="Not now. Keep looking around"
-            haptic="select"
-            onPress={onClose}
-            hitSlop={tokens.spacing[2]}
-            style={styles.close}
-          >
-            <SWText variant="label" tone="textSecondary">
-              Not now
-            </SWText>
-          </PressableScale>
-        ) : null}
-      </Reveal>
+    <Screen place="feed" ambient="feed" contentStyle={styles.content}>
+      <PlaceHero title={text.title}>
+        <Reveal index={0} style={styles.brand}>
+          <Wordmark ink={brand.ink} lensColor={brand.lens} />
+          {onClose ? (
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel="Not now. Keep looking around"
+              haptic="select"
+              onPress={onClose}
+              hitSlop={tokens.spacing[2]}
+              style={styles.close}
+            >
+              <SWText variant="label" color={brand.ink}>
+                Not now
+              </SWText>
+            </PressableScale>
+          ) : null}
+        </Reveal>
 
-      <Reveal index={1} style={styles.intro}>
-        <Animated.View
-          key={mode}
-          entering={FadeIn.duration(240)}
-          exiting={FadeOut.duration(160)}
-          layout={LinearTransition.springify().damping(20)}
-          style={styles.introText}
-        >
-          <SWText variant="displayHero" accessibilityRole="header">
-            {text.title}
-          </SWText>
-          <SWText variant="bodyLarge" tone="textSecondary">
-            {text.why}
-          </SWText>
-        </Animated.View>
-      </Reveal>
+        <Reveal index={1} style={styles.intro}>
+          <Animated.View
+            key={mode}
+            entering={FadeIn.duration(240)}
+            exiting={FadeOut.duration(160)}
+            layout={LinearTransition.springify().damping(20)}
+            style={styles.introText}
+          >
+            <SWText variant="displayHero" color={brand.ink} accessibilityRole="header">
+              {text.title}
+            </SWText>
+            <SWText variant="bodyLarge" color={brand.ink}>
+              {text.why}
+            </SWText>
+          </Animated.View>
+          {/* Worthy is red too, so it waits on a marigold disc rather than vanishing into the block. */}
+          <View style={[styles.worthy, { backgroundColor: colors.marigold }]}>
+            <Worthy size={84} mood="attentive" />
+          </View>
+        </Reveal>
+      </PlaceHero>
 
       {/* One tap first: Sign in with Apple is the fastest, most private way in, so it leads;
           email is there for anyone who prefers it. */}
-      <Reveal index={2} style={styles.quick}>
-        <Button label="Continue with Apple" onPress={continueWithApple} />
-        <Button label="Continue with Google" variant="secondary" onPress={continueWithGoogle} />
-        <View style={styles.or}>
-          <View style={styles.rule} />
-          <SWText variant="caption" tone="textMuted">
-            or use email
-          </SWText>
-          <View style={styles.rule} />
-        </View>
-      </Reveal>
+      <Reveal index={2}>
+        <Surface padding={tokens.spacing[5]} contentStyle={styles.card}>
+          <View style={styles.quick}>
+            <Button label="Continue with Apple" onPress={continueWithApple} />
+            <Button label="Continue with Google" variant="secondary" onPress={continueWithGoogle} />
+            <View style={styles.or}>
+              <View style={styles.rule} />
+              <SWText variant="caption" tone="textMuted">
+                or use email
+              </SWText>
+              <View style={styles.rule} />
+            </View>
+          </View>
 
-      <Reveal index={3} style={styles.form}>
-        <SegmentedControl options={modes} value={mode} onChange={setMode} />
+          <View style={styles.form}>
+            <SegmentedControl options={modes} value={mode} onChange={setMode} />
 
-        <View style={styles.fields}>
-          <Field label="Email">
-            <TextField
-              value={email}
-              onChangeText={setEmail}
-              placeholder="you@example.com"
-              autoCapitalize="none"
-              autoComplete="email"
-              keyboardType="email-address"
-              textContentType="emailAddress"
-              accessibilityLabel="Email address"
-            />
-          </Field>
-          <Field label="Password">
-            <TextField
-              value={password}
-              onChangeText={setPassword}
-              placeholder={mode === 'login' ? 'Your password' : 'At least 8 characters'}
-              secureTextEntry
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              textContentType={mode === 'login' ? 'password' : 'newPassword'}
-              accessibilityLabel="Password"
-            />
-          </Field>
-          {mode === 'login' ? (
-            <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(140)}>
-              <Button
-                label="Forgot password?"
-                variant="tertiary"
-                onPress={onForgotPassword}
-                containerStyle={styles.forgot}
-              />
-            </Animated.View>
-          ) : null}
-        </View>
-      </Reveal>
+            <View style={styles.fields}>
+              <Field label="Email">
+                <TextField
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="you@example.com"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  keyboardType="email-address"
+                  textContentType="emailAddress"
+                  accessibilityLabel="Email address"
+                />
+              </Field>
+              <Field label="Password">
+                <TextField
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder={mode === 'login' ? 'Your password' : 'At least 8 characters'}
+                  secureTextEntry
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  textContentType={mode === 'login' ? 'password' : 'newPassword'}
+                  accessibilityLabel="Password"
+                />
+              </Field>
+              {mode === 'login' ? (
+                <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(140)}>
+                  <Button
+                    label="Forgot password?"
+                    variant="tertiary"
+                    onPress={onForgotPassword}
+                    containerStyle={styles.forgot}
+                  />
+                </Animated.View>
+              ) : null}
+            </View>
+          </View>
 
-      <Reveal index={4} style={styles.actions}>
-        <Button label={text.submit} variant="secondary" loading={submitting} onPress={submit} />
+          <Button label={text.submit} variant="secondary" loading={submitting} onPress={submit} />
+        </Surface>
       </Reveal>
     </Screen>
   );
@@ -174,7 +188,7 @@ export function LoginView({
 
 const stylesFor = themedStyles((colors) => ({
   content: {
-    paddingTop: tokens.spacing[4],
+    paddingTop: tokens.spacing[2],
   },
   brand: {
     minHeight: tokens.layout.headerHeight,
@@ -186,18 +200,31 @@ const stylesFor = themedStyles((colors) => ({
     paddingVertical: tokens.spacing[2],
     paddingLeft: tokens.spacing[3],
   },
+  // The title and why on the left, Worthy waiting beside them.
   intro: {
-    marginTop: tokens.spacing[10],
+    marginTop: tokens.spacing[8],
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: tokens.spacing[2],
   },
   introText: {
+    flex: 1,
     gap: tokens.spacing[3],
   },
+  worthy: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  card: {
+    gap: tokens.spacing[6],
+  },
   quick: {
-    marginTop: tokens.spacing[8],
     gap: tokens.spacing[3],
   },
   form: {
-    marginTop: tokens.spacing[4],
     gap: tokens.spacing[6],
   },
   fields: {
@@ -207,10 +234,6 @@ const stylesFor = themedStyles((colors) => ({
     alignSelf: 'flex-end',
     marginTop: -tokens.spacing[2],
     marginRight: -tokens.spacing[2],
-  },
-  actions: {
-    marginTop: tokens.spacing[6],
-    gap: tokens.spacing[4],
   },
   or: {
     flexDirection: 'row',

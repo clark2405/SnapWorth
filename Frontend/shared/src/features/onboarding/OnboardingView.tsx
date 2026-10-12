@@ -1,6 +1,13 @@
 import { ArrowDown, ArrowUp, Check, type LucideIcon } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import {
+  Platform,
+  StatusBar,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+  type LayoutChangeEvent,
+} from 'react-native';
 import Animated, {
   Easing,
   Extrapolation,
@@ -25,9 +32,12 @@ import {
   AmbientBackdrop,
   CountUp,
   EstimateMark,
+  LogoMark,
   Photo,
   PressableScale,
   Reveal,
+  RevealGate,
+  ScallopEdge,
   Sparkline,
   Sticker,
   SWText,
@@ -36,6 +46,8 @@ import {
 } from '../../components';
 import {
   haptic,
+  held,
+  placeColors,
   themedStyles,
   tokens,
   useTheme,
@@ -157,6 +169,9 @@ export function OnboardingView({
   const settled = useSharedValue(0);
   const idle = useSharedValue(0);
   const width = size.width;
+  // The introduction opens on its cover; the tour waits beneath until the cover rolls away.
+  const [opened, setOpened] = useState(false);
+  const [welcomed, setWelcomed] = useState(false);
 
   useEffect(() => {
     if (reduceMotion) return;
@@ -243,118 +258,267 @@ export function OnboardingView({
   return (
     <View style={styles.root}>
       <AmbientBackdrop mood="feed" />
-      <View style={[styles.column, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-        <Reveal index={0} style={styles.topBar}>
-          <Wordmark />
-          <Animated.View style={skipStyle} pointerEvents={last && replay ? 'none' : 'auto'}>
-            <PressableScale
-              accessibilityRole="button"
-              accessibilityLabel={
-                replay ? 'Close the introduction' : 'Look around without an account'
-              }
-              onPress={onSkip}
-              hitSlop={tokens.spacing[2]}
-              style={styles.skip}
-            >
-              <SWText variant="label" tone="textSecondary">
-                {replay ? 'Close' : 'Look around'}
-              </SWText>
-            </PressableScale>
-          </Animated.View>
-        </Reveal>
-
-        <View style={styles.fill} onLayout={onLayout}>
-          {width > 0 && stageHeight > 0 ? (
-            <>
-              <Reveal index={1} style={[styles.stage, { height: stageHeight }]}>
-                <Stage
-                  progress={scrollX}
-                  idle={idle}
-                  width={width}
-                  height={stageHeight}
-                  index={index}
-                  reduceMotion={reduceMotion}
-                />
-              </Reveal>
-              <Animated.ScrollView
-                ref={pager}
-                horizontal
-                pagingEnabled
-                bounces={false}
-                showsHorizontalScrollIndicator={false}
-                onScroll={onScroll}
-                scrollEventThrottle={16}
-                style={styles.pager}
+      <RevealGate open={opened}>
+        <View style={[styles.column, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+          <Reveal index={0} style={styles.topBar}>
+            <Wordmark />
+            <Animated.View style={skipStyle} pointerEvents={last && replay ? 'none' : 'auto'}>
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityLabel={
+                  replay ? 'Close the introduction' : 'Look around without an account'
+                }
+                onPress={onSkip}
+                hitSlop={tokens.spacing[2]}
+                style={styles.skip}
               >
-                {steps.map((step, stepIndex) => (
-                  <Copy
-                    key={step.key}
-                    title={step.title}
-                    body={step.body}
-                    index={stepIndex}
-                    active={stepIndex === index}
-                    scrollX={scrollX}
+                <SWText variant="label" tone="textSecondary">
+                  {replay ? 'Close' : 'Look around'}
+                </SWText>
+              </PressableScale>
+            </Animated.View>
+          </Reveal>
+
+          <View style={styles.fill} onLayout={onLayout}>
+            {width > 0 && stageHeight > 0 ? (
+              <>
+                <Reveal index={1} style={[styles.stage, { height: stageHeight }]}>
+                  <Stage
+                    progress={scrollX}
+                    idle={idle}
                     width={width}
+                    height={stageHeight}
+                    index={index}
                     reduceMotion={reduceMotion}
                   />
-                ))}
-              </Animated.ScrollView>
-            </>
-          ) : null}
-        </View>
-
-        <Reveal index={2} style={styles.footer}>
-          <View
-            accessible
-            accessibilityRole="progressbar"
-            accessibilityLabel={`Step ${index + 1} of ${steps.length}`}
-            accessibilityValue={{ min: 1, max: steps.length, now: index + 1 }}
-            style={styles.dots}
-          >
-            {steps.map((step, stepIndex) => (
-              <Dot key={step.key} index={stepIndex} scrollX={scrollX} width={width} />
-            ))}
+                </Reveal>
+                <Animated.ScrollView
+                  ref={pager}
+                  horizontal
+                  pagingEnabled
+                  bounces={false}
+                  showsHorizontalScrollIndicator={false}
+                  onScroll={onScroll}
+                  scrollEventThrottle={16}
+                  style={styles.pager}
+                >
+                  {steps.map((step, stepIndex) => (
+                    <Copy
+                      key={step.key}
+                      title={step.title}
+                      body={step.body}
+                      index={stepIndex}
+                      active={stepIndex === index}
+                      scrollX={scrollX}
+                      width={width}
+                      reduceMotion={reduceMotion}
+                    />
+                  ))}
+                </Animated.ScrollView>
+              </>
+            ) : null}
           </View>
 
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityLabel={last ? finishLabel : 'Continue'}
-            accessibilityHint={last && !replay ? 'Creates your SnapWorth account' : undefined}
-            haptic={last ? 'pop' : 'tap'}
-            onPress={advance}
-            style={({ pressed }) => [styles.primary, pressed ? styles.primaryPressed : null]}
-          >
-            <Animated.View style={[styles.primaryLabel, continueStyle]}>
-              <SWText variant="button" tone="onAccent">
-                Continue
-              </SWText>
-            </Animated.View>
-            <Animated.View style={[styles.primaryLabel, startStyle]}>
-              <SWText variant="button" tone="onAccent">
-                {finishLabel}
-              </SWText>
-            </Animated.View>
-          </PressableScale>
+          <Reveal index={2} style={styles.footer}>
+            <View
+              accessible
+              accessibilityRole="progressbar"
+              accessibilityLabel={`Step ${index + 1} of ${steps.length}`}
+              accessibilityValue={{ min: 1, max: steps.length, now: index + 1 }}
+              style={styles.dots}
+            >
+              {steps.map((step, stepIndex) => (
+                <Dot key={step.key} index={stepIndex} scrollX={scrollX} width={width} />
+              ))}
+            </View>
 
-          {replay ? null : (
             <PressableScale
               accessibilityRole="button"
-              accessibilityLabel="I already have an account. Sign in"
-              haptic="none"
-              onPress={onSignIn}
-              style={styles.signIn}
+              accessibilityLabel={last ? finishLabel : 'Continue'}
+              accessibilityHint={last && !replay ? 'Creates your SnapWorth account' : undefined}
+              haptic={last ? 'pop' : 'tap'}
+              onPress={advance}
+              style={({ pressed }) => [styles.primary, pressed ? styles.primaryPressed : null]}
             >
-              <SWText variant="bodyMedium" tone="textSecondary">
-                Have an account?{' '}
-                <SWText variant="label" tone="textPrimary">
-                  Sign in
+              <Animated.View style={[styles.primaryLabel, continueStyle]}>
+                <SWText variant="button" tone="onAccent">
+                  Continue
                 </SWText>
-              </SWText>
+              </Animated.View>
+              <Animated.View style={[styles.primaryLabel, startStyle]}>
+                <SWText variant="button" tone="onAccent">
+                  {finishLabel}
+                </SWText>
+              </Animated.View>
             </PressableScale>
-          )}
-        </Reveal>
-      </View>
+
+            {replay ? null : (
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityLabel="I already have an account. Sign in"
+                haptic="none"
+                onPress={onSignIn}
+                style={styles.signIn}
+              >
+                <SWText variant="bodyMedium" tone="textSecondary">
+                  Have an account?{' '}
+                  <SWText variant="label" tone="textPrimary">
+                    Sign in
+                  </SWText>
+                </SWText>
+              </PressableScale>
+            )}
+          </Reveal>
+        </View>
+      </RevealGate>
+      {welcomed ? null : (
+        <WelcomeCover
+          leaving={opened}
+          onStart={() => setOpened(true)}
+          onSignIn={replay ? undefined : onSignIn}
+          onClose={replay ? onSkip : undefined}
+          onGone={() => setWelcomed(true)}
+        />
+      )}
     </View>
+  );
+}
+
+/**
+ * The introduction's cover, and the app's first screen: the mark swinging on its string, the
+ * wordmark and what SnapWorth is for, on the brand's red. Getting started rolls it up and away
+ * like a ticket off a roll, scalloped edge last, and the tour comes in beneath.
+ */
+function WelcomeCover({
+  leaving,
+  onStart,
+  onSignIn,
+  onClose,
+  onGone,
+}: {
+  readonly leaving: boolean;
+  readonly onStart: () => void;
+  readonly onSignIn?: () => void;
+  readonly onClose?: () => void;
+  readonly onGone: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(stylesFor);
+  const reduceMotion = useReducedMotion();
+  const brand = placeColors(colors, 'feed');
+  const away = useSharedValue(0);
+  const sway = useSharedValue(0);
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    sway.value = withRepeat(
+      withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    );
+    return () => cancelAnimation(sway);
+  }, [reduceMotion, sway]);
+
+  useEffect(() => {
+    if (!leaving) return;
+    away.value = withTiming(
+      1,
+      { duration: reduceMotion ? 240 : 680, easing: expressive },
+      (finished) => {
+        if (finished) runOnJS(onGone)();
+      },
+    );
+  }, [away, leaving, onGone, reduceMotion]);
+
+  // Light status-bar text on the red while the cover is up.
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    StatusBar.setBarStyle('light-content', true);
+    return () => StatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
+  }, [isDark]);
+
+  const coverStyle = useAnimatedStyle(() =>
+    reduceMotion
+      ? { opacity: 1 - away.value }
+      : { transform: [{ translateY: -away.value * (height + tokens.spacing[4]) }] },
+  );
+  // The mark hangs from its string's loop and swings a little, as a tag on a rail does.
+  const markStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${(sway.value - 0.5) * 7}deg` }],
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        styles.cover,
+        {
+          backgroundColor: brand.fill,
+          paddingTop: insets.top + tokens.spacing[2],
+          paddingBottom: insets.bottom + tokens.spacing[4],
+        },
+        coverStyle,
+      ]}
+    >
+      <ScallopEdge color={brand.fill} />
+      <View style={styles.coverTop}>
+        {onClose ? (
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel="Close the introduction"
+            onPress={onClose}
+            hitSlop={tokens.spacing[2]}
+            style={styles.skip}
+          >
+            <SWText variant="label" color={brand.ink}>
+              Close
+            </SWText>
+          </PressableScale>
+        ) : null}
+      </View>
+      <View style={styles.coverCentre}>
+        <Animated.View style={[styles.coverMark, markStyle]}>
+          <LogoMark size={156} />
+        </Animated.View>
+        <Wordmark height={44} ink={brand.ink} lensColor={brand.lens} />
+        <SWText variant="headingLarge" color={brand.ink} align="center" accessibilityRole="header">
+          Snap it. Know what it&apos;s worth.
+        </SWText>
+        <SWText variant="stamp" color={brand.ink}>
+          Fair prices for pre-loved things
+        </SWText>
+      </View>
+      <View style={styles.coverActions}>
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel="Get started"
+          haptic="pop"
+          onPress={onStart}
+          style={[styles.coverStart, { backgroundColor: brand.ink }]}
+        >
+          <SWText variant="button" color={brand.fill}>
+            Get started
+          </SWText>
+        </PressableScale>
+        {onSignIn ? (
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel="I already have an account. Sign in"
+            haptic="none"
+            onPress={onSignIn}
+            style={styles.signIn}
+          >
+            <SWText variant="bodyMedium" color={brand.ink}>
+              Have an account?{' '}
+              <SWText variant="label" color={brand.ink}>
+                Sign in
+              </SWText>
+            </SWText>
+          </PressableScale>
+        ) : null}
+      </View>
+    </Animated.View>
   );
 }
 
@@ -1061,5 +1225,37 @@ const stylesFor = themedStyles((colors, name) => ({
   signIn: {
     alignSelf: 'center',
     paddingVertical: tokens.spacing[2],
+  },
+  cover: {
+    ...StyleSheet.absoluteFill,
+    paddingHorizontal: gutter,
+    justifyContent: 'space-between',
+    zIndex: 10,
+  },
+  coverTop: {
+    minHeight: tokens.layout.headerCompact,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  coverCentre: {
+    alignItems: 'center',
+    gap: tokens.spacing[4],
+  },
+  // Turned about the top of its string, so the swing reads as hanging.
+  coverMark: {
+    marginBottom: tokens.spacing[4],
+    transformOrigin: 'top left',
+  },
+  coverActions: {
+    gap: tokens.spacing[3],
+  },
+  // Cut like everything else you can press and hold in the app: ink outline, hard shadow.
+  coverStart: {
+    height: tokens.layout.primaryButton,
+    borderRadius: tokens.radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...held(colors),
   },
 }));
