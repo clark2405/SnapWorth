@@ -1,9 +1,11 @@
 import MaskedView from '@react-native-masked-view/masked-view';
 import { BlurView } from 'expo-blur';
-import { useId, type RefObject } from 'react';
+import { useId, useState, type RefObject } from 'react';
 import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
+  runOnJS,
   useAnimatedProps,
+  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   type SharedValue,
@@ -25,6 +27,12 @@ export interface ScrollEdgeProps {
    * blur, which iOS only draws properly at full opacity, so it would pop in at the end.
    */
   readonly progress?: SharedValue<number>;
+  /**
+   * `progress` at rest, before anything scrolls. It is committed as the blur's and wash's plain
+   * props, so an animated update that fails to arrive leaves the edge as it should be at rest,
+   * not at the blur's own default strength.
+   */
+  readonly rest?: number;
   readonly style?: StyleProp<ViewStyle>;
   /** An optional target ref for Android native blur when wrapped in BlurTargetView. */
   readonly blurTarget?: RefObject<View | null>;
@@ -57,7 +65,14 @@ function easedStops(opacity: number, from: number, to = 1, steps = 8): EdgeStop[
  * than cross-fading sharp content into blurred. There is no line where the bar ends. The web,
  * without native blur masking, gets the wash alone.
  */
-export function ScrollEdge({ solid, fade = 72, progress, style, blurTarget }: ScrollEdgeProps) {
+export function ScrollEdge({
+  solid,
+  fade = 72,
+  progress,
+  rest = progress ? 0 : 1,
+  style,
+  blurTarget,
+}: ScrollEdgeProps) {
   const { colors, isDark } = useTheme();
   const id = `edge-${useId().replace(/:/g, '')}`;
   const height = solid + fade;
@@ -70,6 +85,15 @@ export function ScrollEdge({ solid, fade = 72, progress, style, blurTarget }: Sc
   const strongProps = useAnimatedProps(() => ({ intensity: presence.value * strongIntensity }));
   const softProps = useAnimatedProps(() => ({ intensity: presence.value * softIntensity }));
   const washStyle = useAnimatedStyle(() => ({ opacity: presence.value }));
+  // The blur only exists once something has scrolled beneath it. A blur view made before it is
+  // on screen can ignore its strength on iOS and blur at full default, over a page at rest.
+  const [blurOn, setBlurOn] = useState(rest > 0);
+  useAnimatedReaction(
+    () => presence.value > 0.02,
+    (now, before) => {
+      if (now && !before) runOnJS(setBlurOn)(true);
+    },
+  );
 
   const gradient = (name: string, stops: readonly EdgeStop[]) => (
     <Svg width="100%" height={height} style={StyleSheet.absoluteFill}>
@@ -91,7 +115,7 @@ export function ScrollEdge({ solid, fade = 72, progress, style, blurTarget }: Sc
 
   // Enough of the canvas to keep the title legible over a busy photo, eased out well below it.
   const wash = (
-    <Animated.View style={[StyleSheet.absoluteFill, washStyle]}>
+    <Animated.View style={[StyleSheet.absoluteFill, { opacity: rest }, washStyle]}>
       {gradient('wash', easedStops(0.86, solidEnd * 0.7))}
     </Animated.View>
   );
@@ -102,31 +126,37 @@ export function ScrollEdge({ solid, fade = 72, progress, style, blurTarget }: Sc
 
   return (
     <View style={[styles.edge, { height }, style]}>
-      {/* Only a mask's alpha matters: opaque keeps the blur, transparent lets content through. */}
-      <MaskedView
-        style={StyleSheet.absoluteFill}
-        maskElement={gradient('soft', easedStops(1, solidEnd * 0.5))}
-      >
-        <AnimatedBlurView
-          animatedProps={softProps}
-          tint={isDark ? 'dark' : 'light'}
-          blurTarget={blurTarget}
-          blurMethod={blurTarget ? 'dimezisBlurView' : undefined}
-          style={StyleSheet.absoluteFill}
-        />
-      </MaskedView>
-      <MaskedView
-        style={StyleSheet.absoluteFill}
-        maskElement={gradient('strong', easedStops(1, solidEnd * 0.35, solidEnd))}
-      >
-        <AnimatedBlurView
-          animatedProps={strongProps}
-          tint={isDark ? 'dark' : 'light'}
-          blurTarget={blurTarget}
-          blurMethod={blurTarget ? 'dimezisBlurView' : undefined}
-          style={StyleSheet.absoluteFill}
-        />
-      </MaskedView>
+      {blurOn ? (
+        <>
+          {/* Only a mask's alpha matters: opaque keeps the blur, transparent lets content through. */}
+          <MaskedView
+            style={StyleSheet.absoluteFill}
+            maskElement={gradient('soft', easedStops(1, solidEnd * 0.5))}
+          >
+            <AnimatedBlurView
+              intensity={rest * softIntensity}
+              animatedProps={softProps}
+              tint={isDark ? 'dark' : 'light'}
+              blurTarget={blurTarget}
+              blurMethod={blurTarget ? 'dimezisBlurView' : undefined}
+              style={StyleSheet.absoluteFill}
+            />
+          </MaskedView>
+          <MaskedView
+            style={StyleSheet.absoluteFill}
+            maskElement={gradient('strong', easedStops(1, solidEnd * 0.35, solidEnd))}
+          >
+            <AnimatedBlurView
+              intensity={rest * strongIntensity}
+              animatedProps={strongProps}
+              tint={isDark ? 'dark' : 'light'}
+              blurTarget={blurTarget}
+              blurMethod={blurTarget ? 'dimezisBlurView' : undefined}
+              style={StyleSheet.absoluteFill}
+            />
+          </MaskedView>
+        </>
+      ) : null}
       {wash}
     </View>
   );

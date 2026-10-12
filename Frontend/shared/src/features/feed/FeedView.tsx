@@ -66,6 +66,7 @@ export function FeedView({
   return (
     <Screen
       clearTabBar
+      place="feed"
       ambient="feed"
       onRefresh={() => new Promise<void>((resolve) => setTimeout(resolve, 900))}
     >

@@ -42,6 +42,7 @@ export function ConversationListView({
   return (
     <Screen
       clearTabBar
+      place="chat"
       ambient="chat"
       onRefresh={() => new Promise((resolve) => setTimeout(resolve, 900))}
     >

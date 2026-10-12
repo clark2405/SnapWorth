@@ -103,6 +103,7 @@ export function MarketplaceView({
   return (
     <Screen
       clearTabBar
+      place="market"
       ambient="market"
       onRefresh={() => new Promise<void>((resolve) => setTimeout(resolve, 900))}
     >

@@ -16,6 +16,10 @@ export interface WordmarkProps {
   readonly style?: StyleProp<ViewStyle>;
   /** Makes the wordmark a pull-to-refresh indicator, every letter moving with the pull. */
   readonly motion?: WordmarkMotion;
+  /** The letters' colour, for a wordmark set on a colour block; the page's ink otherwise. */
+  readonly ink?: string;
+  /** The lens's colour; the accent otherwise. */
+  readonly lensColor?: string;
 }
 
 /**
@@ -69,8 +73,10 @@ const glyphs: readonly Glyph[] = (() => {
  * "snapworth", drawn rather than typed. The "o" is a camera lens in the one accent: you snap
  * it, and the price tag's eye tells you what it is worth.
  */
-export function Wordmark({ height = 26, style, motion }: WordmarkProps) {
+export function Wordmark({ height = 26, style, motion, ink, lensColor }: WordmarkProps) {
   const { colors, isDark } = useTheme();
+  const letters = ink ?? colors.textPrimary;
+  const lensFill = lensColor ?? colors.accent;
   const { lens } = wordmarkPaths;
   const width = (height * wordmarkPaths.width) / wordmarkPaths.height;
   const scale = height / wordmarkPaths.height;
@@ -95,7 +101,7 @@ export function Wordmark({ height = 26, style, motion }: WordmarkProps) {
             scale={scale}
             height={height}
             motion={motion}
-            fill={glyph.lens ? colors.accent : colors.textPrimary}
+            fill={glyph.lens ? lensFill : letters}
           >
             {glyph.lens ? (
               <FocusingLens
@@ -111,8 +117,8 @@ export function Wordmark({ height = 26, style, motion }: WordmarkProps) {
         ))
       ) : (
         <Svg width={width} height={height} viewBox={wordmarkPaths.viewBox}>
-          <Path d={wordmarkPaths.letters} fill={colors.textPrimary} />
-          <Path d={wordmarkPaths.o} fill={colors.accent} />
+          <Path d={wordmarkPaths.letters} fill={letters} />
+          <Path d={wordmarkPaths.o} fill={lensFill} />
           <Circle cx={lens.cx} cy={lens.cy} r={lens.counter * 0.62} fill={pupil} />
           <Circle
             cx={lens.cx + lens.counter * 0.3}
