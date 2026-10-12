@@ -3,7 +3,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CreatePostView } from '@snapworth/shared/features/feed';
 
 import { ModalSafeArea } from '../../src/ModalSafeArea';
-import { pickItemPhotos } from '../../src/photo-picker';
 
 export default function CreatePostRoute() {
   const router = useRouter();
@@ -30,7 +29,6 @@ export default function CreatePostRoute() {
         // Dismissing back to it closes the whole snap flow (camera, estimate, this composer),
         // where replacing would leave them stacked behind the feed.
         onPublish={() => router.dismissTo('/feed')}
-        onAddPhotos={pickItemPhotos}
       />
     </ModalSafeArea>
   );

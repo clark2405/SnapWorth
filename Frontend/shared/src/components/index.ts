@@ -15,7 +15,6 @@ export * from './LikeButton';
 export * from './NavLink';
 export * from './ListRow';
 export * from './Photo';
-export * from './PhotoSetField';
 export * from './PhotoViewer';
 export * from './PressableScale';
 export * from './PriceRangeBar';

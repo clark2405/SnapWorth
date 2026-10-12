@@ -16,19 +16,11 @@ import {
   SWText,
   Tag,
   hideWebFocusOutline,
-  PhotoSetField,
   typeStyle,
   useToast,
-  type ItemPhoto,
 } from '../../components';
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
-import {
-  formatPeso,
-  maxItemPhotos,
-  photosOf,
-  previewItem,
-  previewMyListing,
-} from '../preview/sample-data';
+import { formatPeso, previewItem, previewMyListing } from '../preview/sample-data';
 
 /**
  * What moderation decided about a new post. `approved` goes live; `pending` is live once
@@ -44,8 +36,6 @@ export interface CreatePostViewProps {
   readonly outcome?: PostModerationOutcome;
   readonly onBack?: () => void;
   readonly onPublish?: (question: string) => void;
-  /** Opens the photo picker for up to `room` more photos of the item (the shell supplies it). */
-  readonly onAddPhotos?: (room: number) => Promise<readonly ItemPhoto[]>;
 }
 
 const maxLength = 280;
@@ -61,11 +51,8 @@ export function CreatePostView({
   outcome = 'approved',
   onBack,
   onPublish,
-  onAddPhotos,
 }: CreatePostViewProps) {
   const item = previewItem;
-  // More angles help voters judge condition: the post can carry up to four photos.
-  const [photos, setPhotos] = useState<readonly ItemPhoto[]>(() => photosOf(previewItem));
   const asking = source === 'listing' ? previewMyListing.askingPrice : null;
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
@@ -126,8 +113,8 @@ export function CreatePostView({
     >
       <Reveal index={0} style={styles.lockup}>
         <Photo
-          source={photos[0]?.source ?? item.photo}
-          label={photos[0]?.label ?? item.photoLabel}
+          source={item.photo}
+          label={item.photoLabel}
           aspectRatio={4 / 3}
           radius={tokens.radius.large}
         />
@@ -156,15 +143,6 @@ export function CreatePostView({
           </View>
         </Animated.View>
       ) : null}
-
-      <Reveal index={1}>
-        <PhotoSetField
-          photos={photos}
-          onChange={setPhotos}
-          onAddPhotos={onAddPhotos}
-          max={maxItemPhotos}
-        />
-      </Reveal>
 
       <Reveal index={2}>
         <Field label="Your question" helper={`${trimmed.length}/${maxLength}`}>
