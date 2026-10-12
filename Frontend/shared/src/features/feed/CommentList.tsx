@@ -1,4 +1,5 @@
 import { Clock3, CornerDownRight, Flag, ShieldAlert, Trash2 } from 'lucide-react-native';
+import { useState } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-reanimated';
 
@@ -25,50 +26,103 @@ export function CommentList({ groups, onReply, onDelete, onReport }: CommentList
   return (
     <View style={styles.list}>
       {groups.map((group, index) => (
-        <Animated.View
+        <Thread
           key={group.id}
-          entering={FadeInDown.springify()
-            .damping(18)
-            .delay(Math.min(index, 4) * 50)}
-          layout={LinearTransition.springify().damping(20)}
-          style={styles.group}
-        >
-          {group.comment ? (
-            <CommentRow
-              comment={group.comment}
-              onReply={onReply}
-              onDelete={onDelete}
-              onReport={onReport}
-            />
-          ) : (
-            <SWText variant="bodySmall" tone="textMuted" style={styles.removed}>
-              This comment was removed.
-            </SWText>
-          )}
-          {group.replies.length > 0 ? (
-            <View style={styles.replies}>
-              {group.replies.map((reply) => (
-                <Animated.View
-                  key={reply.id}
-                  entering={FadeIn.duration(tokens.motion.duration.base)}
-                  layout={LinearTransition.springify().damping(20)}
-                >
-                  <CommentRow
-                    comment={reply}
-                    compact
-                    onReply={onReply}
-                    onDelete={onDelete}
-                    onReport={onReport}
-                  />
-                </Animated.View>
-              ))}
-            </View>
-          ) : null}
-        </Animated.View>
+          group={group}
+          index={index}
+          onReply={onReply}
+          onDelete={onDelete}
+          onReport={onReport}
+        />
       ))}
     </View>
   );
 }
+
+/**
+ * One comment and its replies. A thread line runs down from the comment's avatar, and each
+ * reply branches off it on a rounded elbow that points into the reply's avatar.
+ */
+function Thread({
+  group,
+  index,
+  onReply,
+  onDelete,
+  onReport,
+}: {
+  readonly group: ThreadGroup;
+  readonly index: number;
+} & Omit<CommentListProps, 'groups'>) {
+  const styles = useThemedStyles(stylesFor);
+  // Where the replies start in the thread, and where the last one starts among them: the line
+  // runs from under the comment's avatar down to the last reply's elbow.
+  const [repliesY, setRepliesY] = useState<number | null>(null);
+  const [lastY, setLastY] = useState<number | null>(null);
+  const lastIndex = group.replies.length - 1;
+  const spineEnd =
+    repliesY !== null && lastY !== null ? repliesY + lastY + replyAvatar / 2 - elbowRadius : null;
+
+  return (
+    <Animated.View
+      entering={FadeInDown.springify()
+        .damping(18)
+        .delay(Math.min(index, 4) * 50)}
+      layout={LinearTransition.springify().damping(20)}
+      style={styles.group}
+    >
+      {group.replies.length > 0 && spineEnd !== null ? (
+        <View
+          pointerEvents="none"
+          style={[styles.spine, { height: Math.max(0, spineEnd - spineTop) }]}
+        />
+      ) : null}
+      {group.comment ? (
+        <CommentRow
+          comment={group.comment}
+          onReply={onReply}
+          onDelete={onDelete}
+          onReport={onReport}
+        />
+      ) : (
+        <SWText variant="bodySmall" tone="textMuted" style={styles.removed}>
+          This comment was removed.
+        </SWText>
+      )}
+      {group.replies.length > 0 ? (
+        <View style={styles.replies} onLayout={(event) => setRepliesY(event.nativeEvent.layout.y)}>
+          {group.replies.map((reply, at) => (
+            <Animated.View
+              key={reply.id}
+              entering={FadeIn.duration(tokens.motion.duration.base)}
+              layout={LinearTransition.springify().damping(20)}
+              onLayout={
+                at === lastIndex ? (event) => setLastY(event.nativeEvent.layout.y) : undefined
+              }
+            >
+              <View pointerEvents="none" style={styles.elbow} />
+              <CommentRow
+                comment={reply}
+                compact
+                onReply={onReply}
+                onDelete={onDelete}
+                onReport={onReport}
+              />
+            </Animated.View>
+          ))}
+        </View>
+      ) : null}
+    </Animated.View>
+  );
+}
+
+// The thread's geometry: avatars, where the line runs, and the elbow's curve.
+const commentAvatar = 36;
+const replyAvatar = 28;
+const replyIndent = commentAvatar + tokens.spacing[3];
+const lineWidth = 2;
+const lineX = commentAvatar / 2 - lineWidth / 2;
+const spineTop = commentAvatar + tokens.spacing[1];
+const elbowRadius = 12;
 
 function CommentRow({
   comment,
@@ -91,7 +145,11 @@ function CommentRow({
 
   return (
     <View style={styles.row}>
-      <AuthorAvatar handle={author.handle} avatarUrl={author.avatarUrl} size={compact ? 28 : 36} />
+      <AuthorAvatar
+        handle={author.handle}
+        avatarUrl={author.avatarUrl}
+        size={compact ? replyAvatar : commentAvatar}
+      />
       <View style={styles.body}>
         <View style={styles.header}>
           <SWText variant="labelSmall" numberOfLines={1} style={styles.handle}>
@@ -193,13 +251,29 @@ const stylesFor = themedStyles((colors) => ({
   removed: {
     paddingVertical: tokens.spacing[1],
   },
-  // Replies sit under their parent's text column, set off by a hairline.
+  // Replies sit under their parent's text column; the thread line leads into each of them.
   replies: {
-    marginLeft: 36 + tokens.spacing[3],
-    paddingLeft: tokens.spacing[3],
-    borderLeftWidth: 2,
-    borderLeftColor: colors.borderSubtle,
+    paddingLeft: replyIndent,
     gap: tokens.spacing[4],
+  },
+  spine: {
+    position: 'absolute',
+    left: lineX,
+    top: spineTop,
+    width: lineWidth,
+    backgroundColor: colors.borderStrong,
+  },
+  // From the thread line, curving right into the reply's avatar and stopping just short of it.
+  elbow: {
+    position: 'absolute',
+    left: lineX - replyIndent,
+    top: replyAvatar / 2 - elbowRadius,
+    width: replyIndent - lineX - tokens.spacing[1],
+    height: elbowRadius + lineWidth / 2,
+    borderLeftWidth: lineWidth,
+    borderBottomWidth: lineWidth,
+    borderBottomLeftRadius: elbowRadius,
+    borderColor: colors.borderStrong,
   },
   row: {
     flexDirection: 'row',
