@@ -1,4 +1,4 @@
-import { useIsPreview, useScrollToTop } from 'expo-router';
+import { useIsFocused, useIsPreview, useScrollToTop } from 'expo-router';
 import {
   createContext,
   useCallback,
@@ -15,6 +15,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   RefreshControl,
+  StatusBar,
   StyleSheet,
   useWindowDimensions,
   View,
@@ -24,6 +25,8 @@ import {
 import Animated, {
   Extrapolation,
   interpolate,
+  runOnJS,
+  useAnimatedReaction,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useDerivedValue,
@@ -36,7 +39,15 @@ import Animated, {
 import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
-import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../design';
+import {
+  haptic,
+  placeColors,
+  themedStyles,
+  tokens,
+  useTheme,
+  useThemedStyles,
+  type Place,
+} from '../design';
 import { AmbientBackdrop, type AmbientBackdropProps } from './AmbientBackdrop';
 import { ScrollEdge } from './ScrollEdge';
 import { contentScrolling, onScrollToTopRequest } from './scroll-signal';
@@ -57,6 +68,8 @@ interface ScreenScrollState {
   readonly refreshing: SharedValue<number>;
   /** Whether the page can be pulled to refresh. */
   readonly refreshable: boolean;
+  /** The place a tab opens on, whose colour block its large title sits in. */
+  readonly place: Place | null;
 }
 
 const ScreenScrollContext = createContext<ScreenScrollState | null>(null);
@@ -95,6 +108,11 @@ export interface ScreenProps {
    * through beneath the floating bar.
    */
   readonly sheet?: boolean;
+  /**
+   * The place a tab opens on. Its large title sits in a block of the place's colour, the
+   * compact bar keeps that colour, and the status bar reads against it.
+   */
+  readonly place?: Place;
 }
 
 /**
@@ -115,6 +133,7 @@ export function Screen({
   transparent = false,
   scrollRef,
   sheet = false,
+  place,
 }: ScreenProps) {
   const deviceInsets = useSafeAreaInsets();
   const insets = useMemo(
@@ -215,8 +234,9 @@ export function Screen({
       offsetBase,
       refreshing: refreshingValue,
       refreshable: Boolean(onRefresh),
+      place: place ?? null,
     }),
-    [header, offsetBase, onRefresh, refreshingValue, scrollY, titleEdge],
+    [header, offsetBase, onRefresh, place, refreshingValue, scrollY, titleEdge],
   );
 
   const clearance = insets.top + (header ? headerHeight : 0);
@@ -292,7 +312,12 @@ export function Screen({
     <CompactTitleBar title={compactTitle} topInset={insets.top} />
   );
 
-  const tabTap = isPreview ? null : <ScrollToTopOnTabTap target={topTarget} />;
+  const tabTap = isPreview ? null : (
+    <>
+      <ScrollToTopOnTabTap target={topTarget} />
+      {place ? <PlaceStatusBar place={place} scrollY={scrollY} titleEdge={titleEdge} /> : null}
+    </>
+  );
 
   if (bare) {
     return (
@@ -369,6 +394,40 @@ function ScrollToTopOnTabTap({
   readonly target: Parameters<typeof useScrollToTop>[0];
 }) {
   useScrollToTop(target);
+  return null;
+}
+
+/**
+ * While a place's tab is in front and its colour block is under the status bar, the status bar
+ * reads against the block. Once the block has scrolled away, or the tab is left, it is the
+ * app's own again.
+ */
+function PlaceStatusBar({
+  place,
+  scrollY,
+  titleEdge,
+}: {
+  readonly place: Place;
+  readonly scrollY: SharedValue<number>;
+  readonly titleEdge: SharedValue<number>;
+}) {
+  const focused = useIsFocused();
+  const { colors, isDark } = useTheme();
+  const dark = placeColors(colors, place).dark;
+  const [onBlock, setOnBlock] = useState(true);
+  // The compact bar has mostly grown in over the page by then.
+  useAnimatedReaction(
+    () => scrollY.value < titleEdge.value - 40,
+    (now, before) => {
+      if (now !== before) runOnJS(setOnBlock)(now);
+    },
+  );
+  useEffect(() => {
+    if (!focused || Platform.OS === 'web') return;
+    const light = onBlock ? dark : isDark;
+    StatusBar.setBarStyle(light ? 'light-content' : 'dark-content', true);
+    return () => StatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
+  }, [dark, focused, isDark, onBlock]);
   return null;
 }
 

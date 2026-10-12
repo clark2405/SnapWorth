@@ -122,6 +122,7 @@ export function HistoryView({
   return (
     <Screen
       clearTabBar
+      place="history"
       ambient="history"
       onRefresh={() => new Promise((resolve) => setTimeout(resolve, 900))}
     >

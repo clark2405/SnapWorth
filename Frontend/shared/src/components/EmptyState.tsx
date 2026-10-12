@@ -2,8 +2,9 @@ import type { LucideIcon } from 'lucide-react-native';
 import { View } from 'react-native';
 import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 
-import { themedStyles, tokens, useTheme, useThemedStyles } from '../design';
+import { held, placeColors, themedStyles, tokens, useTheme, useThemedStyles } from '../design';
 import { Button } from './Button';
+import { useScreenScroll } from './Screen';
 import { SWText } from './SWText';
 import { Worthy } from './Worthy';
 
@@ -28,6 +29,9 @@ export function EmptyState({
 }: EmptyStateProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
+  const place = useScreenScroll()?.place;
+  // Worthy stands on a disc of the place's colour, or marigold outside one.
+  const disc = place ? placeColors(colors, place).fill : colors.marigold;
 
   return (
     <View style={styles.root} accessibilityLiveRegion="polite">
@@ -39,6 +43,7 @@ export function EmptyState({
         </Animated.View>
       ) : (
         <Animated.View entering={ZoomIn.springify().damping(14)} style={styles.worthy}>
+          <View style={[styles.disc, { backgroundColor: disc }]} />
           <Worthy size={84} mood="attentive" />
           <View style={styles.held}>
             <Icon size={16} strokeWidth={2} color={colors.kraftInk} />
@@ -78,10 +83,17 @@ const stylesFor = themedStyles((colors) => ({
     backgroundColor: colors.sunken,
   },
   worthy: {
-    width: 104,
-    height: 96,
+    width: 120,
+    height: 112,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  disc: {
+    position: 'absolute',
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    ...held(colors),
   },
   // A little manila tag tucked against Worthy, carrying the screen's own icon.
   held: {
@@ -94,9 +106,8 @@ const stylesFor = themedStyles((colors) => ({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.kraft,
-    borderWidth: 2,
-    borderColor: colors.canvas,
-    transform: [{ rotate: '12deg' }],
+    ...held(colors, 2),
+    transform: [{ rotate: `${tokens.tilt.end}deg` }],
   },
   text: {
     gap: tokens.spacing[2],

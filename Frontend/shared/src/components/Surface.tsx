@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { themedStyles, tokens, useThemedStyles } from '../design';
+import { held, themedStyles, tokens, useThemedStyles } from '../design';
 import { GlassSurface } from './GlassSurface';
 
 export type SurfaceTone = 'surface' | 'raised' | 'sunken' | 'accent' | 'feature';
@@ -18,9 +18,9 @@ export interface SurfaceProps {
 }
 
 /**
- * A soft, rounded card. In light mode it lifts off the cream page on a warm shadow with no
- * border; in dark mode it steps up in value with a hairline edge, since shadows vanish there.
- * `feature` is the inverted slab a screen may use once, for its hero number.
+ * A card, cut from the same stock as every other thing you can hold: an ink outline and a hard
+ * shadow offset beneath it (a cream outline at night). `feature` is the inverted slab a screen
+ * may use once, for its hero number; `sunken` and `accent` lie flat in the page.
  */
 export function Surface({
   children,
@@ -88,32 +88,25 @@ export function Divider({ style }: { readonly style?: StyleProp<ViewStyle> }) {
 const screenCornerRadius = 55;
 const bottomBarMargin = tokens.spacing[4];
 
-const stylesFor = themedStyles((colors, name) => ({
-  card: {
-    borderWidth: name === 'dark' ? StyleSheet.hairlineWidth : 0,
-    borderColor: colors.borderSubtle,
-    shadowColor: tokens.shadow[name],
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: name === 'dark' ? 0 : 2,
-  },
+const stylesFor = themedStyles((colors) => ({
+  card: held(colors),
   clip: {
     overflow: 'hidden',
   },
   surface: { backgroundColor: colors.surface },
   raised: { backgroundColor: colors.surfaceRaised },
-  feature: { backgroundColor: colors.feature, borderWidth: 0 },
+  feature: { backgroundColor: colors.feature },
   sunken: {
     backgroundColor: colors.sunken,
-    shadowOpacity: 0,
-    elevation: 0,
     borderWidth: 0,
+    shadowOpacity: 0,
+    boxShadow: undefined,
   },
   accent: {
     backgroundColor: colors.estimateSurface,
     borderWidth: 0,
     shadowOpacity: 0,
+    boxShadow: undefined,
   },
   bottomWrap: {
     paddingHorizontal: tokens.spacing[3],

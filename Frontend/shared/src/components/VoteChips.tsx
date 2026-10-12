@@ -12,6 +12,7 @@ import Animated, {
 
 import {
   haptic,
+  held,
   themedStyles,
   tokens,
   useTheme,
@@ -92,8 +93,8 @@ function VoteChip({
   }, [fill, isSelected]);
 
   const flood = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(fill.value, [0, 1], [colors.sunken, colors.surface]),
-    borderColor: interpolateColor(fill.value, [0, 1], [colors.sunken, hue]),
+    backgroundColor: colors.surface,
+    borderColor: interpolateColor(fill.value, [0, 1], [colors.heldEdge, hue]),
   }));
 
   return (
@@ -204,17 +205,17 @@ function VerdictSegment({
 const stylesFor = themedStyles((colors) => ({
   row: {
     flexDirection: 'row',
-    gap: tokens.spacing[2],
+    gap: tokens.spacing[3],
   },
   slot: {
     flex: 1,
   },
+  // Cut from the same card as everything you can hold; the chosen vote's outline takes its hue.
   chip: {
     minHeight: tokens.focus.minimumTarget + 4,
     borderRadius: tokens.radius.medium,
-    borderWidth: 1.5,
-    borderColor: colors.sunken,
-    backgroundColor: colors.sunken,
+    ...held(colors, 2),
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: tokens.spacing[1],

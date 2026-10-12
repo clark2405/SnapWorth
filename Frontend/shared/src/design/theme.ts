@@ -68,6 +68,23 @@ export const contrastPairings = Object.freeze<readonly ContrastPairing[]>([
   { foreground: 'textSecondary', background: 'sunken', classification: 'normal-text' },
   { foreground: 'success', background: 'surface', classification: 'ui-boundary' },
   { foreground: 'danger', background: 'surface', classification: 'normal-text' },
+  { foreground: 'onPlaceFeed', background: 'placeFeed', classification: 'normal-text' },
+  { foreground: 'onPlaceMarket', background: 'placeMarket', classification: 'normal-text' },
+  { foreground: 'onPlaceHistory', background: 'placeHistory', classification: 'normal-text' },
+  { foreground: 'onPlaceChat', background: 'placeChat', classification: 'normal-text' },
+  { foreground: 'heldEdge', background: 'canvas', classification: 'ui-boundary' },
+  { foreground: 'heldEdge', background: 'surface', classification: 'ui-boundary' },
+  // A switch's off track against the card it sits on.
+  { foreground: 'interactiveBoundary', background: 'surfaceRaised', classification: 'ui-boundary' },
+  // The brand's printed pieces: the price tag, stickers and signs, and the red stamp.
+  { foreground: 'kraftInk', background: 'kraft', classification: 'normal-text' },
+  { foreground: 'onMarigold', background: 'marigold', classification: 'normal-text' },
+  { foreground: 'onCobalt', background: 'cobalt', classification: 'normal-text' },
+  { foreground: 'textMuted', background: 'sunken', classification: 'normal-text' },
+  { foreground: 'textSecondary', background: 'surfaceRaised', classification: 'normal-text' },
+  { foreground: 'mintInk', background: 'surface', classification: 'normal-text' },
+  { foreground: 'success', background: 'canvas', classification: 'normal-text' },
+  { foreground: 'onInverse', background: 'textPrimary', classification: 'normal-text' },
 ]);
 
 function toKebabCase(value: string): string {

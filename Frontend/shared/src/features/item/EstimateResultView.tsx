@@ -59,6 +59,7 @@ import {
   useToast,
   DetailHero,
   DetailSheet,
+  WorthySays,
 } from '../../components';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import {
@@ -106,6 +107,25 @@ const conditionFactor = (key: PreviewCondition) =>
 /** The preview estimate is for a like-new item; other conditions scale from the good-condition base. */
 const baseValue = previewItem.estimate / conditionFactor(previewValuation.condition);
 const roundTo50 = (value: number) => Math.round(value / 50) * 50;
+
+/**
+ * Worthy's word on the condition chosen, in pesos: what it adds or costs against like new, and
+ * what to do about it. `low` is the bottom of the range at that condition.
+ */
+function conditionLine(condition: PreviewCondition, low: number): string {
+  const worth = (key: PreviewCondition) => roundTo50(baseValue * conditionFactor(key));
+  const gap = formatPeso(Math.abs(worth('like_new') - worth(condition)));
+  switch (condition) {
+    case 'new':
+      return `Tags still on? Say so first. New is worth ${gap} more than like new.`;
+    case 'like_new':
+      return 'Like new is where this sells best. Photograph the label and any wear up close: buyers pay for proof.';
+    case 'good':
+      return `Good knocks about ${gap} off like new. A wash and a daylight photo can win some back.`;
+    case 'fair':
+      return `Fair still sells, just slower. Ask near ${formatPeso(low)} to move it this month.`;
+  }
+}
 
 export function EstimateResultView({
   itemId,
@@ -229,7 +249,12 @@ export function EstimateResultView({
                 {item.category}
               </SWText>
               <View style={styles.tagRow}>
-                <TagShape hanging tilt={-1.5} swing={resolvedHere.current} style={styles.priceTag}>
+                <TagShape
+                  hanging
+                  tilt={tokens.tilt.start}
+                  swing={resolvedHere.current}
+                  style={styles.priceTag}
+                >
                   <SWText variant="stamp" color={colors.kraftInk}>
                     AI Estimate
                   </SWText>
@@ -245,7 +270,7 @@ export function EstimateResultView({
                 </TagShape>
                 <Stamp
                   label={`${previewValuation.confidence} confidence`}
-                  tilt={-8}
+                  side="end"
                   // Stamped once the count has landed on the price.
                   land={resolvedHere.current ? { delay: 1250 } : undefined}
                   style={styles.confidence}
@@ -295,6 +320,12 @@ export function EstimateResultView({
                 <SWText variant="bodySmall" tone="textMuted">
                   {previewConditions.find((c) => c.key === condition)?.hint}
                 </SWText>
+              </Animated.View>
+            </Reveal>
+
+            <Reveal index={3} delay={80}>
+              <Animated.View key={condition} entering={FadeIn.duration(220)}>
+                <WorthySays>{conditionLine(condition, low)}</WorthySays>
               </Animated.View>
             </Reveal>
 
@@ -734,7 +765,7 @@ function ShareCardSheet({
         <View style={styles.shareBody}>
           <SWText variant="headingMedium">{title}</SWText>
           {/* The card people post carries the same tag as the app, so it is recognisably ours. */}
-          <TagShape tilt={-2} style={styles.shareTag}>
+          <TagShape tilt={tokens.tilt.start} style={styles.shareTag}>
             <SWText variant="stamp" color={colors.kraftInk}>
               Worth about
             </SWText>

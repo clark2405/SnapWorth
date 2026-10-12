@@ -66,7 +66,7 @@ export function EstimateBadge({ value, size = 'compact', range }: EstimateBadgeP
       accessibilityLabel={`AI estimate ${value}${range ? `, range ${range}` : ''}. ${estimateCaption}`}
       style={styles.hero}
     >
-      <TagShape hanging tilt={-1.5} style={styles.heroTag}>
+      <TagShape hanging tilt={tokens.tilt.start} style={styles.heroTag}>
         <SWText variant="stamp" color={colors.kraftInk}>
           AI Estimate
         </SWText>

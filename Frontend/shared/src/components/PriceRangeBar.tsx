@@ -10,7 +10,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { themedStyles, tokens, useThemedStyles } from '../design';
+import { held, themedStyles, tokens, useThemedStyles } from '../design';
 import { SWText } from './SWText';
 
 export type EstimateConfidence = 'high' | 'medium' | 'low';
@@ -36,9 +36,9 @@ const confidenceCopy: Record<EstimateConfidence, string> = {
 };
 
 /**
- * Where the value probably sits, not just one number. The band draws out from its centre, then
- * the estimate marker drops onto it on a spring. Confidence is spelled out in words, and the
- * band's weight follows it: a tight, solid band for high confidence, a lighter one for low.
+ * Where the value probably sits, not just one number, drawn as a shop's price ruler: the fair
+ * range is a marigold band along the rule, and the estimate a red pin that drops onto it on a
+ * spring. Confidence is spelled out in words, and the band's weight follows it.
  */
 export function PriceRangeBar({
   low,
@@ -55,6 +55,10 @@ export function PriceRangeBar({
   const [width, setWidth] = useState(0);
   const band = useSharedValue(reduceMotion ? 1 : 0);
   const marker = useSharedValue(reduceMotion ? 1 : 0);
+  // Once drawn, the band and pin render plainly: the finished state is committed through React,
+  // so an animation that fails to reach the screen (on a sheet still sliding in, say) can't
+  // leave them hidden.
+  const [drawn, setDrawn] = useState(reduceMotion);
 
   // The track shows 15% either side of the range so the band never touches the ends.
   const span = high - low || 1;
@@ -66,6 +70,8 @@ export function PriceRangeBar({
     if (reduceMotion || width === 0) return;
     band.value = withTiming(1, { duration: 560, easing: Easing.bezier(0.16, 1, 0.3, 1) });
     marker.value = withDelay(260, withSpring(1, tokens.motion.spring.playful));
+    const done = setTimeout(() => setDrawn(true), drawMs);
+    return () => clearTimeout(done);
   }, [band, marker, reduceMotion, width]);
 
   const bandStyle = useAnimatedStyle(() => ({
@@ -84,7 +90,21 @@ export function PriceRangeBar({
       accessibilityLabel={`Likely between ${format(low)} and ${format(high)}. ${confidenceCopy[confidence]}.${asking !== undefined ? ` Asking ${format(asking)}.` : ''}`}
     >
       <View style={styles.track} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
-        <View style={styles.rail} />
+        <View style={styles.rail}>
+          {/* The rule's ticks, every 12 points along its foot. */}
+          {width > 0
+            ? Array.from({ length: Math.floor(width / tickGap) }, (_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.tick,
+                    index % 5 === 0 ? styles.tickMajor : null,
+                    { left: (index + 1) * tickGap },
+                  ]}
+                />
+              ))
+            : null}
+        </View>
         {width > 0 ? (
           <>
             <Animated.View
@@ -96,7 +116,7 @@ export function PriceRangeBar({
                     ? styles.bandMedium
                     : styles.bandWeak,
                 { left: at(low), width: at(high) - at(low) },
-                bandStyle,
+                drawn ? null : bandStyle,
               ]}
             />
             {asking !== undefined ? (
@@ -104,7 +124,13 @@ export function PriceRangeBar({
                 style={[styles.asking, { left: Math.min(width - 2, Math.max(0, at(asking))) }]}
               />
             ) : null}
-            <Animated.View style={[styles.marker, { left: at(estimate) - 9 }, markerStyle]} />
+            <Animated.View
+              style={[
+                styles.marker,
+                { left: at(estimate) - pinWidth / 2 },
+                drawn ? null : markerStyle,
+              ]}
+            />
           </>
         ) : null}
       </View>
@@ -159,19 +185,36 @@ export function PriceRangeBar({
 }
 
 const endWidth = 76;
+/** Comfortably past the band's draw and the pin's spring. */
+const drawMs = 1400;
+const tickGap = 12;
+const pinWidth = 4;
+const railHeight = 28;
 
 const stylesFor = themedStyles((colors) => ({
   root: {
     gap: tokens.spacing[2],
   },
   track: {
-    height: 18,
+    height: railHeight + 12,
     justifyContent: 'center',
   },
   rail: {
-    height: 4,
-    borderRadius: tokens.radius.full,
-    backgroundColor: colors.sunken,
+    height: railHeight,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    overflow: 'visible',
+    ...held(colors),
+  },
+  tick: {
+    position: 'absolute',
+    bottom: 0,
+    width: 1.5,
+    height: 6,
+    backgroundColor: colors.heldEdge,
+  },
+  tickMajor: {
+    height: 10,
   },
   ends: {
     height: 16,
@@ -201,28 +244,31 @@ const stylesFor = themedStyles((colors) => ({
     borderRadius: 1,
     backgroundColor: colors.textPrimary,
   },
+  // The fair range, painted along the top of the rule.
   band: {
     position: 'absolute',
-    height: 4,
-    borderRadius: tokens.radius.full,
+    top: 10,
+    height: 11,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: colors.heldEdge,
   },
-  bandStrong: { backgroundColor: colors.textPrimary },
-  bandMedium: { backgroundColor: colors.textPrimary, opacity: 0.6 },
-  bandWeak: { backgroundColor: colors.estimateBorder },
+  bandStrong: { backgroundColor: colors.marigold },
+  bandMedium: { backgroundColor: colors.marigold, opacity: 0.75 },
+  bandWeak: { backgroundColor: colors.kraft },
   asking: {
     position: 'absolute',
     width: 2,
-    height: 18,
+    height: railHeight + 8,
     borderRadius: 1,
-    backgroundColor: colors.textPrimary,
+    backgroundColor: colors.heldEdge,
   },
+  // The estimate: a red pin through the rule, standing proud of it top and bottom.
   marker: {
     position: 'absolute',
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: colors.textPrimary,
-    borderWidth: 5,
-    borderColor: colors.surface,
+    width: pinWidth,
+    height: railHeight + 12,
+    borderRadius: 2,
+    backgroundColor: colors.accent,
   },
 }));

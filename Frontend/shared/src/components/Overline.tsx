@@ -11,6 +11,8 @@ export interface OverlineProps {
   /** An urgent count after a "·", e.g. "2 unread": the one place text may wear the accent. */
   readonly count?: string;
   readonly tone?: SemanticColorName;
+  /** A colour of its own, for an overline set on a colour block; overrides `tone`. */
+  readonly color?: string;
   readonly style?: StyleProp<ViewStyle>;
 }
 
@@ -18,18 +20,25 @@ export interface OverlineProps {
  * The small uppercase line that sits above titles and sections, led by a thin line icon rather
  * than an emoji, so it renders identically on every platform.
  */
-export function Overline({ label, icon: Icon, count, tone = 'textMuted', style }: OverlineProps) {
+export function Overline({
+  label,
+  icon: Icon,
+  count,
+  tone = 'textMuted',
+  color,
+  style,
+}: OverlineProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
 
   return (
     <View style={[styles.row, style]} accessibilityRole="header">
-      {Icon ? <Icon size={14} strokeWidth={2} color={colors[tone]} /> : null}
-      <SWText variant="overline" tone={tone} numberOfLines={1} style={styles.label}>
+      {Icon ? <Icon size={14} strokeWidth={2} color={color ?? colors[tone]} /> : null}
+      <SWText variant="overline" tone={tone} color={color} numberOfLines={1} style={styles.label}>
         {label}
         {count ? (
           <>
-            <SWText variant="overline" tone={tone}>
+            <SWText variant="overline" tone={tone} color={color}>
               {'  ·  '}
             </SWText>
             <SWText variant="overline" tone="accent">

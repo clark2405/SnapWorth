@@ -1,3 +1,4 @@
+import { useIsFocused } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import Animated, {
@@ -29,6 +30,7 @@ export function Sparkline({ values, height = 56, filled = true, color }: Sparkli
   const reduceMotion = useReducedMotion();
   const [width, setWidth] = useState(0);
   const draw = useSharedValue(reduceMotion ? 1 : 0);
+  const focused = useIsFocused();
 
   const { line, area, length } = useMemo(() => {
     if (width === 0 || values.length < 2) return { line: '', area: '', length: 0 };
@@ -63,8 +65,13 @@ export function Sparkline({ values, height = 56, filled = true, color }: Sparkli
     draw.value = withTiming(1, { duration: 1100, easing: Easing.bezier(0.16, 1, 0.3, 1) });
   }, [draw, length, reduceMotion]);
 
-  const lineProps = useAnimatedProps(() => ({ strokeDashoffset: length * (1 - draw.value) }));
-  const areaProps = useAnimatedProps(() => ({ opacity: draw.value }));
+  // Re-applied whenever the screen comes back into view: a line drawn while its screen was out
+  // of sight can miss the native view.
+  const lineProps = useAnimatedProps(
+    () => ({ strokeDashoffset: length * (1 - draw.value) }),
+    [focused, length],
+  );
+  const areaProps = useAnimatedProps(() => ({ opacity: draw.value }), [focused]);
 
   return (
     <View style={{ height }} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>

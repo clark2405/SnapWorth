@@ -18,10 +18,11 @@ test('a listing photo opens full screen and closes again', async ({ page }) => {
     .getByRole('button', { name: /full screen/i })
     .first()
     .click();
-  await expect(page.getByText('1 of 2')).toBeVisible();
+  const close = page.getByRole('button', { name: 'Close photos' });
+  await expect(close).toBeVisible();
 
-  await page.getByRole('button', { name: /close/i }).first().click();
-  await expect(page.getByText('1 of 2')).toBeHidden();
+  await close.click();
+  await expect(close).toBeHidden();
 });
 
 test('sharing a listing copies a link to it where the browser has no share sheet', async ({

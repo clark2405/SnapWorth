@@ -1,3 +1,4 @@
+import { useIsFocused } from 'expo-router';
 import { useEffect } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
@@ -42,9 +43,12 @@ export function AmbientBackdrop({ mood = 'calm' }: AmbientBackdropProps) {
   const { width, height } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
   const breath = useSharedValue(0);
+  // Only the screen in view breathes: hidden tabs and the screens stacked behind it hold still,
+  // so the work doesn't grow with every screen that's open.
+  const focused = useIsFocused();
 
   useEffect(() => {
-    if (reduceMotion || mood === 'none') return;
+    if (reduceMotion || mood === 'none' || !focused) return;
     breath.value = withRepeat(
       withTiming(1, {
         duration: tokens.motion.duration.ambientLoop,
@@ -54,7 +58,7 @@ export function AmbientBackdrop({ mood = 'calm' }: AmbientBackdropProps) {
       true,
     );
     return () => cancelAnimation(breath);
-  }, [breath, mood, reduceMotion]);
+  }, [breath, focused, mood, reduceMotion]);
 
   if (mood === 'none') return null;
 

@@ -1,7 +1,7 @@
 import { UserRound } from 'lucide-react-native';
 
-import { Avatar, PressableScale } from '../../components';
-import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import { Avatar, PressableScale, useScreenScroll } from '../../components';
+import { placeColors, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import { previewProfile } from '../preview/sample-data';
 import { useAccountGate, useSession } from '../session';
 
@@ -14,6 +14,9 @@ export function ProfileButton({ onPress }: { readonly onPress?: () => void }) {
   const { colors } = useTheme();
   const { isGuest } = useSession();
   const requireAccount = useAccountGate();
+  // On a tab's colour block the ring and mark take the block's ink, so they keep their contrast.
+  const place = useScreenScroll()?.place;
+  const ink = place ? placeColors(colors, place).ink : null;
   return (
     <PressableScale
       accessibilityRole="button"
@@ -21,10 +24,10 @@ export function ProfileButton({ onPress }: { readonly onPress?: () => void }) {
       haptic="select"
       onPress={() => requireAccount('profile', onPress)}
       hitSlop={4}
-      style={styles.ring}
+      style={[styles.ring, ink ? { borderColor: ink, borderWidth: 1.5 } : null]}
     >
       {isGuest ? (
-        <UserRound size={20} strokeWidth={2} color={colors.textSecondary} />
+        <UserRound size={20} strokeWidth={2} color={ink ?? colors.textSecondary} />
       ) : (
         <Avatar source={previewProfile.user.avatar} name={previewProfile.user.handle} size={36} />
       )}

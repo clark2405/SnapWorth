@@ -70,12 +70,12 @@ export const accountIntentCopy: Record<AccountIntent, { title: string; body: str
     body: 'Create a free account to list items and talk to buyers.',
   },
   chats: {
-    title: 'Your chats live here',
-    body: 'Create a free account to message sellers and buyers.',
+    title: 'Haggle here.',
+    body: 'Make a free account to message sellers, make offers and arrange pickup.',
   },
   history: {
-    title: 'Keep track of what you value',
-    body: 'Create a free account and every item you snap is saved here.',
+    title: 'Every snap gets a tag.',
+    body: 'Make a free account and everything you price is kept here, worth and all.',
   },
   profile: {
     title: 'Make it yours',

@@ -2,8 +2,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { CreatePostView } from '@snapworth/shared/features/feed';
 
-import { pickItemPhotos } from '../../../src/photo-picker';
-
 export default function CreatePostRoute() {
   const router = useRouter();
   const { id, from, outcome } = useLocalSearchParams<{
@@ -24,7 +22,6 @@ export default function CreatePostRoute() {
       onBack={() => router.back()}
       // Preview wiring: there is no post service yet, so publishing just opens the feed.
       onPublish={() => router.replace('/feed')}
-      onAddPhotos={pickItemPhotos}
     />
   );
 }

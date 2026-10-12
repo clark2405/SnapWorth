@@ -71,7 +71,7 @@ export function SellerProfileView({
       <Reveal index={0} style={styles.identity}>
         <Avatar source={seller.user.avatar} name={seller.user.handle} size={72} ring />
         <View style={styles.identityText}>
-          <SWText variant="displayTitle" accessibilityRole="header">
+          <SWText variant="displayMedium" accessibilityRole="header">
             {seller.displayName}
           </SWText>
           <Rating

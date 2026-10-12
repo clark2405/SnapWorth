@@ -36,6 +36,7 @@ import {
   DetailHero,
   DetailSheet,
   Toggle,
+  WorthySays,
 } from '../../components';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import type { VoteCounts } from '../../types';
@@ -48,6 +49,7 @@ import {
   previewMyListingInsight,
 } from '../preview/sample-data';
 import { useAccountGate, useSession } from '../session';
+import { askingLine } from './asking-line';
 import { useTip } from '../tips';
 
 export interface ListingDetailViewProps {
@@ -241,6 +243,19 @@ export function ListingDetailView({
             <VerdictBar tally={tally} />
           </Surface>
 
+          <WorthySays>
+            {askingLine(
+              {
+                asking: listing.askingPrice,
+                estimate: insight.estimate,
+                low: insight.estimateLow,
+                high: insight.estimateHigh,
+              },
+              owned,
+              formatPeso,
+            )}
+          </WorthySays>
+
           {owned ? (
             <OwnerPanel
               stats={previewMyListing.stats}
@@ -405,10 +420,10 @@ function OwnerPanel({
 }
 
 const stylesFor = themedStyles((colors) => ({
+  // No gap: the sheet must sit right on the photo so its rounded top overlaps it fully.
   content: {
     paddingTop: 0,
     paddingHorizontal: 0,
-    gap: tokens.spacing[5],
   },
   headerActions: {
     flexDirection: 'row',
