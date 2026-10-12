@@ -3,6 +3,17 @@
 -- client sends. Public content is fail-closed: a comment is visible to other people only once
 -- moderation has approved it; its author always sees their own pending or held comment.
 
+CREATE OR REPLACE FUNCTION auth.jwt()
+RETURNS jsonb
+LANGUAGE sql STABLE
+AS $$
+  SELECT COALESCE(
+    nullif(current_setting('request.jwt.claim', true), ''),
+    nullif(current_setting('request.jwt.claims', true), ''),
+    '{}'
+  )::jsonb;
+$$;
+
 create type public.moderation_status as enum ('pending', 'approved', 'held', 'removed');
 create type public.report_reason as enum (
   'spam',
