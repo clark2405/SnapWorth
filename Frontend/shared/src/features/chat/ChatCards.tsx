@@ -185,8 +185,10 @@ const stylesFor = themedStyles((colors) => ({
     borderColor: colors.borderSubtle,
     backgroundColor: colors.surface,
   },
+  // A settled offer steps back into the page instead of fading, so it stays readable.
   settled: {
-    opacity: 0.7,
+    backgroundColor: colors.sunken,
+    borderColor: colors.sunken,
   },
   cardHead: {
     flexDirection: 'row',

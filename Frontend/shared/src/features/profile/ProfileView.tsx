@@ -107,7 +107,7 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
         >
           <Avatar source={profile.user.avatar} name={profile.user.handle} size={72} ring />
           <View style={styles.identityText}>
-            <SWText variant="displayTitle" accessibilityRole="header">
+            <SWText variant="displayMedium" accessibilityRole="header">
               {profile.displayName}
             </SWText>
             <View style={styles.handleRow}>

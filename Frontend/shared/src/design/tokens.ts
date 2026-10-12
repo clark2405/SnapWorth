@@ -76,10 +76,12 @@ export const colorLight = {
   borderSubtle: '#ECE3D6',
   borderStrong: '#DDD1C0',
   textPrimary: ink,
-  textSecondary: '#6B6157',
-  textMuted: '#7A6F63',
-  accent: '#D63A14',
-  accentPressed: '#B8371A',
+  textSecondary: '#5F564C',
+  textMuted: '#6A6055',
+  // A shade deeper than the feed's block red, so red type and the red button read clearly on
+  // the counter-coloured page.
+  accent: '#C4300F',
+  accentPressed: '#A82B0D',
   accentSoft: '#FFE7E0',
   onAccent: '#FFFFFF',
   inverse: ink,
@@ -94,7 +96,7 @@ export const colorLight = {
   danger: '#B3261E',
   dangerSoft: '#FBE7E3',
   warning: '#B8371A',
-  focusRing: '#D63A14',
+  focusRing: '#C4300F',
   interactiveBoundary: '#8F8477',
   sand: '#F0E6D6',
   sandInk: '#6F5F45',
@@ -115,6 +117,21 @@ export const colorLight = {
   cobalt: '#2343C4',
   onCobalt: '#FFFFFF',
   stickerOutline: ink,
+  // Each place in the app has its own colour: the block its tab opens on, and the type set on
+  // it. Feed is the price-gun red, Market a bargain-sign marigold, History cobalt, and Chats
+  // jeepney green, where buyers and sellers talk it over.
+  placeFeed: '#D63A14',
+  onPlaceFeed: '#FFFFFF',
+  placeMarket: '#FFC21A',
+  onPlaceMarket: ink,
+  placeHistory: '#2343C4',
+  onPlaceHistory: '#FFF8EE',
+  placeChat: '#1D6B47',
+  onPlaceChat: '#FFF8EE',
+  // Anything you can hold (cards, photos, chips, tags) is cut from the same paper: an ink
+  // outline with a hard shadow offset beneath it, so stickers and tags belong on it.
+  heldEdge: ink,
+  heldShadow: ink,
 } as const;
 
 export const colorDark = {
@@ -163,6 +180,18 @@ export const colorDark = {
   cobalt: '#4A68E8',
   onCobalt: '#FFFFFF',
   stickerOutline: '#0B0805',
+  // Deeper at night, so a block is bold without glaring.
+  placeFeed: '#B5341A',
+  onPlaceFeed: cream,
+  placeMarket: '#E8AE12',
+  onPlaceMarket: charcoal,
+  placeHistory: '#2D46B0',
+  onPlaceHistory: cream,
+  placeChat: '#1A5C3E',
+  onPlaceChat: cream,
+  // At night the outline turns cream so it still reads; the shadow stays a deep ink.
+  heldEdge: '#E6DAC6',
+  heldShadow: '#000000',
 } as const satisfies Record<keyof typeof colorLight, string>;
 
 /**
@@ -214,6 +243,16 @@ export const colorNight = {
   cobalt: '#4A68E8',
   onCobalt: '#FFFFFF',
   stickerOutline: '#0B0710',
+  placeFeed: '#B5341A',
+  onPlaceFeed: '#F3ECDD',
+  placeMarket: '#E8AE12',
+  onPlaceMarket: '#15101B',
+  placeHistory: '#2D46B0',
+  onPlaceHistory: '#F3ECDD',
+  placeChat: '#1A5C3E',
+  onPlaceChat: '#F3ECDD',
+  heldEdge: '#E6DCF0',
+  heldShadow: '#000000',
 } as const satisfies Record<keyof typeof colorLight, string>;
 
 export const tokens = deepFreeze({
@@ -334,7 +373,16 @@ export const tokens = deepFreeze({
         weight: '800',
         letterSpacing: -1,
       },
+      // A tab's title, set big and tight on its colour block: the type does the shouting.
       displayTitle: {
+        family: 'display',
+        size: 44,
+        lineHeight: 46,
+        weight: '800',
+        letterSpacing: -1.4,
+      },
+      // A name or summary beside a portrait, a step down from a tab's title.
+      displayMedium: {
         family: 'display',
         size: 34,
         lineHeight: 38,
@@ -453,6 +501,15 @@ export const tokens = deepFreeze({
     10: 40,
     12: 48,
     16: 64,
+  },
+  /**
+   * The one lean every printed piece (sticker, sign, stamp, a single tag) takes, by the side of
+   * its container it sits on: everything on the left leans one way, everything on the right
+   * the other, by the same amount, so no two labels ever disagree. Degrees.
+   */
+  tilt: {
+    start: -2,
+    end: 2,
   },
   radius: {
     none: 0,

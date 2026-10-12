@@ -47,7 +47,7 @@ export function AdminReviewView({ onBack, onDecide }: AdminReviewViewProps) {
       contentStyle={styles.content}
     >
       <Reveal index={0} style={styles.summary}>
-        <SWText variant="displayTitle" accessibilityRole="header">
+        <SWText variant="displayMedium" accessibilityRole="header">
           {queue.length === 0 ? 'All clear.' : `${queue.length} held`}
         </SWText>
         <SWText variant="bodySmall" tone="textMuted">
