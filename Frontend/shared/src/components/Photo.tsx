@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   Image,
   View,
@@ -6,6 +7,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import Animated, {
+  runOnJS,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -26,6 +28,9 @@ export interface PhotoProps {
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
+/** The latest a photo shows in full, loaded or not. */
+const developFallbackMs = 1500;
+
 /**
  * An item photograph. It develops in rather than popping: a short fade with a slight settle
  * from 104%, like a print coming into focus. Every screen that shows an item shows its photo.
@@ -40,6 +45,16 @@ export function Photo({
   const styles = useThemedStyles(stylesFor);
   const reduceMotion = useReducedMotion();
   const loaded = useSharedValue(reduceMotion ? 1 : 0);
+  // Once developed, the photo drops its animated style and renders plainly. A fade can fail to
+  // reach the screen (a photo loading while its screen is hidden, or while a sheet is still
+  // sliding in), so the finished state is committed through React, where it can't be lost.
+  // The timer also covers a load event that never arrives.
+  const [developed, setDeveloped] = useState(reduceMotion);
+  useEffect(() => {
+    if (developed) return;
+    const fallback = setTimeout(() => setDeveloped(true), developFallbackMs);
+    return () => clearTimeout(fallback);
+  }, [developed]);
 
   const imageStyle = useAnimatedStyle(() => ({
     opacity: loaded.value,
@@ -54,9 +69,15 @@ export function Photo({
         source={source}
         resizeMode="cover"
         onLoad={() => {
-          loaded.value = withTiming(1, { duration: 420, easing: Easing.bezier(0.16, 1, 0.3, 1) });
+          loaded.value = withTiming(
+            1,
+            { duration: 420, easing: Easing.bezier(0.16, 1, 0.3, 1) },
+            (finished) => {
+              if (finished) runOnJS(setDeveloped)(true);
+            },
+          );
         }}
-        style={[styles.image, imageStyle]}
+        style={developed ? styles.image : [styles.image, imageStyle]}
       />
     </View>
   );
