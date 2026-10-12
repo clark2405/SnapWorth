@@ -9,7 +9,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { haptic, themedStyles, tokens, useThemedStyles } from '../design';
+import { haptic, held, themedStyles, tokens, useThemedStyles } from '../design';
 import { PressableScale } from './PressableScale';
 import { SWText } from './SWText';
 
@@ -38,6 +38,16 @@ export function ChoiceChips<Key extends string>({
 }: ChoiceChipsProps<Key>) {
   const styles = useThemedStyles(stylesFor);
   const reduceMotion = useReducedMotion();
+  // The choice at rest. Once a change has finished gliding, the chosen chip paints itself solid
+  // ink with plain labels, committed through React: a glide that fails to reach the screen (on
+  // a sheet still sliding in, say) can never leave the selection blank.
+  const [settledKey, setSettledKey] = useState<Key | null>(value);
+  useEffect(() => {
+    if (value === settledKey) return;
+    setSettledKey(null);
+    const done = setTimeout(() => setSettledKey(value), glideMs);
+    return () => clearTimeout(done);
+  }, [settledKey, value]);
   const [layouts, setLayouts] = useState<Partial<Record<Key, LayoutRectangle>>>({});
   const x = useSharedValue(0);
   const y = useSharedValue(0);
@@ -102,7 +112,8 @@ export function ChoiceChips<Key extends string>({
         active={option.key === value}
         // Until the layers have measured, the chip paints its own background and fill.
         painted={!placed}
-        solid={option.key === value && !placed}
+        solid={option.key === settledKey}
+        still={settledKey !== null}
         onPress={() => {
           if (option.key !== value) haptic('select');
           onChange(option.key);
@@ -165,12 +176,15 @@ function Chip({
   active,
   painted,
   solid,
+  still,
   onPress,
 }: {
   readonly label: string;
   readonly active: boolean;
   readonly painted: boolean;
   readonly solid: boolean;
+  /** No change is gliding, so the labels render plainly. */
+  readonly still: boolean;
   readonly onPress: () => void;
 }) {
   const styles = useThemedStyles(stylesFor);
@@ -197,48 +211,66 @@ function Chip({
         pressed && !active ? styles.pressed : null,
       ]}
     >
-      <Animated.View style={restLabel}>
-        <SWText variant="chip" tone="textSecondary">
+      {still ? (
+        <SWText variant="chip" tone={solid ? 'onInverse' : 'textSecondary'}>
           {label}
         </SWText>
-      </Animated.View>
-      <Animated.View style={[styles.activeLabel, activeLabel]}>
-        <SWText variant="chip" tone="onInverse">
-          {label}
-        </SWText>
-      </Animated.View>
+      ) : (
+        <>
+          <Animated.View style={restLabel}>
+            <SWText variant="chip" tone="textSecondary">
+              {label}
+            </SWText>
+          </Animated.View>
+          <Animated.View style={[styles.activeLabel, activeLabel]}>
+            <SWText variant="chip" tone="onInverse">
+              {label}
+            </SWText>
+          </Animated.View>
+        </>
+      )}
     </PressableScale>
   );
 }
 
+const chipShadow = 2;
+/** Long enough for the pill's spring to land on the new chip. */
+const glideMs = 500;
+
 const stylesFor = themedStyles((colors) => ({
+  // Chips sit a full step apart, so each one's hard shadow clears its neighbour.
   wrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: tokens.spacing[2],
+    gap: tokens.spacing[3],
   },
   bleed: {
     marginHorizontal: -tokens.layout.pageGutterCompact,
     flexGrow: 0,
   },
   scrollRow: {
-    gap: tokens.spacing[2],
+    gap: tokens.spacing[3],
     paddingHorizontal: tokens.layout.pageGutterCompact,
+    // Room for the shadows beneath the row, which a scroll view would otherwise clip.
+    paddingBottom: chipShadow,
   },
+  // The chosen chip is cut the same as the rest, only inked in. Its shadow is the resting chip's
+  // beneath it, so the gliding layer carries the outline alone.
   indicator: {
     position: 'absolute',
     top: 0,
     left: 0,
     borderRadius: tokens.radius.full,
     backgroundColor: colors.inverse,
+    borderWidth: 2,
+    borderColor: colors.heldEdge,
   },
   base: {
     position: 'absolute',
     top: 0,
     left: 0,
     borderRadius: tokens.radius.full,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderSubtle,
+    ...held(colors, chipShadow),
     backgroundColor: colors.surface,
   },
   chip: {
@@ -249,13 +281,13 @@ const stylesFor = themedStyles((colors) => ({
     justifyContent: 'center',
   },
   painted: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderSubtle,
+    ...held(colors, chipShadow),
     backgroundColor: colors.surface,
   },
   solid: {
     backgroundColor: colors.inverse,
-    borderColor: colors.inverse,
+    borderWidth: 2,
+    borderColor: colors.heldEdge,
   },
   pressed: {
     backgroundColor: colors.sunken,

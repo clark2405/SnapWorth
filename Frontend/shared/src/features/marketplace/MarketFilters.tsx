@@ -12,7 +12,7 @@ import {
   SWText,
   TextField,
 } from '../../components';
-import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import { held, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import {
   formatPeso,
   previewListingPlaces,
@@ -315,8 +315,7 @@ const stylesFor = themedStyles((colors) => ({
     minHeight: 36,
     paddingHorizontal: tokens.spacing[3],
     borderRadius: tokens.radius.full,
-    borderWidth: tokens.border.hairline,
-    borderColor: colors.borderStrong,
+    ...held(colors, 2),
     backgroundColor: colors.surface,
   },
   // Set filters close up against their clear button, so the pair reads as one control.

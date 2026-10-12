@@ -3,7 +3,7 @@ import { X } from 'lucide-react-native';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, { FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
 
-import { themedStyles, tokens, useTheme, useThemedStyles } from '../design';
+import { held, themedStyles, tokens, useTheme, useThemedStyles } from '../design';
 import { PressableScale } from './PressableScale';
 import { SWText } from './SWText';
 
@@ -61,8 +61,7 @@ const stylesFor = themedStyles((colors) => ({
     padding: tokens.spacing[4],
     borderRadius: tokens.radius.large,
     backgroundColor: colors.surface,
-    borderWidth: tokens.border.hairline,
-    borderColor: colors.borderSubtle,
+    ...held(colors),
   },
   icon: {
     width: 32,

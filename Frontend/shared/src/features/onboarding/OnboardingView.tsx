@@ -527,7 +527,7 @@ function Stage({ progress, idle, width, height, index, reduceMotion }: StageProp
             <Sticker
               label={previewValuation.trendChange.split(' ')[0] ?? ''}
               tone="marigold"
-              tilt={6}
+              side="end"
             />
           </View>
           <View style={styles.rangeRow} key={`range-${rangeRun}`}>
@@ -1013,7 +1013,7 @@ const stylesFor = themedStyles((colors, name) => ({
     shadowOpacity: 1,
     shadowRadius: 0,
     shadowOffset: { width: 2, height: 2 },
-    transform: [{ rotate: '-4deg' }],
+    transform: [{ rotate: `${tokens.tilt.end}deg` }],
   },
   priceTag: {
     paddingVertical: tokens.spacing[2],

@@ -5,8 +5,8 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import {
   Button,
   LargeTitle,
-  Overline,
   Photo,
+  Sign,
   SnapIcon,
   Sticker,
   ZoomLink,
@@ -17,7 +17,7 @@ import {
   SWText,
   type SearchOrigin,
 } from '../../components';
-import { themedStyles, tokens, useThemedStyles } from '../../design';
+import { held, themedStyles, tokens, useThemedStyles } from '../../design';
 import type { VoteChoice } from '../../types';
 import { previewOlderPosts, previewPosts, previewTrending } from '../preview/sample-data';
 import { ProfileButton } from '../profile/ProfileButton';
@@ -93,7 +93,7 @@ export function FeedView({
       <Tip id="snap" style={styles.tip} />
 
       <Reveal index={0} style={styles.trending}>
-        <Overline icon={Flame} label="Hot this month" style={styles.trendingTitle} />
+        <Sign icon={Flame} label="Hot this month" />
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -150,12 +150,12 @@ function TrendingTile({
       zoomFromSource
       style={styles.tile}
     >
-      <View>
+      <View style={styles.tileFrame}>
         <ZoomSource>
           <Photo
             source={trend.photo}
             label={trend.label}
-            radius={tokens.radius.large}
+            radius={tokens.radius.large - 2}
             style={styles.tilePhoto}
           />
         </ZoomSource>
@@ -163,7 +163,6 @@ function TrendingTile({
         <Sticker
           label={trend.change}
           tone={rising ? 'marigold' : 'cobalt'}
-          tilt={rising ? -6 : 5}
           style={styles.tileSticker}
         />
       </View>
@@ -184,7 +183,6 @@ const stylesFor = themedStyles((colors) => ({
     gap: tokens.spacing[4],
     marginBottom: tokens.spacing[10],
   },
-  trendingTitle: {},
   trendingBleed: {
     marginHorizontal: -tokens.layout.pageGutterCompact,
     flexGrow: 0,
@@ -197,24 +195,28 @@ const stylesFor = themedStyles((colors) => ({
     width: 120,
     gap: tokens.spacing['0.5'],
   },
-  tilePhoto: {
-    width: 120,
-    height: 120,
+  tileFrame: {
+    borderRadius: tokens.radius.large,
     marginBottom: tokens.spacing[2],
+    ...held(colors),
+  },
+  tilePhoto: {
+    width: 116,
+    height: 116,
   },
   tileSticker: {
     position: 'absolute',
     left: tokens.spacing[2],
     bottom: tokens.spacing[4],
   },
+  divided: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderSubtle,
+  },
   list: {
     gap: 0,
   },
   tip: {
     marginBottom: tokens.spacing[6],
-  },
-  divided: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.borderSubtle,
   },
 }));

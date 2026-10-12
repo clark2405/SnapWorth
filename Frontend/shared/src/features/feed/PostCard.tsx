@@ -26,7 +26,7 @@ import {
   ZoomLink,
   useToast,
 } from '../../components';
-import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import { haptic, held, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import type { VoteChoice } from '../../types';
 import { formatPeso, type PreviewPost } from '../preview/sample-data';
 import { useCommentCount } from './comment-thread';
@@ -130,12 +130,12 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
             source={post.photo}
             label={post.photoLabel}
             aspectRatio={4 / 3}
-            radius={tokens.radius.medium}
+            radius={tokens.radius.medium - 2}
           />
           <JustRightBurst trigger={burst} />
           {verdict ? (
             <View style={styles.stickerSpot} pointerEvents="none">
-              <Sticker label={verdict.label} tone={verdict.tone} tilt={5} />
+              <Sticker label={verdict.label} tone={verdict.tone} side="end" />
             </View>
           ) : null}
           <GestureDetector gesture={doubleTap}>
@@ -223,10 +223,11 @@ const stylesFor = themedStyles((colors, name) => ({
   byline: {
     flex: 1,
   },
+  // The photo is outlined and casts a hard shadow, so the sticker and tag on it belong.
   photoWrap: {
     position: 'relative',
     borderRadius: tokens.radius.medium,
-    overflow: 'hidden',
+    ...held(colors),
   },
   // The crowd's verdict, slapped on the photo's top corner once there is one.
   stickerSpot: {

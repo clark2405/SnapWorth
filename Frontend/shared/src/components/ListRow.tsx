@@ -2,7 +2,14 @@ import { ChevronRight, type LucideIcon } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { themedStyles, tokens, useTheme, useThemedStyles, type SemanticColorName } from '../design';
+import {
+  held,
+  themedStyles,
+  tokens,
+  useTheme,
+  useThemedStyles,
+  type SemanticColorName,
+} from '../design';
 import { Overline } from './Overline';
 import { PressableScale } from './PressableScale';
 import { SWText } from './SWText';
@@ -96,12 +103,14 @@ export function ListGroup({
     <View style={styles.groupWrap}>
       {title ? <Overline label={title} icon={icon} style={styles.groupTitle} /> : null}
       <View style={styles.group}>
-        {rows.map((row, index) => (
-          <View key={index}>
-            {index > 0 ? <View style={styles.separator} /> : null}
-            {row}
-          </View>
-        ))}
+        <View style={styles.groupClip}>
+          {rows.map((row, index) => (
+            <View key={index}>
+              {index > 0 ? <View style={styles.separator} /> : null}
+              {row}
+            </View>
+          ))}
+        </View>
       </View>
     </View>
   );
@@ -136,12 +145,16 @@ const stylesFor = themedStyles((colors) => ({
   groupTitle: {
     paddingHorizontal: tokens.spacing[4],
   },
+  // Outlined like every card; the rows clip inside the outline, so a pressed row's tint keeps
+  // to the rounded corners while the shadow still falls outside.
   group: {
+    ...held(colors),
     backgroundColor: colors.surface,
     borderRadius: tokens.radius.large,
+  },
+  groupClip: {
+    borderRadius: tokens.radius.large - 2,
     overflow: 'hidden',
-    borderWidth: colors.canvas === colors.sunken ? 0 : StyleSheet.hairlineWidth,
-    borderColor: colors.borderSubtle,
   },
   separator: {
     height: StyleSheet.hairlineWidth,

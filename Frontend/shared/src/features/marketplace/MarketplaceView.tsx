@@ -10,16 +10,16 @@ import {
   EmptyState,
   EstimateBadge,
   LargeTitle,
-  Overline,
   Photo,
   Reveal,
   Screen,
+  Sign,
   SnapIcon,
   Sticker,
   SWText,
   ZoomLink,
 } from '../../components';
-import { themedStyles, tokens, useThemedStyles } from '../../design';
+import { held, themedStyles, tokens, useThemedStyles } from '../../design';
 import {
   formatPeso,
   previewListings,
@@ -156,7 +156,7 @@ export function MarketplaceView({
 
       {underEstimate.length > 0 ? (
         <Reveal index={1} style={styles.highlightSection}>
-          <Overline icon={BadgePercent} label="Steals · Under estimate" />
+          <Sign icon={BadgePercent} label="Steals · Under estimate" tone="cobalt" />
           <View style={styles.highlightRow}>
             {underEstimate.map((listing) => (
               <UnderEstimateCard
@@ -254,29 +254,35 @@ function UnderEstimateCard({
         radius={tokens.radius.medium}
         style={styles.highlightPhoto}
       />
-      {under > 0 ? (
-        <View style={styles.underSpot} pointerEvents="none">
-          <Sticker label={`${under}% under`} tone="marigold" tilt={4} />
-        </View>
-      ) : null}
       <View style={styles.highlightText}>
-        <SWText variant="bodyCompact" tone="textSecondary" numberOfLines={1}>
+        <SWText
+          variant="bodyCompact"
+          tone="textSecondary"
+          numberOfLines={1}
+          style={under > 0 ? styles.underTitle : null}
+        >
           {listing.title}
         </SWText>
         <AskingPriceBadge value={formatPeso(listing.askingPrice)} size="compact" />
-        <EstimateBadge value={formatPeso(estimate)} />
+        <View style={styles.highlightEstimate}>
+          <EstimateBadge value={formatPeso(estimate)} />
+        </View>
       </View>
+      {under > 0 ? (
+        <View style={styles.underSpot} pointerEvents="none">
+          <Sticker label={`${under}% under`} tone="marigold" side="end" />
+        </View>
+      ) : null}
     </ZoomLink>
   );
 }
 
 const stylesFor = themedStyles((colors) => ({
-  // How far under the AI's estimate a steal is asking, stuck on its photo.
-  // Bottom right, where the card has room: the title and prices run along the top and left.
+  // How far under the AI's estimate a steal is asking, slapped over the card's top corner.
   underSpot: {
     position: 'absolute',
-    bottom: tokens.spacing[4],
-    right: tokens.spacing[4],
+    top: -tokens.spacing[3],
+    right: -tokens.spacing[2],
   },
   actions: {
     flexDirection: 'row',
@@ -290,15 +296,16 @@ const stylesFor = themedStyles((colors) => ({
   pills: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: tokens.spacing[2],
+    gap: tokens.spacing[3],
   },
   highlightSection: {
     gap: tokens.spacing[4],
     marginBottom: tokens.spacing[10],
   },
   // Stacked, so each steal gets the full width for its asking price and estimate side by side.
+  // The gap leaves room for each card's sticker, which overhangs its top edge.
   highlightRow: {
-    gap: tokens.spacing[3],
+    gap: tokens.spacing[6],
   },
   highlightSlot: {
     alignSelf: 'stretch',
@@ -309,17 +316,25 @@ const stylesFor = themedStyles((colors) => ({
     padding: tokens.spacing[3],
     borderRadius: tokens.radius.large,
     backgroundColor: colors.surface,
-    borderWidth: tokens.border.hairline,
-    borderColor: colors.borderSubtle,
+    ...held(colors),
   },
   highlightPhoto: {
     width: 64,
     height: 64,
+    ...held(colors, 0),
   },
   highlightText: {
     flex: 1,
     gap: tokens.spacing['0.5'],
     justifyContent: 'center',
+  },
+  // The title stops short of the sticker in the card's corner.
+  underTitle: {
+    marginRight: tokens.spacing[16] + tokens.spacing[4],
+  },
+  // The AI's tag sits a step apart from the asking price, so the two never read as one.
+  highlightEstimate: {
+    marginTop: tokens.spacing[2],
   },
   grid: {
     flexDirection: 'row',

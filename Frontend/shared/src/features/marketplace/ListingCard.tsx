@@ -1,6 +1,6 @@
 import { CircleCheck, TrendingDown, TrendingUp, type LucideIcon } from 'lucide-react-native';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import {
   LikeButton,
@@ -13,7 +13,7 @@ import {
   type NavLinkMenuItem,
   type TagTone,
 } from '../../components';
-import { themedStyles, tokens, useThemedStyles } from '../../design';
+import { held, themedStyles, tokens, useThemedStyles } from '../../design';
 import type { VoteChoice } from '../../types';
 import { formatPeso, type PreviewListing } from '../preview/sample-data';
 import { useAccountGate } from '../session';
@@ -131,19 +131,14 @@ export function ListingCard({ listing, onOpen, onMessageSeller }: ListingCardPro
   );
 }
 
-const stylesFor = themedStyles((colors, name) => ({
+const stylesFor = themedStyles((colors) => ({
   card: {
     gap: tokens.spacing[3],
     padding: tokens.spacing[2],
     paddingBottom: tokens.spacing[3],
     borderRadius: tokens.radius.large,
     backgroundColor: colors.surface,
-    borderWidth: name === 'dark' ? StyleSheet.hairlineWidth : 0,
-    borderColor: colors.borderSubtle,
-    shadowColor: tokens.shadow[name],
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
+    ...held(colors),
   },
   photoWrap: {
     position: 'relative',

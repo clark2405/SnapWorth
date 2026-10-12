@@ -7,19 +7,19 @@ import {
   DetailSheet,
   EmptyState,
   NavHeader,
-  Overline,
   Photo,
   PressableScale,
   Reveal,
   Screen,
   ShareButton,
+  Sign,
   SnapIcon,
   Sparkline,
   Sticker,
   SWText,
   ZoomTarget,
 } from '../../components';
-import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import { held, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import { ListingCard } from '../marketplace/ListingCard';
 import {
   formatPeso,
@@ -109,14 +109,13 @@ export function TrendView({
           <Rect width="100%" height="100%" fill="url(#trend-fade)" />
         </Svg>
         <View style={styles.heroText}>
-          <Overline icon={Flame} label="Hot this month" />
+          <Sign icon={Flame} label="Hot this month" />
           <SWText variant="displayHero" accessibilityRole="header">
             {trend.label}
           </SWText>
           <Sticker
             label={`${trend.change} this month`}
             tone={rising ? 'marigold' : 'cobalt'}
-            tilt={-3}
             style={styles.heroSticker}
           />
         </View>
@@ -220,7 +219,7 @@ export function TrendView({
             <SWText variant="headingLarge" color={colors.onCobalt}>
               Got one?
             </SWText>
-            <SWText variant="bodyMedium" color={colors.onCobalt} style={styles.ctaBody}>
+            <SWText variant="bodyMedium" color={colors.onCobalt}>
               Snap it to see what yours is worth while {trend.label.toLowerCase()} are{' '}
               {rising ? 'up' : 'moving'}.
             </SWText>
@@ -240,7 +239,7 @@ function Stat({ label, value }: { readonly label: string; readonly value: string
       <SWText variant="priceSmall" color={colors.onMarigold}>
         {value}
       </SWText>
-      <SWText variant="caption" color={colors.onMarigold} style={styles.dim}>
+      <SWText variant="caption" color={colors.onMarigold}>
         {label}
       </SWText>
     </View>
@@ -283,9 +282,7 @@ const stylesFor = themedStyles((colors) => ({
     padding: tokens.spacing[5],
     borderRadius: tokens.radius.large,
     backgroundColor: colors.marigold,
-  },
-  dim: {
-    opacity: 0.72,
+    ...held(colors),
   },
   statRow: {
     flexDirection: 'row',
@@ -331,8 +328,5 @@ const stylesFor = themedStyles((colors) => ({
     padding: tokens.spacing[5],
     borderRadius: tokens.radius.large,
     backgroundColor: colors.cobalt,
-  },
-  ctaBody: {
-    opacity: 0.86,
   },
 }));

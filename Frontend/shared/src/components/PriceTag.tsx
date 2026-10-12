@@ -9,9 +9,10 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Circle, Path } from 'react-native-svg';
+import type { LucideIcon } from 'lucide-react-native';
+import Svg, { Circle, G, Path } from 'react-native-svg';
 
-import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../design';
+import { haptic, held, themedStyles, tokens, useTheme, useThemedStyles } from '../design';
 import { SWText } from './SWText';
 
 /**
@@ -65,21 +66,33 @@ export function TagShape({
       }}
     >
       {width > 0 ? (
+        // Outlined and shadowed like every card, the shadow cut to the tag's own shape.
         <Svg
-          width={width}
-          height={height}
-          style={{ position: 'absolute', left: 0, top: 0 }}
+          width={width + tagShadow + 2}
+          height={height + tagShadow + 2}
+          style={{ position: 'absolute', left: -1, top: -1 }}
           pointerEvents="none"
         >
-          <Path d={tagPath(width, height, nose)} fill={colors.kraft} />
-          <Circle
-            cx={eyeletX}
-            cy={height / 2}
-            r={eyelet}
-            fill={colors.canvas}
-            stroke={colors.kraftEdge}
-            strokeWidth={Math.max(1.2, eyelet * 0.32)}
-          />
+          <G x={1 + tagShadow} y={1 + tagShadow}>
+            <Path d={tagPath(width, height, nose)} fill={colors.heldShadow} />
+          </G>
+          <G x={1} y={1}>
+            <Path
+              d={tagPath(width, height, nose)}
+              fill={colors.kraft}
+              stroke={colors.heldEdge}
+              strokeWidth={2}
+              strokeLinejoin="round"
+            />
+            <Circle
+              cx={eyeletX}
+              cy={height / 2}
+              r={eyelet}
+              fill={colors.canvas}
+              stroke={colors.kraftEdge}
+              strokeWidth={Math.max(1.2, eyelet * 0.32)}
+            />
+          </G>
         </Svg>
       ) : null}
       {hanging && height > 0 ? (
@@ -131,6 +144,9 @@ function useSwing(swing: boolean, tilt: number) {
   }));
 }
 
+/** How far the tag's hard shadow sits out, down and to the right. */
+const tagShadow = 3;
+
 const noseFor = (height: number) => Math.min(20, Math.max(8, height * 0.28));
 
 /** A rectangle whose left end is cut to a blunt point, with softly rounded right corners. */
@@ -153,14 +169,17 @@ function tagPath(width: number, height: number, nose: number) {
  * A rubber stamp in the price-gun red, for the AI's confidence and other verdicts that are
  * declared rather than measured ("High confidence", "Sold").
  */
+/** Which side of its container a printed piece sits on, which sets its lean. */
+export type PieceSide = 'start' | 'end';
+
 export function Stamp({
   label,
-  tilt = -6,
+  side = 'start',
   land,
   style,
 }: {
   readonly label: string;
-  readonly tilt?: number;
+  readonly side?: PieceSide;
   /** Brings the stamp down onto the page after `delay` ms, with a thud you feel. */
   readonly land?: { readonly delay: number };
   readonly style?: StyleProp<ViewStyle>;
@@ -169,6 +188,7 @@ export function Stamp({
   const reduceMotion = useReducedMotion();
   const delay = land?.delay;
   const pressed = useSharedValue(delay === undefined ? 1 : 0);
+  const tilt = tokens.tilt[side];
 
   useEffect(() => {
     if (delay === undefined) return;
@@ -198,6 +218,50 @@ export function Stamp({
 
 export type StickerTone = 'marigold' | 'cobalt' | 'accent';
 
+export type SignTone = StickerTone | 'ink';
+
+/**
+ * A section's label, painted on a strip like a market stall's sign rather than set in grey
+ * small capitals. Use it for the sections a page is browsed by ("Hot this month", "Steals").
+ */
+export function Sign({
+  label,
+  icon: Icon,
+  tone = 'marigold',
+  side = 'start',
+  style,
+}: {
+  readonly label: string;
+  readonly icon?: LucideIcon;
+  readonly tone?: SignTone;
+  readonly side?: PieceSide;
+  readonly style?: StyleProp<ViewStyle>;
+}) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(stylesFor);
+  const [fill, ink] = {
+    marigold: [colors.marigold, colors.onMarigold],
+    cobalt: [colors.cobalt, colors.onCobalt],
+    accent: [colors.accent, colors.onAccent],
+    ink: [colors.inverse, colors.onInverse],
+  }[tone];
+  return (
+    <View
+      accessibilityRole="header"
+      style={[
+        styles.sign,
+        { backgroundColor: fill, transform: [{ rotate: `${tokens.tilt[side]}deg` }] },
+        style,
+      ]}
+    >
+      {Icon ? <Icon size={13} strokeWidth={2.4} color={ink} /> : null}
+      <SWText variant="stamp" color={ink} numberOfLines={1}>
+        {label}
+      </SWText>
+    </View>
+  );
+}
+
 /**
  * A sticker slapped on a photo, the way a market stall marks a bargain: the community's verdict
  * on a price. Loud on purpose, so use one per photo at most.
@@ -205,12 +269,12 @@ export type StickerTone = 'marigold' | 'cobalt' | 'accent';
 export function Sticker({
   label,
   tone = 'marigold',
-  tilt = -4,
+  side = 'start',
   style,
 }: {
   readonly label: string;
   readonly tone?: StickerTone;
-  readonly tilt?: number;
+  readonly side?: PieceSide;
   readonly style?: StyleProp<ViewStyle>;
 }) {
   const { colors } = useTheme();
@@ -224,7 +288,7 @@ export function Sticker({
     <View
       style={[
         styles.sticker,
-        { backgroundColor: fill[0], transform: [{ rotate: `${tilt}deg` }] },
+        { backgroundColor: fill[0], transform: [{ rotate: `${tokens.tilt[side]}deg` }] },
         style,
       ]}
     >
@@ -243,20 +307,23 @@ const stylesFor = themedStyles((colors) => ({
     borderRadius: 5,
     paddingHorizontal: tokens.spacing[2],
     paddingVertical: 3,
-    opacity: 0.92,
   },
   sticker: {
     alignSelf: 'flex-start',
     paddingHorizontal: tokens.spacing[3],
     paddingVertical: 5,
     borderRadius: 10,
-    borderWidth: 2,
-    borderColor: colors.stickerOutline,
-    // A hard offset shadow, like a sticker lifting off the photo.
-    shadowColor: colors.stickerOutline,
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 3,
+    // The same outline and hard shadow as everything else you can hold, lifting off the photo.
+    ...held(colors, 2),
+  },
+  sign: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing[1] + 2,
+    paddingHorizontal: tokens.spacing[3],
+    paddingVertical: tokens.spacing[1] + 1,
+    borderRadius: 5,
+    ...held(colors, 2),
   },
 }));

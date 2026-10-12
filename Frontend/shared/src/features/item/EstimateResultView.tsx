@@ -229,7 +229,12 @@ export function EstimateResultView({
                 {item.category}
               </SWText>
               <View style={styles.tagRow}>
-                <TagShape hanging tilt={-1.5} swing={resolvedHere.current} style={styles.priceTag}>
+                <TagShape
+                  hanging
+                  tilt={tokens.tilt.start}
+                  swing={resolvedHere.current}
+                  style={styles.priceTag}
+                >
                   <SWText variant="stamp" color={colors.kraftInk}>
                     AI Estimate
                   </SWText>
@@ -245,7 +250,7 @@ export function EstimateResultView({
                 </TagShape>
                 <Stamp
                   label={`${previewValuation.confidence} confidence`}
-                  tilt={-8}
+                  side="end"
                   // Stamped once the count has landed on the price.
                   land={resolvedHere.current ? { delay: 1250 } : undefined}
                   style={styles.confidence}
@@ -734,7 +739,7 @@ function ShareCardSheet({
         <View style={styles.shareBody}>
           <SWText variant="headingMedium">{title}</SWText>
           {/* The card people post carries the same tag as the app, so it is recognisably ours. */}
-          <TagShape tilt={-2} style={styles.shareTag}>
+          <TagShape tilt={tokens.tilt.start} style={styles.shareTag}>
             <SWText variant="stamp" color={colors.kraftInk}>
               Worth about
             </SWText>
