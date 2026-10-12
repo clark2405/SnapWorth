@@ -25,6 +25,7 @@ import {
   shareIcon,
   DetailHero,
   DetailSheet,
+  WorthySays,
 } from '../../components';
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import { commentBodyMaxLength, type ThreadComment } from '../../types/entities';
@@ -44,6 +45,7 @@ import { useAccountGate, useSession } from '../session';
 import { Tip, useTip } from '../tips';
 import { CommentList } from './CommentList';
 import { useCommentThread } from './comment-thread';
+import { verdictLine } from './verdict';
 
 export interface PostDetailViewProps {
   readonly postId?: string;
@@ -325,6 +327,7 @@ export function PostDetailView({
         </Reveal>
 
         <Reveal index={2} style={styles.verdict}>
+          <WorthySays>{verdictLine(post.votes, post.estimate, formatPeso)}</WorthySays>
           <VerdictBar tally={post.votes} />
           <Tip id="vote" />
           <VoteChips

@@ -44,3 +44,4 @@ export * from './Confetti';
 export * from './Overline';
 export * from './Rating';
 export * from './Worthy';
+export * from './WorthySays';
