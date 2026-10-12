@@ -420,10 +420,10 @@ function OwnerPanel({
 }
 
 const stylesFor = themedStyles((colors) => ({
+  // No gap: the sheet must sit right on the photo so its rounded top overlaps it fully.
   content: {
     paddingTop: 0,
     paddingHorizontal: 0,
-    gap: tokens.spacing[5],
   },
   headerActions: {
     flexDirection: 'row',
