@@ -3,18 +3,31 @@ import { extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const frontendRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const sourceRoots = [join(frontendRoot, 'web'), join(frontendRoot, 'shared', 'src')];
+const sourceRoots = [
+  join(frontendRoot, 'web'),
+  join(frontendRoot, 'mobile'),
+  join(frontendRoot, 'shared', 'src'),
+];
 const sourceExtensions = new Set(['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx']);
-const ignoredDirectories = new Set(['.expo', 'coverage', 'dist', 'e2e', 'node_modules']);
+const ignoredDirectories = new Set([
+  '.expo',
+  'android',
+  'coverage',
+  'dist',
+  'e2e',
+  'ios',
+  'node_modules',
+]);
 const manifests = [
   join(frontendRoot, 'package.json'),
   join(frontendRoot, 'web', 'package.json'),
+  join(frontendRoot, 'mobile', 'package.json'),
   join(frontendRoot, 'shared', 'package.json'),
 ];
 
 const layerRules = [
   {
-    importer: /^web\/app\//,
+    importer: /^(?:web|mobile)\/app\//,
     forbidden: /(?:^|\/)(?:services|ports|data|adapters|supabase)(?:\/|$)/,
     reason: 'route wrappers cannot import services, ports, data, adapters, or Supabase',
   },
@@ -26,7 +39,8 @@ const layerRules = [
   {
     importer: /^shared\/src\/services\//,
     forbidden: /(?:^|\/)(?:features|components|data|adapters|supabase)(?:\/|$)/,
-    reason: 'services depend inward on ports and types, not concrete infrastructure or presentation',
+    reason:
+      'services depend inward on ports and types, not concrete infrastructure or presentation',
   },
   {
     importer: /^shared\/src\/ports\//,
@@ -47,8 +61,9 @@ const browserSecret =
   /(?:SUPABASE_SERVICE_ROLE(?:_KEY)?|OPENAI_API_KEY|ANTHROPIC_API_KEY|GOOGLE_API_KEY|provider(?:Api)?Secret|serviceRoleKey)/;
 const productionMockSelection =
   /production[^;\n]*(?:seeded|mock(?:Pricing|Moderation)?|permit.?all)|(?:seeded|mock(?:Pricing|Moderation)?|permit.?all)[^;\n]*production/i;
-const importPattern = /(?:import\s+(?:[^'"]+?\s+from\s+)?|require\s*\(|import\s*\()\s*['"]([^'"]+)['"]/g;
-const visualSource = /^(?:web\/app|web\/src|shared\/src\/(?:components|features))\//;
+const importPattern =
+  /(?:import\s+(?:[^'"]+?\s+from\s+)?|require\s*\(|import\s*\()\s*['"]([^'"]+)['"]/g;
+const visualSource = /^(?:web\/app|web\/src|mobile\/app|shared\/src\/(?:components|features))\//;
 const tokenSource = /^shared\/src\/design\/(?:tokens|theme|nativewind-preset)\./;
 
 function assert(condition, message) {
@@ -105,7 +120,9 @@ async function checkArchitecture(files) {
       }
     }
   }
-  console.log('Source imports respect route, view/component, service, port, and infrastructure boundaries.');
+  console.log(
+    'Source imports respect route, view/component, service, port, and infrastructure boundaries.',
+  );
 }
 
 async function checkVisualLiterals(files) {
@@ -113,7 +130,10 @@ async function checkVisualLiterals(files) {
     const name = relative(frontendRoot, path).replaceAll('\\', '/');
     if (!visualSource.test(name) || tokenSource.test(name)) continue;
     const source = await readFile(path, 'utf8');
-    assert(!rawVisualLiteral.test(source), `${name} contains a raw color literal; use a design token.`);
+    assert(
+      !rawVisualLiteral.test(source),
+      `${name} contains a raw color literal; use a design token.`,
+    );
   }
   console.log('Presentation source contains no raw color literals outside design token modules.');
 }
@@ -140,7 +160,9 @@ async function checkBrowserSafety(files) {
       `${name} appears to select seeded, mock, or permit-all infrastructure in production.`,
     );
   }
-  console.log('Browser source contains no secret identifiers or production mock-selection patterns.');
+  console.log(
+    'Browser source contains no secret identifiers or production mock-selection patterns.',
+  );
 }
 
 async function checkDependencies() {
@@ -157,7 +179,9 @@ async function checkDependencies() {
       }
     }
   }
-  console.log('No payment, escrow, shipping, identity-verification, or IoT dependency is declared.');
+  console.log(
+    'No payment, escrow, shipping, identity-verification, or IoT dependency is declared.',
+  );
 }
 
 const command = process.argv[2] ?? 'all';

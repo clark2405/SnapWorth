@@ -49,8 +49,7 @@ export const transitionEstimation = (
 ): Result<EstimationState, AppError> => {
   if (event.type === 'retry') {
     const canRetry =
-      current.status === 'queued_offline' ||
-      (current.status === 'failed' && current.retryable);
+      current.status === 'queued_offline' || (current.status === 'failed' && current.retryable);
     if (!canRetry) return err(transitionConflict('estimate_not_retryable'));
     return ok({ status: 'estimating', attempt: current.attempt + 1, startedAt: event.startedAt });
   }
@@ -89,9 +88,8 @@ export const transitionModeration = (
   return ok(next);
 };
 
-export const withdrawPublication = (
-  current: 'published' | 'withdrawn',
-): 'withdrawn' => (current === 'withdrawn' ? current : 'withdrawn');
+export const withdrawPublication = (current: 'published' | 'withdrawn'): 'withdrawn' =>
+  current === 'withdrawn' ? current : 'withdrawn';
 
 export const transitionListingStatus = (
   current: ListingStatus,

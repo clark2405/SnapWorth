@@ -1,6 +1,7 @@
 import { tokens, type SemanticColorName, type ThemeName } from './tokens';
 
-export type ThemePreference = ThemeName | 'system';
+/** What a user can choose. The night room is scoped to one section, never a preference. */
+export type ThemePreference = Exclude<ThemeName, 'night'> | 'system';
 export type ThemeColors = Readonly<Record<SemanticColorName, string>>;
 export type NativeWindThemeVariables = Readonly<Record<`--sw-color-${string}`, string>>;
 
@@ -25,7 +26,7 @@ export interface ContrastIssue extends ContrastPairing {
 }
 
 export const semanticColorNames = Object.freeze(
-  Object.keys(tokens.color.light) as SemanticColorName[],
+  Object.keys(tokens.color.dark) as SemanticColorName[],
 );
 
 export const contrastPairings = Object.freeze<readonly ContrastPairing[]>([
@@ -39,6 +40,9 @@ export const contrastPairings = Object.freeze<readonly ContrastPairing[]>([
   { foreground: 'onAccent', background: 'accent', classification: 'normal-text' },
   { foreground: 'onAccent', background: 'accentPressed', classification: 'normal-text' },
   { foreground: 'textPrimary', background: 'estimateSurface', classification: 'normal-text' },
+  { foreground: 'estimateBorder', background: 'estimateSurface', classification: 'ui-boundary' },
+  { foreground: 'textPrimary', background: 'surfaceRaised', classification: 'normal-text' },
+  { foreground: 'textMuted', background: 'surfaceRaised', classification: 'normal-text' },
   { foreground: 'danger', background: 'canvas', classification: 'normal-text' },
   { foreground: 'warning', background: 'canvas', classification: 'normal-text' },
   { foreground: 'voteHigh', background: 'surface', classification: 'ui-boundary' },
@@ -48,6 +52,39 @@ export const contrastPairings = Object.freeze<readonly ContrastPairing[]>([
   { foreground: 'focusRing', background: 'surface', classification: 'ui-boundary' },
   { foreground: 'interactiveBoundary', background: 'canvas', classification: 'ui-boundary' },
   { foreground: 'interactiveBoundary', background: 'surface', classification: 'ui-boundary' },
+  { foreground: 'onInverse', background: 'inverse', classification: 'normal-text' },
+  { foreground: 'onInverse', background: 'inversePressed', classification: 'normal-text' },
+  { foreground: 'accent', background: 'canvas', classification: 'normal-text' },
+  { foreground: 'accent', background: 'surface', classification: 'normal-text' },
+  { foreground: 'accentPressed', background: 'accentSoft', classification: 'normal-text' },
+  { foreground: 'sandInk', background: 'sand', classification: 'normal-text' },
+  { foreground: 'mintInk', background: 'mint', classification: 'normal-text' },
+  { foreground: 'graveInk', background: 'grave', classification: 'normal-text' },
+  { foreground: 'danger', background: 'dangerSoft', classification: 'normal-text' },
+  { foreground: 'onFeature', background: 'feature', classification: 'normal-text' },
+  { foreground: 'onFeatureDim', background: 'feature', classification: 'normal-text' },
+  { foreground: 'textMuted', background: 'surface', classification: 'normal-text' },
+  { foreground: 'textPrimary', background: 'accentSoft', classification: 'normal-text' },
+  { foreground: 'textSecondary', background: 'sunken', classification: 'normal-text' },
+  { foreground: 'success', background: 'surface', classification: 'ui-boundary' },
+  { foreground: 'danger', background: 'surface', classification: 'normal-text' },
+  { foreground: 'onPlaceFeed', background: 'placeFeed', classification: 'normal-text' },
+  { foreground: 'onPlaceMarket', background: 'placeMarket', classification: 'normal-text' },
+  { foreground: 'onPlaceHistory', background: 'placeHistory', classification: 'normal-text' },
+  { foreground: 'onPlaceChat', background: 'placeChat', classification: 'normal-text' },
+  { foreground: 'heldEdge', background: 'canvas', classification: 'ui-boundary' },
+  { foreground: 'heldEdge', background: 'surface', classification: 'ui-boundary' },
+  // A switch's off track against the card it sits on.
+  { foreground: 'interactiveBoundary', background: 'surfaceRaised', classification: 'ui-boundary' },
+  // The brand's printed pieces: the price tag, stickers and signs, and the red stamp.
+  { foreground: 'kraftInk', background: 'kraft', classification: 'normal-text' },
+  { foreground: 'onMarigold', background: 'marigold', classification: 'normal-text' },
+  { foreground: 'onCobalt', background: 'cobalt', classification: 'normal-text' },
+  { foreground: 'textMuted', background: 'sunken', classification: 'normal-text' },
+  { foreground: 'textSecondary', background: 'surfaceRaised', classification: 'normal-text' },
+  { foreground: 'mintInk', background: 'surface', classification: 'normal-text' },
+  { foreground: 'success', background: 'canvas', classification: 'normal-text' },
+  { foreground: 'onInverse', background: 'textPrimary', classification: 'normal-text' },
 ]);
 
 function toKebabCase(value: string): string {
@@ -75,16 +112,17 @@ export const nativeWindColorReferences = Object.freeze(
   ) as Record<SemanticColorName, string>,
 );
 
+// `system` follows the device appearance; an explicit preference always wins.
 export function resolveThemeName(
   preference: ThemePreference,
-  systemTheme: ThemeName = 'light',
+  systemTheme: ThemeName = 'dark',
 ): ThemeName {
   return preference === 'system' ? systemTheme : preference;
 }
 
 export function resolveTheme(
   preference: ThemePreference,
-  systemTheme: ThemeName = 'light',
+  systemTheme: ThemeName = 'dark',
 ): ResolvedTheme {
   const name = resolveThemeName(preference, systemTheme);
   const colors = tokens.color[name];
@@ -102,9 +140,7 @@ export function resolveTheme(
 
 function channelToLinear(channel: number): number {
   const normalized = channel / 255;
-  return normalized <= 0.04045
-    ? normalized / 12.92
-    : Math.pow((normalized + 0.055) / 1.055, 2.4);
+  return normalized <= 0.04045 ? normalized / 12.92 : Math.pow((normalized + 0.055) / 1.055, 2.4);
 }
 
 function relativeLuminance(hex: string): number {
@@ -130,8 +166,6 @@ export function auditThemeContrast(theme: ThemeName): readonly ContrastIssue[] {
     const ratio = getContrastRatio(colors[pairing.foreground], colors[pairing.background]);
     const minimum = pairing.classification === 'normal-text' ? 4.5 : 3;
 
-    return ratio >= minimum
-      ? []
-      : [{ ...pairing, theme, ratio, minimum } satisfies ContrastIssue];
+    return ratio >= minimum ? [] : [{ ...pairing, theme, ratio, minimum } satisfies ContrastIssue];
   });
 }

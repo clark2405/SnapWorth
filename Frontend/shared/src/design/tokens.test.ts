@@ -3,7 +3,8 @@ import { tokens } from './tokens';
 describe('SnapWorth design tokens', () => {
   it('deep-freezes the token source so themes and components cannot mutate it', () => {
     expect(Object.isFrozen(tokens)).toBe(true);
-    expect(Object.isFrozen(tokens.color.light)).toBe(true);
+    expect(Object.isFrozen(tokens.color.dark)).toBe(true);
+    expect(Object.isFrozen(tokens.overlay)).toBe(true);
     expect(Object.isFrozen(tokens.typography.style.priceHero)).toBe(true);
     expect(Object.isFrozen(tokens.motion.recipe.estimateWait)).toBe(true);
   });
@@ -14,7 +15,7 @@ describe('SnapWorth design tokens', () => {
     expect(tokens.focus.ringWidth).toBeGreaterThan(0);
     expect(tokens.breakpoint.compactMin).toBe(320);
     expect(tokens.breakpoint.supportedMax).toBe(1920);
-    expect(tokens.typography.maxFontSizeMultiplier.priceHero).toBe(1.6);
+    expect(tokens.typography.maxFontSizeMultiplier.priceHero).toBe(1.4);
     expect(tokens.typography.maxFontSizeMultiplier.default).toBe(2);
   });
 
@@ -27,9 +28,49 @@ describe('SnapWorth design tokens', () => {
     expect(tokens.motion.duration.estimateOutcomeDeadline).toBe(10_000);
 
     for (const [name, recipe] of Object.entries(tokens.motion.recipe)) {
-      if (name === 'estimateReveal' || name === 'estimateWait') continue;
+      if (name === 'estimateReveal' || name === 'estimateWait' || name === 'entrance') continue;
       expect(recipe.durationMs).toBeLessThanOrEqual(tokens.motion.limits.maximumArtisticDuration);
       expect(recipe.repeats).toBe(false);
     }
+  });
+
+  it('keeps entrances expressive but brief, with staggers inside the 40-80ms band', () => {
+    const { entrance } = tokens.motion.recipe;
+
+    expect(entrance.easing).toBe('cubic-bezier(0.16, 1, 0.3, 1)');
+    expect(entrance.properties).toEqual(['opacity', 'transform']);
+    expect(entrance.durationMs).toBeLessThan(tokens.motion.limits.maximumEntranceDuration);
+    expect(tokens.motion.limits.maximumEntranceDuration).toBeLessThanOrEqual(900);
+    expect(tokens.motion.limits.staggerInterval).toBeGreaterThanOrEqual(40);
+    expect(tokens.motion.limits.staggerInterval).toBeLessThanOrEqual(80);
+  });
+
+  it.each(['light', 'dark'] as const)(
+    '%s keeps vermilion as the only accent on a warm ground',
+    (name) => {
+      const palette = tokens.color[name];
+      expect(palette.focusRing).toBe(palette.accent);
+      // Votes and statuses wear tonal inks, so the accent keeps meaning "the primary action".
+      for (const tone of [
+        palette.voteHigh,
+        palette.voteLow,
+        palette.voteRight,
+        palette.sandInk,
+        palette.mintInk,
+        palette.graveInk,
+      ]) {
+        expect(tone).not.toBe(palette.accent);
+      }
+      // Selected chips and the segmented thumb are solid ink, never the accent.
+      expect(palette.inverse).toBe(palette.textPrimary);
+    },
+  );
+
+  it('pairs light and dark palettes with identical semantic names', () => {
+    expect(Object.keys(tokens.color.light).sort()).toEqual(Object.keys(tokens.color.dark).sort());
+  });
+
+  it('keeps the launch hold short enough that it never reads as a wait', () => {
+    expect(tokens.motion.duration.launchMinimumHold).toBeLessThanOrEqual(1500);
   });
 });

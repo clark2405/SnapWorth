@@ -18,7 +18,7 @@ interface ThemeContrastCase {
   readonly theme: ThemeName;
 }
 
-const themes = ['light', 'dark'] as const;
+const themes = ['light', 'dark', 'night'] as const;
 const themeContrastCases: ThemeContrastCase[] = themes.flatMap((theme) =>
   contrastPairings.map((pairing) => ({
     ...pairing,
@@ -47,16 +47,18 @@ describe('SnapWorth theme foundation', () => {
   );
 
   it('resolves system and explicit preferences deterministically', () => {
-    expect(resolveThemeName('system', 'dark')).toBe('dark');
+    expect(resolveThemeName('system')).toBe('dark');
+    expect(resolveThemeName('system', 'light')).toBe('light');
+    expect(resolveThemeName('dark', 'light')).toBe('dark');
     expect(resolveThemeName('light', 'dark')).toBe('light');
   });
 
-  it('exposes NativeWind channel variables without raw component fallbacks', () => {
-    const theme = resolveTheme('light');
+  it.each(themes)('%s exposes NativeWind channel variables without raw fallbacks', (name) => {
+    const theme = resolveTheme(name);
 
     for (const colorName of semanticColorNames) {
       expect(theme.nativeWindVariables[nativeWindVariableName(colorName)]).toMatch(/^\d+ \d+ \d+$/);
-      expect(theme.colors[colorName]).toBe(tokens.color.light[colorName]);
+      expect(theme.colors[colorName]).toBe(tokens.color[name][colorName]);
     }
   });
 });

@@ -8,7 +8,10 @@ const milliseconds = (value: number): string => `${value}ms`;
 
 const colorTheme = {
   canvas: nativeWindColorReferences.canvas,
-  surface: nativeWindColorReferences.surface,
+  surface: {
+    DEFAULT: nativeWindColorReferences.surface,
+    raised: nativeWindColorReferences.surfaceRaised,
+  },
   sunken: nativeWindColorReferences.sunken,
   border: {
     subtle: nativeWindColorReferences.borderSubtle,
@@ -46,26 +49,18 @@ export const snapWorthNativeWindPreset = {
     extend: {
       colors: colorTheme,
       fontFamily: {
-        display: [tokens.typography.family.displayMedium],
-        'display-bold': [tokens.typography.family.displayBold],
-        body: [tokens.typography.family.bodyRegular],
-        'body-medium': [tokens.typography.family.bodyMedium],
-        'body-semibold': [tokens.typography.family.bodySemibold],
+        display: [tokens.typography.webFamily.display],
+        body: [tokens.typography.webFamily.sans],
+        rounded: [tokens.typography.webFamily.rounded],
       },
-      fontSize: {
-        'price-hero': [px(typography.priceHero.size), { lineHeight: px(typography.priceHero.lineHeight) }],
-        'price-lg': [px(typography.priceLarge.size), { lineHeight: px(typography.priceLarge.lineHeight) }],
-        'price-md': [px(typography.priceMedium.size), { lineHeight: px(typography.priceMedium.lineHeight) }],
-        'heading-lg': [px(typography.headingLarge.size), { lineHeight: px(typography.headingLarge.lineHeight) }],
-        'heading-md': [px(typography.headingMedium.size), { lineHeight: px(typography.headingMedium.lineHeight) }],
-        'body-lg': [px(typography.bodyLarge.size), { lineHeight: px(typography.bodyLarge.lineHeight) }],
-        'body-md': [px(typography.bodyMedium.size), { lineHeight: px(typography.bodyMedium.lineHeight) }],
-        'label-md': [px(typography.labelMedium.size), { lineHeight: px(typography.labelMedium.lineHeight) }],
-        caption: [px(typography.caption.size), { lineHeight: px(typography.caption.lineHeight) }],
-        overline: [px(typography.overline.size), { lineHeight: px(typography.overline.lineHeight) }],
-      },
+      fontSize: Object.fromEntries(
+        Object.entries(typography).map(([name, style]) => [
+          name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`),
+          [px(style.size), { lineHeight: px(style.lineHeight) }],
+        ]),
+      ),
       letterSpacing: {
-        overline: `${typography.overline.letterSpacingEm}em`,
+        overline: px(typography.overline.letterSpacing),
       },
       spacing: Object.fromEntries(
         Object.entries(tokens.spacing).map(([name, value]) => [name, px(value)]),
@@ -115,12 +110,14 @@ export const snapWorthNativeWindPreset = {
         data: milliseconds(tokens.motion.duration.dataShift),
         accent: milliseconds(tokens.motion.duration.artisticAccent),
         reveal: milliseconds(tokens.motion.duration.reveal),
+        entrance: milliseconds(tokens.motion.duration.entrance),
         reduced: milliseconds(tokens.motion.duration.reducedCrossFade),
       },
       transitionTimingFunction: {
         direct: tokens.motion.easing.direct,
         enter: tokens.motion.easing.enter,
         exit: tokens.motion.easing.exit,
+        expressive: tokens.motion.easing.expressive,
       },
       boxShadow: {
         sheet: `${px(tokens.elevation.sheet.x)} ${px(tokens.elevation.sheet.y)} ${px(

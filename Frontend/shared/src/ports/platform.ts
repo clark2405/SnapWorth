@@ -13,9 +13,7 @@ export interface IdGenerator {
 }
 
 export type NetworkStatus =
-  | { readonly status: 'online' }
-  | { readonly status: 'offline' }
-  | { readonly status: 'unknown' };
+  { readonly status: 'online' } | { readonly status: 'offline' } | { readonly status: 'unknown' };
 
 export interface NetworkPort {
   getStatus(): NetworkStatus;

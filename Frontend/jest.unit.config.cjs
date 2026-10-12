@@ -1,5 +1,5 @@
-const { motionHookProject, pureUnitProject } = require('./jest.projects.cjs');
+const { motionHookProject, screenProject, pureUnitProject } = require('./jest.projects.cjs');
 
 module.exports = {
-  projects: [pureUnitProject, motionHookProject],
+  projects: [pureUnitProject, motionHookProject, screenProject],
 };

@@ -5,10 +5,12 @@
   "packageManager": "npm@11.6.2",
   "workspaces": [
     "web",
+    "mobile",
     "shared"
   ],
   "scripts": {
     "build:web": "npm run build --workspace=@snapworth/web",
+    "build:mobile": "npm run build --workspace=@snapworth/mobile",
     "dev": "npm run dev --workspace=@snapworth/web",
     "check:architecture": "eslint ./web/app ./shared/src --max-warnings=0 && node ./scripts/validate-source.mjs architecture",
     "check:dependency-pins": "node ./scripts/validate-workspace.mjs dependencies",
@@ -21,8 +23,11 @@
     "test:browser": "playwright test --config ./playwright.config.ts --pass-with-no-tests",
     "test:property": "jest --config ./jest.property.config.cjs --runInBand --passWithNoTests",
     "test:unit": "jest --config ./jest.unit.config.cjs --runInBand --passWithNoTests",
-    "typecheck": "tsc --project ./shared/tsconfig.json --noEmit && tsc --project ./web/tsconfig.json --noEmit",
-    "validate": "npm run check:topology && npm run check:dependency-pins && npm run check:static && npm run typecheck && npm run lint && npm run test:unit && npm run test:property"
+    "typecheck": "tsc --project ./shared/tsconfig.json --noEmit && tsc --project ./web/tsconfig.json --noEmit && tsc --project ./mobile/tsconfig.json --noEmit",
+    "validate": "npm run check:topology && npm run check:dependency-pins && npm run check:static && npm run typecheck && npm run lint && npm run test:unit && npm run test:property",
+    "dev:mobile": "npm run dev --workspace=@snapworth/mobile",
+    "ios": "npm run ios --workspace=@snapworth/mobile",
+    "android": "npm run android --workspace=@snapworth/mobile"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -47,7 +52,9 @@
     "typescript": "5.9.3",
     "typescript-eslint": "8.70.0"
   },
-  "dependencies": {
-    "snapworth": "file:.."
+  "overrides": {
+    "react-native-reanimated": "4.5.1",
+    "react-native-worklets": "0.10.1",
+    "react-native-gesture-handler": "2.32.0"
   }
 }

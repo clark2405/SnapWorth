@@ -18,10 +18,10 @@ The product is built around one core loop:
 
 Everything after that is optional, and the choices can be combined:
 
-| Choice | What happens |
-|---|---|
-| **Keep private** | The default. The item stays in your history as a personal valuation record. |
-| **Post to feed** | The community votes *Too High*, *Too Low*, or *Just Right* and can comment with pricing advice. |
+| Choice            | What happens                                                                                                                      |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Keep private**  | The default. The item stays in your history as a personal valuation record.                                                       |
+| **Post to feed**  | The community votes _Too High_, _Too Low_, or _Just Right_ and can comment with pricing advice.                                   |
 | **List for sale** | You confirm an asking price yourself. The AI estimate is never published as a price automatically. Buyers can then chat with you. |
 
 A feed post can be added to the marketplace later, and a listing can be reposted to the feed to ask whether the price is fair.
@@ -43,16 +43,16 @@ A feed post can be added to the marketplace later, and a listing can be reposted
 
 ## Tech stack
 
-| Layer | Technology |
-|---|---|
-| Frontend framework | [Expo](https://docs.expo.dev) (React Native) + react-native-web, written in TypeScript (strict) |
-| Navigation | [Expo Router](https://docs.expo.dev/router/introduction/): file-based routes shared by mobile screens and web URLs |
-| Styling | [NativeWind](https://www.nativewind.dev) (Tailwind CSS) |
-| Backend | [Supabase](https://supabase.com/docs): Auth, PostgreSQL with row-level security, Storage, Realtime |
-| AI price estimation | Provider to be selected, accessed through `PricingAdapter` |
-| AI content moderation | Provider to be selected, accessed through `ModerationAdapter` |
-| Testing | Jest, React Native Testing Library, fast-check (property tests), Playwright |
-| Deployment | EAS (Android build), Expo Go (iOS testing), Vercel (web) |
+| Layer                 | Technology                                                                                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Frontend framework    | [Expo](https://docs.expo.dev) (React Native) + react-native-web, written in TypeScript (strict)                    |
+| Navigation            | [Expo Router](https://docs.expo.dev/router/introduction/): file-based routes shared by mobile screens and web URLs |
+| Styling               | [NativeWind](https://www.nativewind.dev) (Tailwind CSS)                                                            |
+| Backend               | [Supabase](https://supabase.com/docs): Auth, PostgreSQL with row-level security, Storage, Realtime                 |
+| AI price estimation   | Provider to be selected, accessed through `PricingAdapter`                                                         |
+| AI content moderation | Provider to be selected, accessed through `ModerationAdapter`                                                      |
+| Testing               | Jest, React Native Testing Library, fast-check (property tests), Playwright                                        |
+| Deployment            | EAS builds (iOS and Android), Vercel (web)                                                                         |
 
 ---
 
@@ -87,7 +87,7 @@ SnapWorth/
 ├── Frontend/                 npm workspace (run npm commands from here)
 │   ├── web/                  Expo Router website: route files, app config, Tailwind
 │   │   └── app/              (auth)/ and (product)/ route groups
-│   ├── shared/               Code shared by web and future mobile
+│   ├── shared/               Code shared by the website and the mobile app
 │   │   └── src/
 │   │       ├── types/        Domain types: ids, money, entities, errors, workflow states
 │   │       ├── design/       Design tokens, theme, fonts, motion, NativeWind preset
@@ -96,9 +96,9 @@ SnapWorth/
 │   │       ├── components/   Reusable UI components (planned)
 │   │       ├── services/     Domain services (planned)
 │   │       └── adapters/     Supabase, pricing, and moderation adapters (planned)
-│   ├── mobile/               Deferred: one future Expo shell for iOS and Android
+│   ├── mobile/               Expo Router app for iOS and Android
 │   └── scripts/              Workspace topology, dependency-pin, and architecture checks
-├── Backend/                  Supabase: migrations, seed data, Edge Functions, tests (planned)
+├── Backend/                  Supabase: migrations, seed data, Edge Functions, tests
 ├── agents/                   Guidance for AI coding agents
 │   ├── AGENTS.md             Start here
 │   ├── skills/               offbrand-design UI and motion skill
@@ -113,7 +113,7 @@ SnapWorth/
 ### Prerequisites
 
 - [Node.js](https://nodejs.org) (current LTS or newer) and npm 11
-- For mobile testing later: [Expo Go](https://expo.dev/go) on a phone
+- For the mobile app: Xcode (iOS Simulator) or Android Studio (Android emulator)
 
 ### Install and run
 
@@ -127,18 +127,21 @@ npm run dev
 
 `npm run dev` starts the Expo web dev server. Open the URL it prints, usually http://localhost:8081.
 
+To run the mobile app instead, use `npm run ios` (iOS Simulator) or `npm run android` (Android emulator). The first run builds and installs the SnapWorth development build, which takes a few minutes.
+
 > Run `npm install` inside `Frontend/`. The npm workspace lives there, and the root `package.json` only forwards commands to it.
 
 ### Scripts
 
 From the repository root:
 
-| Command | What it does |
-|---|---|
-| `npm run dev` | Start the web development server |
-| `npm run build` | Export a production web build to `Frontend/web/dist/` |
-| `npm test` | Run unit tests |
-| `npm run validate` | Run every check: topology, dependency pins, static checks, typecheck, lint, unit and property tests |
+| Command                           | What it does                                                                                        |
+| --------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `npm run dev`                     | Start the web development server                                                                    |
+| `npm run ios` / `npm run android` | Start the mobile app in the iOS Simulator or Android emulator                                       |
+| `npm run build`                   | Export a production web build to `Frontend/web/dist/`                                               |
+| `npm test`                        | Run unit tests                                                                                      |
+| `npm run validate`                | Run every check: topology, dependency pins, static checks, typecheck, lint, unit and property tests |
 
 Additional scripts in `Frontend/`: `typecheck`, `lint`, `format`, `test:property`, `test:browser`, `check:architecture`.
 
@@ -157,15 +160,15 @@ npm install --save-exact <package> --workspace=@snapworth/web   # or @snapworth/
 
 The term runs 17 August to 12 December 2026. Features are delivered in scope tiers: **must have** by week 9, **should have** by week 14, and **could have** only if time allows.
 
-| ID | Milestone | Target |
-|---|---|---|
-| M1 | Planning and design documents approved | Week 2 (28 Aug) |
-| M2 | Development environment ready | Week 5 (18 Sep) |
-| M3 | Core loop: photo → AI estimate → history, working end to end | Week 9 (16 Oct) |
-| M4 | Feed, voting, comments, and moderation live | Week 12 (6 Nov) |
-| M5 | Marketplace and chat live; feature freeze | Week 14 (20 Nov) |
-| M6 | User acceptance testing passed | Week 16 (4 Dec) |
-| M7 | Deployed, defended, and turned over | Week 17 (12 Dec) |
+| ID  | Milestone                                                    | Target           |
+| --- | ------------------------------------------------------------ | ---------------- |
+| M1  | Planning and design documents approved                       | Week 2 (28 Aug)  |
+| M2  | Development environment ready                                | Week 5 (18 Sep)  |
+| M3  | Core loop: photo → AI estimate → history, working end to end | Week 9 (16 Oct)  |
+| M4  | Feed, voting, comments, and moderation live                  | Week 12 (6 Nov)  |
+| M5  | Marketplace and chat live; feature freeze                    | Week 14 (20 Nov) |
+| M6  | User acceptance testing passed                               | Week 16 (4 Dec)  |
+| M7  | Deployed, defended, and turned over                          | Week 17 (12 Dec) |
 
 **Done so far**
 
@@ -173,13 +176,14 @@ The term runs 17 August to 12 December 2026. Features are delivered in scope tie
 - [x] Architecture and dependency-pin checks
 - [x] Expo Router routes for every screen (placeholder views)
 - [x] Shared domain types and design system (tokens, theme, motion), with tests
+- [x] Feed comments and replies end to end: Supabase schema with row-level security, fail-closed moderation Edge Function, comment service, and the threaded UI (see [Backend/README.md](Backend/README.md))
 
 **Next**
 
 - [ ] Shared UI components and domain services
 - [ ] Authentication, onboarding, and the responsive web shell
 - [ ] Capture → estimate → history core loop
-- [ ] Supabase schema, row-level security policies, and Edge Functions
+- [ ] Supabase schema, row-level security policies, and Edge Functions for the rest of the product (items, votes, listings, chat)
 - [ ] AI pricing and moderation provider selection (week 6 spike)
 
 The detailed task plan is in [agents/specs/snapworth-web/tasks.md](agents/specs/snapworth-web/tasks.md).
@@ -188,23 +192,23 @@ The detailed task plan is in [agents/specs/snapworth-web/tasks.md](agents/specs/
 
 ## Documentation
 
-| Document | Covers |
-|---|---|
-| Software Requirements Specification (SRS) v01.00 | What the system must do |
-| Software Design Document (SDD) v01.00 | Architecture, data model, components, screens |
-| Software Project Management Plan (SPMP) v01.00 | Scope, schedule, budget, risks, team roles |
+| Document                                                   | Covers                                                           |
+| ---------------------------------------------------------- | ---------------------------------------------------------------- |
+| Software Requirements Specification (SRS) v01.00           | What the system must do                                          |
+| Software Design Document (SDD) v01.00                      | Architecture, data model, components, screens                    |
+| Software Project Management Plan (SPMP) v01.00             | Scope, schedule, budget, risks, team roles                       |
 | [agents/specs/snapworth-web/](agents/specs/snapworth-web/) | Implementation requirements, design, and tasks for the web build |
-| [Frontend/README.md](Frontend/README.md) | Workspace details and package management |
+| [Frontend/README.md](Frontend/README.md)                   | Workspace details and package management                         |
 
 ---
 
 ## Team
 
-| Member | Role | Responsible for |
-|---|---|---|
+| Member                 | Role                                      | Responsible for                                           |
+| ---------------------- | ----------------------------------------- | --------------------------------------------------------- |
 | Ivan Clement P. Cañete | Team Leader: Full Stack / Project Manager | Schedule, architecture decisions, environment, deployment |
-| Aldrich A. Segura | Full Stack | Supabase schema, RLS policies, services, AI adapters |
-| Clark Jaca | Frontend | Screens, components, navigation, testing |
+| Aldrich A. Segura      | Full Stack                                | Supabase schema, RLS policies, services, AI adapters      |
+| Clark Jaca             | Frontend                                  | Screens, components, navigation, testing                  |
 
 ---
 
