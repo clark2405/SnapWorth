@@ -13,11 +13,13 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     // If on the server, provide a dummy storage object that does nothing.
     // If in the browser, safely use standard local storage.
-    storage: isBrowser ? window.localStorage : {
-      getItem: () => null,
-      setItem: () => {},
-      removeItem: () => {},
-    },
+    storage: isBrowser
+      ? window.localStorage
+      : {
+          getItem: () => null,
+          setItem: () => {},
+          removeItem: () => {},
+        },
     autoRefreshToken: isBrowser,
     persistSession: isBrowser,
     detectSessionInUrl: isBrowser,
