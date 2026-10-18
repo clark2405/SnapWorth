@@ -17,6 +17,7 @@
     "@snapworth/shared": "0.0.0",
     "expo": "57.0.26",
     "expo-blur": "57.0.3",
+    "expo-camera": "57.0.6",
     "expo-constants": "57.0.20",
     "expo-glass-effect": "57.0.4",
     "expo-haptics": "57.0.3",

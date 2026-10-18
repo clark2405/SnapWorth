@@ -7,5 +7,10 @@ module.exports = {
     'web/src/**/*.{ts,tsx}',
     '!web/src/**/*.d.ts',
   ],
-  projects: [pureUnitProject, motionHookProject, propertyProject],
+  projects: [
+    pureUnitProject,
+    motionHookProject,
+    propertyProject,
+    require('./mobile/jest.config.cjs'),
+  ],
 };

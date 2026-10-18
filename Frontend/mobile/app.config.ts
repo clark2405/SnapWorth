@@ -34,6 +34,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-status-bar',
     'expo-system-ui',
     [
+      'expo-camera',
+      {
+        cameraPermission: 'Allow SnapWorth to use your camera to photograph items.',
+        recordAudioAndroid: false,
+        barcodeScannerEnabled: false,
+      },
+    ],
+    [
       'expo-splash-screen',
       {
         image: './assets/splash-mark.png',

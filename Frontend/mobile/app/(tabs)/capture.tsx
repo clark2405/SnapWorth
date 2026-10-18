@@ -1,23 +1,16 @@
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useIsFocused, useRouter } from 'expo-router';
 
-import { CaptureView } from '@snapworth/shared/features/capture';
+import { CameraCapture } from '../../src/camera/CameraCapture';
 
 export default function CaptureRoute() {
   const router = useRouter();
-  const [flashOn, setFlashOn] = useState(false);
+  const focused = useIsFocused();
 
   return (
-    <CaptureView
-      flashOn={flashOn}
-      onToggleFlash={() => setFlashOn((value) => !value)}
+    <CameraCapture
+      active={focused}
       onClose={() => router.navigate('/feed')}
-      // Preview wiring: capture and estimation services are not built yet, so the shutter
-      // opens the sample estimate.
-      onCapture={() => router.push('/item/nike-neon-windbreaker?fresh=1')}
       onOpenHistory={() => router.navigate('/history')}
-      // The camera sits under the floating tab bar.
-      bottomInset={64}
     />
   );
 }

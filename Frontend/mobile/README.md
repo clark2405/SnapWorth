@@ -27,6 +27,20 @@ To open one screen directly while reviewing it, set a start route:
 EXPO_PUBLIC_DEV_START_ROUTE=/item/nike-neon-windbreaker npm run dev:mobile
 ```
 
+## Camera setup
+
+The Snap tab uses the phone's rear camera through `expo-camera`. It requests camera
+permission and offers Settings when permission is blocked. The shutter is enabled only
+after the camera is ready; flash can be toggled before taking a photo. Camera access stops
+when the tab loses focus or the app enters the background.
+
+Taking a photo opens a temporary local preview with Retake. This setup does not upload
+photos, add them to History, generate AI estimates, or publish posts yet.
+
+Rebuild and reinstall the Android APK after this native dependency/configuration change;
+reloading JavaScript in an older APK is insufficient. Test on a physical phone: grant and
+deny camera access, take a photo, retake, switch tabs, and background/return to the app.
+
 ## Navigation
 
 - `app/(tabs)/` — the native tab bar (Feed, Market, Snap, Chats, History). On iOS 26 it is the
