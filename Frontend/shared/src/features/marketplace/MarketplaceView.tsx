@@ -1,4 +1,4 @@
-import { Camera, PackageSearch } from 'lucide-react-native';
+import { BadgePercent, PackageSearch } from 'lucide-react-native';
 import { useState } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -13,10 +13,13 @@ import {
   Photo,
   Reveal,
   Screen,
+  Sign,
+  SnapIcon,
+  Sticker,
   SWText,
   ZoomLink,
 } from '../../components';
-import { themedStyles, tokens, useThemedStyles } from '../../design';
+import { held, themedStyles, tokens, useThemedStyles } from '../../design';
 import {
   formatPeso,
   previewListings,
@@ -24,12 +27,25 @@ import {
   type PreviewListing,
 } from '../preview/sample-data';
 import { ProfileButton } from '../profile/ProfileButton';
+import { Tip } from '../tips';
 import { ListingCard } from './ListingCard';
+import {
+  areaLabel,
+  defaultMarketFilters,
+  FilterPill,
+  filterIcons,
+  LocationFilterSheet,
+  matchesPriceAndPlace,
+  PriceFilterSheet,
+  priceLabel,
+  type MarketFilters,
+} from './MarketFilters';
 
 export interface MarketplaceViewProps {
   readonly onOpenListing?: (listingId: string) => void;
   readonly onSell?: () => void;
-  readonly onFilter?: (filter: 'category' | 'price' | 'location') => void;
+  /** Every change to category, price range or location, for the listing query to follow. */
+  readonly onFiltersChange?: (filters: MarketFilters) => void;
   readonly onOpenProfile?: () => void;
 }
 
@@ -40,6 +56,10 @@ const categoryByListing: Readonly<Record<string, string>> = {
   'air-jordan-1-bred': 'sneakers',
   'retro-walkman': 'electronics',
   'keychron-keyboard': 'electronics',
+  'nike-teal-windbreaker': 'fashion',
+  'colour-block-windbreaker': 'fashion',
+  'black-puffer-jacket': 'fashion',
+  'polaroid-film-bundle': 'collectibles',
 };
 
 /** A rough read on whether a listing sits under its likely fair value, from its community verdict. */
@@ -51,55 +71,92 @@ function impliedEstimate(listing: PreviewListing): number {
 export function MarketplaceView({
   onOpenListing,
   onSell,
-  onFilter,
+  onFiltersChange,
   onOpenProfile,
 }: MarketplaceViewProps) {
   const styles = useThemedStyles(stylesFor);
-  const [category, setCategory] = useState('all');
+  const [filters, setFilters] = useState<MarketFilters>(defaultMarketFilters);
+  const [openSheet, setOpenSheet] = useState<'price' | 'location' | null>(null);
 
-  const filtered =
-    category === 'all'
-      ? previewListings
-      : previewListings.filter((listing) => categoryByListing[listing.id] === category);
+  const update = (change: Partial<MarketFilters>) => {
+    const next = { ...filters, ...change };
+    setFilters(next);
+    onFiltersChange?.(next);
+  };
 
-  const underEstimate = previewListings
-    .filter((listing) => listing.verdict === 'too_low')
-    .slice(0, 2);
+  const matching = (candidate: MarketFilters) =>
+    previewListings.filter(
+      (listing) =>
+        (candidate.category === 'all' || categoryByListing[listing.id] === candidate.category) &&
+        matchesPriceAndPlace(listing, candidate),
+    );
+
+  const filtered = matching(filters);
+  const narrowed =
+    filters.minPrice !== null || filters.maxPrice !== null || filters.area !== 'anywhere';
+
+  // Steals sit above the grid only while browsing everything; once narrowed, the grid is the answer.
+  const underEstimate = narrowed
+    ? []
+    : previewListings.filter((listing) => listing.verdict === 'too_low').slice(0, 2);
 
   return (
     <Screen
       clearTabBar
-      ambient="value"
+      place="market"
+      ambient="market"
       onRefresh={() => new Promise<void>((resolve) => setTimeout(resolve, 900))}
     >
       <LargeTitle
+        brand
         title="Market"
-        subtitle="Seller-set prices, checked by the community."
         trailing={
           <View style={styles.actions}>
-            <Button label="Sell" size="small" variant="accent" icon={Camera} onPress={onSell} />
+            {/* On iOS, Snap rides above the tab bar; shells without it pass onSell. */}
+            {onSell ? (
+              <Button
+                label="Sell"
+                size="small"
+                variant="secondary"
+                icon={SnapIcon}
+                onPress={onSell}
+              />
+            ) : null}
             <ProfileButton onPress={onOpenProfile} />
           </View>
         }
       />
 
+      <Tip id="save" style={styles.tip} />
+
       <Reveal index={0} style={styles.filters}>
         <ChoiceChips
           options={previewMarketCategories}
-          value={category}
+          value={filters.category}
           scroll
-          onChange={(key) => {
-            setCategory(key);
-            onFilter?.('category');
-          }}
+          onChange={(key) => update({ category: key })}
         />
+        <View style={styles.pills}>
+          <FilterPill
+            icon={filterIcons.price}
+            placeholder="Price"
+            value={priceLabel(filters.minPrice, filters.maxPrice)}
+            onOpen={() => setOpenSheet('price')}
+            onClear={() => update({ minPrice: null, maxPrice: null })}
+          />
+          <FilterPill
+            icon={filterIcons.location}
+            placeholder="Location"
+            value={areaLabel(filters.area, filters.radiusKm)}
+            onOpen={() => setOpenSheet('location')}
+            onClear={() => update({ area: 'anywhere' })}
+          />
+        </View>
       </Reveal>
 
       {underEstimate.length > 0 ? (
         <Reveal index={1} style={styles.highlightSection}>
-          <SWText variant="overline" tone="textMuted">
-            Priced under estimate
-          </SWText>
+          <Sign icon={BadgePercent} label="Steals · Under estimate" tone="cobalt" />
           <View style={styles.highlightRow}>
             {underEstimate.map((listing) => (
               <UnderEstimateCard
@@ -116,7 +173,17 @@ export function MarketplaceView({
         <EmptyState
           icon={PackageSearch}
           title="Nothing here yet"
-          body="Try a different category, or check back soon."
+          body={
+            narrowed
+              ? 'Nothing matches these filters. Widen the price range or location.'
+              : 'Try a different category, or check back soon.'
+          }
+          actionLabel={narrowed ? 'Clear filters' : undefined}
+          onAction={
+            narrowed
+              ? () => update({ minPrice: null, maxPrice: null, area: 'anywhere' })
+              : undefined
+          }
         />
       ) : (
         <View style={styles.grid}>
@@ -133,8 +200,31 @@ export function MarketplaceView({
               <ListingCard listing={listing} onOpen={() => onOpenListing?.(listing.id)} />
             </Animated.View>
           ))}
+          {/* An odd count keeps its last card at half width instead of stretching. */}
+          {filtered.length % 2 === 1 ? <View style={styles.cell} /> : null}
         </View>
       )}
+
+      <PriceFilterSheet
+        visible={openSheet === 'price'}
+        filters={filters}
+        countFor={(minPrice, maxPrice) => matching({ ...filters, minPrice, maxPrice }).length}
+        onClose={() => setOpenSheet(null)}
+        onApply={(minPrice, maxPrice) => {
+          update({ minPrice, maxPrice });
+          setOpenSheet(null);
+        }}
+      />
+      <LocationFilterSheet
+        visible={openSheet === 'location'}
+        filters={filters}
+        countFor={(area, radiusKm) => matching({ ...filters, area, radiusKm }).length}
+        onClose={() => setOpenSheet(null)}
+        onApply={(area, radiusKm) => {
+          update({ area, radiusKm });
+          setOpenSheet(null);
+        }}
+      />
     </Screen>
   );
 }
@@ -148,6 +238,7 @@ function UnderEstimateCard({
 }) {
   const styles = useThemedStyles(stylesFor);
   const estimate = impliedEstimate(listing);
+  const under = Math.round((1 - listing.askingPrice / estimate) * 100);
   return (
     <ZoomLink
       href={`/listing/${listing.id}`}
@@ -164,63 +255,98 @@ function UnderEstimateCard({
         style={styles.highlightPhoto}
       />
       <View style={styles.highlightText}>
-        <SWText variant="bodyCompact" tone="textSecondary" numberOfLines={1}>
+        <SWText
+          variant="bodyCompact"
+          tone="textSecondary"
+          numberOfLines={1}
+          style={under > 0 ? styles.underTitle : null}
+        >
           {listing.title}
         </SWText>
         <AskingPriceBadge value={formatPeso(listing.askingPrice)} size="compact" />
-        <EstimateBadge value={formatPeso(estimate)} />
+        <View style={styles.highlightEstimate}>
+          <EstimateBadge value={formatPeso(estimate)} />
+        </View>
       </View>
+      {under > 0 ? (
+        <View style={styles.underSpot} pointerEvents="none">
+          <Sticker label={`${under}% under`} tone="marigold" side="end" />
+        </View>
+      ) : null}
     </ZoomLink>
   );
 }
 
 const stylesFor = themedStyles((colors) => ({
+  // How far under the AI's estimate a steal is asking, slapped over the card's top corner.
+  underSpot: {
+    position: 'absolute',
+    top: -tokens.spacing[3],
+    right: -tokens.spacing[2],
+  },
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing[2],
   },
   filters: {
-    marginBottom: tokens.spacing[6],
+    gap: tokens.spacing[3],
+    marginBottom: tokens.spacing[8],
+  },
+  pills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: tokens.spacing[3],
   },
   highlightSection: {
-    gap: tokens.spacing[3],
-    marginBottom: tokens.spacing[6],
+    gap: tokens.spacing[4],
+    marginBottom: tokens.spacing[10],
   },
+  // Stacked, so each steal gets the full width for its asking price and estimate side by side.
+  // The gap leaves room for each card's sticker, which overhangs its top edge.
   highlightRow: {
-    flexDirection: 'row',
-    gap: tokens.spacing[3],
+    gap: tokens.spacing[6],
   },
   highlightSlot: {
-    flex: 1,
+    alignSelf: 'stretch',
   },
   highlightCard: {
-    flex: 1,
     flexDirection: 'row',
     gap: tokens.spacing[3],
     padding: tokens.spacing[3],
     borderRadius: tokens.radius.large,
-    backgroundColor: colors.estimateSurface,
-    borderWidth: tokens.border.hairline,
-    borderColor: colors.estimateBorder,
+    backgroundColor: colors.surface,
+    ...held(colors),
   },
   highlightPhoto: {
     width: 64,
     height: 64,
+    ...held(colors, 0),
   },
   highlightText: {
     flex: 1,
     gap: tokens.spacing['0.5'],
     justifyContent: 'center',
   },
+  // The title stops short of the sticker in the card's corner.
+  underTitle: {
+    marginRight: tokens.spacing[16] + tokens.spacing[4],
+  },
+  // The AI's tag sits a step apart from the asking price, so the two never read as one.
+  highlightEstimate: {
+    marginTop: tokens.spacing[2],
+  },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    columnGap: tokens.spacing[4],
-    rowGap: tokens.spacing[6],
+    columnGap: tokens.spacing[3],
+    rowGap: tokens.spacing[4],
   },
   cell: {
     flexBasis: '46%',
     flexGrow: 1,
+  },
+  tip: {
+    marginBottom: tokens.spacing[4],
   },
 }));

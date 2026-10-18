@@ -1,8 +1,15 @@
 import { Slot, usePathname, useRouter, type Href } from 'expo-router';
-import { Clock, MessageSquare, Newspaper, ShoppingBag } from 'lucide-react-native';
 import { View } from 'react-native';
 
-import { TabBar, type TabItem } from '@snapworth/shared/components';
+import {
+  ChatsIcon,
+  FeedIcon,
+  HistoryIcon,
+  MarketIcon,
+  requestScrollToTop,
+  TabBar,
+  type TabItem,
+} from '@snapworth/shared/components';
 
 type TabKey = 'feed' | 'marketplace' | 'chat' | 'history';
 
@@ -13,14 +20,13 @@ const tabRoutes: Record<TabKey, Href> = {
   history: '/history',
 };
 
-const leading = [
-  { key: 'feed', label: 'Feed', icon: Newspaper },
-  { key: 'marketplace', label: 'Market', icon: ShoppingBag },
-] as const satisfies readonly TabItem<TabKey>[];
-
-const trailing = [
-  { key: 'chat', label: 'Chat', icon: MessageSquare },
-  { key: 'history', label: 'History', icon: Clock },
+// Places only: Snap is an action, so it lives in the Feed and History headers (and as Sell in
+// Market), not in the bar.
+const tabs = [
+  { key: 'feed', label: 'Feed', icon: FeedIcon },
+  { key: 'marketplace', label: 'Market', icon: MarketIcon },
+  { key: 'chat', label: 'Chats', icon: ChatsIcon },
+  { key: 'history', label: 'History', icon: HistoryIcon },
 ] as const satisfies readonly TabItem<TabKey>[];
 
 export default function ProductLayout() {
@@ -33,11 +39,12 @@ export default function ProductLayout() {
       <Slot />
       {activeKey ? (
         <TabBar
-          leading={leading}
-          trailing={trailing}
+          tabs={tabs}
           activeKey={activeKey}
-          onSelect={(key) => router.replace(tabRoutes[key])}
-          onCapture={() => router.push('/capture')}
+          // Tapping the tab you are on takes its page back to the top.
+          onSelect={(key) =>
+            key === activeKey ? requestScrollToTop() : router.replace(tabRoutes[key])
+          }
         />
       ) : null}
     </View>

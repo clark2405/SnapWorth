@@ -18,6 +18,11 @@ export interface NavLinkRenderProps {
   /** Layout for the outer pressable, e.g. `{ flex: 1 }` to fill a row. */
   readonly containerStyle?: StyleProp<ViewStyle>;
   readonly menu?: readonly NavLinkMenuItem[];
+  /**
+   * The zoom starts from a `ZoomSource` inside the card (usually its photo) rather than the
+   * whole card, so a photo zooms into a photo instead of text and price stretching with it.
+   */
+  readonly zoomFromSource?: boolean;
   readonly children: ReactNode;
 }
 
@@ -26,6 +31,8 @@ interface NavLinkBridge {
   readonly link?: (props: NavLinkRenderProps) => ReactElement;
   /** Marks the element a zoom transition lands on in the destination screen. */
   readonly target?: (children: ReactNode) => ReactElement;
+  /** Marks the part of a card a zoom transition starts from. */
+  readonly source?: (children: ReactNode) => ReactElement;
 }
 
 const NavLinkContext = createContext<NavLinkBridge>({});
@@ -38,9 +45,10 @@ const NavLinkContext = createContext<NavLinkBridge>({});
 export function NavLinkProvider({
   link,
   target,
+  source,
   children,
 }: NavLinkBridge & { readonly children: ReactNode }) {
-  const value = useMemo(() => ({ link, target }), [link, target]);
+  const value = useMemo(() => ({ link, target, source }), [link, source, target]);
   return <NavLinkContext.Provider value={value}>{children}</NavLinkContext.Provider>;
 }
 
@@ -51,6 +59,8 @@ export interface ZoomLinkProps {
   /** Used where the platform has no link bridge (the web), or for analytics. */
   readonly onPress?: () => void;
   readonly menu?: readonly NavLinkMenuItem[];
+  /** Zoom from a `ZoomSource` inside the card instead of the whole card. */
+  readonly zoomFromSource?: boolean;
   readonly style?: StyleProp<ViewStyle>;
   /** Layout for the outer pressable, e.g. `{ flex: 1 }` to fill a row. */
   readonly containerStyle?: StyleProp<ViewStyle>;
@@ -63,12 +73,13 @@ export function ZoomLink({
   label,
   onPress,
   menu,
+  zoomFromSource,
   style,
   containerStyle,
   children,
 }: ZoomLinkProps) {
   const { link } = useContext(NavLinkContext);
-  if (link) return link({ href, label, style, containerStyle, menu, children });
+  if (link) return link({ href, label, style, containerStyle, menu, zoomFromSource, children });
   return (
     <PressableScale
       accessibilityRole="link"
@@ -82,6 +93,12 @@ export function ZoomLink({
       {children}
     </PressableScale>
   );
+}
+
+/** The part of a `ZoomLink` card (its photo) that the zoom transition starts from. */
+export function ZoomSource({ children }: { readonly children: ReactNode }) {
+  const { source } = useContext(NavLinkContext);
+  return source ? source(children) : <>{children}</>;
 }
 
 /** The element in a detail screen that an incoming zoom transition lands on. */

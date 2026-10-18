@@ -1,0 +1,15 @@
+# Supabase CLI configuration. Only the settings SnapWorth relies on are listed; everything else
+# uses the CLI defaults. See Backend/README.md for setup.
+project_id = "snapworth"
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed/*.sql"]
+
+[auth]
+# Lets the app comment before full sign-in exists: each device gets an anonymous account with
+# its own profile. Turn off once email sign-in is wired up.
+enable_anonymous_sign_ins = true
+
+[functions.moderate-content]
+verify_jwt = true

@@ -78,7 +78,7 @@ export function SegmentedControl<Key extends string>({
             containerStyle={styles.slot}
             style={[styles.segment, active && segmentWidth === 0 ? styles.pillStatic : null]}
           >
-            <SWText variant="labelSmall" tone={active ? 'textPrimary' : 'textMuted'}>
+            <SWText variant="labelSmall" tone={active ? 'onInverse' : 'textSecondary'}>
               {option.label}
             </SWText>
           </PressableScale>
@@ -104,18 +104,18 @@ const stylesFor = themedStyles((colors, name) => ({
     bottom: inset,
     left: inset,
     borderRadius: tokens.radius.full,
-    backgroundColor: name === 'dark' ? colors.borderStrong : colors.surface,
+    backgroundColor: colors.inverse,
     shadowColor: tokens.shadow[name],
     shadowOpacity: 1,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
     pointerEvents: 'none',
   },
   pillStatic: {
-    backgroundColor: name === 'dark' ? colors.borderStrong : colors.surface,
+    backgroundColor: colors.inverse,
   },
   segment: {
-    minHeight: 36,
+    minHeight: 40,
     borderRadius: tokens.radius.full,
     alignItems: 'center',
     justifyContent: 'center',

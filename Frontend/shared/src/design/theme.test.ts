@@ -18,7 +18,7 @@ interface ThemeContrastCase {
   readonly theme: ThemeName;
 }
 
-const themes = ['light', 'dark'] as const;
+const themes = ['light', 'dark', 'night'] as const;
 const themeContrastCases: ThemeContrastCase[] = themes.flatMap((theme) =>
   contrastPairings.map((pairing) => ({
     ...pairing,

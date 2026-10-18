@@ -14,7 +14,8 @@ export default function CreateListingRoute() {
       <ConfirmPriceView
         itemId={itemId}
         onBack={() => router.back()}
-        onPublish={() => router.replace('/marketplace')}
+        // Back to the market, closing the snap flow behind it rather than stacking on top.
+        onPublish={() => router.dismissTo('/marketplace')}
       />
     </ModalSafeArea>
   );

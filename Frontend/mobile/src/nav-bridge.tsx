@@ -1,6 +1,6 @@
 import { Link, type Href } from 'expo-router';
 import type { ReactNode } from 'react';
-import { Platform } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import type { SFSymbol } from 'sf-symbols-typescript';
 
 import { PressableScale, type NavLinkRenderProps } from '@snapworth/shared/components';
@@ -15,16 +15,19 @@ export function renderNavLink({
   style,
   containerStyle,
   menu,
+  zoomFromSource,
   children,
 }: NavLinkRenderProps) {
+  // `Link asChild` hands its child's props to a Slot, which rejects style arrays, so callers'
+  // composed styles (e.g. a row plus a divider) are flattened into one object first.
   const card = (
     <PressableScale
       accessibilityRole="link"
       accessibilityLabel={label}
       depth="surface"
       haptic="none"
-      style={style}
-      containerStyle={containerStyle}
+      style={StyleSheet.flatten(style)}
+      containerStyle={StyleSheet.flatten(containerStyle)}
     >
       {children}
     </PressableScale>
@@ -40,7 +43,8 @@ export function renderNavLink({
 
   return (
     <Link href={href as Href} asChild>
-      <Link.Trigger withAppleZoom>{card}</Link.Trigger>
+      {/* With a ZoomSource inside, the zoom starts there (the photo) instead of the card. */}
+      <Link.Trigger withAppleZoom={!zoomFromSource}>{card}</Link.Trigger>
       <Link.Preview />
       {menu && menu.length > 0 ? (
         <Link.Menu>
@@ -57,6 +61,11 @@ export function renderNavLink({
       ) : null}
     </Link>
   );
+}
+
+export function renderZoomSource(children: ReactNode) {
+  if (Platform.OS !== 'ios') return <>{children}</>;
+  return <Link.AppleZoom>{children}</Link.AppleZoom>;
 }
 
 export function renderZoomTarget(children: ReactNode) {

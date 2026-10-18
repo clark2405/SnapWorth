@@ -45,8 +45,12 @@ export function CountUp({
       if (t < 1) frame.current = requestAnimationFrame(tick);
     };
     frame.current = requestAnimationFrame(tick);
+    // Frames can stall (a busy device, a screen still sliding in), so the count is guaranteed to
+    // land on its value once its time is up.
+    const land = setTimeout(() => setShown(value), delayMs + durationMs + 100);
     return () => {
       if (frame.current !== null) cancelAnimationFrame(frame.current);
+      clearTimeout(land);
     };
   }, [delayMs, durationMs, reduceMotion, start, value]);
 

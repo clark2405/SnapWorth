@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { themedStyles, tokens, useThemedStyles } from '../design';
+import { held, themedStyles, tokens, useThemedStyles } from '../design';
 import { GlassSurface } from './GlassSurface';
 
-export type SurfaceTone = 'surface' | 'raised' | 'sunken' | 'accent';
+export type SurfaceTone = 'surface' | 'raised' | 'sunken' | 'accent' | 'feature';
 
 export interface SurfaceProps {
   readonly children?: ReactNode;
@@ -17,8 +18,9 @@ export interface SurfaceProps {
 }
 
 /**
- * A grouped card. In light mode it lifts off the paper on a soft, wide shadow; in dark mode it
- * steps up in value with a hairline edge instead, since shadows vanish on a dark ground.
+ * A card, cut from the same stock as every other thing you can hold: an ink outline and a hard
+ * shadow offset beneath it (a cream outline at night). `feature` is the inverted slab a screen
+ * may use once, for its hero number; `sunken` and `accent` lie flat in the page.
  */
 export function Surface({
   children,
@@ -46,7 +48,10 @@ export function Surface({
   );
 }
 
-/** A floating glass bar over the bottom edge: composers and action bars. */
+/**
+ * A floating glass bar over the bottom edge: composers and action bars. It owns the inner
+ * padding, so every bar in the app sits its contents the same distance from the glass edge.
+ */
 export function BottomBar({
   children,
   style,
@@ -55,9 +60,15 @@ export function BottomBar({
   readonly style?: StyleProp<ViewStyle>;
 }) {
   const styles = useThemedStyles(stylesFor);
+  const insets = useSafeAreaInsets();
+  // On a phone with rounded screen corners the bar floats as far from the bottom as from the
+  // sides, and its corners follow the screen's: concentric, like iOS 26's own floating bars.
+  const rounded = insets.bottom > 0;
   return (
-    <View style={[styles.bottomWrap, style]}>
-      <GlassSurface style={styles.bottomBar}>{children}</GlassSurface>
+    <View style={[styles.bottomWrap, rounded ? styles.bottomWrapRounded : null]}>
+      <GlassSurface style={[styles.bottomBar, rounded ? styles.bottomBarRounded : null]}>
+        <View style={[styles.bottomContent, style]}>{children}</View>
+      </GlassSurface>
     </View>
   );
 }
@@ -73,43 +84,50 @@ export function Divider({ style }: { readonly style?: StyleProp<ViewStyle> }) {
   );
 }
 
-const stylesFor = themedStyles((colors, name) => ({
-  card: {
-    borderWidth: name === 'dark' ? StyleSheet.hairlineWidth : 0,
-    borderColor: colors.borderSubtle,
-    shadowColor: tokens.shadow[name],
-    shadowOpacity: name === 'dark' ? 0 : 1,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: name === 'dark' ? 0 : 2,
-  },
+/** Roughly the display corner radius of Face ID iPhones, which the bottom bar nests inside. */
+const screenCornerRadius = 55;
+const bottomBarMargin = tokens.spacing[4];
+
+const stylesFor = themedStyles((colors) => ({
+  card: held(colors),
   clip: {
     overflow: 'hidden',
   },
   surface: { backgroundColor: colors.surface },
-  raised: { backgroundColor: colors.surfaceRaised, borderColor: colors.borderStrong },
+  raised: { backgroundColor: colors.surfaceRaised },
+  feature: { backgroundColor: colors.feature },
   sunken: {
     backgroundColor: colors.sunken,
-    shadowOpacity: 0,
-    elevation: 0,
     borderWidth: 0,
+    shadowOpacity: 0,
+    boxShadow: undefined,
   },
   accent: {
     backgroundColor: colors.estimateSurface,
-    borderColor: colors.estimateBorder,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 0,
     shadowOpacity: 0,
+    boxShadow: undefined,
   },
   bottomWrap: {
     paddingHorizontal: tokens.spacing[3],
-    paddingBottom: tokens.spacing[2],
+    paddingBottom: tokens.spacing[3],
+  },
+  bottomWrapRounded: {
+    paddingHorizontal: bottomBarMargin,
+    paddingBottom: bottomBarMargin,
   },
   bottomBar: {
     borderRadius: tokens.radius.xlarge,
   },
+  bottomBarRounded: {
+    borderRadius: screenCornerRadius - bottomBarMargin,
+  },
+  bottomContent: {
+    padding: tokens.spacing[3],
+    gap: tokens.spacing[2],
+  },
   divider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.borderStrong,
-    opacity: 0.6,
+    backgroundColor: colors.borderSubtle,
   },
 }));

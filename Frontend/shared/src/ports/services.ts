@@ -8,7 +8,6 @@ import type {
   VoteError,
 } from '../types/errors';
 import type {
-  CommentBody,
   CommentReceipt,
   ConversationDetail,
   ConversationSummary,
@@ -27,6 +26,7 @@ import type {
   ReportReason,
   Session,
   StoredItem,
+  ThreadComment,
   VoteChoice,
   VoteSnapshot,
   SelectedImage,
@@ -40,7 +40,6 @@ import type {
   ListingId,
   ModerationCaseId,
   PostId,
-  ReportId,
   UserId,
 } from '../types/ids';
 import type { AiEstimate, AskingPriceDraft } from '../types/money';
@@ -80,10 +79,20 @@ export interface VoteService {
   setVote(postId: PostId, desired: VoteChoice | null): Promise<Result<VoteSnapshot, VoteError>>;
 }
 
+/**
+ * A post's discussion. Posts are addressed by their public key (the slug in a post's link).
+ * Submitting returns the comment as moderation left it: `approved` and public, or `pending` /
+ * `held` and visible only to its author.
+ */
 export interface CommentService {
-  submit(postId: PostId, body: CommentBody): Promise<Result<CommentReceipt, ModerationError>>;
+  listThread(postKey: string): Promise<Result<readonly ThreadComment[], AppError>>;
+  submit(
+    postKey: string,
+    body: string,
+    replyTo?: CommentId,
+  ): Promise<Result<CommentReceipt, ModerationError>>;
   remove(commentId: CommentId): Promise<Result<void, AppError>>;
-  report(target: PublicContentRef, reason: ReportReason): Promise<Result<ReportId, AppError>>;
+  report(target: CommentId, reason: ReportReason): Promise<Result<void, AppError>>;
 }
 
 export interface ListingService {

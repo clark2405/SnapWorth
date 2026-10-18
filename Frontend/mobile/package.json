@@ -12,16 +12,23 @@
     "build": "expo export --platform ios --output-dir dist/ios && expo export --platform android --output-dir dist/android"
   },
   "dependencies": {
+    "@expo-google-fonts/bricolage-grotesque": "0.4.1",
+    "@expo-google-fonts/dm-mono": "0.4.2",
+    "@expo-google-fonts/plus-jakarta-sans": "0.4.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-masked-view/masked-view": "0.3.2",
     "@snapworth/shared": "0.0.0",
+    "@supabase/supabase-js": "2.117.2",
     "expo": "57.0.26",
     "expo-blur": "57.0.3",
     "expo-camera": "57.0.6",
     "expo-constants": "57.0.20",
+    "expo-font": "57.0.4",
     "expo-glass-effect": "57.0.4",
     "expo-haptics": "57.0.3",
+    "expo-image-picker": "57.0.20",
     "expo-linking": "57.0.11",
+    "expo-notifications": "57.0.22",
     "expo-router": "57.0.24",
     "expo-splash-screen": "57.0.9",
     "expo-status-bar": "57.0.1",
@@ -35,6 +42,7 @@
     "react-native-safe-area-context": "5.7.0",
     "react-native-screens": "4.26.2",
     "react-native-svg": "15.15.4",
+    "react-native-url-polyfill": "3.0.0",
     "react-native-worklets": "0.10.1"
   }
 }

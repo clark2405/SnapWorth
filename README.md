@@ -98,7 +98,7 @@ SnapWorth/
 │   │       └── adapters/     Supabase, pricing, and moderation adapters (planned)
 │   ├── mobile/               Expo Router app for iOS and Android
 │   └── scripts/              Workspace topology, dependency-pin, and architecture checks
-├── Backend/                  Supabase: migrations, seed data, Edge Functions, tests (planned)
+├── Backend/                  Supabase: migrations, seed data, Edge Functions, tests
 ├── agents/                   Guidance for AI coding agents
 │   ├── AGENTS.md             Start here
 │   ├── skills/               offbrand-design UI and motion skill
@@ -176,13 +176,14 @@ The term runs 17 August to 12 December 2026. Features are delivered in scope tie
 - [x] Architecture and dependency-pin checks
 - [x] Expo Router routes for every screen (placeholder views)
 - [x] Shared domain types and design system (tokens, theme, motion), with tests
+- [x] Feed comments and replies end to end: Supabase schema with row-level security, fail-closed moderation Edge Function, comment service, and the threaded UI (see [Backend/README.md](Backend/README.md))
 
 **Next**
 
 - [ ] Shared UI components and domain services
 - [ ] Authentication, onboarding, and the responsive web shell
 - [ ] Capture → estimate → history core loop
-- [ ] Supabase schema, row-level security policies, and Edge Functions
+- [ ] Supabase schema, row-level security policies, and Edge Functions for the rest of the product (items, votes, listings, chat)
 - [ ] AI pricing and moderation provider selection (week 6 spike)
 
 The detailed task plan is in [agents/specs/snapworth-web/tasks.md](agents/specs/snapworth-web/tasks.md).

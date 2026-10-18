@@ -8,3 +8,5 @@ package-lock.json
 mobile/.expo
 mobile/ios
 mobile/android
+# Icon Composer writes its own JSON style; formatting it would fight the tool.
+*.icon

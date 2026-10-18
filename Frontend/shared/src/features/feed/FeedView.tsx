@@ -1,65 +1,99 @@
+import { Flame } from 'lucide-react-native';
 import { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import {
+  Button,
   LargeTitle,
   Photo,
-  PressableScale,
+  Sign,
+  SnapIcon,
+  Sticker,
+  ZoomLink,
+  ZoomSource,
   Reveal,
   Screen,
   SearchButton,
   SWText,
   type SearchOrigin,
 } from '../../components';
-import { themedStyles, tokens, useThemedStyles } from '../../design';
+import { held, themedStyles, tokens, useThemedStyles } from '../../design';
 import type { VoteChoice } from '../../types';
-import { previewPosts, previewTrending } from '../preview/sample-data';
+import { previewOlderPosts, previewPosts, previewTrending } from '../preview/sample-data';
 import { ProfileButton } from '../profile/ProfileButton';
+import { useAccountGate } from '../session';
+import { Tip, useTip } from '../tips';
 import { PostCard } from './PostCard';
 
 export interface FeedViewProps {
   readonly onOpenPost?: (postId: string) => void;
   readonly onSearch?: (origin?: SearchOrigin) => void;
   readonly onOpenProfile?: () => void;
+  /**
+   * Opens the camera from the header, for shells without a persistent Snap control (the web);
+   * on iOS, Snap rides above the tab bar instead.
+   */
+  readonly onSnap?: () => void;
+  /** Opens a "Hot this month" category's trend screen, by its key (where links need a hand). */
+  readonly onOpenTrend?: (trendKey: string) => void;
+  /** Shares a link to a post, from its press-and-hold menu. */
+  readonly onSharePost?: (postId: string) => void;
 }
 
 type PreviewTrend = (typeof previewTrending)[number];
+
+/** Newest first, the older ones further down, as the feed reads once it has history. */
+const feedPosts = [...previewPosts, ...previewOlderPosts];
 
 /**
  * The community's front page: what is trending this month, then every open question, newest
  * first. Nothing here is a hard card; posts are set apart by air, not rules.
  */
-export function FeedView({ onOpenPost, onSearch, onOpenProfile }: FeedViewProps) {
+export function FeedView({
+  onOpenPost,
+  onSearch,
+  onOpenProfile,
+  onSnap,
+  onOpenTrend,
+  onSharePost,
+}: FeedViewProps) {
   const styles = useThemedStyles(stylesFor);
   // Local until VoteService exists: tapping the same vote again withdraws it.
   const [votes, setVotes] = useState<Record<string, VoteChoice | null>>({});
+  const requireAccount = useAccountGate();
+  const voteTip = useTip('vote');
 
   return (
     <Screen
       clearTabBar
-      ambient="value"
+      place="feed"
+      ambient="feed"
       onRefresh={() => new Promise<void>((resolve) => setTimeout(resolve, 900))}
     >
       <LargeTitle
+        brand
         title="Feed"
-        subtitle="Vote on whether the AI got the price right."
         trailing={
           <View style={styles.actions}>
-            <SearchButton label="Search the feed" onOpen={onSearch} />
+            {onSnap ? (
+              <Button
+                label="Snap"
+                size="small"
+                variant="secondary"
+                icon={SnapIcon}
+                onPress={onSnap}
+              />
+            ) : null}
+            {/* On iOS, search is a tab of its own; shells without one pass onSearch. */}
+            {onSearch ? <SearchButton label="Search the feed" onOpen={onSearch} /> : null}
             <ProfileButton onPress={onOpenProfile} />
           </View>
         }
       />
+      <Tip id="snap" style={styles.tip} />
 
       <Reveal index={0} style={styles.trending}>
-        <SWText
-          variant="overline"
-          tone="textMuted"
-          style={styles.trendingTitle}
-          accessibilityRole="header"
-        >
-          Trending this month
-        </SWText>
+        <Sign icon={Flame} label="Hot this month" />
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -67,24 +101,28 @@ export function FeedView({ onOpenPost, onSearch, onOpenProfile }: FeedViewProps)
           contentContainerStyle={styles.trendingRow}
         >
           {previewTrending.map((trend) => (
-            <TrendingTile key={trend.key} trend={trend} />
+            <TrendingTile key={trend.key} trend={trend} onOpen={() => onOpenTrend?.(trend.key)} />
           ))}
         </ScrollView>
       </Reveal>
 
       <View style={styles.list}>
-        {previewPosts.map((post, index) => (
-          <Reveal key={post.id} index={index + 1}>
+        {feedPosts.map((post, index) => (
+          <Reveal key={post.id} index={index + 1} style={index > 0 ? styles.divided : null}>
             <PostCard
               post={post}
               vote={votes[post.id] ?? null}
               onVote={(choice) =>
-                setVotes((current) => ({
-                  ...current,
-                  [post.id]: current[post.id] === choice ? null : choice,
-                }))
+                requireAccount('vote', () => {
+                  voteTip.done();
+                  setVotes((current) => ({
+                    ...current,
+                    [post.id]: current[post.id] === choice ? null : choice,
+                  }));
+                })
               }
               onOpen={() => onOpenPost?.(post.id)}
+              onShare={onSharePost ? () => onSharePost(post.id) : undefined}
             />
           </Reveal>
         ))}
@@ -93,45 +131,57 @@ export function FeedView({ onOpenPost, onSearch, onOpenProfile }: FeedViewProps)
   );
 }
 
-function TrendingTile({ trend }: { readonly trend: PreviewTrend }) {
+function TrendingTile({
+  trend,
+  onOpen,
+}: {
+  readonly trend: PreviewTrend;
+  readonly onOpen: () => void;
+}) {
   const styles = useThemedStyles(stylesFor);
   const rising = trend.change.trim().startsWith('+');
 
+  // Zooms open into the trend's own screen on iOS, the photo carrying straight across.
   return (
-    <PressableScale
-      accessibilityRole="button"
-      accessibilityLabel={`${trend.label}, ${trend.change} this month`}
-      depth="surface"
+    <ZoomLink
+      href={`/trend/${trend.key}`}
+      label={`${trend.label}, ${trend.change} this month. See what's selling`}
+      onPress={onOpen}
+      zoomFromSource
       style={styles.tile}
     >
-      <Photo
-        source={trend.photo}
-        label={trend.label}
-        radius={tokens.radius.large}
-        style={styles.tilePhoto}
-      />
+      <View style={styles.tileFrame}>
+        <ZoomSource>
+          <Photo
+            source={trend.photo}
+            label={trend.label}
+            radius={tokens.radius.large - 2}
+            style={styles.tilePhoto}
+          />
+        </ZoomSource>
+        {/* The month's move, slapped on like a market sticker. */}
+        <Sticker
+          label={trend.change}
+          tone={rising ? 'marigold' : 'cobalt'}
+          style={styles.tileSticker}
+        />
+      </View>
       <SWText variant="labelSmall" numberOfLines={1}>
         {trend.label}
       </SWText>
-      <SWText variant="caption" tone={rising ? 'success' : 'danger'}>
-        {trend.change}
-      </SWText>
-    </PressableScale>
+    </ZoomLink>
   );
 }
 
-const stylesFor = themedStyles(() => ({
+const stylesFor = themedStyles((colors) => ({
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing[2],
   },
   trending: {
-    gap: tokens.spacing[3],
-    marginBottom: tokens.spacing[8],
-  },
-  trendingTitle: {
-    paddingHorizontal: tokens.spacing['0.5'],
+    gap: tokens.spacing[4],
+    marginBottom: tokens.spacing[10],
   },
   trendingBleed: {
     marginHorizontal: -tokens.layout.pageGutterCompact,
@@ -142,14 +192,31 @@ const stylesFor = themedStyles(() => ({
     paddingHorizontal: tokens.layout.pageGutterCompact,
   },
   tile: {
-    width: 112,
-    gap: tokens.spacing[1],
+    width: 120,
+    gap: tokens.spacing['0.5'],
+  },
+  tileFrame: {
+    borderRadius: tokens.radius.large,
+    marginBottom: tokens.spacing[2],
+    ...held(colors),
   },
   tilePhoto: {
-    width: 112,
-    height: 112,
+    width: 116,
+    height: 116,
+  },
+  tileSticker: {
+    position: 'absolute',
+    left: tokens.spacing[2],
+    bottom: tokens.spacing[4],
+  },
+  divided: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderSubtle,
   },
   list: {
-    gap: tokens.spacing[8],
+    gap: 0,
+  },
+  tip: {
+    marginBottom: tokens.spacing[6],
   },
 }));

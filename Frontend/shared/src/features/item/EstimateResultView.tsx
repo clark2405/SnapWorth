@@ -5,16 +5,16 @@ import {
   EyeOff,
   Flame,
   Gem,
+  Handshake,
+  Lock,
   RotateCw,
-  Share2,
   ShoppingBag,
-  Sparkles,
+  type LucideIcon,
   Users,
   WifiOff,
-  type LucideIcon,
 } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollView, Share, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { ScrollView, Share, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -34,7 +34,10 @@ import {
   BottomBar,
   Button,
   ChoiceChips,
-  CompanionOrb,
+  PriceTagIcon,
+  Stamp,
+  TagShape,
+  Worthy,
   CountUp,
   Field,
   IconButton,
@@ -47,20 +50,29 @@ import {
   Sheet,
   Sparkline,
   SWText,
+  shareIcon,
+  Wordmark,
+  LogoMark,
   Surface,
   Tag,
   TextField,
-  ZoomTarget,
   useToast,
+  DetailHero,
+  DetailSheet,
+  WorthySays,
 } from '../../components';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import {
   formatPeso,
+  photosOf,
   previewConditions,
   previewItem,
+  previewSharingByItem,
   previewValuation,
   type PreviewCondition,
+  type PreviewSharing,
 } from '../preview/sample-data';
+import { Tip, useTip } from '../tips';
 
 /**
  * Where the estimate stands. The photo is already saved in every state, because the item is
@@ -74,9 +86,20 @@ export interface EstimateResultViewProps {
   readonly onBack?: () => void;
   readonly onShare?: () => void;
   readonly onRetry?: () => void;
-  readonly onPostToFeed?: () => void;
+  /** `listing` when the item is already for sale, so the post asks about its asking price. */
+  readonly onPostToFeed?: (source: 'item' | 'listing') => void;
   readonly onListForSale?: () => void;
   readonly onKeepPrivate?: () => void;
+  /** Opens the feed post this item is already shared in. */
+  readonly onViewPost?: (postId: string) => void;
+  /** Opens the marketplace listing for this item. */
+  readonly onViewListing?: (listingId: string) => void;
+  /**
+   * `sheet` is the answer to a fresh snap, risen over the frozen camera the way Visual
+   * Intelligence answers: the photo is already behind it, so the price leads, and the sheet is
+   * swiped away rather than backed out of. `screen` is an item opened from History.
+   */
+  readonly presentation?: 'screen' | 'sheet';
 }
 
 const conditionFactor = (key: PreviewCondition) =>
@@ -85,7 +108,27 @@ const conditionFactor = (key: PreviewCondition) =>
 const baseValue = previewItem.estimate / conditionFactor(previewValuation.condition);
 const roundTo50 = (value: number) => Math.round(value / 50) * 50;
 
+/**
+ * Worthy's word on the condition chosen, in pesos: what it adds or costs against like new, and
+ * what to do about it. `low` is the bottom of the range at that condition.
+ */
+function conditionLine(condition: PreviewCondition, low: number): string {
+  const worth = (key: PreviewCondition) => roundTo50(baseValue * conditionFactor(key));
+  const gap = formatPeso(Math.abs(worth('like_new') - worth(condition)));
+  switch (condition) {
+    case 'new':
+      return `Tags still on? Say so first. New is worth ${gap} more than like new.`;
+    case 'like_new':
+      return 'Like new is where this sells best. Photograph the label and any wear up close: buyers pay for proof.';
+    case 'good':
+      return `Good knocks about ${gap} off like new. A wash and a daylight photo can win some back.`;
+    case 'fair':
+      return `Fair still sells, just slower. Ask near ${formatPeso(low)} to move it this month.`;
+  }
+}
+
 export function EstimateResultView({
+  itemId,
   status = 'estimated',
   onBack,
   onShare,
@@ -93,11 +136,19 @@ export function EstimateResultView({
   onPostToFeed,
   onListForSale,
   onKeepPrivate,
+  onViewPost,
+  onViewListing,
+  presentation = 'screen',
 }: EstimateResultViewProps) {
+  const asSheet = presentation === 'sheet';
+  const listTip = useTip('list');
   const item = previewItem;
+  // A fresh capture (the sheet) is private until the owner shares it; History items carry their
+  // own state. The preview reuses a History item for the capture, so the sheet ignores its state.
+  const placement: PreviewSharing =
+    (asSheet || !itemId ? undefined : previewSharingByItem[itemId]) ?? {};
   const styles = useThemedStyles(stylesFor);
   const { colors } = useTheme();
-  const { height } = useWindowDimensions();
   const [title, setTitle] = useState<string>(item.title);
   const [condition, setCondition] = useState<PreviewCondition>(previewValuation.condition);
   const [sharing, setSharing] = useState(false);
@@ -117,15 +168,19 @@ export function EstimateResultView({
 
   return (
     <Screen
-      bleedTop
+      bleedTop={!asSheet}
+      sheet={asSheet}
       header={
+        // In the sheet the title stays up from the start: the photo is behind the sheet, so the
+        // name is what tells you what was recognised.
         <NavHeader
-          title={estimated ? title : 'Estimating'}
-          onBack={onBack}
+          title={estimated ? title : asSheet ? 'New snap' : 'Estimating'}
+          banded={asSheet}
+          onBack={asSheet ? undefined : onBack}
           trailing={
             estimated ? (
               <IconButton
-                icon={Share2}
+                icon={shareIcon}
                 label="Share this estimate"
                 appearance="glass"
                 onPress={() => {
@@ -140,27 +195,34 @@ export function EstimateResultView({
       footer={
         estimated ? (
           <Destinations
-            onListForSale={onListForSale}
-            onPostToFeed={onPostToFeed}
+            sharing={placement}
+            onListForSale={() => {
+              listTip.done();
+              onListForSale?.();
+            }}
+            onPostToFeed={(source) => {
+              listTip.done();
+              onPostToFeed?.(source);
+            }}
             onKeepPrivate={onKeepPrivate}
+            onViewPost={onViewPost}
+            onViewListing={onViewListing}
           />
         ) : null
       }
       contentStyle={styles.content}
     >
-      <View style={[styles.hero, { height: Math.round(height * (estimated ? 0.5 : 0.62)) }]}>
-        <ZoomTarget>
-          <Photo
-            source={item.photo}
-            label={item.photoLabel}
-            radius={0}
-            style={StyleSheet.absoluteFill}
-          />
-        </ZoomTarget>
-        {status === 'estimating' ? <ScanOverlay /> : null}
-      </View>
+      {asSheet ? null : (
+        <DetailHero photos={photosOf(item)} heightRatio={estimated ? 0.5 : 0.62}>
+          {status === 'estimating' ? <ScanOverlay /> : null}
+        </DetailHero>
+      )}
 
-      <View style={styles.sheet}>
+      {/* Only an estimate that resolves here gets the reveal; one opened from History is known. */}
+      <DetailSheet
+        reveal={resolvedHere.current}
+        style={[styles.sheet, asSheet ? styles.inSheet : null]}
+      >
         {status === 'estimating' ? <EstimatingStatus /> : null}
         {status === 'failed' ? (
           <Problem
@@ -181,28 +243,41 @@ export function EstimateResultView({
 
         {estimated ? (
           <>
+            {/* The appraisal hangs on its price tag, stamped with how sure the AI is. */}
             <Reveal index={0} style={styles.headline}>
-              <View style={styles.titleRow}>
-                <SWText variant="caption" tone="textMuted">
-                  {item.category}
-                </SWText>
-                <Tag label={`${previewValuation.confidence} confidence`} tone="accent" />
+              <SWText variant="caption" tone="textMuted">
+                {item.category}
+              </SWText>
+              <View style={styles.tagRow}>
+                <TagShape
+                  hanging
+                  tilt={tokens.tilt.start}
+                  swing={resolvedHere.current}
+                  style={styles.priceTag}
+                >
+                  <SWText variant="stamp" color={colors.kraftInk}>
+                    AI Estimate
+                  </SWText>
+                  <CountUp
+                    variant="priceHero"
+                    color={colors.kraftInk}
+                    value={value}
+                    format={formatPeso}
+                    from={resolvedHere.current ? undefined : value}
+                    durationMs={1100}
+                    accessibilityLiveRegion="polite"
+                  />
+                </TagShape>
+                <Stamp
+                  label={`${previewValuation.confidence} confidence`}
+                  side="end"
+                  // Stamped once the count has landed on the price.
+                  land={resolvedHere.current ? { delay: 1250 } : undefined}
+                  style={styles.confidence}
+                />
               </View>
-              <View style={styles.estimateLabel}>
-                <Sparkles size={14} strokeWidth={2.2} color={colors.accent} />
-                <SWText variant="overline" tone="accent">
-                  AI Estimate
-                </SWText>
-              </View>
-              <CountUp
-                variant="priceHero"
-                value={value}
-                format={formatPeso}
-                durationMs={resolvedHere.current ? 1100 : 500}
-                accessibilityLiveRegion="polite"
-              />
               <SWText variant="bodyMedium" tone="textMuted">
-                Likely {formatPeso(low)} – {formatPeso(high)} · AI estimate, not a sale price
+                AI estimate, not a sale price
               </SWText>
             </Reveal>
 
@@ -213,8 +288,12 @@ export function EstimateResultView({
                 estimate={value}
                 confidence={previewValuation.confidence}
                 format={formatPeso}
+                showConfidence={false}
+                animate={resolvedHere.current}
               />
             </Reveal>
+
+            <Tip id="list" />
 
             <Reveal index={2} style={styles.insights}>
               <Insight
@@ -222,11 +301,7 @@ export function EstimateResultView({
                 label={previewValuation.demand}
                 detail={previewValuation.demandDetail}
               />
-              <Insight
-                icon={Clock3}
-                label={previewValuation.sellTime}
-                detail="Based on similar listings"
-              />
+              <Insight icon={Clock3} label={previewValuation.sellTime} />
               <Insight
                 icon={Gem}
                 label={previewValuation.rarity}
@@ -235,7 +310,7 @@ export function EstimateResultView({
             </Reveal>
 
             <Reveal index={3} style={styles.section}>
-              <SectionTitle title="Condition" detail="Adjusts the estimate" />
+              <SectionTitle title="Condition" />
               <ChoiceChips
                 options={previewConditions.map(({ key, label }) => ({ key, label }))}
                 value={condition}
@@ -245,6 +320,12 @@ export function EstimateResultView({
                 <SWText variant="bodySmall" tone="textMuted">
                   {previewConditions.find((c) => c.key === condition)?.hint}
                 </SWText>
+              </Animated.View>
+            </Reveal>
+
+            <Reveal index={3} delay={80}>
+              <Animated.View key={condition} entering={FadeIn.duration(220)}>
+                <WorthySays>{conditionLine(condition, low)}</WorthySays>
               </Animated.View>
             </Reveal>
 
@@ -268,7 +349,7 @@ export function EstimateResultView({
             </Reveal>
 
             <Reveal index={4} delay={120} style={styles.section}>
-              <SectionTitle title="Recent sales" detail="Comparable items" />
+              <SectionTitle title="Recent sales" />
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -290,11 +371,14 @@ export function EstimateResultView({
                       radius={tokens.radius.medium}
                     />
                     <SWText variant="priceSmall">{formatPeso(comparable.price)}</SWText>
-                    <SWText variant="caption" numberOfLines={1}>
+                    <SWText variant="caption" numberOfLines={2} style={styles.comparableTitle}>
                       {comparable.title}
                     </SWText>
                     <SWText variant="caption" tone="textMuted" numberOfLines={1}>
-                      {comparable.soldAgo} · {comparable.source}
+                      {comparable.soldAgo}
+                    </SWText>
+                    <SWText variant="caption" tone="textMuted" numberOfLines={1}>
+                      {comparable.source}
                     </SWText>
                   </Animated.View>
                 ))}
@@ -317,8 +401,8 @@ export function EstimateResultView({
           </>
         ) : null}
 
-        <SavedNote />
-      </View>
+        <SavedNote sharing={placement} />
+      </DetailSheet>
 
       <ShareCardSheet
         visible={sharing}
@@ -363,32 +447,53 @@ function Insight({
 }: {
   readonly icon: LucideIcon;
   readonly label: string;
-  readonly detail: string;
+  readonly detail?: string;
 }) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   return (
-    <View style={styles.insight} accessible accessibilityLabel={`${label}. ${detail}`}>
-      <Icon size={17} strokeWidth={2.1} color={colors.accent} />
-      <SWText variant="labelSmall" numberOfLines={2}>
-        {label}
-      </SWText>
-      <SWText variant="caption" tone="textMuted" numberOfLines={2}>
-        {detail}
-      </SWText>
+    <View
+      style={styles.insight}
+      accessible
+      accessibilityLabel={detail ? `${label}. ${detail}` : label}
+    >
+      <Icon size={22} strokeWidth={1.5} color={colors.textPrimary} />
+      <View style={styles.insightText}>
+        <SWText variant="headingSmall">{label}</SWText>
+        {detail ? (
+          <SWText variant="bodySmall" tone="textMuted">
+            {detail}
+          </SWText>
+        ) : null}
+      </View>
     </View>
   );
 }
 
-function SavedNote() {
+/** Saved to history always; then wherever else the item lives. */
+function SavedNote({ sharing }: { readonly sharing: PreviewSharing }) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
+  const shared = sharing.postId !== undefined || sharing.listingId !== undefined;
   return (
     <View style={styles.saved}>
-      <CircleCheck size={15} strokeWidth={2} color={colors.success} />
-      <SWText variant="labelMedium" tone="textSecondary">
-        Photo saved to your history
-      </SWText>
+      <View style={styles.savedLine}>
+        <CircleCheck size={15} strokeWidth={2} color={colors.success} />
+        <SWText variant="labelMedium" tone="textSecondary">
+          Photo saved to your history
+        </SWText>
+      </View>
+      <View style={styles.sharedTags}>
+        {shared ? null : <Tag label="Private" tone="sand" icon={Lock} />}
+        {sharing.postId ? <Tag label="On feed" tone="sand" icon={Users} /> : null}
+        {sharing.listingId ? (
+          sharing.sold ? (
+            <Tag label="Sold" tone="grave" icon={Handshake} />
+          ) : (
+            <Tag label="Listed" tone="mint" icon={PriceTagIcon} />
+          )
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -503,7 +608,7 @@ function EstimatingStatus() {
 
   return (
     <View style={styles.status} accessibilityLiveRegion="polite">
-      <CompanionOrb size={44} mood="thinking" />
+      <Worthy size={44} mood="thinking" />
       <View style={styles.flex}>
         {visible ? (
           <Animated.View entering={FadeIn.duration(300)} exiting={FadeOut}>
@@ -551,40 +656,79 @@ function Problem({
   );
 }
 
+/**
+ * The ways forward from an estimate. Sharing is never either/or: an item on the feed can be
+ * listed too, and a listing can go to the feed to ask whether its price is fair.
+ */
 function Destinations({
+  sharing,
   onListForSale,
   onPostToFeed,
   onKeepPrivate,
-}: Pick<EstimateResultViewProps, 'onListForSale' | 'onPostToFeed' | 'onKeepPrivate'>) {
+  onViewPost,
+  onViewListing,
+}: { readonly sharing: PreviewSharing } & Pick<
+  EstimateResultViewProps,
+  'onListForSale' | 'onPostToFeed' | 'onKeepPrivate' | 'onViewPost' | 'onViewListing'
+>) {
   const styles = useThemedStyles(stylesFor);
+  const { postId, listingId, sold } = sharing;
+
+  const feedAction = postId ? (
+    <Button
+      label="View post"
+      variant="secondary"
+      icon={Users}
+      onPress={() => onViewPost?.(postId)}
+      containerStyle={styles.flex}
+    />
+  ) : (
+    <Button
+      label="Ask the feed"
+      variant={listingId && !sold ? 'accent' : 'secondary'}
+      icon={Users}
+      accessibilityHint={
+        listingId ? 'Reposts your listing so the community can vote on its price.' : undefined
+      }
+      onPress={() => onPostToFeed?.(listingId && !sold ? 'listing' : 'item')}
+      containerStyle={styles.flex}
+    />
+  );
+
+  const marketAction = listingId ? (
+    <Button
+      label={sold ? 'View sale' : 'View listing'}
+      variant="secondary"
+      icon={sold ? Handshake : PriceTagIcon}
+      onPress={() => onViewListing?.(listingId)}
+      containerStyle={styles.flex}
+    />
+  ) : (
+    <Button
+      label={postId ? 'Sell it too' : 'Sell'}
+      variant="accent"
+      icon={ShoppingBag}
+      accessibilityHint="Opens price confirmation. You set the asking price yourself."
+      onPress={onListForSale}
+      containerStyle={postId ? styles.flex : undefined}
+    />
+  );
+
   return (
     <BottomBar>
-      <Animated.View
-        entering={FadeInDown.delay(500).springify().damping(18)}
-        style={styles.destinations}
-      >
-        <IconButton
-          icon={EyeOff}
-          label="Keep private"
-          appearance="tinted"
-          onPress={onKeepPrivate}
-        />
-        <Button
-          label="Ask the feed"
-          variant="secondary"
-          icon={Users}
-          onPress={onPostToFeed}
-          containerStyle={styles.flex}
-        />
-        <Button
-          label="Sell"
-          variant="accent"
-          icon={ShoppingBag}
-          accessibilityHint="Opens price confirmation. You set the asking price yourself."
-          onPress={onListForSale}
-          containerStyle={styles.flex}
-        />
-      </Animated.View>
+      {/* The actions arrive with their bar, not after it. */}
+      <View style={styles.destinations}>
+        {postId || listingId ? null : (
+          <IconButton
+            icon={EyeOff}
+            label="Keep private"
+            appearance="tinted"
+            onPress={onKeepPrivate}
+          />
+        )}
+        {feedAction}
+        {marketAction}
+      </View>
     </BottomBar>
   );
 }
@@ -606,6 +750,7 @@ function ShareCardSheet({
   readonly high: number;
 }) {
   const styles = useThemedStyles(stylesFor);
+  const { colors } = useTheme();
   const toast = useToast();
 
   return (
@@ -619,24 +764,27 @@ function ShareCardSheet({
         />
         <View style={styles.shareBody}>
           <SWText variant="headingMedium">{title}</SWText>
-          <View style={styles.estimateLabel}>
-            <SWText variant="overline" tone="accent">
+          {/* The card people post carries the same tag as the app, so it is recognisably ours. */}
+          <TagShape tilt={tokens.tilt.start} style={styles.shareTag}>
+            <SWText variant="stamp" color={colors.kraftInk}>
               Worth about
             </SWText>
-          </View>
-          <SWText variant="priceLarge">{formatPeso(value)}</SWText>
+            <SWText variant="priceLarge" color={colors.kraftInk}>
+              {formatPeso(value)}
+            </SWText>
+          </TagShape>
           <SWText variant="caption" tone="textMuted">
             Range {formatPeso(low)} – {formatPeso(high)} · valued with SnapWorth
           </SWText>
         </View>
         <View style={styles.shareMark}>
-          <CompanionOrb size={22} />
-          <SWText variant="wordmark">SnapWorth</SWText>
+          <LogoMark size={24} />
+          <Wordmark height={18} />
         </View>
       </View>
       <Button
         label="Share card"
-        icon={Share2}
+        icon={shareIcon}
         onPress={() => {
           void Share.share({ message: `${title} — worth about ${formatPeso(value)} on SnapWorth.` })
             .then((result) => {
@@ -658,22 +806,35 @@ const stylesFor = themedStyles((colors, name) => ({
     paddingTop: 0,
     paddingHorizontal: 0,
   },
-  hero: {
-    width: '100%',
-    overflow: 'hidden',
-    backgroundColor: colors.sunken,
+  // The sheet is already the page's surface, so the body sits flat on it rather than as a
+  // second rounded card.
+  inSheet: {
+    marginTop: 0,
+    paddingTop: tokens.spacing[5],
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    backgroundColor: 'transparent',
   },
   sheet: {
-    marginTop: -tokens.radius.xlarge,
-    borderTopLeftRadius: tokens.radius.xlarge,
-    borderTopRightRadius: tokens.radius.xlarge,
-    backgroundColor: colors.canvas,
-    paddingHorizontal: gutter,
-    paddingTop: tokens.spacing[6],
-    gap: tokens.spacing[8],
+    gap: tokens.spacing[10],
   },
   headline: {
+    gap: tokens.spacing[3],
+  },
+  tagRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    flexWrap: 'wrap',
+    gap: tokens.spacing[3],
+    paddingTop: tokens.spacing[5],
+  },
+  priceTag: {
+    paddingRight: tokens.spacing[6],
+    paddingVertical: tokens.spacing[4],
     gap: tokens.spacing[1],
+  },
+  confidence: {
+    marginBottom: tokens.spacing[2],
   },
   titleRow: {
     flexDirection: 'row',
@@ -684,18 +845,25 @@ const stylesFor = themedStyles((colors, name) => ({
   estimateLabel: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: tokens.spacing[1],
-  },
-  insights: {
-    flexDirection: 'row',
     gap: tokens.spacing[2],
   },
+  // Highlights read as a quiet list, icon then title over one line of context, the way
+  // listing highlights do on the big marketplaces, rather than three cramped tiles.
+  insights: {
+    gap: tokens.spacing[5],
+    paddingVertical: tokens.spacing[6],
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle,
+  },
   insight: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: tokens.spacing[4],
+  },
+  insightText: {
     flex: 1,
-    gap: tokens.spacing[1],
-    padding: tokens.spacing[3],
-    borderRadius: tokens.radius.large,
-    backgroundColor: colors.sunken,
+    gap: 2,
   },
   section: {
     gap: tokens.spacing[3],
@@ -719,12 +887,28 @@ const stylesFor = themedStyles((colors, name) => ({
   },
   comparable: {
     width: 148,
-    gap: tokens.spacing[1],
+    gap: 2,
   },
+  // Two lines reserved for every title, so the cards in the row stay the same height.
+  comparableTitle: {
+    minHeight: tokens.typography.style.caption.lineHeight * 2,
+    marginTop: tokens.spacing[1],
+  },
+  // On the content's left edge like everything above it, with where the item lives at the end.
   saved: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: tokens.spacing[3],
+  },
+  savedLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing[2],
+  },
+  sharedTags: {
+    flexDirection: 'row',
     gap: tokens.spacing[2],
   },
   status: {
@@ -748,7 +932,6 @@ const stylesFor = themedStyles((colors, name) => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing[2],
-    padding: tokens.spacing[2],
   },
   scanDim: {
     backgroundColor: tokens.overlay.chrome,
@@ -793,13 +976,13 @@ const stylesFor = themedStyles((colors, name) => ({
   },
   scanGlow: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: colors.accent,
-    opacity: 0.18,
+    backgroundColor: colors.sand,
+    opacity: 0.35,
   },
   scanCore: {
     height: 2,
     backgroundColor: tokens.overlay.text,
-    shadowColor: colors.accent,
+    shadowColor: tokens.overlay.text,
     shadowOpacity: 1,
     shadowRadius: 10,
   },
@@ -831,6 +1014,12 @@ const stylesFor = themedStyles((colors, name) => ({
     shadowOpacity: 1,
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 8 },
+  },
+  shareTag: {
+    alignSelf: 'flex-start',
+    paddingRight: tokens.spacing[5],
+    paddingVertical: tokens.spacing[3],
+    marginVertical: tokens.spacing[2],
   },
   shareBody: {
     gap: 2,

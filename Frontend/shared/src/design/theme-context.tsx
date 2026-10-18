@@ -138,6 +138,19 @@ function ThemeDip({ name }: { readonly name: ThemeName }) {
   );
 }
 
+/**
+ * Scopes the "night room" palette to one dramatic section (Worthy's chat). Everything inside
+ * renders against it; the user's own light/dark preference is untouched outside.
+ */
+export function NightRoom({ children }: { readonly children: ReactNode }) {
+  const parent = useTheme();
+  const value = useMemo<ThemeContextValue>(
+    () => ({ ...parent, name: 'night', isDark: true, colors: tokens.color.night }),
+    [parent],
+  );
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}
+
 export function useTheme(): ThemeContextValue {
   return useContext(ThemeContext);
 }

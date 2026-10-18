@@ -4,9 +4,10 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 
 import {
   Avatar,
-  EmptyState,
   IconButton,
+  EmptyState,
   NavHeader,
+  Rating,
   Reveal,
   Screen,
   SWText,
@@ -14,6 +15,7 @@ import {
 import { themedStyles, tokens, useThemedStyles } from '../../design';
 import { ListingCard } from '../marketplace/ListingCard';
 import { previewListings, previewSellers } from '../preview/sample-data';
+import { useAccountGate } from '../session';
 
 export interface SellerProfileViewProps {
   readonly handle?: string;
@@ -30,6 +32,7 @@ export function SellerProfileView({
   onReport,
 }: SellerProfileViewProps) {
   const styles = useThemedStyles(stylesFor);
+  const requireAccount = useAccountGate();
   const seller = handle ? previewSellers[handle] : undefined;
 
   if (!seller) {
@@ -55,7 +58,11 @@ export function SellerProfileView({
           title={`@${seller.user.handle}`}
           onBack={onBack}
           trailing={
-            <IconButton icon={Flag} label="Report or block this seller" onPress={onReport} />
+            <IconButton
+              icon={Flag}
+              label="Report or block this seller"
+              onPress={() => requireAccount('report', onReport)}
+            />
           }
         />
       }
@@ -64,12 +71,15 @@ export function SellerProfileView({
       <Reveal index={0} style={styles.identity}>
         <Avatar source={seller.user.avatar} name={seller.user.handle} size={72} ring />
         <View style={styles.identityText}>
-          <SWText variant="displayTitle" accessibilityRole="header">
+          <SWText variant="displayMedium" accessibilityRole="header">
             {seller.displayName}
           </SWText>
-          <SWText variant="bodySmall" tone="textSecondary">
-            ★ {seller.rating} · {seller.sales} sales
-          </SWText>
+          <Rating
+            value={seller.rating}
+            detail={`${seller.sales} sales`}
+            variant="bodySmall"
+            tone="textSecondary"
+          />
           <SWText variant="caption" tone="textMuted">
             {seller.joined}
           </SWText>

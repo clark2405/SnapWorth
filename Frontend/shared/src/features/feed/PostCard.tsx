@@ -17,15 +17,20 @@ import {
   Avatar,
   EstimateBadge,
   Photo,
+  PriceTagIcon,
+  Sticker,
   SWText,
+  Tag,
   VerdictBar,
   VoteChips,
   ZoomLink,
   useToast,
 } from '../../components';
-import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import { haptic, held, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import type { VoteChoice } from '../../types';
 import { formatPeso, type PreviewPost } from '../preview/sample-data';
+import { useCommentCount } from './comment-thread';
+import { verdictFor } from './verdict';
 
 export interface PostCardProps {
   readonly post: PreviewPost;
@@ -38,8 +43,8 @@ export interface PostCardProps {
 }
 
 /**
- * One feed beat: photo and estimate lead, the author's question frames them, and the vote is
- * the action. No card chrome; posts are separated by space alone. The photo opens the discussion
+ * One feed beat in a soft card: photo and estimate lead, the author's question frames them, and
+ * the vote is the action. The photo opens the discussion
  * on tap and carries a long-press menu; double-tapping its estimate corner casts "Just Right"
  * without leaving the feed, the way a double-tap-to-like works elsewhere.
  */
@@ -48,6 +53,9 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
   const [burst, setBurst] = useState(0);
+  // Live from the comment service; the bundled sample count shows until it loads.
+  const commentCount = useCommentCount(post.id) ?? post.comments.length;
+  const verdict = verdictFor(post.votes);
 
   const castJustRight = useCallback(() => {
     haptic('pop');
@@ -66,16 +74,10 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
     [castJustRight],
   );
 
+  // Share is only offered where the shell can make a link, and the shell reports how it went.
   const menu = useMemo(
     () => [
-      {
-        title: 'Share',
-        symbol: 'square.and.arrow.up',
-        onPress: () => {
-          onShare?.();
-          toast.show({ title: 'Link copied' });
-        },
-      },
+      ...(onShare ? [{ title: 'Share', symbol: 'square.and.arrow.up', onPress: onShare }] : []),
       {
         title: 'Save',
         symbol: 'bookmark',
@@ -107,6 +109,14 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
             {post.postedAgo}
           </SWText>
         </View>
+        {/* A listing reposted for a price check: the vote is on what the seller is asking. */}
+        {post.listing ? (
+          <Tag
+            label={`For sale · ${formatPeso(post.listing.askingPrice)}`}
+            tone="mint"
+            icon={PriceTagIcon}
+          />
+        ) : null}
       </View>
 
       <ZoomLink
@@ -120,9 +130,14 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
             source={post.photo}
             label={post.photoLabel}
             aspectRatio={4 / 3}
-            radius={tokens.radius.large}
+            radius={tokens.radius.medium - 2}
           />
           <JustRightBurst trigger={burst} />
+          {verdict ? (
+            <View style={styles.stickerSpot} pointerEvents="none">
+              <Sticker label={verdict.label} tone={verdict.tone} side="end" />
+            </View>
+          ) : null}
           <GestureDetector gesture={doubleTap}>
             <Animated.View style={styles.badgeOverlay}>
               <EstimateBadge value={formatPeso(post.estimate)} />
@@ -137,10 +152,10 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
 
       <View style={styles.meta}>
         <VerdictBar tally={post.votes} />
-        <View style={styles.comments} accessibilityLabel={`${post.commentCount} comments`}>
+        <View style={styles.comments} accessibilityLabel={`${commentCount} comments`}>
           <MessageCircle size={16} strokeWidth={1.75} color={colors.textMuted} />
           <SWText variant="labelMedium" tone="textMuted">
-            {post.commentCount}
+            {commentCount}
           </SWText>
         </View>
       </View>
@@ -194,8 +209,11 @@ function JustRightBurst({ trigger }: { readonly trigger: number }) {
 }
 
 const stylesFor = themedStyles((colors, name) => ({
+  // An edge-to-edge row, not a floating card: the photo carries each post, and a hairline
+  // between posts (drawn by the feed) does the separating, so the page scans like a list.
   post: {
     gap: tokens.spacing[4],
+    paddingVertical: tokens.spacing[5],
   },
   header: {
     flexDirection: 'row',
@@ -205,10 +223,17 @@ const stylesFor = themedStyles((colors, name) => ({
   byline: {
     flex: 1,
   },
+  // The photo is outlined and casts a hard shadow, so the sticker and tag on it belong.
   photoWrap: {
     position: 'relative',
-    borderRadius: tokens.radius.large,
-    overflow: 'hidden',
+    borderRadius: tokens.radius.medium,
+    ...held(colors),
+  },
+  // The crowd's verdict, slapped on the photo's top corner once there is one.
+  stickerSpot: {
+    position: 'absolute',
+    top: tokens.spacing[3],
+    right: tokens.spacing[3],
   },
   badgeOverlay: {
     position: 'absolute',

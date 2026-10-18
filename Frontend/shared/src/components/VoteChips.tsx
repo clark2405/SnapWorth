@@ -12,6 +12,7 @@ import Animated, {
 
 import {
   haptic,
+  held,
   themedStyles,
   tokens,
   useTheme,
@@ -92,8 +93,8 @@ function VoteChip({
   }, [fill, isSelected]);
 
   const flood = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(fill.value, [0, 1], [colors.sunken, colors.surface]),
-    borderColor: interpolateColor(fill.value, [0, 1], [colors.sunken, hue]),
+    backgroundColor: colors.surface,
+    borderColor: interpolateColor(fill.value, [0, 1], [colors.heldEdge, hue]),
   }));
 
   return (
@@ -112,19 +113,23 @@ function VoteChip({
         containerStyle={styles.slot}
       >
         <Animated.View style={[styles.chip, flood]}>
-          <View style={styles.labelRow}>
+          <SWText
+            variant="chip"
+            tone={isSelected ? 'textPrimary' : 'textSecondary'}
+            numberOfLines={1}
+          >
+            {vote.label}
+          </SWText>
+          <View style={styles.countRow}>
             <Animated.View style={iconPop}>
-              <Icon size={14} strokeWidth={2.5} color={hue} />
+              <Icon size={13} strokeWidth={2.5} color={hue} />
             </Animated.View>
-            <SWText variant="chip" tone={isSelected ? 'textPrimary' : 'textSecondary'}>
-              {vote.label}
-            </SWText>
+            <Animated.View style={countStyle}>
+              <SWText variant="caption" tone="textMuted" style={styles.count}>
+                {count}
+              </SWText>
+            </Animated.View>
           </View>
-          <Animated.View style={countStyle}>
-            <SWText variant="caption" tone="textMuted" style={styles.count}>
-              {count}
-            </SWText>
-          </Animated.View>
         </Animated.View>
       </PressableScale>
     </Animated.View>
@@ -200,25 +205,26 @@ function VerdictSegment({
 const stylesFor = themedStyles((colors) => ({
   row: {
     flexDirection: 'row',
-    gap: tokens.spacing[2],
+    gap: tokens.spacing[3],
   },
   slot: {
     flex: 1,
   },
+  // Cut from the same card as everything you can hold; the chosen vote's outline takes its hue.
   chip: {
     minHeight: tokens.focus.minimumTarget + 4,
     borderRadius: tokens.radius.medium,
-    borderWidth: 1.5,
-    borderColor: colors.sunken,
-    backgroundColor: colors.sunken,
+    ...held(colors, 2),
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: tokens.spacing[1],
     paddingVertical: tokens.spacing[2],
     gap: 2,
   },
-  // Count sits under the label so all three chips keep one line of label at phone widths.
-  labelRow: {
+  // The label has a line to itself and the icon rides with the count beneath, so all three
+  // chips keep one line of label, and one height, down to the narrowest phones.
+  countRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing[1],

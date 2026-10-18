@@ -1,24 +1,37 @@
 import {
   Bell,
+  History,
+  MessagesSquare,
+  Vote,
   ChevronRight,
   CircleHelp,
   LogOut,
   ShieldAlert,
+  Palette,
+  Settings2,
   Sparkles,
+  Wallet,
   TrendingDown,
+  UserX,
 } from 'lucide-react-native';
+import { useState } from 'react';
 import { View } from 'react-native';
 
 import {
   Avatar,
+  Button,
   CountUp,
   ListGroup,
   ListRow,
   NavHeader,
+  Overline,
   PressableScale,
+  PriceTagIcon,
+  Rating,
   Reveal,
   Screen,
   SegmentedControl,
+  Sheet,
   Sparkline,
   Surface,
   SWText,
@@ -35,11 +48,16 @@ import {
   formatPeso,
   previewHeldContent,
   previewPortfolio,
+  previewConversations,
   previewProfile,
+  previewVotesCast,
 } from '../preview/sample-data';
 
 export type ProfileDestination =
   | 'edit-profile'
+  | 'listings'
+  | 'votes'
+  | 'conversations'
   | 'notifications'
   | 'price-alerts'
   | 'privacy'
@@ -52,6 +70,11 @@ export interface ProfileViewProps {
   readonly onBack?: () => void;
   readonly onOpen?: (destination: ProfileDestination) => void;
   readonly onLogOut?: () => void;
+  /**
+   * Permanently deletes the account and its data. Apple requires apps that create accounts to
+   * offer deletion in the app, not just deactivation.
+   */
+  readonly onDeleteAccount?: () => void;
 }
 
 const appearanceOptions: readonly { readonly key: ThemePreference; readonly label: string }[] = [
@@ -60,9 +83,10 @@ const appearanceOptions: readonly { readonly key: ThemePreference; readonly labe
   { key: 'dark', label: 'Dark' },
 ];
 
-export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
+export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: ProfileViewProps) {
   const { colors, preference, setPreference } = useTheme();
   const styles = useThemedStyles(stylesFor);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const profile = previewProfile;
   const stats = [
     { label: 'Checked', value: profile.stats.checked },
@@ -83,14 +107,20 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
         >
           <Avatar source={profile.user.avatar} name={profile.user.handle} size={72} ring />
           <View style={styles.identityText}>
-            <SWText variant="displayTitle" accessibilityRole="header">
+            <SWText variant="displayMedium" accessibilityRole="header">
               {profile.displayName}
             </SWText>
-            <SWText variant="bodySmall" tone="textSecondary">
-              @{profile.user.handle} · ★ {profile.rating}
+            <View style={styles.handleRow}>
+              <SWText variant="bodySmall" tone="textSecondary">
+                @{profile.user.handle} ·
+              </SWText>
+              <Rating value={profile.rating} variant="bodySmall" tone="textSecondary" />
+            </View>
+            <SWText variant="caption" tone="textMuted">
+              {profile.location}
             </SWText>
             <SWText variant="caption" tone="textMuted">
-              {profile.location} · {profile.joined}
+              {profile.joined}
             </SWText>
           </View>
           <ChevronRight size={18} strokeWidth={2} color={colors.textMuted} />
@@ -98,40 +128,64 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
       </Reveal>
 
       <Reveal index={1} style={styles.stats}>
-        {stats.map((stat, index) => (
-          <View
+        {stats.map((stat) => (
+          <Surface
             key={stat.label}
-            accessible
-            accessibilityLabel={`${stat.value} ${stat.label.toLowerCase()}`}
-            style={[styles.stat, index > 0 ? styles.statRule : null]}
+            padding={tokens.spacing[4]}
+            style={styles.statTile}
+            contentStyle={styles.stat}
           >
-            <CountUp
-              value={stat.value}
-              format={(value) => String(Math.round(value))}
-              variant="priceLarge"
-            />
-            <SWText variant="overline" tone="textMuted">
-              {stat.label}
-            </SWText>
-          </View>
+            <View accessible accessibilityLabel={`${stat.value} ${stat.label.toLowerCase()}`}>
+              <CountUp
+                value={stat.value}
+                format={(value) => String(Math.round(value))}
+                variant="priceMedium"
+              />
+              <SWText variant="labelSmall" tone="textSecondary">
+                {stat.label}
+              </SWText>
+            </View>
+          </Surface>
         ))}
       </Reveal>
 
       <Reveal index={2}>
-        <Surface padding={tokens.spacing[4]} contentStyle={styles.collectionCard}>
-          <View style={styles.collectionHeader}>
-            <SWText variant="overline" tone="textMuted">
-              Collection value
-            </SWText>
-            <Tag label={previewPortfolio.changeLabel} tone="success" />
-          </View>
-          <CountUp value={previewPortfolio.total} format={formatPeso} variant="priceLarge" />
-          <Sparkline values={previewPortfolio.series} height={56} />
+        <Surface tone="feature" padding={tokens.spacing[5]} contentStyle={styles.collectionCard}>
+          <Overline icon={Wallet} label="Collection value" tone="onFeatureDim" />
+          <CountUp
+            value={previewPortfolio.total}
+            format={formatPeso}
+            variant="priceLarge"
+            tone="onFeature"
+          />
+          <Tag label={previewPortfolio.changeLabel} tone="mint" />
+          <Sparkline values={previewPortfolio.series} height={56} color={colors.onFeature} />
         </Surface>
       </Reveal>
 
       <Reveal index={3} style={styles.sections}>
-        <ListGroup title="Appearance">
+        <ListGroup title="Your activity" icon={History}>
+          <ListRow
+            label="Your listings"
+            icon={PriceTagIcon}
+            value={String(profile.stats.listed)}
+            onPress={() => onOpen?.('listings')}
+          />
+          <ListRow
+            label="Votes cast"
+            icon={Vote}
+            value={String(previewVotesCast.length)}
+            onPress={() => onOpen?.('votes')}
+          />
+          <ListRow
+            label="Conversations"
+            icon={MessagesSquare}
+            value={String(previewConversations.length)}
+            onPress={() => onOpen?.('conversations')}
+          />
+        </ListGroup>
+
+        <ListGroup title="The look" icon={Palette}>
           <View style={styles.appearanceRow}>
             <SegmentedControl
               options={appearanceOptions}
@@ -141,7 +195,7 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
           </View>
         </ListGroup>
 
-        <ListGroup title="Settings">
+        <ListGroup title="The fine print" icon={Settings2}>
           <ListRow label="Notifications" icon={Bell} onPress={() => onOpen?.('notifications')} />
           <ListRow
             label="Price alerts"
@@ -159,7 +213,6 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
           <ListRow label="Help" icon={CircleHelp} onPress={() => onOpen?.('help')} />
           <ListRow
             label="Replay introduction"
-            detail="See how SnapWorth works"
             icon={Sparkles}
             onPress={() => onOpen?.('introduction')}
           />
@@ -167,13 +220,48 @@ export function ProfileView({ onBack, onOpen, onLogOut }: ProfileViewProps) {
 
         <ListGroup>
           <ListRow label="Log out" icon={LogOut} destructive onPress={onLogOut} />
+          <ListRow
+            label="Delete account"
+            icon={UserX}
+            destructive
+            onPress={() => setConfirmingDelete(true)}
+          />
         </ListGroup>
       </Reveal>
+
+      {/* Deleting can't be undone, so this is the one place the app stops to confirm. */}
+      <Sheet
+        visible={confirmingDelete}
+        onClose={() => setConfirmingDelete(false)}
+        title="Delete your account?"
+      >
+        <View style={styles.deleteSheet}>
+          <SWText variant="bodyMedium" tone="textSecondary">
+            This permanently removes your profile, items, listings, votes, comments and chats. It
+            can&apos;t be undone. You can still look around SnapWorth without an account.
+          </SWText>
+          <View style={styles.deleteActions}>
+            <Button
+              label="Delete account"
+              variant="danger"
+              onPress={() => {
+                setConfirmingDelete(false);
+                onDeleteAccount?.();
+              }}
+            />
+            <Button
+              label="Keep my account"
+              variant="secondary"
+              onPress={() => setConfirmingDelete(false)}
+            />
+          </View>
+        </View>
+      </Sheet>
     </Screen>
   );
 }
 
-const stylesFor = themedStyles((colors) => ({
+const stylesFor = themedStyles(() => ({
   content: {
     paddingTop: tokens.spacing[4],
     gap: tokens.spacing[8],
@@ -187,29 +275,23 @@ const stylesFor = themedStyles((colors) => ({
     flex: 1,
     gap: tokens.spacing[1],
   },
-  stats: {
+  handleRow: {
     flexDirection: 'row',
-    paddingVertical: tokens.spacing[4],
-    borderTopWidth: tokens.border.hairline,
-    borderBottomWidth: tokens.border.hairline,
-    borderColor: colors.borderSubtle,
-  },
-  stat: {
-    flex: 1,
     alignItems: 'center',
     gap: tokens.spacing[1],
   },
-  statRule: {
-    borderLeftWidth: tokens.border.hairline,
-    borderLeftColor: colors.borderSubtle,
+  stats: {
+    flexDirection: 'row',
+    gap: tokens.spacing[3],
+  },
+  statTile: {
+    flex: 1,
+  },
+  stat: {
+    gap: tokens.spacing[1],
   },
   collectionCard: {
     gap: tokens.spacing[3],
-  },
-  collectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
   },
   sections: {
     gap: tokens.spacing[6],
@@ -217,5 +299,11 @@ const stylesFor = themedStyles((colors) => ({
   appearanceRow: {
     paddingHorizontal: tokens.spacing[4],
     paddingVertical: tokens.spacing[3],
+  },
+  deleteSheet: {
+    gap: tokens.spacing[5],
+  },
+  deleteActions: {
+    gap: tokens.spacing[2],
   },
 }));

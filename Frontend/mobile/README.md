@@ -29,10 +29,10 @@ EXPO_PUBLIC_DEV_START_ROUTE=/item/nike-neon-windbreaker npm run dev:mobile
 
 ## Camera setup
 
-The Snap tab uses the phone's rear camera through `expo-camera`. It requests camera
+The full-screen Snap camera uses the phone's rear camera through `expo-camera`. It requests camera
 permission and offers Settings when permission is blocked. The shutter is enabled only
 after the camera is ready; flash can be toggled before taking a photo. Camera access stops
-when the tab loses focus or the app enters the background.
+when the screen loses focus or the app enters the background.
 
 Taking a photo opens a temporary local preview with Retake. This setup does not upload
 photos, add them to History, generate AI estimates, or publish posts yet.
@@ -43,8 +43,9 @@ deny camera access, take a photo, retake, switch tabs, and background/return to 
 
 ## Navigation
 
-- `app/(tabs)/` — the native tab bar (Feed, Market, Snap, Chats, History). On iOS 26 it is the
+- `app/(tabs)/` — the native tab bar (Feed, Market, Search, Chats, History). On iOS 26 it is the
   system Liquid Glass bar and minimises on scroll.
+- `app/capture.tsx` — the full-screen camera opened by the Snap control.
 - Everything else pushes over the tabs on the root stack. Cards zoom into their detail screen
   on iOS 18+ and peek on long-press; `worthy`, `ask/[id]`, and `list/[id]` present as sheets.
 - `src/` holds the shell's glue: the zoom-link bridge, the appearance store, and Worthy's host.

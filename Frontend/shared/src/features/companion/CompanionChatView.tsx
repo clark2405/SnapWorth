@@ -1,4 +1,4 @@
-import { ArrowUp } from 'lucide-react-native';
+import { ArrowUp, PenLine } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-reanimated';
@@ -7,19 +7,20 @@ import {
   BottomBar,
   Button,
   ChoiceChips,
-  CompanionOrb,
+  Worthy,
+  hideWebFocusOutline,
   NavHeader,
+  Overline,
   PressableScale,
   PriceRangeBar,
   Screen,
   Sparkline,
-  SWText,
   Surface,
-  hideWebFocusOutline,
+  SWText,
   typeStyle,
   useToast,
 } from '../../components';
-import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import { NightRoom, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import {
   formatPeso,
   previewCompanionReplies,
@@ -67,14 +68,20 @@ export interface CompanionChatViewProps {
 }
 
 /**
- * A conversation with Worthy. Answers arrive the way a person speaks: the orb thinks, the words
- * type themselves out, then the evidence (a range, a draft, a trend) rises into place beneath.
+ * A conversation with Worthy, set in the app's one "night room": a plum-dark palette that makes
+ * talking to the AI feel like stepping into a different space. Answers arrive the way a person
+ * speaks: the orb thinks, the words type themselves out, then the evidence (a range, a draft, a
+ * trend) rises into place beneath.
  */
-export function CompanionChatView({
-  initialQuestion,
-  onBack,
-  onUseListing,
-}: CompanionChatViewProps) {
+export function CompanionChatView(props: CompanionChatViewProps) {
+  return (
+    <NightRoom>
+      <CompanionChat {...props} />
+    </NightRoom>
+  );
+}
+
+function CompanionChat({ initialQuestion, onBack, onUseListing }: CompanionChatViewProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
@@ -84,8 +91,12 @@ export function CompanionChatView({
   const scroller = useRef<ScrollView>(null);
   const counter = useRef(0);
   const asked = useRef(false);
+  // Follow the conversation as it grows (a reply types itself out, then its card rises in),
+  // unless the person has scrolled up to reread something.
+  const following = useRef(true);
 
   const ask = useCallback((question: string) => {
+    following.current = true;
     counter.current += 1;
     const id = `${counter.current}`;
     setMessages((current) => [
@@ -108,11 +119,6 @@ export function CompanionChatView({
     asked.current = true;
     ask(initialQuestion ?? 'What can you do?');
   }, [ask, initialQuestion]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => scroller.current?.scrollToEnd({ animated: true }), 80);
-    return () => clearTimeout(timer);
-  }, [messages, thinking]);
 
   const submit = () => {
     const question = draft.trim();
@@ -137,6 +143,10 @@ export function CompanionChatView({
               selectionColor={colors.accent}
               returnKeyType="send"
               onSubmitEditing={submit}
+              onFocus={() => {
+                following.current = true;
+                scroller.current?.scrollToEnd({ animated: true });
+              }}
               style={[
                 styles.input,
                 typeStyle('bodyLarge'),
@@ -163,15 +173,19 @@ export function CompanionChatView({
         contentContainerStyle={styles.thread}
         showsVerticalScrollIndicator={false}
         keyboardDismissMode="interactive"
+        scrollEventThrottle={32}
+        onScroll={(event) => {
+          const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+          following.current =
+            contentOffset.y + layoutMeasurement.height >= contentSize.height - followSlack;
+        }}
+        onContentSizeChange={() => {
+          if (following.current) scroller.current?.scrollToEnd({ animated: true });
+        }}
       >
+        {/* The header already names Worthy; the intro is just Worthy itself. */}
         <Animated.View entering={FadeIn.duration(500)} style={styles.intro}>
-          <CompanionOrb size={72} mood={thinking ? 'thinking' : 'idle'} />
-          <SWText variant="companion" align="center">
-            Worthy
-          </SWText>
-          <SWText variant="caption" tone="textMuted" align="center">
-            Preview answers use sample market data
-          </SWText>
+          <Worthy size={72} mood={thinking ? 'thinking' : 'idle'} />
         </Animated.View>
 
         {messages.map((message) =>
@@ -200,7 +214,7 @@ export function CompanionChatView({
 
         {thinking ? (
           <Animated.View entering={FadeIn} style={styles.thinking}>
-            <CompanionOrb size={28} mood="thinking" />
+            <Worthy size={28} mood="thinking" />
             <SWText variant="labelMedium" tone="textMuted">
               Checking recent sales…
             </SWText>
@@ -289,9 +303,7 @@ function ReplyCardView({
     const draft = previewCompanionReplies.listingDraft;
     return (
       <Surface padding={tokens.spacing[4]} contentStyle={styles.card}>
-        <SWText variant="overline" tone="accent">
-          Draft listing
-        </SWText>
+        <Overline icon={PenLine} label="Draft listing" />
         <SWText variant="headingMedium">{draft.title}</SWText>
         <SWText variant="bodyMedium" tone="textSecondary">
           {draft.body}
@@ -314,6 +326,9 @@ function ReplyCardView({
     </Surface>
   );
 }
+
+/** How close to the bottom still counts as reading the latest reply. */
+const followSlack = 96;
 
 const stylesFor = themedStyles((colors) => ({
   noPad: {
@@ -341,9 +356,9 @@ const stylesFor = themedStyles((colors) => ({
     borderRadius: tokens.radius.large,
     borderBottomRightRadius: 6,
   },
+  // Replies run the full column so their cards line up with the person's bubbles on the right.
   worthy: {
     gap: tokens.spacing[3],
-    paddingRight: tokens.spacing[4],
   },
   thinking: {
     flexDirection: 'row',
@@ -360,9 +375,7 @@ const stylesFor = themedStyles((colors) => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing[2],
-    paddingLeft: tokens.spacing[4],
-    paddingRight: tokens.spacing[2],
-    paddingVertical: tokens.spacing[2],
+    paddingLeft: tokens.spacing[1],
   },
   input: {
     flex: 1,

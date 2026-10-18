@@ -45,7 +45,11 @@ export function PressableScale({
 }: PressableScaleProps) {
   const reduceMotion = useReducedMotion();
   const scale = useSharedValue(1);
-  const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const nudge = useSharedValue(0);
+  // A weighted settle: the control sinks and drops a hair, then springs back past rest.
+  const animated = useAnimatedStyle(() => ({
+    transform: [{ translateY: nudge.value }, { scale: scale.value }],
+  }));
 
   return (
     <Pressable
@@ -54,12 +58,18 @@ export function PressableScale({
       disabled={disabled}
       style={containerStyle}
       onPressIn={(event) => {
-        if (!reduceMotion) scale.value = withSpring(sink[depth], tokens.motion.spring.snappy);
+        if (!reduceMotion) {
+          scale.value = withSpring(sink[depth], tokens.motion.spring.snappy);
+          nudge.value = withSpring(tokens.motion.press.nudgeY, tokens.motion.spring.snappy);
+        }
         haptic(hapticKind);
         onPressIn?.(event);
       }}
       onPressOut={(event) => {
-        if (!reduceMotion) scale.value = withSpring(1, release);
+        if (!reduceMotion) {
+          scale.value = withSpring(1, release);
+          nudge.value = withSpring(0, release);
+        }
         onPressOut?.(event);
       }}
       {...rest}

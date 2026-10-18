@@ -14,12 +14,32 @@ import type {
 } from './ids';
 import type { EmailAddress } from './identity';
 import type { AiEstimate, AskingPrice } from './money';
+import { err, ok, type Result } from './result';
+import type { ValidationError } from './errors';
 
 declare const commentBodyBrand: unique symbol;
 declare const messageBodyBrand: unique symbol;
 
 export type CommentBody = string & { readonly [commentBodyBrand]: true };
 export type MessageBody = string & { readonly [messageBodyBrand]: true };
+
+/** The most a comment can say; the database enforces the same limit. */
+export const commentBodyMaxLength = 280;
+
+/** A comment body is its trimmed text, 1 to 280 characters. */
+export const parseCommentBody = (raw: string): Result<CommentBody, ValidationError> => {
+  const body = raw.trim();
+  if (body.length === 0) return err({ kind: 'validation', code: 'empty', field: 'comment' });
+  if (body.length > commentBodyMaxLength) {
+    return err({
+      kind: 'validation',
+      code: 'too_long',
+      field: 'comment',
+      limit: String(commentBodyMaxLength),
+    });
+  }
+  return ok(body as CommentBody);
+};
 
 export type UserRole = 'user' | 'owner' | 'administrator';
 
@@ -144,9 +164,33 @@ export interface VoteSnapshot {
   readonly counts: VoteCounts;
 }
 
-export type CommentReceipt =
-  | { readonly status: 'approved'; readonly comment: Comment }
-  | { readonly status: 'held'; readonly commentId: CommentId };
+/** The public face of an account, as shown beside what it posts. */
+export interface PublicProfile {
+  readonly userId: UserId;
+  readonly handle: string;
+  readonly avatarUrl?: string;
+}
+
+/** A comment as one viewer sees it in a post's thread. */
+export interface ThreadComment {
+  readonly id: CommentId;
+  /** The top-level comment this replies to. Threads are one level deep. */
+  readonly parentId: CommentId | null;
+  /** The parent exists but this viewer can no longer see it (deleted or held for review). */
+  readonly parentHidden: boolean;
+  readonly body: CommentBody;
+  /** Others only ever see `approved`; an author also sees their own pending or held comment. */
+  readonly moderationStatus: ModerationStatus;
+  readonly createdAt: UtcDateTime;
+  readonly author: PublicProfile;
+  readonly isMine: boolean;
+  readonly reportedByMe: boolean;
+}
+
+/** What posting a comment produced, after moderation has had its say. */
+export interface CommentReceipt {
+  readonly comment: ThreadComment;
+}
 
 export type PublicContentRef =
   | { readonly type: 'feed_post'; readonly id: PostId }

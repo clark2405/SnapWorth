@@ -151,7 +151,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.test.{ts,tsx}', '**/*.property.test.{ts,tsx}'],
+    files: ['**/*.test.{ts,tsx}', '**/*.property.test.{ts,tsx}', 'test/**/*.cjs'],
     languageOptions: {
       globals: globals.jest,
     },

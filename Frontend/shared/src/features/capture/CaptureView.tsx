@@ -41,6 +41,12 @@ export interface CaptureViewProps {
   readonly onOpenHistory?: () => void;
   /** Room reserved at the bottom, e.g. for a floating tab bar the camera sits under. */
   readonly bottomInset?: number;
+  /**
+   * What the shutter does to the scene. `fly` sends the shot into the corner before the estimate
+   * opens as a page. `freeze` holds the frame still, the way Visual Intelligence does, so the
+   * estimate can rise over it as a sheet; the camera wakes again when it comes back into view.
+   */
+  readonly afterCapture?: 'fly' | 'freeze';
 }
 
 const tips = [
@@ -66,7 +72,9 @@ export function CaptureView({
   onOpenGallery,
   onOpenHistory,
   bottomInset = 0,
+  afterCapture = 'fly',
 }: CaptureViewProps) {
+  const freeze = afterCapture === 'freeze';
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const focused = useIsFocusedSafe();
@@ -125,6 +133,11 @@ export function CaptureView({
       }
       return;
     }
+    if (freeze) {
+      // Hold the frame, then let the answer rise over it.
+      if (onCapture) setTimeout(onCapture, 240);
+      return;
+    }
     shot.value = withDelay(
       80,
       withTiming(1, { duration: 560, easing: Easing.bezier(0.16, 1, 0.3, 1) }, (done) => {
@@ -151,7 +164,9 @@ export function CaptureView({
 
   return (
     <View style={styles.root}>
-      <View style={StyleSheet.absoluteFill}>{viewfinder ?? <SimulatedScene />}</View>
+      <View style={StyleSheet.absoluteFill}>
+        {viewfinder ?? <SimulatedScene still={freeze && shooting} />}
+      </View>
       <Vignette />
 
       <View style={[styles.topBar, { paddingTop: insets.top + tokens.spacing[2] }]}>
@@ -167,9 +182,11 @@ export function CaptureView({
               ? captureDisabled
                 ? 'Starting camera…'
                 : 'Ready to capture'
-              : locked
-                ? 'Nike windbreaker'
-                : 'Looking…'}
+              : freeze && shooting
+                ? 'Valuing…'
+                : locked
+                  ? 'Nike windbreaker'
+                  : 'Looking…'}
           </SWText>
         </Animated.View>
         <IconButton
@@ -189,7 +206,14 @@ export function CaptureView({
         </Animated.View>
       </View>
 
-      <View style={[styles.bottom, { paddingBottom: controlsBottom }]}>
+      <View
+        style={[
+          styles.bottom,
+          { paddingBottom: controlsBottom },
+          freeze && shooting ? styles.hidden : null,
+        ]}
+        pointerEvents={freeze && shooting ? 'none' : 'auto'}
+      >
         <View style={styles.tipRow}>
           <Animated.View
             key={tip}
@@ -241,7 +265,7 @@ export function CaptureView({
       </View>
 
       <Animated.View style={[StyleSheet.absoluteFill, styles.flash, flashStyle]} />
-      {shooting && !viewfinder ? (
+      {shooting && !viewfinder && !freeze ? (
         <Animated.View style={[styles.flyingShot, shotStyle]}>
           <Image source={previewItem.photo} style={styles.flyingImage} />
         </Animated.View>
@@ -297,19 +321,23 @@ function Shutter({
 }
 
 /** Stand-in for the live camera: the scene drifts a little, like a hand-held phone. */
-function SimulatedScene() {
+function SimulatedScene({ still = false }: { readonly still?: boolean }) {
   const reduceMotion = useReducedMotion();
   const sway = useSharedValue(0);
 
   useEffect(() => {
-    if (reduceMotion) return;
+    // A frozen frame stops exactly where it was.
+    if (reduceMotion || still) {
+      cancelAnimation(sway);
+      return;
+    }
     sway.value = withRepeat(
       withTiming(1, { duration: 5200, easing: Easing.inOut(Easing.sin) }),
       -1,
       true,
     );
     return () => cancelAnimation(sway);
-  }, [reduceMotion, sway]);
+  }, [reduceMotion, still, sway]);
 
   const style = useAnimatedStyle(() => ({
     transform: [
@@ -357,6 +385,9 @@ const bracketStroke = 3.5;
 const bracketRadius = 14;
 
 const styles = StyleSheet.create({
+  hidden: {
+    opacity: 0,
+  },
   root: {
     flex: 1,
     backgroundColor: tokens.color.dark.sunken,

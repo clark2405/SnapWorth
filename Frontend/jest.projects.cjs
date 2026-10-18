@@ -27,6 +27,7 @@ const pureUnitProject = {
     ...common.testPathIgnorePatterns,
     '\\.property\\.test\\.[jt]sx?$',
     '\\.native\\.test\\.[jt]sx?$',
+    '\\.screen\\.test\\.[jt]sx?$',
   ],
 };
 
@@ -47,7 +48,32 @@ const propertyProject = {
   testMatch: ['**/*.property.test.[jt]s?(x)'],
 };
 
+/**
+ * Screens and components rendered as React Native would render them (jest-expo's iOS preset),
+ * driven through React Native Testing Library: what a person sees and can press.
+ */
+const screenProject = {
+  rootDir,
+  displayName: 'screens',
+  preset: 'jest-expo/ios',
+  roots: ['<rootDir>/shared/src'],
+  // There is no root Babel config, so React Native's own sources get the Expo preset here too,
+  // and so do the libraries that ship untranspiled modules (the icons ship .mjs).
+  transform: {
+    '^.+\\.(m?js|jsx|tsx?)$': common.transform['^.+\\.[jt]sx?$'],
+  },
+  transformIgnorePatterns: [
+    '/node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(-.*)?|@expo(-google-fonts)?/.*|react-native-.*|@react-native-.*/.*|lucide-react-native|@supabase/.*))',
+  ],
+  testMatch: ['**/*.screen.test.[jt]s?(x)'],
+  setupFiles: ['<rootDir>/test/screen-setup.cjs'],
+  moduleNameMapper: {
+    '^@snapworth/shared/(.*)$': '<rootDir>/shared/src/$1',
+  },
+};
+
 module.exports = {
+  screenProject,
   motionHookProject,
   propertyProject,
   pureUnitProject,

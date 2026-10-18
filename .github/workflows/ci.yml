@@ -77,3 +77,26 @@ jobs:
       # native-only bundling errors without needing Xcode or Android Studio.
       - name: Build ${{ matrix.target }}
         run: npm run build:${{ matrix.target }}
+
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: Backend
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      # Migrations, row-level security, and the seed against a throwaway Postgres (the runner
+      # image ships the server binaries) with a stand-in for Supabase's auth schema.
+      - name: Database tests
+        run: scripts/test-db.sh
+
+      # Typecheck the Edge Functions and run their unit tests.
+      - name: Edge Function tests
+        run: scripts/test-functions.sh

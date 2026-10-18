@@ -33,7 +33,7 @@ export function ResetPasswordView({ onBack, onSendLink, onBackToLogin }: ResetPa
   if (status === 'sent') {
     return (
       <Screen
-        ambient="aurora"
+        ambient="calm"
         header={<NavHeader title="" onBack={onBack} />}
         contentStyle={styles.content}
       >
@@ -62,7 +62,7 @@ export function ResetPasswordView({ onBack, onSendLink, onBackToLogin }: ResetPa
 
   return (
     <Screen
-      ambient="aurora"
+      ambient="calm"
       header={<NavHeader title="" onBack={onBack} />}
       contentStyle={styles.content}
     >

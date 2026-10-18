@@ -2,9 +2,11 @@ import type { LucideIcon } from 'lucide-react-native';
 import { View } from 'react-native';
 import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 
-import { themedStyles, tokens, useTheme, useThemedStyles } from '../design';
+import { held, placeColors, themedStyles, tokens, useTheme, useThemedStyles } from '../design';
 import { Button } from './Button';
+import { useScreenScroll } from './Screen';
 import { SWText } from './SWText';
+import { Worthy } from './Worthy';
 
 export interface EmptyStateProps {
   readonly icon: LucideIcon;
@@ -27,16 +29,27 @@ export function EmptyState({
 }: EmptyStateProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
+  const place = useScreenScroll()?.place;
+  // Worthy stands on a disc of the place's colour, or marigold outside one.
+  const disc = place ? placeColors(colors, place).fill : colors.marigold;
 
   return (
     <View style={styles.root} accessibilityLiveRegion="polite">
-      <Animated.View entering={ZoomIn.springify().damping(14)} style={styles.icon}>
-        <Icon
-          size={24}
-          strokeWidth={1.75}
-          color={tone === 'error' ? colors.danger : colors.textSecondary}
-        />
-      </Animated.View>
+      {/* An empty screen is Worthy's to explain, holding up a tag with what belongs here. A
+          failure keeps the plain red mark: nothing about it should look cheerful. */}
+      {tone === 'error' ? (
+        <Animated.View entering={ZoomIn.springify().damping(14)} style={styles.icon}>
+          <Icon size={24} strokeWidth={1.75} color={colors.danger} />
+        </Animated.View>
+      ) : (
+        <Animated.View entering={ZoomIn.springify().damping(14)} style={styles.worthy}>
+          <View style={[styles.disc, { backgroundColor: disc }]} />
+          <Worthy size={84} mood="attentive" />
+          <View style={styles.held}>
+            <Icon size={16} strokeWidth={2} color={colors.kraftInk} />
+          </View>
+        </Animated.View>
+      )}
       <Animated.View entering={FadeInDown.delay(80).duration(420)} style={styles.text}>
         <SWText variant="headingLarge" align="center">
           {title}
@@ -68,6 +81,33 @@ const stylesFor = themedStyles((colors) => ({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.sunken,
+  },
+  worthy: {
+    width: 120,
+    height: 112,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  disc: {
+    position: 'absolute',
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    ...held(colors),
+  },
+  // A little manila tag tucked against Worthy, carrying the screen's own icon.
+  held: {
+    position: 'absolute',
+    right: 0,
+    bottom: 4,
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.kraft,
+    ...held(colors, 2),
+    transform: [{ rotate: `${tokens.tilt.end}deg` }],
   },
   text: {
     gap: tokens.spacing[2],

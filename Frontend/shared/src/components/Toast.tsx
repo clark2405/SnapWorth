@@ -3,6 +3,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -13,6 +14,7 @@ import Animated, { FadeOutUp, SlideInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../design';
+import { Confetti } from './Confetti';
 import { GlassSurface } from './GlassSurface';
 import { SWText } from './SWText';
 
@@ -20,6 +22,8 @@ export interface ToastMessage {
   readonly title: string;
   readonly body?: string;
   readonly icon?: LucideIcon;
+  /** The big payoff moments (a listing goes live) also throw a burst of confetti. */
+  readonly celebrate?: boolean;
 }
 
 interface ToastApi {
@@ -40,14 +44,24 @@ export function ToastProvider({ children }: { readonly children: ReactNode }) {
   const [current, setCurrent] = useState<(ToastMessage & { id: number }) | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const counter = useRef(0);
+  const [burst, setBurst] = useState(0);
 
   const show = useCallback((message: ToastMessage) => {
     counter.current += 1;
     setCurrent({ ...message, id: counter.current });
+    if (message.celebrate) setBurst((value) => value + 1);
     haptic('success');
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => setCurrent(null), 2400);
   }, []);
+
+  // A toast still showing when the app's shell goes away has nowhere left to hide.
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
 
   const api = useMemo(() => ({ show }), [show]);
 
@@ -55,6 +69,7 @@ export function ToastProvider({ children }: { readonly children: ReactNode }) {
     <ToastContext.Provider value={api}>
       {children}
       <View style={styles.host}>
+        <Confetti burst={burst} />
         {current ? <ToastPill key={current.id} message={current} /> : null}
       </View>
     </ToastContext.Provider>

@@ -11,9 +11,15 @@ export interface CameraCaptureProps {
   readonly active: boolean;
   readonly onClose: () => void;
   readonly onOpenHistory: () => void;
+  readonly onPhotoCaptured?: () => void;
 }
 
-export function CameraCapture({ active, onClose, onOpenHistory }: CameraCaptureProps) {
+export function CameraCapture({
+  active,
+  onClose,
+  onOpenHistory,
+  onPhotoCaptured,
+}: CameraCaptureProps) {
   const [permission, requestPermission, refreshPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
   const takingPhoto = useRef<number | null>(null);
@@ -62,6 +68,7 @@ export function CameraCapture({ active, onClose, onOpenHistory }: CameraCaptureP
       if (!photo?.uri) throw new Error('No photo returned');
       setReady(false);
       setPhotoUri(photo.uri);
+      onPhotoCaptured?.();
     } catch {
       if (captureSession === session.current)
         setError('Could not take the photo. Please try again.');
@@ -86,7 +93,7 @@ export function CameraCapture({ active, onClose, onOpenHistory }: CameraCaptureP
 
   const panelStyle = [
     styles.panel,
-    { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 88 },
+    { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 },
   ];
 
   if (!permission?.granted) {
@@ -169,7 +176,6 @@ export function CameraCapture({ active, onClose, onOpenHistory }: CameraCaptureP
         onCapture={takePhoto}
         onClose={onClose}
         onOpenHistory={onOpenHistory}
-        bottomInset={64}
       />
       {error ? (
         <View style={[styles.error, { top: insets.top + 80 }]} accessibilityLiveRegion="polite">
