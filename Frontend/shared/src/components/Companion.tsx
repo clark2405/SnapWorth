@@ -91,6 +91,7 @@ export function Companion({
   const [mood, setMood] = useState<CompanionMood>('idle');
   const [side, setSide] = useState<'left' | 'right'>('right');
   const [showHint, setShowHint] = useState(false);
+  const cameraOpening = useRef(false);
 
   const restX = side === 'right' ? width - orbSize - edgeGap : edgeGap;
   const restY = height - insets.bottom - bottomOffset - orbSize - tokens.spacing[3];
@@ -107,6 +108,7 @@ export function Companion({
     y.value = withSpring(restY + dragY, tokens.motion.spring.smooth);
   }, [dragY, restY, y]);
   useEffect(() => {
+    cameraOpening.current = false;
     lift.value = reduceMotion
       ? withTiming(hidden ? 0 : 1, { duration: 160 })
       : withSpring(hidden ? 0 : 1, tokens.motion.spring.playful);
@@ -153,13 +155,15 @@ export function Companion({
   }, []);
 
   const holdSnap = useCallback(() => {
+    if (hidden || cameraOpening.current || !onHoldSnap) return;
+    cameraOpening.current = true;
     haptic('heavy');
-    setMood('thinking');
-    setTimeout(() => {
-      onHoldSnap?.();
-      setMood('idle');
-    }, 180);
-  }, [onHoldSnap]);
+    setOpen(false);
+    setShowHint(false);
+    setMood('idle');
+    Keyboard.dismiss();
+    onHoldSnap();
+  }, [hidden, onHoldSnap]);
 
   const settleSide = useCallback((next: 'left' | 'right') => {
     haptic('select');
@@ -167,19 +171,22 @@ export function Companion({
   }, []);
 
   const tap = Gesture.Tap()
+    .enabled(!hidden)
     .maxDuration(holdMs - 20)
     .onEnd((_event, success) => {
       if (success) runOnJS(openPanel)();
     });
 
   const hold = Gesture.LongPress()
+    .enabled(!hidden)
     .minDuration(holdMs)
     .onBegin(() => {
       charge.value = withTiming(1, { duration: holdMs, easing: Easing.linear });
       runOnJS(setMood)('charging');
     })
-    .onStart(() => {
-      if (onHoldSnap) runOnJS(holdSnap)();
+    // Present the native camera after release, not under an active touch gesture.
+    .onEnd((_event, success) => {
+      if (success && onHoldSnap) runOnJS(holdSnap)();
     })
     .onFinalize(() => {
       charge.value = withTiming(0, { duration: 200 });
@@ -187,6 +194,7 @@ export function Companion({
     });
 
   const drag = Gesture.Pan()
+    .enabled(!hidden)
     .activeOffsetX([-12, 12])
     .activeOffsetY([-12, 12])
     .onChange((event) => {
@@ -234,7 +242,7 @@ export function Companion({
   }));
 
   return (
-    <View style={styles.host}>
+    <View style={styles.host} pointerEvents={hidden ? 'none' : 'box-none'}>
       {open ? (
         <CompanionPanel
           greeting={greeting}

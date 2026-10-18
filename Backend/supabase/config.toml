@@ -13,3 +13,8 @@ enable_anonymous_sign_ins = true
 
 [functions.moderate-content]
 verify_jwt = true
+
+[functions.estimate-price]
+# The handler validates the bearer session with Supabase Auth itself. This also
+# supports clients using the newer publishable project keys.
+verify_jwt = false

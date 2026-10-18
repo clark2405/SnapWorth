@@ -34,8 +34,18 @@ permission and offers Settings when permission is blocked. The shutter is enable
 after the camera is ready; flash can be toggled before taking a photo. Camera access stops
 when the screen loses focus or the app enters the background.
 
-Taking a photo opens a temporary local preview with Retake. This setup does not upload
-photos, add them to History, generate AI estimates, or publish posts yet.
+Taking a photo sends its JPEG to the authenticated `estimate-price` Edge Function and displays
+Gemini's rough PHP estimate, range, and explanation alongside the actual photo. Retake cancels
+the old request; Retry estimates the same photo again. This prototype does not save History
+or publish posts. Image processing is performed remotely by Gemini through Supabase;
+the provider notice was removed from the capture UI at the user's request.
+
+Startup shows the existing login screen after the first-run introduction. That login is
+still a local demo session. Estimation separately establishes a background Supabase anonymous
+session, so Anonymous Sign-Ins must be enabled in the Supabase project. The two flows will be
+unified when real email authentication is implemented.
+
+The backend function must be deployed before phone estimates work; see `../../Backend/README.md`.
 
 Rebuild and reinstall the Android APK after this native dependency/configuration change;
 reloading JavaScript in an older APK is insufficient. Test on a physical phone: grant and

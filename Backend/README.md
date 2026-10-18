@@ -4,13 +4,13 @@
 
 ## What is built
 
-| Area               | Where                                              | What it does                                                                                                         |
-| ------------------ | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Feed discussion    | `supabase/migrations/20261005000000_feed_comments.sql` | Profiles, feed posts, comments with one level of replies, reports, and the RLS policies that decide who sees what. |
-| Moderation         | `supabase/functions/moderate-content/`              | Screens each new comment and approves or holds it. Fail-closed: nothing is public until it has been screened.       |
-| Moderation providers | `supabase/functions/_shared/providers/moderation.ts` | `openai` (OpenAI's free moderation endpoint) for real use; `rules` (a fixed word list) for local development.     |
-| Development data   | `supabase/seed/01_feed_preview.sql`                 | The demo accounts, the two feed posts the app ships with, and their comments.                                         |
-| Tests              | `supabase/tests/`, `scripts/`                       | Database behaviour tests and Edge Function tests, run in CI on every push.                                           |
+| Area                 | Where                                                  | What it does                                                                                                       |
+| -------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| Feed discussion      | `supabase/migrations/20261005000000_feed_comments.sql` | Profiles, feed posts, comments with one level of replies, reports, and the RLS policies that decide who sees what. |
+| Moderation           | `supabase/functions/moderate-content/`                 | Screens each new comment and approves or holds it. Fail-closed: nothing is public until it has been screened.      |
+| Moderation providers | `supabase/functions/_shared/providers/moderation.ts`   | `openai` (OpenAI's free moderation endpoint) for real use; `rules` (a fixed word list) for local development.      |
+| Development data     | `supabase/seed/01_feed_preview.sql`                    | The demo accounts, the two feed posts the app ships with, and their comments.                                      |
+| Tests                | `supabase/tests/`, `scripts/`                          | Database behaviour tests and Edge Function tests, run in CI on every push.                                         |
 
 ### How comments work
 
@@ -47,6 +47,62 @@ You need the [Supabase CLI](https://supabase.com/docs/guides/cli) (`npx supabase
 4. **Point the apps at the project:** copy `Frontend/web/.env.example` to `Frontend/web/.env` (and the same for `Frontend/mobile/`) and fill in the project URL and **anon** key from Dashboard → Project Settings → API. Never put the service-role key in an app.
 
 Without step 4 the apps still work: comments are kept on the device, under the same rules, so the UI can be built and tested before a project exists.
+
+## Camera price estimation
+
+`supabase/functions/estimate-price/` implements the camera-only Gemini prototype. It validates
+the caller's Supabase session, accepts a JPEG/PNG/WebP up to 4 MiB, sends image bytes to Gemini,
+and validates a PHP estimate/range/explanation or an explicit unable-to-estimate result. The
+key is never sent to the app. There is no upload to permanent Storage or saved scan History yet.
+
+The function uses the existing `AI_PROVIDER=gemini` and `AI_API_KEY` Edge Function secrets.
+`AI_MODEL` optionally overrides the default `gemini-3.6-flash`; use a model available on your
+free tier. There is no automatic model or paid fallback. Rate limits return an explicit retry
+error. The prototype also has a per-instance guard of two requests/minute and ten/day per
+user; this is not a durable project-wide quota across multiple Edge instances. Before a public
+launch, add a shared persistent quota and abuse controls for anonymous signups.
+
+The default uses medium reasoning, a 4,096-token budget shared by reasoning and output,
+a concise explanation, and up to three assumptions. Other model overrides use low reasoning.
+`AI_THINKING_LEVEL` optionally overrides reasoning (`minimal`, `low`, `medium`, `high`); choose a
+level supported by the selected model (3.8 Flash does not support minimal). Keep these settings
+on the server. The prompt checks identification, visible condition and completeness, and asks
+for missing details when necessary rather than inventing an exact model or functionality.
+The user's selected deployment configuration is `AI_MODEL=gemini-3.6-flash` and
+`AI_THINKING_LEVEL=medium`. There is no automatic model fallback. Timing varies, and the
+free-tier quota can block estimates until its applicable limit resets. The five-photo
+[3.6 comparison](../docs/benchmarks/gemini-3.6-comparison.md) records provider errors and
+timings for low and medium reasoning. These tests do not establish pricing accuracy.
+
+Enable Anonymous Sign-Ins in the project's Authentication settings. This is a backend session
+for the camera; the existing app login screen remains visible and is still a demo UI session.
+
+After signing into the Supabase CLI with `supabase login`, deploy from `Backend/`:
+
+```sh
+supabase functions deploy estimate-price --project-ref ofnkthxiexmbmyhjevbm --use-api
+```
+
+The function intentionally disables gateway JWT verification because it validates the bearer
+token itself with Supabase Auth. It rejects unauthenticated callers before any Gemini call.
+Never remove the function's session validation.
+
+Run isolated handler tests from the repository root:
+
+```sh
+node --experimental-strip-types --test Backend/supabase/functions/estimate-price/pricing_test.mjs
+```
+
+For one real Gemini call using a non-sensitive repository image, fill in the ignored
+`Backend/supabase/.env.local`, then run:
+
+```sh
+node --experimental-strip-types Backend/scripts/check-pricing.mjs
+```
+
+This smoke test exercises pricing logic and the Gemini API; it does not test deployed
+Supabase authentication. Actual private photos should not be used in development because
+Google's unpaid API terms permit product-improvement use of inputs and outputs.
 
 ## Running the tests
 

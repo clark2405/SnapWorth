@@ -37,6 +37,7 @@ export interface CaptureViewProps {
   readonly onCapture?: () => void | Promise<void>;
   readonly captureDisabled?: boolean;
   readonly captureHint?: string;
+  readonly notice?: string;
   readonly onOpenGallery?: () => void;
   readonly onOpenHistory?: () => void;
   /** Room reserved at the bottom, e.g. for a floating tab bar the camera sits under. */
@@ -69,6 +70,7 @@ export function CaptureView({
   onCapture,
   captureDisabled = false,
   captureHint = 'Saves the photo to your history and starts the AI estimate',
+  notice,
   onOpenGallery,
   onOpenHistory,
   bottomInset = 0,
@@ -214,6 +216,11 @@ export function CaptureView({
         ]}
         pointerEvents={freeze && shooting ? 'none' : 'auto'}
       >
+        {notice ? (
+          <SWText variant="caption" color={tokens.overlay.text} align="center">
+            {notice}
+          </SWText>
+        ) : null}
         <View style={styles.tipRow}>
           <Animated.View
             key={tip}

@@ -2,6 +2,7 @@ import { useIsFocused, useRouter } from 'expo-router';
 
 import { AccountGateView, useSession } from '@snapworth/shared/features/session';
 import { useTip } from '@snapworth/shared/features/tips';
+import { usePhotoPricing } from '@snapworth/shared/composition';
 
 import { CameraCapture } from '../src/camera/CameraCapture';
 
@@ -10,6 +11,7 @@ import { CameraCapture } from '../src/camera/CameraCapture';
 export default function CaptureRoute() {
   const router = useRouter();
   const focused = useIsFocused();
+  const pricing = usePhotoPricing();
   const { isGuest } = useSession();
   // Taking a photo is what the Snap tip teaches, so doing it retires the tip.
   const snapTip = useTip('snap');
@@ -22,6 +24,7 @@ export default function CaptureRoute() {
       active={focused}
       onClose={close}
       onPhotoCaptured={snapTip.done}
+      onEstimate={pricing.estimate}
       onOpenHistory={() => router.dismissTo('/history')}
     />
   );

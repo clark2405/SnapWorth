@@ -14,8 +14,8 @@ export default function OnboardingRoute() {
     return <OnboardingView mode="replay" onGetStarted={close} onSkip={close} />;
   }
 
-  // However the introduction is left, it has been seen: later launches open the feed.
-  const leave = (href: '/signup' | '/login' | '/feed') => {
+  // However the introduction is left, later launches go straight to the account step.
+  const leave = (href: '/signup' | '/login') => {
     void markIntroSeen();
     router.replace(href);
   };
@@ -24,8 +24,7 @@ export default function OnboardingRoute() {
     <OnboardingView
       onGetStarted={() => leave('/signup')}
       onSignIn={() => leave('/login')}
-      // Looking around needs no account; one is asked for when the person first acts.
-      onSkip={() => leave('/feed')}
+      onSkip={() => leave('/login')}
     />
   );
 }

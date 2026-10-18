@@ -1,13 +1,24 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useCameraPermissions } from 'expo-camera';
 import type * as ReactApi from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import type * as ReactNativeApi from 'react-native';
 
 import { CameraCapture } from './CameraCapture';
 
 const mockTakePicture = jest.fn();
 const mockRequestPermission = jest.fn();
+const mockEstimate = jest.fn();
+const mockCameraMount = jest.fn();
+const sampleEstimate = {
+  status: 'estimated',
+  itemName: 'Camera-tested jacket',
+  amountPhp: 1500,
+  lowPhp: 900,
+  highPhp: 2500,
+  explanation: 'A rough estimate based on the visible item.',
+  assumptions: ['Condition is based on the photo.'],
+};
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
@@ -19,7 +30,18 @@ jest.mock('expo-camera', () => {
   return {
     useCameraPermissions: jest.fn(),
     CameraView: React.forwardRef((props: object, ref: unknown) => {
-      React.useImperativeHandle(ref, () => ({ takePictureAsync: mockTakePicture }));
+      React.useEffect(() => {
+        mockCameraMount();
+      }, []);
+      React.useImperativeHandle(ref, () => ({
+        takePictureAsync: mockTakePicture,
+        getAvailablePictureSizesAsync: async () => [
+          '4000x3000',
+          '1920x1080',
+          '1280x720',
+          '640x480',
+        ],
+      }));
       return React.createElement(View, { ...props, testID: 'camera' });
     }),
   };
@@ -72,6 +94,7 @@ jest.mock('@snapworth/shared/design', () => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.replaceProperty(Platform, 'OS', 'ios');
   jest.spyOn(AppState, 'addEventListener').mockReturnValue({ remove: jest.fn() });
   jest
     .mocked(useCameraPermissions)
@@ -80,12 +103,53 @@ beforeEach(() => {
       mockRequestPermission,
       jest.fn(),
     ]);
-  mockTakePicture.mockResolvedValue({ uri: 'file:///photo.jpg', width: 100, height: 100 });
+  mockTakePicture.mockResolvedValue({
+    uri: 'file:///photo.jpg',
+    base64: '/9j/4AAQSkZJRg==',
+    width: 100,
+    height: 100,
+  });
+  mockEstimate.mockReset().mockResolvedValue(sampleEstimate);
 });
 
 function openCamera(active = true) {
-  return render(<CameraCapture active={active} onClose={jest.fn()} onOpenHistory={jest.fn()} />);
+  return render(
+    <CameraCapture
+      active={active}
+      onClose={jest.fn()}
+      onOpenHistory={jest.fn()}
+      onEstimate={mockEstimate}
+    />,
+  );
 }
+
+async function readyCamera() {
+  await act(async () => {
+    fireEvent(screen.getByTestId('camera'), 'cameraReady');
+  });
+  await act(async () => {
+    fireEvent(screen.getByTestId('camera'), 'cameraReady');
+  });
+}
+
+it('configures resolution without replacing the native camera session', async () => {
+  openCamera();
+  expect(mockCameraMount).toHaveBeenCalledTimes(1);
+  await readyCamera();
+  expect(screen.getByTestId('camera').props.pictureSize).toBe('1280x720');
+  expect(mockCameraMount).toHaveBeenCalledTimes(1);
+});
+
+it('enables iOS capture after its single camera-ready event', async () => {
+  jest.replaceProperty(Platform, 'OS', 'ios');
+  openCamera();
+  await act(async () => {
+    fireEvent(screen.getByTestId('camera'), 'cameraReady');
+  });
+  expect(screen.getByTestId('camera').props.pictureSize).toBe('1280x720');
+  fireEvent.press(screen.getByText('Take photo'));
+  await waitFor(() => expect(mockTakePicture).toHaveBeenCalledTimes(1));
+});
 
 it('requests permission before mounting the camera', () => {
   jest
@@ -115,26 +179,37 @@ it('offers settings when camera permission cannot be requested again', () => {
 });
 
 it('waits for readiness and displays the actual photo without a fake estimate', async () => {
+  jest.replaceProperty(Platform, 'OS', 'android');
   openCamera();
-  fireEvent.press(screen.getByText('Take photo'));
+  fireEvent.press(screen.getByText(/take photo/i));
   expect(mockTakePicture).not.toHaveBeenCalled();
-  fireEvent(screen.getByTestId('camera'), 'cameraReady');
-  fireEvent.press(screen.getByText('Take photo'));
+  await act(async () => {
+    fireEvent(screen.getByTestId('camera'), 'cameraReady');
+  });
+  expect(screen.getByTestId('camera').props.pictureSize).toBe('1280x720');
+  fireEvent.press(screen.getByText(/take photo/i));
+  expect(mockTakePicture).not.toHaveBeenCalled();
+  await readyCamera();
+  fireEvent.press(screen.getByText(/take photo/i));
   await waitFor(() =>
     expect(screen.getByLabelText('Your captured photo').props.source).toEqual({
       uri: 'file:///photo.jpg',
     }),
   );
   expect(screen.queryByTestId('camera')).toBeNull();
-  expect(screen.getByText('AI estimation is not connected yet.')).toBeTruthy();
-  fireEvent.press(screen.getByText('Retake photo'));
+  await screen.findByText('Camera-tested jacket');
+  expect(mockEstimate).toHaveBeenCalledWith(
+    { data: '/9j/4AAQSkZJRg==', mimeType: 'image/jpeg' },
+    expect.any(AbortSignal),
+  );
+  fireEvent.press(screen.getByText(/retake photo/i));
   expect(screen.getByTestId('camera')).toBeTruthy();
 });
 
 it('allows retry after a capture failure', async () => {
   mockTakePicture.mockRejectedValueOnce(new Error('Camera busy'));
   openCamera();
-  fireEvent(screen.getByTestId('camera'), 'cameraReady');
+  await readyCamera();
   fireEvent.press(screen.getByText('Take photo'));
   await screen.findByText('Could not take the photo. Please try again.');
   fireEvent.press(screen.getByText('Take photo'));
@@ -164,13 +239,27 @@ it('ignores repeated shutter presses and discards a result after leaving the tab
       }),
   );
   const { rerender } = openCamera();
-  fireEvent(screen.getByTestId('camera'), 'cameraReady');
+  await readyCamera();
   fireEvent.press(screen.getByText('Take photo'));
   fireEvent.press(screen.getByText('Take photo'));
   expect(mockTakePicture).toHaveBeenCalledTimes(1);
-  rerender(<CameraCapture active={false} onClose={jest.fn()} onOpenHistory={jest.fn()} />);
+  rerender(
+    <CameraCapture
+      active={false}
+      onClose={jest.fn()}
+      onOpenHistory={jest.fn()}
+      onEstimate={mockEstimate}
+    />,
+  );
   await act(async () => finishCapture({ uri: 'file:///stale.jpg' }));
-  rerender(<CameraCapture active={true} onClose={jest.fn()} onOpenHistory={jest.fn()} />);
+  rerender(
+    <CameraCapture
+      active={true}
+      onClose={jest.fn()}
+      onOpenHistory={jest.fn()}
+      onEstimate={mockEstimate}
+    />,
+  );
   expect(screen.queryByLabelText('Your captured photo')).toBeNull();
   expect(screen.getByTestId('camera')).toBeTruthy();
 });
@@ -185,12 +274,73 @@ it('passes the flash setting to the camera', () => {
 it('can capture again when leaving the tab cancels a native capture that never settles', async () => {
   mockTakePicture.mockImplementationOnce(() => new Promise(() => {}));
   const { rerender } = openCamera();
-  fireEvent(screen.getByTestId('camera'), 'cameraReady');
+  await readyCamera();
   fireEvent.press(screen.getByText('Take photo'));
-  rerender(<CameraCapture active={false} onClose={jest.fn()} onOpenHistory={jest.fn()} />);
-  rerender(<CameraCapture active={true} onClose={jest.fn()} onOpenHistory={jest.fn()} />);
-  fireEvent(screen.getByTestId('camera'), 'cameraReady');
+  rerender(
+    <CameraCapture
+      active={false}
+      onClose={jest.fn()}
+      onOpenHistory={jest.fn()}
+      onEstimate={mockEstimate}
+    />,
+  );
+  rerender(
+    <CameraCapture
+      active={true}
+      onClose={jest.fn()}
+      onOpenHistory={jest.fn()}
+      onEstimate={mockEstimate}
+    />,
+  );
+  await readyCamera();
   fireEvent.press(screen.getByText('Take photo'));
   await screen.findByLabelText('Your captured photo');
   expect(mockTakePicture).toHaveBeenCalledTimes(2);
+});
+
+it('retains the photo and retries a failed estimate without taking a second photo', async () => {
+  mockEstimate.mockRejectedValueOnce(new Error('The free AI limit has been reached.'));
+  openCamera();
+  await readyCamera();
+  fireEvent.press(screen.getByText('Take photo'));
+  await screen.findByText('The free AI limit has been reached.');
+  expect(screen.getByLabelText('Your captured photo')).toBeTruthy();
+  fireEvent.press(screen.getByText('Retry estimate'));
+  await screen.findByText('Camera-tested jacket');
+  expect(mockEstimate).toHaveBeenCalledTimes(2);
+  expect(mockTakePicture).toHaveBeenCalledTimes(1);
+});
+
+it('does not display an old estimate after retaking the photo', async () => {
+  let finishEstimate!: (value: typeof sampleEstimate) => void;
+  mockEstimate.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishEstimate = resolve;
+      }),
+  );
+  openCamera();
+  await readyCamera();
+  fireEvent.press(screen.getByText('Take photo'));
+  await screen.findByText('Estimating your item…');
+  fireEvent.press(screen.getByText('Retake photo'));
+  await act(async () => finishEstimate(sampleEstimate));
+  expect(screen.queryByText('Camera-tested jacket')).toBeNull();
+  expect(screen.getByTestId('camera')).toBeTruthy();
+});
+
+it('keeps an oversized photo for review without sending it to the AI', async () => {
+  mockTakePicture.mockResolvedValueOnce({
+    uri: 'file:///large.jpg',
+    base64: 'A'.repeat(6_000_000),
+    width: 4000,
+    height: 3000,
+  });
+  openCamera();
+  await readyCamera();
+  fireEvent.press(screen.getByText('Take photo'));
+  await screen.findByText('This photo is too large to estimate. Please retake it.');
+  expect(mockEstimate).not.toHaveBeenCalled();
+  expect(screen.getByLabelText('Your captured photo')).toBeTruthy();
+  expect(screen.queryByText('Retry estimate')).toBeNull();
 });
