@@ -6,7 +6,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: 'snapworth-web',
   scheme: 'snapworth',
   userInterfaceStyle: 'automatic',
-  plugins: ['expo-router', 'expo-status-bar'],
+  plugins: ['expo-router', 'expo-status-bar', 'expo-font'],
   web: {
     ...config.web,
     bundler: 'metro',

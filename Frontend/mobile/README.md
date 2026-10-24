@@ -13,8 +13,9 @@ simulator as **SnapWorth** with its own icon.
 From the repository root:
 
 ```sh
-npm run ios       # builds and installs the SnapWorth dev build, then starts Metro
-npm run android   # same for the Android emulator
+npm run ios           # builds and installs the SnapWorth dev build, then starts Metro
+npm run android       # same for the Android emulator
+npm run dev:mobile:go # starts Metro in Expo Go mode
 ```
 
 The first build takes a few minutes; after that, `npm run dev:mobile` starts Metro and the

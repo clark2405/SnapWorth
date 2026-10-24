@@ -4,11 +4,17 @@
   "scripts": {
     "dev": "npm --prefix Frontend run dev",
     "dev:mobile": "npm --prefix Frontend run dev:mobile",
+    "dev:mobile:go": "npm --prefix Frontend run dev:mobile:go",
     "start": "npm --prefix Frontend run dev:mobile",
     "ios": "npm --prefix Frontend run ios",
     "android": "npm --prefix Frontend run android",
     "build": "npm --prefix Frontend run build:web",
     "test": "npm --prefix Frontend run test:unit",
     "validate": "npm --prefix Frontend run validate"
+  },
+  "dependencies": {
+    "expo": "^58.0.19",
+    "react": "19.3.0",
+    "react-native": "0.88.0"
   }
 }

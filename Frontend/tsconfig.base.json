@@ -1,6 +1,11 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "expo-router": ["./mobile/node_modules/expo-router"],
+      "expo-router/*": ["./mobile/node_modules/expo-router/*"]
+    },
     "allowJs": false,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
