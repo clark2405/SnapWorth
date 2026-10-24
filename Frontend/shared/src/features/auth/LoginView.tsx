@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View } from 'react-native';
+import { View, Alert } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import {
@@ -22,11 +22,16 @@ export type AuthMode = 'login' | 'signup';
 
 export interface LoginViewProps {
   readonly initialMode?: AuthMode;
-  readonly onSubmit?: (input: { mode: AuthMode; email: string; password: string }) => void;
+  readonly onSubmit?: (input: {
+    mode: AuthMode;
+    email: string;
+    password: string;
+    fullName?: string;
+    gender?: string;
+  }) => void;
   readonly onForgotPassword?: () => void;
   readonly onContinueWithApple?: () => void;
   readonly onContinueWithGoogle?: () => void;
-  /** Shown when the screen was opened from an account prompt, so a guest can change their mind. */
   readonly onClose?: () => void;
 }
 
@@ -58,20 +63,30 @@ export function LoginView({
 }: LoginViewProps) {
   const styles = useThemedStyles(stylesFor);
   const { colors } = useTheme();
-  // The door to the app wears its front colour: the feed's price-gun red.
   const brand = placeColors(colors, 'feed');
+
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [gender, setGender] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
   const text = copy[mode];
 
   const submit = () => {
     if (submitting) return;
+
+    if (mode === 'signup' && password !== confirmPassword) {
+      Alert.alert("Error", "Passwords do not match.");
+      return;
+    }
+
     setSubmitting(true);
     setTimeout(() => {
       setSubmitting(false);
-      onSubmit?.({ mode, email, password });
+      onSubmit?.({ mode, email, password, fullName, gender });
     }, 900);
   };
 
@@ -116,15 +131,12 @@ export function LoginView({
               {text.why}
             </SWText>
           </Animated.View>
-          {/* Worthy is red too, so it waits on a marigold disc rather than vanishing into the block. */}
           <View style={[styles.worthy, { backgroundColor: colors.marigold }]}>
             <Worthy size={84} mood="attentive" />
           </View>
         </Reveal>
       </PlaceHero>
 
-      {/* One tap first: Sign in with Apple is the fastest, most private way in, so it leads;
-          email is there for anyone who prefers it. */}
       <Reveal index={2}>
         <Surface padding={tokens.spacing[5]} contentStyle={styles.card}>
           <View style={styles.quick}>
@@ -155,6 +167,7 @@ export function LoginView({
                   accessibilityLabel="Email address"
                 />
               </Field>
+
               <Field label="Password">
                 <TextField
                   value={password}
@@ -166,6 +179,40 @@ export function LoginView({
                   accessibilityLabel="Password"
                 />
               </Field>
+
+              {mode === 'signup' ? (
+                <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(140)} style={styles.signupFields}>
+                  <Field label="Confirm Password">
+                    <TextField
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                      placeholder="Repeat your password"
+                      secureTextEntry
+                      textContentType="newPassword"
+                      accessibilityLabel="Confirm Password"
+                    />
+                  </Field>
+                  <Field label="Full Name">
+                    <TextField
+                      value={fullName}
+                      onChangeText={setFullName}
+                      placeholder="e.g. John Doe"
+                      autoCapitalize="words"
+                      textContentType="name"
+                      accessibilityLabel="Full Name"
+                    />
+                  </Field>
+                  <Field label="Gender">
+                    <TextField
+                      value={gender}
+                      onChangeText={setGender}
+                      placeholder="e.g. Male, Female, Other"
+                      accessibilityLabel="Gender"
+                    />
+                  </Field>
+                </Animated.View>
+              ) : null}
+
               {mode === 'login' ? (
                 <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(140)}>
                   <Button
@@ -200,7 +247,6 @@ const stylesFor = themedStyles((colors) => ({
     paddingVertical: tokens.spacing[2],
     paddingLeft: tokens.spacing[3],
   },
-  // The title and why on the left, Worthy waiting beside them.
   intro: {
     marginTop: tokens.spacing[8],
     flexDirection: 'row',
@@ -228,6 +274,9 @@ const stylesFor = themedStyles((colors) => ({
     gap: tokens.spacing[6],
   },
   fields: {
+    gap: tokens.spacing[4],
+  },
+  signupFields: {
     gap: tokens.spacing[4],
   },
   forgot: {

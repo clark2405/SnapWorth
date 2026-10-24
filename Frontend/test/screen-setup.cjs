@@ -34,11 +34,15 @@ jest.mock('expo-haptics', () => ({
 
 // Shared screens only ask the router whether they are focused or a link preview; the shells
 // own navigation, so the router itself stays out of screen tests.
-jest.mock('expo-router', () => ({
-  useIsFocused: () => true,
-  useIsPreview: () => false,
-  useScrollToTop: () => undefined,
-}));
+jest.mock(
+  'expo-router',
+  () => ({
+    useIsFocused: () => true,
+    useIsPreview: () => false,
+    useScrollToTop: () => undefined,
+  }),
+  { virtual: true },
+);
 
 // Expo installs `fetch` and friends as lazy globals that load on first touch, which Jest's
 // module scope refuses; screens never fetch, so plain stand-ins are enough.
