@@ -1,3 +1,4 @@
+import { Redirect } from 'expo-router';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { Platform, View } from 'react-native';
 
@@ -15,6 +16,10 @@ import { SnapAccessory, SnapBar } from '../../src/SnapAccessory';
 export default function TabsLayout() {
   const { colors } = useTheme();
   const { isGuest } = useSession();
+
+  // Screen previews remain available in development; normal navigation requires a session.
+  const previewing = __DEV__ && process.env.EXPO_PUBLIC_DEV_START_ROUTE;
+  if (isGuest && !previewing) return <Redirect href="/login" />;
 
   const tabs = (
     <NativeTabs

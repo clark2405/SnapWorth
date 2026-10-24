@@ -6,6 +6,7 @@ export * from './ids';
 export * from './identity';
 export * from './money';
 export * from './pagination';
+export * from './photo-estimate';
 export * from './result';
 export * from './state-transitions';
 export * from './workflow-states';

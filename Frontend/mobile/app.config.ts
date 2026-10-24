@@ -39,7 +39,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       {
         photosPermission:
           'SnapWorth uses the photos you choose to show more angles of an item you list or ask about.',
-        cameraPermission: false,
+        cameraPermission: 'Allow SnapWorth to use your camera to photograph items.',
         microphonePermission: false,
       },
     ],
@@ -48,6 +48,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-notifications',
     'expo-status-bar',
     'expo-system-ui',
+    [
+      'expo-camera',
+      {
+        cameraPermission: 'Allow SnapWorth to use your camera to photograph items.',
+        microphonePermission: false,
+        recordAudioAndroid: false,
+        barcodeScannerEnabled: false,
+      },
+    ],
     [
       'expo-splash-screen',
       {

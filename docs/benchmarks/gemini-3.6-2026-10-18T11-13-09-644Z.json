@@ -1,0 +1,294 @@
+{
+  "model": "gemini-3.6-flash",
+  "startedAt": "2026-10-18T11:13:09.644Z",
+  "plannedRequests": 20,
+  "method": "Sequential local pricing-handler calls with real Gemini; two rounds, five photos, low and medium. Alternate setting order. At least six seconds between starts. Same prompt and 4096-token budget. No automatic retries. Not an end-to-end mobile test.",
+  "limitation": "No known sale prices; this measures response reliability, latency and price repeatability, not accuracy. Small repository images do not represent full phone uploads.",
+  "results": [
+    {
+      "trial": 1,
+      "round": 1,
+      "photo": "windbreaker-teal",
+      "thinkingLevel": "low",
+      "elapsedMs": 5961,
+      "httpStatus": 200,
+      "providerStatus": 200,
+      "status": "estimated",
+      "itemName": "Vintage Turquoise Windbreaker Jacket",
+      "amountPhp": 650,
+      "lowPhp": 400,
+      "highPhp": 900,
+      "explanation": "This is an approximate AI guess based on general secondhand marketplace trends in the Philippines, not verified current market data. Vintage or retro-style half-zip nylon windbreakers generally resell well depending on brand, condition, and sizing.",
+      "assumptions": [
+        "The jacket is authentic and free from major stains, tears, or zipper defects.",
+        "The brand is standard vintage outerwear rather than a high-end luxury label.",
+        "The size and fit appeal to average unisex buyers."
+      ]
+    },
+    {
+      "trial": 2,
+      "round": 1,
+      "photo": "windbreaker-teal",
+      "thinkingLevel": "medium",
+      "elapsedMs": 10300,
+      "httpStatus": 502,
+      "providerStatus": 503,
+      "providerCode": "UNAVAILABLE",
+      "code": "provider_unavailable"
+    },
+    {
+      "trial": 3,
+      "round": 1,
+      "photo": "polaroid-camera",
+      "thinkingLevel": "medium",
+      "elapsedMs": 8065,
+      "httpStatus": 200,
+      "providerStatus": 200,
+      "status": "estimated",
+      "itemName": "Vintage Polaroid Sun 600 Camera",
+      "amountPhp": 3500,
+      "lowPhp": 2000,
+      "highPhp": 5000,
+      "explanation": "This is a vintage Polaroid Sun 600 instant film camera. Estimated resale value in the Philippines ranges from PHP 2,000 to PHP 5,000 depending on operational condition and cosmetic wear. Please note this is an approximate AI guess, not verified market data.",
+      "assumptions": [
+        "The internal flash and shutter mechanism are fully functional.",
+        "The camera is authentic and has no severe internal damage.",
+        "There is no battery corrosion inside the compartment."
+      ]
+    },
+    {
+      "trial": 4,
+      "round": 1,
+      "photo": "polaroid-camera",
+      "thinkingLevel": "low",
+      "elapsedMs": 3085,
+      "httpStatus": 200,
+      "providerStatus": 200,
+      "status": "estimated",
+      "itemName": "Polaroid Sun 600 Instant Camera",
+      "amountPhp": 3000,
+      "lowPhp": 2000,
+      "highPhp": 4500,
+      "explanation": "This is an approximate AI guess, not verified market data. The vintage Polaroid Sun 600 instant camera is a popular collectible piece. Resale value depends heavily on working flash, functional shutter mechanism, and overall cosmetic condition.",
+      "assumptions": [
+        "The camera is functional and shutter/flash operate correctly",
+        "No major battery/corrosion damage in film compartment",
+        "Item is an authentic original vintage Polaroid camera"
+      ]
+    },
+    {
+      "trial": 5,
+      "round": 1,
+      "photo": "jordan-bred",
+      "thinkingLevel": "low",
+      "elapsedMs": 20106,
+      "httpStatus": 200,
+      "providerStatus": 200,
+      "status": "estimated",
+      "itemName": "Nike Retro Sneakers",
+      "amountPhp": 1800,
+      "lowPhp": 1200,
+      "highPhp": 2500,
+      "explanation": "This is an approximate AI guess based on general secondhand market trends in the Philippines, not verified real-time data. The sneakers appear to be in good or like-new condition based on visible profile details.",
+      "assumptions": [
+        "The pair is authentic and in good wearable condition.",
+        "Both shoes of the pair are included.",
+        "Minimal wear on outsoles and insoles."
+      ]
+    },
+    {
+      "trial": 6,
+      "round": 1,
+      "photo": "jordan-bred",
+      "thinkingLevel": "medium",
+      "elapsedMs": 6589,
+      "httpStatus": 200,
+      "providerStatus": 200,
+      "status": "estimated",
+      "itemName": "Nike Retro Running Shoes",
+      "amountPhp": 2000,
+      "lowPhp": 1200,
+      "highPhp": 2800,
+      "explanation": "This is an approximate AI guess, not verified current market data. Values for secondhand Nike retro sneakers depend on authenticity, size, overall wear, and outsole condition. In good secondhand shape, similar pairs typically trade in this range in the PH market.",
+      "assumptions": [
+        "The shoe is an authentic Nike product.",
+        "The outsoles and midsoles are in good condition without separation.",
+        "Includes a complete pair in the same size."
+      ]
+    },
+    {
+      "trial": 7,
+      "round": 1,
+      "photo": "keyboard",
+      "thinkingLevel": "medium",
+      "elapsedMs": 21498,
+      "httpStatus": 200,
+      "providerStatus": 200,
+      "status": "estimated",
+      "itemName": "75% Mechanical Keyboard with Knob",
+      "amountPhp": 2800,
+      "lowPhp": 1500,
+      "highPhp": 4500,
+      "explanation": "This is an approximate AI guess based on visual features (75% mechanical keyboard with rotary knob and RGB), not verified market data. Resale value varies depending on the exact brand, switch type, and case material.",
+      "assumptions": [
+        "The keyboard and RGB lighting are in fully working order.",
+        "It is a standard mid-range or budget brand.",
+        "The custom coiled USB cable is included."
+      ]
+    },
+    {
+      "trial": 8,
+      "round": 1,
+      "photo": "keyboard",
+      "thinkingLevel": "low",
+      "elapsedMs": 3789,
+      "httpStatus": 502,
+      "providerStatus": 503,
+      "providerCode": "UNAVAILABLE",
+      "code": "provider_unavailable"
+    },
+    {
+      "trial": 9,
+      "round": 1,
+      "photo": "walkman",
+      "thinkingLevel": "low",
+      "elapsedMs": 3920,
+      "httpStatus": 200,
+      "providerStatus": 200,
+      "status": "estimated",
+      "itemName": "Vintage Sony Walkman Cassette Player",
+      "amountPhp": 5000,
+      "lowPhp": 3000,
+      "highPhp": 8000,
+      "explanation": "This is an approximate AI estimate, not verified market data. Vintage portable cassette players like the Sony Walkman have strong collectible value in the Philippines, but final price depends heavily on whether the motor and belts are fully functional.",
+      "assumptions": [
+        "The device is an authentic Sony Walkman model.",
+        "The cassette mechanism is functional or easily restorable.",
+        "Cosmetic wear is minor to moderate considering its age."
+      ]
+    },
+    {
+      "trial": 10,
+      "round": 1,
+      "photo": "walkman",
+      "thinkingLevel": "medium",
+      "elapsedMs": 5646,
+      "httpStatus": 200,
+      "providerStatus": 200,
+      "status": "estimated",
+      "itemName": "Vintage Sony Walkman Cassette Player",
+      "amountPhp": 8000,
+      "lowPhp": 4000,
+      "highPhp": 15000,
+      "explanation": "This appears to be a vintage ultra-compact Sony Walkman cassette player. Collectible portable cassette players command a premium, though value relies heavily on functional condition and internal belt status. This is an approximate AI guess, not verified market data.",
+      "assumptions": [
+        "The unit is an authentic vintage Sony Walkman.",
+        "The motor and internal mechanical parts are functional or repairable.",
+        "There is no major battery corrosion inside."
+      ]
+    },
+    {
+      "trial": 11,
+      "round": 2,
+      "photo": "windbreaker-teal",
+      "thinkingLevel": "medium",
+      "elapsedMs": 4900,
+      "httpStatus": 200,
+      "providerStatus": 200,
+      "status": "estimated",
+      "itemName": "Vintage Teal Half-Zip Windbreaker Jacket",
+      "amountPhp": 500,
+      "lowPhp": 350,
+      "highPhp": 800,
+      "explanation": "This is an approximate AI guess, not verified market data. The jacket is a retro half-zip nylon windbreaker pullover in turquoise/teal. Estimated value reflects typical Philippine secondhand and ukay-ukay market pricing for vintage windbreakers in good wearable condition.",
+      "assumptions": [
+        "No major tears, stains, or functional zipper defects",
+        "Standard vintage unbranded or mid-tier outdoor brand",
+        "Fabric retains good water/wind resistance condition"
+      ]
+    },
+    {
+      "trial": 12,
+      "round": 2,
+      "photo": "windbreaker-teal",
+      "thinkingLevel": "low",
+      "elapsedMs": 2768,
+      "httpStatus": 200,
+      "providerStatus": 200,
+      "status": "estimated",
+      "itemName": "Vintage Half-Zip Windbreaker Jacket",
+      "amountPhp": 600,
+      "lowPhp": 400,
+      "highPhp": 900,
+      "explanation": "This is a vintage-style half-zip nylon windbreaker pullover jacket in teal. Pre-owned vintage outerwear in good wearable condition generally sells in this range depending on brand and vintage appeal. This is an approximate AI valuation, not verified market data.",
+      "assumptions": [
+        "Item is authentic and functional with working zippers",
+        "No major hidden tears, stains, or severe lining degradation",
+        "Brand is an unverified standard vintage athletic/outdoors label"
+      ]
+    },
+    {
+      "trial": 13,
+      "round": 2,
+      "photo": "polaroid-camera",
+      "thinkingLevel": "low",
+      "elapsedMs": 2384,
+      "httpStatus": 200,
+      "providerStatus": 200,
+      "status": "estimated",
+      "itemName": "Polaroid Sun 600 Instant Camera",
+      "amountPhp": 3500,
+      "lowPhp": 2500,
+      "highPhp": 4500,
+      "explanation": "This is an approximate AI guess based on visual identification, not verified market data. Vintage Polaroid Sun 600 cameras typically sell in this range in the PH secondhand market depending heavily on working condition, flash functionality, and cosmetic state.",
+      "assumptions": [
+        "The camera mechanism and built-in flash are fully functional.",
+        "The lens and internal rollers are clean and undamaged.",
+        "It is an authentic vintage Polaroid 600 series instant camera."
+      ]
+    },
+    {
+      "trial": 14,
+      "round": 2,
+      "photo": "polaroid-camera",
+      "thinkingLevel": "medium",
+      "elapsedMs": 212,
+      "httpStatus": 429,
+      "providerStatus": 429,
+      "providerCode": "RESOURCE_EXHAUSTED",
+      "code": "rate_limited"
+    }
+  ],
+  "stoppedReason": "Provider quota reached; stopped rather than retrying rate-limited requests.",
+  "finishedAt": "2026-10-18T11:15:04.572Z",
+  "summary": {
+    "low": {
+      "trials": 7,
+      "priceEstimates": 6,
+      "needsMoreDetail": 0,
+      "errors": 1,
+      "estimatesWithin20Seconds": 5,
+      "medianMs": 3789,
+      "p90Ms": 20106,
+      "slowestMs": 20106,
+      "providerUnavailable": 1,
+      "quotaErrors": 0,
+      "medianEstimateMs": 3502.5,
+      "slowestEstimateMs": 20106
+    },
+    "medium": {
+      "trials": 7,
+      "priceEstimates": 5,
+      "needsMoreDetail": 0,
+      "errors": 2,
+      "estimatesWithin20Seconds": 4,
+      "medianMs": 6589,
+      "p90Ms": 21498,
+      "slowestMs": 21498,
+      "providerUnavailable": 1,
+      "quotaErrors": 1,
+      "medianEstimateMs": 6589,
+      "slowestEstimateMs": 21498
+    }
+  }
+}

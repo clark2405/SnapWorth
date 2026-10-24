@@ -1,10 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, type ReactNode } from 'react';
 
 import {
   createLocalCommentRepository,
   createSupabaseClient,
   createSupabaseCommentRepository,
+  createPhotoPricingService,
   screenWithRules,
   type LocalSeedComment,
 } from '../adapters';
@@ -20,6 +21,7 @@ import { createCommentService } from '../services';
 import type { UtcDateTime } from '../types/date-time';
 import type { PublicProfile } from '../types/entities';
 import type { UserId } from '../types/ids';
+import type { PhotoPricingService } from '../types/photo-estimate';
 
 /** What a shell passes in from its environment (EXPO_PUBLIC_SUPABASE_URL / _ANON_KEY). */
 export interface BackendConfig {
@@ -31,6 +33,7 @@ export interface AppServices {
   /** `supabase` when a project is configured; otherwise comments live on this device. */
   readonly backend: 'supabase' | 'device';
   readonly comments: CommentService;
+  readonly pricing: PhotoPricingService;
 }
 
 const profileOf = (user: PreviewUser): PublicProfile => ({
@@ -75,10 +78,18 @@ export function createAppServices(config: BackendConfig): AppServices {
     return {
       backend: 'supabase',
       comments: createCommentService(createSupabaseCommentRepository(client)),
+      pricing: createPhotoPricingService(client),
     };
   }
   return {
     backend: 'device',
+    pricing: {
+      async estimate() {
+        throw new Error(
+          'Price estimation needs a connection to the server. Please try again later.',
+        );
+      },
+    },
     comments: createCommentService(
       createLocalCommentRepository({
         store: AsyncStorage,
@@ -88,6 +99,14 @@ export function createAppServices(config: BackendConfig): AppServices {
       }),
     ),
   };
+}
+
+const PhotoPricingContext = createContext<PhotoPricingService | null>(null);
+
+export function usePhotoPricing(): PhotoPricingService {
+  const pricing = useContext(PhotoPricingContext);
+  if (!pricing) throw new Error('Photo pricing requires AppServicesProvider.');
+  return pricing;
 }
 
 export function AppServicesProvider({
@@ -101,5 +120,9 @@ export function AppServicesProvider({
     () => createAppServices(config),
     [config.supabaseUrl, config.supabaseAnonKey],
   );
-  return <CommentServiceProvider service={services.comments}>{children}</CommentServiceProvider>;
+  return (
+    <PhotoPricingContext.Provider value={services.pricing}>
+      <CommentServiceProvider service={services.comments}>{children}</CommentServiceProvider>
+    </PhotoPricingContext.Provider>
+  );
 }

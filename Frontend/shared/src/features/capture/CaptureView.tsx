@@ -34,7 +34,10 @@ export interface CaptureViewProps {
   readonly flashOn?: boolean;
   readonly onClose?: () => void;
   readonly onToggleFlash?: () => void;
-  readonly onCapture?: () => void;
+  readonly onCapture?: () => void | Promise<void>;
+  readonly captureDisabled?: boolean;
+  readonly captureHint?: string;
+  readonly notice?: string;
   readonly onOpenGallery?: () => void;
   readonly onOpenHistory?: () => void;
   /** Room reserved at the bottom, e.g. for a floating tab bar the camera sits under. */
@@ -65,6 +68,9 @@ export function CaptureView({
   onClose,
   onToggleFlash,
   onCapture,
+  captureDisabled = false,
+  captureHint = 'Saves the photo to your history and starts the AI estimate',
+  notice,
   onOpenGallery,
   onOpenHistory,
   bottomInset = 0,
@@ -116,11 +122,19 @@ export function CaptureView({
     return () => clearInterval(timer);
   }, [focused]);
 
-  const capture = () => {
-    if (shooting) return;
+  const capture = async () => {
+    if (shooting || captureDisabled) return;
     setShooting(true);
     haptic('heavy');
     flash.value = withSequence(withTiming(1, { duration: 60 }), withTiming(0, { duration: 380 }));
+    if (viewfinder) {
+      try {
+        await onCapture?.();
+      } finally {
+        setShooting(false);
+      }
+      return;
+    }
     if (freeze) {
       // Hold the frame, then let the answer rise over it.
       if (onCapture) setTimeout(onCapture, 240);
@@ -166,7 +180,15 @@ export function CaptureView({
         >
           <ScanLine size={14} strokeWidth={2.2} color={tokens.overlay.text} />
           <SWText variant="labelSmall" color={tokens.overlay.text}>
-            {freeze && shooting ? 'Valuing…' : locked ? 'Nike windbreaker' : 'Looking…'}
+            {viewfinder
+              ? captureDisabled
+                ? 'Starting camera…'
+                : 'Ready to capture'
+              : freeze && shooting
+                ? 'Valuing…'
+                : locked
+                  ? 'Nike windbreaker'
+                  : 'Looking…'}
           </SWText>
         </Animated.View>
         <IconButton
@@ -194,6 +216,11 @@ export function CaptureView({
         ]}
         pointerEvents={freeze && shooting ? 'none' : 'auto'}
       >
+        {notice ? (
+          <SWText variant="caption" color={tokens.overlay.text} align="center">
+            {notice}
+          </SWText>
+        ) : null}
         <View style={styles.tipRow}>
           <Animated.View
             key={tip}
@@ -211,21 +238,30 @@ export function CaptureView({
           </Animated.View>
         </View>
         <View style={styles.controls}>
-          <PressableScale
-            accessibilityLabel="Choose a photo from your gallery"
-            onPress={onOpenGallery}
-            style={styles.galleryButton}
-          >
-            <Image
-              source={previewItem.photo}
-              style={styles.galleryThumb}
-              accessibilityIgnoresInvertColors
-            />
-            <View style={styles.galleryBadge}>
-              <Images size={12} strokeWidth={2.4} color={tokens.overlay.text} />
-            </View>
-          </PressableScale>
-          <Shutter onPress={capture} disabled={shooting} ready={locked} />
+          {!viewfinder || onOpenGallery ? (
+            <PressableScale
+              accessibilityLabel="Choose a photo from your gallery"
+              onPress={onOpenGallery}
+              style={styles.galleryButton}
+            >
+              <Image
+                source={previewItem.photo}
+                style={styles.galleryThumb}
+                accessibilityIgnoresInvertColors
+              />
+              <View style={styles.galleryBadge}>
+                <Images size={12} strokeWidth={2.4} color={tokens.overlay.text} />
+              </View>
+            </PressableScale>
+          ) : (
+            <View style={styles.galleryButton} />
+          )}
+          <Shutter
+            onPress={capture}
+            disabled={shooting || captureDisabled}
+            ready={viewfinder ? !captureDisabled : locked}
+            hint={captureHint}
+          />
           <IconButton
             icon={History}
             label="Open your history"
@@ -236,7 +272,7 @@ export function CaptureView({
       </View>
 
       <Animated.View style={[StyleSheet.absoluteFill, styles.flash, flashStyle]} />
-      {shooting && !freeze ? (
+      {shooting && !viewfinder && !freeze ? (
         <Animated.View style={[styles.flyingShot, shotStyle]}>
           <Image source={previewItem.photo} style={styles.flyingImage} />
         </Animated.View>
@@ -250,10 +286,12 @@ function Shutter({
   onPress,
   disabled,
   ready,
+  hint,
 }: {
   readonly onPress: () => void;
   readonly disabled: boolean;
   readonly ready: boolean;
+  readonly hint: string;
 }) {
   const press = useSharedValue(0);
   const glow = useSharedValue(0);
@@ -271,7 +309,7 @@ function Shutter({
   return (
     <PressableScale
       accessibilityLabel="Take photo"
-      accessibilityHint="Saves the photo to your history and starts the AI estimate"
+      accessibilityHint={hint}
       haptic="none"
       disabled={disabled}
       onPressIn={() => {

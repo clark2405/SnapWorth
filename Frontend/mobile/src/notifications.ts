@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Notifications from 'expo-notifications';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState, Linking } from 'react-native';
+
+import * as Notifications from './local-notifications';
 
 import {
   defaultNotificationPreferences,
