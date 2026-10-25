@@ -1,9 +1,72 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["react", "react-native"]
+    "ignoreDeprecations": "6.0",
+    "types": [
+      "react",
+      "react-native"
+    ],
+    "paths": {
+      "react-native-reanimated": [
+        "./web/node_modules/react-native-reanimated"
+      ],
+      "react-native-reanimated/*": [
+        "./web/node_modules/react-native-reanimated/*"
+      ],
+      "react-native-gesture-handler": [
+        "./web/node_modules/react-native-gesture-handler"
+      ],
+      "react-native-gesture-handler/*": [
+        "./web/node_modules/react-native-gesture-handler/*"
+      ],
+      "react-native-svg": [
+        "./web/node_modules/react-native-svg"
+      ],
+      "react-native-svg/*": [
+        "./web/node_modules/react-native-svg/*"
+      ],
+      "react-native-safe-area-context": [
+        "./web/node_modules/react-native-safe-area-context"
+      ],
+      "react-native-safe-area-context/*": [
+        "./web/node_modules/react-native-safe-area-context/*"
+      ],
+      "lucide-react-native": [
+        "./node_modules/lucide-react-native"
+      ],
+      "lucide-react-native/*": [
+        "./node_modules/lucide-react-native/*"
+      ],
+      "expo-blur": [
+        "./web/node_modules/expo-blur"
+      ],
+      "expo-blur/*": [
+        "./web/node_modules/expo-blur/*"
+      ],
+      "expo-glass-effect": [
+        "./web/node_modules/expo-glass-effect"
+      ],
+      "expo-glass-effect/*": [
+        "./web/node_modules/expo-glass-effect/*"
+      ],
+      "expo-haptics": [
+        "./web/node_modules/expo-haptics"
+      ],
+      "expo-haptics/*": [
+        "./web/node_modules/expo-haptics/*"
+      ],
+      "expo-router": [
+        "./mobile/node_modules/expo-router"
+      ],
+      "expo-router/*": [
+        "./mobile/node_modules/expo-router/*"
+      ]
+    }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ],
   "exclude": [
     "src/**/*.test.ts",
     "src/**/*.test.tsx",

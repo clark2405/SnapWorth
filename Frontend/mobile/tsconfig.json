@@ -2,6 +2,7 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "customConditions": ["react-native"],
+    "ignoreDeprecations": "6.0",
     "moduleResolution": "Bundler",
     "types": ["react", "react-native"]
   },
