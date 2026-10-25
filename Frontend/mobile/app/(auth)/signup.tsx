@@ -1,8 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert } from 'react-native';
-import { LoginView } from '@snapworth/shared/features/auth';
+import { LoginView, performAuth, performGoogleAuth } from '@snapworth/shared/features/auth';
 import { useSession } from '@snapworth/shared/features/session';
-import { supabase } from '../../../shared/src/adapters/supabaseClient';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 
@@ -16,13 +15,7 @@ export default function SignupRoute() {
   const handleGoogleLogin = async () => {
     const redirectUrl = Linking.createURL('/feed');
 
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: redirectUrl,
-        skipBrowserRedirect: true,
-      },
-    });
+    const { data, error } = await performGoogleAuth(redirectUrl);
 
     if (error) {
       console.error("Google Auth Error:", error.message);
@@ -44,43 +37,21 @@ export default function SignupRoute() {
       return;
     }
 
-    if (mode === 'signup') {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            gender: gender,
-          }
-        }
-      });
+    const { data, error } = await performAuth({ mode, email, password, fullName, gender });
 
-      if (error) {
-        Alert.alert("Signup Failed", error.message);
-        return;
-      }
-
-      if (data.session) {
-        startSession();
-        if (returning && router.canGoBack()) router.back();
-        else router.replace('/feed');
-      } else {
-        Alert.alert("Check your email", "We sent you a confirmation link to complete your registration.");
-      }
-
-    } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-      if (error) {
-        Alert.alert("Login Failed", error.message);
-        return;
-      }
-
-      startSession();
-      if (returning && router.canGoBack()) router.back();
-      else router.replace('/feed');
+    if (error) {
+      Alert.alert(mode === 'signup' ? "Signup Failed" : "Login Failed", error.message);
+      return;
     }
+
+    if (mode === 'signup' && !data?.session) {
+      Alert.alert("Check your email", "We sent you a confirmation link to complete your registration.");
+      return;
+    }
+
+    startSession();
+    if (returning && router.canGoBack()) router.back();
+    else router.replace('/feed');
   };
 
   return (
