@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "npm --prefix Frontend run dev",
     "dev:mobile": "npm --prefix Frontend run dev:mobile",
+    "dev:mobile:go": "npm --prefix Frontend run dev:mobile:go",
     "start": "npm --prefix Frontend run dev:mobile",
     "ios": "npm --prefix Frontend run ios",
     "android": "npm --prefix Frontend run android",

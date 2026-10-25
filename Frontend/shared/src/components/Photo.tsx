@@ -63,28 +63,33 @@ export function Photo({
 
   // Detaching an animated style does not clear its last native opacity. A fresh
   // Image guarantees that a missed fade cannot leave the photo invisible.
-  const ImageComponent = developed ? Image : AnimatedImage;
+  const imageProps = {
+    accessibilityRole: 'image',
+    accessibilityLabel: label,
+    source,
+    resizeMode: 'cover',
+  } as const;
 
   return (
     <View style={[styles.frame, { borderRadius: radius, aspectRatio }, style]}>
-      <ImageComponent
-        key={developed ? 'developed' : 'developing'}
-        accessibilityRole="image"
-        accessibilityLabel={label}
-        source={source}
-        resizeMode="cover"
-        onLoad={() => {
-          if (developed) return;
-          loaded.value = withTiming(
-            1,
-            { duration: 420, easing: Easing.bezier(0.16, 1, 0.3, 1) },
-            (finished) => {
-              if (finished) runOnJS(setDeveloped)(true);
-            },
-          );
-        }}
-        style={developed ? styles.image : [styles.image, imageStyle]}
-      />
+      {developed ? (
+        <Image key="developed" {...imageProps} style={styles.image} />
+      ) : (
+        <AnimatedImage
+          key="developing"
+          {...imageProps}
+          onLoad={() => {
+            loaded.value = withTiming(
+              1,
+              { duration: 420, easing: Easing.bezier(0.16, 1, 0.3, 1) },
+              (finished) => {
+                if (finished) runOnJS(setDeveloped)(true);
+              },
+            );
+          }}
+          style={[styles.image, imageStyle]}
+        />
+      )}
     </View>
   );
 }

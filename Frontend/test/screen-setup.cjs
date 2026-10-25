@@ -2,6 +2,12 @@
 require('react-native-gesture-handler/jestSetup');
 
 jest.mock('react-native-worklets', () => require('react-native-worklets/src/mock'));
+// Reanimated 4.7's mock loads its native entry, which registers a CSS event handler that the
+// Jest runtime refuses. Screens use no CSS animations, so registering is skipped.
+jest.mock('react-native-reanimated/src/css/native/proxy', () => ({
+  ...jest.requireActual('react-native-reanimated/src/css/native/proxy'),
+  setCSSEventHandler: () => undefined,
+}));
 // Reanimated's mock leaves out the Reduce Motion hook; screens see motion as allowed.
 jest.mock('react-native-reanimated', () => {
   const mock = require('react-native-reanimated/mock');

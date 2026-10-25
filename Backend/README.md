@@ -44,7 +44,7 @@ You need the [Supabase CLI](https://supabase.com/docs/guides/cli) (`npx supabase
    npx supabase secrets set MODERATION_PROVIDER=rules
    ```
 
-4. **Point the apps at the project:** copy `Frontend/web/.env.example` to `Frontend/web/.env` (and the same for `Frontend/mobile/`) and fill in the project URL and **anon** key from Dashboard → Project Settings → API. Never put the service-role key in an app.
+4. **Point the apps at the project:** copy `Frontend/web/.env.example` to `Frontend/web/.env.local` (and the same for `Frontend/mobile/`) and fill in the project URL and **anon** key from Dashboard → Project Settings → API. Never put the service-role key in an app. Expo loads `.env.local` on `expo start`. Restart the dev server after changing these values.
 
 Without step 4 the apps still work: comments are kept on the device, under the same rules, so the UI can be built and tested before a project exists.
 
