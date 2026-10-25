@@ -15,8 +15,6 @@ const common = {
   },
   moduleNameMapper: {
     '^@snapworth/shared/(.*)$': '<rootDir>/shared/src/$1',
-    '^expo-router$': '<rootDir>/mobile/node_modules/expo-router',
-    '^expo-router/(.*)$': '<rootDir>/mobile/node_modules/expo-router/$1',
   },
   testPathIgnorePatterns: ['/node_modules/', '/e2e/'],
 };
@@ -70,7 +68,7 @@ const screenProject = {
   testMatch: ['**/*.screen.test.[jt]s?(x)'],
   setupFiles: ['<rootDir>/test/screen-setup.cjs'],
   moduleNameMapper: {
-    ...common.moduleNameMapper,
+    '^@snapworth/shared/(.*)$': '<rootDir>/shared/src/$1',
   },
 };
 

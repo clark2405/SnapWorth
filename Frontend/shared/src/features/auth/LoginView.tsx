@@ -20,15 +20,17 @@ import { placeColors, themedStyles, tokens, useTheme, useThemedStyles } from '..
 
 export type AuthMode = 'login' | 'signup';
 
+export interface AuthInput {
+  readonly mode: AuthMode;
+  readonly email: string;
+  readonly password: string;
+  readonly fullName?: string;
+  readonly gender?: string;
+}
+
 export interface LoginViewProps {
   readonly initialMode?: AuthMode;
-  readonly onSubmit?: (input: {
-    mode: AuthMode;
-    email: string;
-    password: string;
-    fullName?: string;
-    gender?: string;
-  }) => void;
+  readonly onSubmit?: (input: AuthInput) => void;
   readonly onForgotPassword?: () => void;
   readonly onContinueWithApple?: () => void;
   readonly onContinueWithGoogle?: () => void;
@@ -79,7 +81,7 @@ export function LoginView({
     if (submitting) return;
 
     if (mode === 'signup' && password !== confirmPassword) {
-      Alert.alert("Error", "Passwords do not match.");
+      Alert.alert('Error', 'Passwords do not match.');
       return;
     }
 
@@ -181,7 +183,11 @@ export function LoginView({
               </Field>
 
               {mode === 'signup' ? (
-                <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(140)} style={styles.signupFields}>
+                <Animated.View
+                  entering={FadeIn.duration(200)}
+                  exiting={FadeOut.duration(140)}
+                  style={styles.signupFields}
+                >
                   <Field label="Confirm Password">
                     <TextField
                       value={confirmPassword}

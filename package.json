@@ -11,10 +11,5 @@
     "build": "npm --prefix Frontend run build:web",
     "test": "npm --prefix Frontend run test:unit",
     "validate": "npm --prefix Frontend run validate"
-  },
-  "dependencies": {
-    "expo": "^58.0.19",
-    "react": "19.3.0",
-    "react-native": "0.88.0"
   }
 }
