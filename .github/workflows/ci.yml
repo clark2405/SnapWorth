@@ -38,7 +38,7 @@ jobs:
         run: npm install --global "$(node -p "require('./package.json').packageManager")"
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       # Topology, exact dependency pins, static safety checks, typecheck, lint, unit and property tests.
       - name: Validate
@@ -71,7 +71,7 @@ jobs:
         run: npm install --global "$(node -p "require('./package.json').packageManager")"
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       # web: production Expo web export. mobile: iOS and Android JavaScript bundles, which catch
       # native-only bundling errors without needing Xcode or Android Studio.
