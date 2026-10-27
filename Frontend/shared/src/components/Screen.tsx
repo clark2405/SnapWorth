@@ -49,6 +49,7 @@ import {
   type Place,
 } from '../design';
 import { AmbientBackdrop, type AmbientBackdropProps } from './AmbientBackdrop';
+import { useScreenVisibility } from './screen-visibility';
 import { ScrollEdge } from './ScrollEdge';
 import { contentScrolling, onScrollToTopRequest } from './scroll-signal';
 import { SWText } from './SWText';
@@ -188,6 +189,9 @@ export function Screen({
   );
   // A screen shown as a link preview is not in the navigator, so it doesn't listen for taps.
   const isPreview = useIsPreview();
+  // A link preview isn't in the navigator, so it never counts as focused; it's always shown.
+  const focusedHere = useIsFocused();
+  const visibility = useScreenVisibility(focusedHere || isPreview);
   useEffect(() => {
     if (!clearTabBar || Platform.OS !== 'web') return;
     return onScrollToTopRequest(() => scrollerRef.current?.scrollTo({ y: 0, animated: true }));
@@ -340,7 +344,7 @@ export function Screen({
 
   const page = (
     <ScreenScrollContext.Provider value={context}>
-      <View style={[styles.root, transparent ? styles.clear : null]}>
+      <View style={[styles.root, transparent ? styles.clear : null]} {...visibility}>
         {transparent || backdropInScroll ? null : <AmbientBackdrop mood={ambient} print={print} />}
         <KeyboardAvoidingView
           style={styles.fill}

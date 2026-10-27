@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { FeedView } from '@snapworth/shared/features/feed';
 import { useAccountGate } from '@snapworth/shared/features/session';
 
-import { useShareLink } from '../../src/share-link';
+import { useShareLink } from '../../../src/share-link';
 
 export default function FeedRoute() {
   const router = useRouter();

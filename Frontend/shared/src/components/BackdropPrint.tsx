@@ -282,6 +282,16 @@ export function StickerArt({
   );
 }
 
+// The geometry and faces, shared with the web's CSS-drawn backdrop.
+export {
+  outline as stickerOutline,
+  pad as stickerPad,
+  priceFace,
+  scallopPath,
+  shadow as stickerShadow,
+  tagPath,
+};
+
 const styles = StyleSheet.create({
   art: {
     position: 'absolute',
