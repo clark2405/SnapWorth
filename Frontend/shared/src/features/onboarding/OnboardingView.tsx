@@ -231,6 +231,12 @@ export function OnboardingView({
       scrollTo(pager, target, 0, false);
       return;
     }
+    // A browser pages with CSS scroll snapping, which pulls every step of a scripted glide back
+    // to a page edge, so the move would land as a jump; its own smooth scroll glides with the snap.
+    if (Platform.OS === 'web') {
+      pager.current?.scrollTo({ x: target, animated: true });
+      return;
+    }
     cancelAnimation(glide);
     glide.value = scrollX.value;
     gliding.value = true;
@@ -1249,6 +1255,10 @@ const stylesFor = themedStyles((colors, name) => ({
   },
   coverActions: {
     gap: tokens.spacing[3],
+    // A hand's width, however wide the window: a full-width bar reads as a banner, not a button.
+    width: '100%',
+    maxWidth: tokens.layout.phoneColumn,
+    alignSelf: 'center',
   },
   // Cut like everything else you can press and hold in the app: ink outline, hard shadow.
   coverStart: {

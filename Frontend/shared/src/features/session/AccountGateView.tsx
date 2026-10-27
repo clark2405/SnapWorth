@@ -171,6 +171,10 @@ const stylesFor = themedStyles(() => ({
   actions: {
     gap: tokens.spacing[2],
     paddingHorizontal: tokens.spacing[4],
+    // Buttons a hand's width across, however wide the window: a full-width bar reads as a banner.
+    width: '100%',
+    maxWidth: tokens.layout.phoneColumn,
+    alignSelf: 'center',
   },
   scene: {
     gap: tokens.spacing[5],

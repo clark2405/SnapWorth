@@ -16,7 +16,14 @@ import {
   Wordmark,
   Worthy,
 } from '../../components';
-import { placeColors, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import {
+  placeColors,
+  themedStyles,
+  tokens,
+  useTheme,
+  useThemedStyles,
+  useWideLayout,
+} from '../../design';
 
 export type AuthMode = 'login' | 'signup';
 
@@ -76,6 +83,9 @@ export function LoginView({
   const [submitting, setSubmitting] = useState(false);
 
   const text = copy[mode];
+  // On a wide window the colour block and the form sit side by side, so it all fits at once.
+  const wide = useWideLayout();
+  const half = wide ? styles.half : null;
 
   const submit = () => {
     if (submitting) return;
@@ -98,143 +108,175 @@ export function LoginView({
     onContinueWithGoogle ? onContinueWithGoogle() : onSubmit?.({ mode, email, password });
 
   return (
-    <Screen place="feed" ambient="feed" quiet contentStyle={styles.content}>
-      <PlaceHero title={text.title}>
-        <Reveal index={0} style={styles.brand}>
-          <Wordmark ink={brand.ink} lensColor={brand.lens} />
-          {onClose ? (
-            <PressableScale
-              accessibilityRole="button"
-              accessibilityLabel="Not now. Keep looking around"
-              haptic="select"
-              onPress={onClose}
-              hitSlop={tokens.spacing[2]}
-              style={styles.close}
+    <Screen
+      place="feed"
+      ambient="feed"
+      quiet
+      width="wide"
+      contentStyle={[styles.content, wide ? styles.contentCentred : null]}
+    >
+      <View style={wide ? styles.split : null}>
+        <PlaceHero title={text.title} style={wide ? styles.heroSide : null}>
+          <Reveal index={0} style={styles.brand}>
+            <Wordmark ink={brand.ink} lensColor={brand.lens} />
+            {onClose ? (
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityLabel="Not now. Keep looking around"
+                haptic="select"
+                onPress={onClose}
+                hitSlop={tokens.spacing[2]}
+                style={styles.close}
+              >
+                <SWText variant="label" color={brand.ink}>
+                  Not now
+                </SWText>
+              </PressableScale>
+            ) : null}
+          </Reveal>
+
+          <Reveal index={1} style={styles.intro}>
+            <Animated.View
+              key={mode}
+              entering={FadeIn.duration(240)}
+              exiting={FadeOut.duration(160)}
+              layout={LinearTransition.springify().damping(20)}
+              style={styles.introText}
             >
-              <SWText variant="label" color={brand.ink}>
-                Not now
+              <SWText variant="displayHero" color={brand.ink} accessibilityRole="header">
+                {text.title}
               </SWText>
-            </PressableScale>
-          ) : null}
-        </Reveal>
-
-        <Reveal index={1} style={styles.intro}>
-          <Animated.View
-            key={mode}
-            entering={FadeIn.duration(240)}
-            exiting={FadeOut.duration(160)}
-            layout={LinearTransition.springify().damping(20)}
-            style={styles.introText}
-          >
-            <SWText variant="displayHero" color={brand.ink} accessibilityRole="header">
-              {text.title}
-            </SWText>
-            <SWText variant="bodyLarge" color={brand.ink}>
-              {text.why}
-            </SWText>
-          </Animated.View>
-          <View style={[styles.worthy, { backgroundColor: colors.marigold }]}>
-            <Worthy size={84} mood="attentive" />
-          </View>
-        </Reveal>
-      </PlaceHero>
-
-      <Reveal index={2}>
-        <Surface padding={tokens.spacing[5]} contentStyle={styles.card}>
-          <View style={styles.quick}>
-            <Button label="Continue with Apple" onPress={continueWithApple} />
-            <Button label="Continue with Google" variant="secondary" onPress={continueWithGoogle} />
-            <View style={styles.or}>
-              <View style={styles.rule} />
-              <SWText variant="caption" tone="textMuted">
-                or use email
+              <SWText variant="bodyLarge" color={brand.ink}>
+                {text.why}
               </SWText>
-              <View style={styles.rule} />
+            </Animated.View>
+            <View style={[styles.worthy, { backgroundColor: colors.marigold }]}>
+              <Worthy size={84} mood="attentive" />
             </View>
-          </View>
+          </Reveal>
+        </PlaceHero>
 
-          <View style={styles.form}>
-            <SegmentedControl options={modes} value={mode} onChange={setMode} />
-
-            <View style={styles.fields}>
-              <Field label="Email">
-                <TextField
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="you@example.com"
-                  autoCapitalize="none"
-                  autoComplete="email"
-                  keyboardType="email-address"
-                  textContentType="emailAddress"
-                  accessibilityLabel="Email address"
+        <Reveal index={2} style={wide ? styles.formSide : null}>
+          <Surface padding={tokens.spacing[5]} contentStyle={styles.card}>
+            <View style={styles.quick}>
+              <View style={wide ? styles.pair : styles.quick}>
+                <Button
+                  label="Continue with Apple"
+                  onPress={continueWithApple}
+                  containerStyle={half}
                 />
-              </Field>
-
-              <Field label="Password">
-                <TextField
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder={mode === 'login' ? 'Your password' : 'At least 8 characters'}
-                  secureTextEntry
-                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                  textContentType={mode === 'login' ? 'password' : 'newPassword'}
-                  accessibilityLabel="Password"
+                <Button
+                  label="Continue with Google"
+                  variant="secondary"
+                  onPress={continueWithGoogle}
+                  containerStyle={half}
                 />
-              </Field>
+              </View>
+              <View style={styles.or}>
+                <View style={styles.rule} />
+                <SWText variant="caption" tone="textMuted">
+                  or use email
+                </SWText>
+                <View style={styles.rule} />
+              </View>
+            </View>
 
-              {mode === 'signup' ? (
-                <Animated.View
-                  entering={FadeIn.duration(200)}
-                  exiting={FadeOut.duration(140)}
-                  style={styles.signupFields}
-                >
-                  <Field label="Confirm Password">
+            <View style={styles.form}>
+              <SegmentedControl options={modes} value={mode} onChange={setMode} />
+
+              <View style={[styles.fields, wide ? styles.pair : null]}>
+                <View style={half}>
+                  <Field label="Email">
                     <TextField
-                      value={confirmPassword}
-                      onChangeText={setConfirmPassword}
-                      placeholder="Repeat your password"
+                      value={email}
+                      onChangeText={setEmail}
+                      placeholder="you@example.com"
+                      autoCapitalize="none"
+                      autoComplete="email"
+                      keyboardType="email-address"
+                      textContentType="emailAddress"
+                      accessibilityLabel="Email address"
+                    />
+                  </Field>
+                </View>
+                <View style={half}>
+                  <Field label="Password">
+                    <TextField
+                      value={password}
+                      onChangeText={setPassword}
+                      placeholder={mode === 'login' ? 'Your password' : 'At least 8 characters'}
                       secureTextEntry
-                      textContentType="newPassword"
-                      accessibilityLabel="Confirm Password"
+                      autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                      textContentType={mode === 'login' ? 'password' : 'newPassword'}
+                      accessibilityLabel="Password"
                     />
                   </Field>
-                  <Field label="Full Name">
-                    <TextField
-                      value={fullName}
-                      onChangeText={setFullName}
-                      placeholder="e.g. John Doe"
-                      autoCapitalize="words"
-                      textContentType="name"
-                      accessibilityLabel="Full Name"
-                    />
-                  </Field>
-                  <Field label="Gender">
-                    <TextField
-                      value={gender}
-                      onChangeText={setGender}
-                      placeholder="e.g. Male, Female, Other"
-                      accessibilityLabel="Gender"
-                    />
-                  </Field>
-                </Animated.View>
-              ) : null}
+                </View>
 
-              {mode === 'login' ? (
-                <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(140)}>
-                  <Button
-                    label="Forgot password?"
-                    variant="tertiary"
-                    onPress={onForgotPassword}
-                    containerStyle={styles.forgot}
-                  />
-                </Animated.View>
-              ) : null}
+                {mode === 'signup' ? (
+                  <Animated.View
+                    entering={FadeIn.duration(200)}
+                    exiting={FadeOut.duration(140)}
+                    style={[styles.signupFields, wide ? styles.pairFull : null]}
+                  >
+                    <View style={half}>
+                      <Field label="Confirm Password">
+                        <TextField
+                          value={confirmPassword}
+                          onChangeText={setConfirmPassword}
+                          placeholder="Repeat your password"
+                          secureTextEntry
+                          textContentType="newPassword"
+                          accessibilityLabel="Confirm Password"
+                        />
+                      </Field>
+                    </View>
+                    <View style={half}>
+                      <Field label="Full Name">
+                        <TextField
+                          value={fullName}
+                          onChangeText={setFullName}
+                          placeholder="e.g. John Doe"
+                          autoCapitalize="words"
+                          textContentType="name"
+                          accessibilityLabel="Full Name"
+                        />
+                      </Field>
+                    </View>
+                    <View style={half}>
+                      <Field label="Gender">
+                        <TextField
+                          value={gender}
+                          onChangeText={setGender}
+                          placeholder="e.g. Male, Female, Other"
+                          accessibilityLabel="Gender"
+                        />
+                      </Field>
+                    </View>
+                  </Animated.View>
+                ) : null}
+
+                {mode === 'login' ? (
+                  <Animated.View
+                    entering={FadeIn.duration(200)}
+                    exiting={FadeOut.duration(140)}
+                    style={wide ? styles.pairFull : null}
+                  >
+                    <Button
+                      label="Forgot password?"
+                      variant="tertiary"
+                      onPress={onForgotPassword}
+                      containerStyle={styles.forgot}
+                    />
+                  </Animated.View>
+                ) : null}
+              </View>
             </View>
-          </View>
 
-          <Button label={text.submit} variant="secondary" loading={submitting} onPress={submit} />
-        </Surface>
-      </Reveal>
+            <Button label={text.submit} variant="secondary" loading={submitting} onPress={submit} />
+          </Surface>
+        </Reveal>
+      </View>
     </Screen>
   );
 }
@@ -242,6 +284,45 @@ export function LoginView({
 const stylesFor = themedStyles((colors) => ({
   content: {
     paddingTop: tokens.spacing[2],
+  },
+  split: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: tokens.spacing[8],
+    paddingTop: tokens.spacing[6],
+  },
+  // The wordmark at the panel's head and the welcome at its foot, as on the phone's block.
+  heroSide: {
+    flex: 5,
+    minWidth: 0,
+    justifyContent: 'space-between',
+  },
+  // The pair sits in the middle of the window rather than hanging from its top.
+  contentCentred: {
+    justifyContent: 'center',
+  },
+  formSide: {
+    flex: 6,
+    minWidth: 0,
+  },
+  // Fields and buttons two to a row on a wide window.
+  pair: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: tokens.spacing[4],
+    rowGap: tokens.spacing[4],
+  },
+  pairFull: {
+    width: '100%',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: tokens.spacing[4],
+    rowGap: tokens.spacing[4],
+  },
+  half: {
+    flexBasis: '45%',
+    flexGrow: 1,
+    minWidth: 0,
   },
   brand: {
     minHeight: tokens.layout.headerHeight,

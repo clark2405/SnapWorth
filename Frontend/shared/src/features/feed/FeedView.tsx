@@ -15,9 +15,10 @@ import {
   Screen,
   SearchButton,
   SWText,
+  useGridColumns,
   type SearchOrigin,
 } from '../../components';
-import { held, themedStyles, tokens, useThemedStyles } from '../../design';
+import { held, themedStyles, tokens, useThemedStyles, useWideLayout } from '../../design';
 import type { VoteChoice } from '../../types';
 import { previewOlderPosts, previewPosts, previewTrending } from '../preview/sample-data';
 import { ProfileButton } from '../profile/ProfileButton';
@@ -62,6 +63,14 @@ export function FeedView({
   const [votes, setVotes] = useState<Record<string, VoteChoice | null>>({});
   const requireAccount = useAccountGate();
   const voteTip = useTip('vote');
+  // One column of posts on a phone; on a wide window as many as fit, up to three.
+  const grid = useGridColumns(feedPosts.length, {
+    minWidth: postMinWidth,
+    maxColumns: 3,
+    gap: tokens.spacing[8],
+  });
+  const gridded = grid.columns > 1;
+  const wide = useWideLayout();
 
   return (
     <Screen
@@ -101,14 +110,23 @@ export function FeedView({
           contentContainerStyle={styles.trendingRow}
         >
           {previewTrending.map((trend) => (
-            <TrendingTile key={trend.key} trend={trend} onOpen={() => onOpenTrend?.(trend.key)} />
+            <TrendingTile
+              key={trend.key}
+              trend={trend}
+              size={wide ? wideTile : tile}
+              onOpen={() => onOpenTrend?.(trend.key)}
+            />
           ))}
         </ScrollView>
       </Reveal>
 
-      <View style={styles.list}>
+      <View style={gridded ? styles.grid : styles.list} onLayout={grid.onLayout}>
         {feedPosts.map((post, index) => (
-          <Reveal key={post.id} index={index + 1} style={index > 0 ? styles.divided : null}>
+          <Reveal
+            key={post.id}
+            index={index + 1}
+            style={gridded ? { width: grid.cellWidth } : index > 0 ? styles.divided : null}
+          >
             <PostCard
               post={post}
               vote={votes[post.id] ?? null}
@@ -131,11 +149,19 @@ export function FeedView({
   );
 }
 
+/** A trend tile's photo: a thumb's width on a phone, larger where there's room. */
+const tile = 116;
+const wideTile = 172;
+/** The narrowest a post can be and still give its photo and vote chips room. */
+const postMinWidth = 340;
+
 function TrendingTile({
   trend,
+  size,
   onOpen,
 }: {
   readonly trend: PreviewTrend;
+  readonly size: number;
   readonly onOpen: () => void;
 }) {
   const styles = useThemedStyles(stylesFor);
@@ -148,7 +174,7 @@ function TrendingTile({
       label={`${trend.label}, ${trend.change} this month. See what's selling`}
       onPress={onOpen}
       zoomFromSource
-      style={styles.tile}
+      style={[styles.tile, { width: size + 4 }]}
     >
       <View style={styles.tileFrame}>
         <ZoomSource>
@@ -156,7 +182,7 @@ function TrendingTile({
             source={trend.photo}
             label={trend.label}
             radius={tokens.radius.large - 2}
-            style={styles.tilePhoto}
+            style={{ width: size, height: size }}
           />
         </ZoomSource>
         {/* The month's move, slapped on like a market sticker. */}
@@ -192,17 +218,12 @@ const stylesFor = themedStyles((colors) => ({
     paddingHorizontal: tokens.layout.pageGutterCompact,
   },
   tile: {
-    width: 120,
     gap: tokens.spacing['0.5'],
   },
   tileFrame: {
     borderRadius: tokens.radius.large,
     marginBottom: tokens.spacing[2],
     ...held(colors),
-  },
-  tilePhoto: {
-    width: 116,
-    height: 116,
   },
   tileSticker: {
     position: 'absolute',
@@ -215,6 +236,13 @@ const stylesFor = themedStyles((colors) => ({
   },
   list: {
     gap: 0,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+    columnGap: tokens.spacing[8],
+    rowGap: tokens.spacing[6],
   },
   tip: {
     marginBottom: tokens.spacing[6],

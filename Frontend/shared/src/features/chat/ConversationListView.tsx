@@ -25,12 +25,18 @@ export interface ConversationListViewProps {
   readonly onOpenConversation?: (conversationId: string) => void;
   readonly onOpenProfile?: () => void;
   readonly onBrowseMarket?: () => void;
+  /** The conversation open beside the list, where there's room for both; it's marked as open. */
+  readonly selectedId?: string;
 }
+
+/** The conversation a list opens on when it has room to show one beside it. */
+export const firstConversationId = previewConversations.find((entry) => !entry.closed)?.id;
 
 export function ConversationListView({
   onOpenConversation,
   onOpenProfile,
   onBrowseMarket,
+  selectedId,
 }: ConversationListViewProps) {
   const styles = useThemedStyles(stylesFor);
   const [view, setView] = useState<'open' | 'past'>('open');
@@ -93,6 +99,7 @@ export function ConversationListView({
                     {index > 0 ? <Divider style={styles.divider} /> : null}
                     <ConversationRow
                       conversation={conversation}
+                      selected={conversation.id === selectedId}
                       onPress={() => onOpenConversation?.(conversation.id)}
                     />
                   </Reveal>
@@ -108,9 +115,11 @@ export function ConversationListView({
 
 function ConversationRow({
   conversation,
+  selected = false,
   onPress,
 }: {
   conversation: PreviewConversationSummary;
+  selected?: boolean;
   onPress: () => void;
 }) {
   const styles = useThemedStyles(stylesFor);
@@ -124,7 +133,7 @@ function ConversationRow({
         unread ? `${conversation.unread} unread. ` : ''
       }Last message: ${preview}, ${conversation.sentAt}`}
       onPress={onPress}
-      style={styles.row}
+      style={[styles.row, selected ? styles.rowSelected : null]}
     >
       <View style={styles.media}>
         <Avatar source={conversation.with.avatar} name={conversation.with.handle} size={48} />
@@ -195,6 +204,9 @@ const stylesFor = themedStyles((colors) => ({
     gap: tokens.spacing[3],
     padding: tokens.spacing[3],
     borderRadius: tokens.radius.medium,
+  },
+  rowSelected: {
+    backgroundColor: colors.sunken,
   },
   media: {
     width: 48,

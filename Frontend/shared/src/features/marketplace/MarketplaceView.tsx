@@ -18,8 +18,9 @@ import {
   Sticker,
   SWText,
   ZoomLink,
+  useGridColumns,
 } from '../../components';
-import { held, themedStyles, tokens, useThemedStyles } from '../../design';
+import { held, themedStyles, tokens, useThemedStyles, useWideLayout } from '../../design';
 import {
   formatPeso,
   previewListings,
@@ -92,6 +93,13 @@ export function MarketplaceView({
     );
 
   const filtered = matching(filters);
+  // Two listings a row on a phone; on a wide window as many as fit, up to four.
+  const wide = useWideLayout();
+  const grid = useGridColumns(filtered.length, {
+    minWidth: listingMinWidth,
+    maxColumns: 4,
+    gap: tokens.spacing[4],
+  });
   const narrowed =
     filters.minPrice !== null || filters.maxPrice !== null || filters.area !== 'anywhere';
 
@@ -157,11 +165,12 @@ export function MarketplaceView({
       {underEstimate.length > 0 ? (
         <Reveal index={1} style={styles.highlightSection}>
           <Sign icon={BadgePercent} label="Steals · Under estimate" tone="cobalt" />
-          <View style={styles.highlightRow}>
+          <View style={[styles.highlightRow, wide ? styles.highlightRowWide : null]}>
             {underEstimate.map((listing) => (
               <UnderEstimateCard
                 key={listing.id}
                 listing={listing}
+                wide={wide}
                 onOpen={() => onOpenListing?.(listing.id)}
               />
             ))}
@@ -186,7 +195,7 @@ export function MarketplaceView({
           }
         />
       ) : (
-        <View style={styles.grid}>
+        <View style={[styles.grid, wide ? styles.gridWide : null]} onLayout={grid.onLayout}>
           {filtered.map((listing, index) => (
             <Animated.View
               key={listing.id}
@@ -195,13 +204,13 @@ export function MarketplaceView({
                 .delay(Math.min(index, 4) * 50)}
               exiting={FadeOut.duration(160)}
               layout={LinearTransition.springify().damping(20)}
-              style={styles.cell}
+              style={wide ? { width: grid.cellWidth } : styles.cell}
             >
               <ListingCard listing={listing} onOpen={() => onOpenListing?.(listing.id)} />
             </Animated.View>
           ))}
           {/* An odd count keeps its last card at half width instead of stretching. */}
-          {filtered.length % 2 === 1 ? <View style={styles.cell} /> : null}
+          {!wide && filtered.length % 2 === 1 ? <View style={styles.cell} /> : null}
         </View>
       )}
 
@@ -229,11 +238,16 @@ export function MarketplaceView({
   );
 }
 
+/** The narrowest a listing card can be and still fit its title, price and estimate. */
+const listingMinWidth = 220;
+
 function UnderEstimateCard({
   listing,
+  wide,
   onOpen,
 }: {
   readonly listing: PreviewListing;
+  readonly wide: boolean;
   readonly onOpen: () => void;
 }) {
   const styles = useThemedStyles(stylesFor);
@@ -245,7 +259,7 @@ function UnderEstimateCard({
       label={`${listing.title}, asking ${formatPeso(listing.askingPrice)}, estimated ${formatPeso(estimate)}`}
       onPress={onOpen}
       style={styles.highlightCard}
-      containerStyle={styles.highlightSlot}
+      containerStyle={[styles.highlightSlot, wide ? styles.highlightSlotWide : null]}
     >
       <Photo
         source={listing.photo}
@@ -310,6 +324,16 @@ const stylesFor = themedStyles((colors) => ({
   highlightSlot: {
     alignSelf: 'stretch',
   },
+  // Side by side on a wide window, two to a row.
+  highlightRowWide: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: tokens.spacing[6],
+  },
+  highlightSlotWide: {
+    flexBasis: '40%',
+    flexGrow: 1,
+  },
   highlightCard: {
     flexDirection: 'row',
     gap: tokens.spacing[3],
@@ -345,6 +369,10 @@ const stylesFor = themedStyles((colors) => ({
   cell: {
     flexBasis: '46%',
     flexGrow: 1,
+  },
+  gridWide: {
+    columnGap: tokens.spacing[4],
+    rowGap: tokens.spacing[6],
   },
   tip: {
     marginBottom: tokens.spacing[4],

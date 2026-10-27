@@ -4,6 +4,8 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import {
   Button,
+  DetailHero,
+  DetailLayout,
   DetailSheet,
   EmptyState,
   NavHeader,
@@ -19,7 +21,7 @@ import {
   SWText,
   ZoomTarget,
 } from '../../components';
-import { held, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import { held, themedStyles, tokens, useTheme, useThemedStyles, useWideLayout } from '../../design';
 import { ListingCard } from '../marketplace/ListingCard';
 import {
   formatPeso,
@@ -76,11 +78,27 @@ export function TrendView({
   const listings = previewListings.filter((listing) => detail.listingIds.includes(listing.id));
   const posts = previewPosts.filter((post) => detail.postIds.includes(post.id));
   const heroHeight = Math.round(height * 0.5);
+  // On a wide window the photo is framed on the left and the title heads the details beside it.
+  const wide = useWideLayout();
+  const title = (
+    <>
+      <Sign icon={Flame} label="Hot this month" />
+      <SWText variant="displayHero" accessibilityRole="header">
+        {trend.label}
+      </SWText>
+      <Sticker
+        label={`${trend.change} this month`}
+        tone={rising ? 'marigold' : 'cobalt'}
+        style={styles.heroSticker}
+      />
+    </>
+  );
 
   return (
     <Screen
       ambient="feed"
       bleedTop
+      width="split"
       header={
         <NavHeader
           title={trend.label}
@@ -90,144 +108,140 @@ export function TrendView({
       }
       contentStyle={styles.content}
     >
-      <View style={[styles.hero, { height: heroHeight }]}>
-        <ZoomTarget>
-          <Photo
-            source={trend.photo}
-            label={trend.label}
-            radius={0}
-            style={StyleSheet.absoluteFill}
-          />
-        </ZoomTarget>
-        {/* The photo melts into the page so the title can sit across both. */}
-        <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Defs>
-            <LinearGradient id="trend-fade" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0.45" stopColor={colors.canvas} stopOpacity={0} />
-              <Stop offset="1" stopColor={colors.canvas} stopOpacity={1} />
-            </LinearGradient>
-          </Defs>
-          <Rect width="100%" height="100%" fill="url(#trend-fade)" />
-        </Svg>
-        <View style={styles.heroText}>
-          <Sign icon={Flame} label="Hot this month" />
-          <SWText variant="displayHero" accessibilityRole="header">
-            {trend.label}
-          </SWText>
-          <Sticker
-            label={`${trend.change} this month`}
-            tone={rising ? 'marigold' : 'cobalt'}
-            style={styles.heroSticker}
-          />
+      {wide ? null : (
+        <View style={[styles.hero, { height: heroHeight }]}>
+          <ZoomTarget>
+            <Photo
+              source={trend.photo}
+              label={trend.label}
+              radius={0}
+              style={StyleSheet.absoluteFill}
+            />
+          </ZoomTarget>
+          {/* The photo melts into the page so the title can sit across both. A web SVG needs its
+              size spelled out, or it takes the browser's default 300 × 150 box. */}
+          <Svg width="100%" height="100%" style={StyleSheet.absoluteFill} pointerEvents="none">
+            <Defs>
+              <LinearGradient id="trend-fade" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0.45" stopColor={colors.canvas} stopOpacity={0} />
+                <Stop offset="1" stopColor={colors.canvas} stopOpacity={1} />
+              </LinearGradient>
+            </Defs>
+            <Rect width="100%" height="100%" fill="url(#trend-fade)" />
+          </Svg>
+          <View style={styles.heroText}>{title}</View>
         </View>
-      </View>
+      )}
 
-      {/* The photo fades into the page colour, and the body carries that same colour all the way
+      <DetailLayout hero={wide ? <DetailHero source={trend.photo} label={trend.label} /> : null}>
+        {/* The photo fades into the page colour, and the body carries that same colour all the way
           down, so there is no step between the hero and the content. */}
-      <DetailSheet style={styles.body}>
-        <Reveal index={0}>
-          <SWText variant="headingLarge">{detail.headline}</SWText>
-        </Reveal>
+        <DetailSheet style={styles.body}>
+          {wide ? <View style={styles.titleBeside}>{title}</View> : null}
+          <Reveal index={0}>
+            <SWText variant="headingLarge">{detail.headline}</SWText>
+          </Reveal>
 
-        <Reveal index={1}>
-          {/* The month's number gets the loudest colour in the brand: this is what's hot. */}
-          <View style={styles.priceCard}>
-            <SWText variant="overline" color={colors.onMarigold}>
-              Typical price
-            </SWText>
-            <SWText variant="priceHero" color={colors.onMarigold}>
-              {formatPeso(detail.typicalPrice)}
-            </SWText>
-            <SWText variant="bodySmall" color={colors.onMarigold}>
-              Most sell between {formatPeso(detail.low)} and {formatPeso(detail.high)}
-            </SWText>
-            <Sparkline values={detail.series} height={72} color={colors.onMarigold} />
-            <View style={styles.statRow}>
-              <Stat label="Sold this month" value={String(detail.soldThisMonth)} />
-              <Stat label="12-week change" value={trend.change} />
-            </View>
-          </View>
-        </Reveal>
-
-        <Reveal index={2} style={styles.section}>
-          <SWText variant="headingMedium" accessibilityRole="header">
-            Why it&apos;s hot
-          </SWText>
-          <SWText variant="bodyLarge" tone="textSecondary">
-            {detail.why}
-          </SWText>
-        </Reveal>
-
-        <Reveal index={3} style={styles.section}>
-          <SWText variant="headingMedium" accessibilityRole="header">
-            For sale now
-          </SWText>
-          {listings.length > 0 ? (
-            <View style={styles.grid}>
-              {listings.map((listing) => (
-                <View key={listing.id} style={styles.cell}>
-                  <ListingCard listing={listing} onOpen={() => onOpenListing?.(listing.id)} />
-                </View>
-              ))}
-              {listings.length % 2 === 1 ? <View style={styles.cell} /> : null}
-            </View>
-          ) : (
-            <SWText variant="bodyMedium" tone="textMuted">
-              Nothing listed right now. Have one? You could be the first.
-            </SWText>
-          )}
-        </Reveal>
-
-        {posts.length > 0 ? (
-          <Reveal index={4} style={styles.section}>
-            <SWText variant="headingMedium" accessibilityRole="header">
-              Being priced on the feed
-            </SWText>
-            <View>
-              {posts.map((post, index) => (
-                <PressableScale
-                  key={post.id}
-                  accessibilityRole="link"
-                  accessibilityLabel={`Open discussion: ${post.body}`}
-                  haptic="select"
-                  depth="surface"
-                  onPress={() => onOpenPost?.(post.id)}
-                  style={[styles.postRow, index > 0 ? styles.divided : null]}
-                >
-                  <Photo
-                    source={post.photo}
-                    label={post.photoLabel}
-                    radius={tokens.radius.medium}
-                    style={styles.postThumb}
-                  />
-                  <View style={styles.postText}>
-                    <SWText variant="bodyMedium" numberOfLines={2}>
-                      {post.body}
-                    </SWText>
-                    <SWText variant="caption" tone="textMuted">
-                      AI est. {formatPeso(post.estimate)} · {post.postedAgo}
-                    </SWText>
-                  </View>
-                  <ChevronRight size={18} strokeWidth={2} color={colors.textMuted} />
-                </PressableScale>
-              ))}
+          <Reveal index={1}>
+            {/* The month's number gets the loudest colour in the brand: this is what's hot. */}
+            <View style={styles.priceCard}>
+              <SWText variant="overline" color={colors.onMarigold}>
+                Typical price
+              </SWText>
+              <SWText variant="priceHero" color={colors.onMarigold}>
+                {formatPeso(detail.typicalPrice)}
+              </SWText>
+              <SWText variant="bodySmall" color={colors.onMarigold}>
+                Most sell between {formatPeso(detail.low)} and {formatPeso(detail.high)}
+              </SWText>
+              <Sparkline values={detail.series} height={72} color={colors.onMarigold} />
+              <View style={styles.statRow}>
+                <Stat label="Sold this month" value={String(detail.soldThisMonth)} />
+                <Stat label="12-week change" value={trend.change} />
+              </View>
             </View>
           </Reveal>
-        ) : null}
 
-        <Reveal index={5}>
-          <View style={styles.cta}>
-            <SWText variant="headingLarge" color={colors.onCobalt}>
-              Got one?
+          <Reveal index={2} style={styles.section}>
+            <SWText variant="headingMedium" accessibilityRole="header">
+              Why it&apos;s hot
             </SWText>
-            <SWText variant="bodyMedium" color={colors.onCobalt}>
-              Snap it to see what yours is worth while {trend.label.toLowerCase()} are{' '}
-              {rising ? 'up' : 'moving'}.
+            <SWText variant="bodyLarge" tone="textSecondary">
+              {detail.why}
             </SWText>
-            <Button label="Snap it" variant="accent" icon={SnapIcon} onPress={onSnap} />
-          </View>
-        </Reveal>
-      </DetailSheet>
+          </Reveal>
+
+          <Reveal index={3} style={styles.section}>
+            <SWText variant="headingMedium" accessibilityRole="header">
+              For sale now
+            </SWText>
+            {listings.length > 0 ? (
+              <View style={styles.grid}>
+                {listings.map((listing) => (
+                  <View key={listing.id} style={styles.cell}>
+                    <ListingCard listing={listing} onOpen={() => onOpenListing?.(listing.id)} />
+                  </View>
+                ))}
+                {listings.length % 2 === 1 ? <View style={styles.cell} /> : null}
+              </View>
+            ) : (
+              <SWText variant="bodyMedium" tone="textMuted">
+                Nothing listed right now. Have one? You could be the first.
+              </SWText>
+            )}
+          </Reveal>
+
+          {posts.length > 0 ? (
+            <Reveal index={4} style={styles.section}>
+              <SWText variant="headingMedium" accessibilityRole="header">
+                Being priced on the feed
+              </SWText>
+              <View>
+                {posts.map((post, index) => (
+                  <PressableScale
+                    key={post.id}
+                    accessibilityRole="link"
+                    accessibilityLabel={`Open discussion: ${post.body}`}
+                    haptic="select"
+                    depth="surface"
+                    onPress={() => onOpenPost?.(post.id)}
+                    style={[styles.postRow, index > 0 ? styles.divided : null]}
+                  >
+                    <Photo
+                      source={post.photo}
+                      label={post.photoLabel}
+                      radius={tokens.radius.medium}
+                      style={styles.postThumb}
+                    />
+                    <View style={styles.postText}>
+                      <SWText variant="bodyMedium" numberOfLines={2}>
+                        {post.body}
+                      </SWText>
+                      <SWText variant="caption" tone="textMuted">
+                        AI est. {formatPeso(post.estimate)} · {post.postedAgo}
+                      </SWText>
+                    </View>
+                    <ChevronRight size={18} strokeWidth={2} color={colors.textMuted} />
+                  </PressableScale>
+                ))}
+              </View>
+            </Reveal>
+          ) : null}
+
+          <Reveal index={5}>
+            <View style={styles.cta}>
+              <SWText variant="headingLarge" color={colors.onCobalt}>
+                Got one?
+              </SWText>
+              <SWText variant="bodyMedium" color={colors.onCobalt}>
+                Snap it to see what yours is worth while {trend.label.toLowerCase()} are{' '}
+                {rising ? 'up' : 'moving'}.
+              </SWText>
+              <Button label="Snap it" variant="accent" icon={SnapIcon} onPress={onSnap} />
+            </View>
+          </Reveal>
+        </DetailSheet>
+      </DetailLayout>
     </Screen>
   );
 }
@@ -268,6 +282,10 @@ const stylesFor = themedStyles((colors) => ({
     alignItems: 'flex-start',
   },
   // Flat to the hero: the photo fades into it rather than the sheet overlapping the photo.
+  titleBeside: {
+    gap: tokens.spacing[2],
+    alignItems: 'flex-start',
+  },
   body: {
     marginTop: 0,
     borderTopLeftRadius: 0,

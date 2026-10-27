@@ -46,6 +46,7 @@ import {
   tokens,
   useTheme,
   useThemedStyles,
+  useWideLayout,
   type Place,
 } from '../design';
 import { AmbientBackdrop, type AmbientBackdropProps } from './AmbientBackdrop';
@@ -119,6 +120,12 @@ export interface ScreenProps {
    * compact bar keeps that colour, and the status bar reads against it.
    */
   readonly place?: Place;
+  /**
+   * How wide the content may grow on a wide web window. Tabs spread out (`wide`); screens opened
+   * from one keep to a reading width unless they lay themselves out in columns: a detail page
+   * (`split`, see `DetailLayout`) is wide, and its footer sits under its details column.
+   */
+  readonly width?: 'reading' | 'wide' | 'split';
 }
 
 /**
@@ -141,8 +148,21 @@ export function Screen({
   scrollRef,
   sheet = false,
   place,
+  width,
 }: ScreenProps) {
   const deviceInsets = useSafeAreaInsets();
+  // A wide web window has a sidebar instead of the floating tab bar, and room for wider content:
+  // a tab spreads out to grids, a screen opened from one keeps to a reading width.
+  const wide = useWideLayout() && !sheet;
+  const columnWidth = wide
+    ? (width ?? (clearTabBar ? 'wide' : 'reading')) === 'reading'
+      ? tokens.layout.readingColumn
+      : tokens.layout.wideColumn
+    : tokens.layout.phoneColumn;
+  const footerBeside = wide && width === 'split';
+  // A photo that runs up under the header is a phone's full-bleed hero; on a wide window it's
+  // framed in a column instead, so the page starts below the header like any other.
+  const bleeds = bleedTop && !wide;
   const insets = useMemo(
     () => (sheet ? { ...deviceInsets, top: 0 } : deviceInsets),
     [deviceInsets, sheet],
@@ -251,7 +271,7 @@ export function Screen({
 
   const clearance = insets.top + (header ? headerHeight : 0);
   const extraTop = Number(StyleSheet.flatten(contentStyle)?.paddingTop ?? 0);
-  const topRoom = bleedTop ? extraTop : clearance + extraTop;
+  const topRoom = bleeds ? extraTop : clearance + extraTop;
   // Exactly the room the bottom chrome takes, plus a little air: iOS 26's floating tab bar and
   // its Snap accessory sit a fixed distance from the screen edge; Android's navigation bar sits
   // on the inset with the Snap bar above it; the web draws its own floating bar. A footer
@@ -263,12 +283,18 @@ export function Screen({
   });
   const bottomRoom = bare
     ? tokens.spacing[4]
-    : clearTabBar
+    : clearTabBar && !wide
       ? tabBarRoom + tokens.spacing[4]
       : (footer ? footerHeight : insets.bottom) + tokens.spacing[8];
 
+  // On a wide window the scroll area fills the window, so its scrollbar sits at the edge and a
+  // tab's colour band can run edge to edge, while the content keeps to its column in the middle.
+  const capped = wide
+    ? { width: '100%' as const, maxWidth: columnWidth, alignSelf: 'center' as const }
+    : null;
   const body = [
     styles.content,
+    capped,
     contentStyle,
     { paddingTop: topRoom - offsetBase, paddingBottom: bottomRoom },
   ];
@@ -350,15 +376,27 @@ export function Screen({
           style={styles.fill}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <View style={styles.column}>
+          <View style={[styles.column, wide ? styles.columnWide : { maxWidth: columnWidth }]}>
             {scroller}
             {footer ? (
               <View
-                style={styles.footer}
+                style={[
+                  styles.footer,
+                  wide ? [styles.footerCentred, { maxWidth: columnWidth }] : null,
+                  footerBeside ? styles.footerBeside : null,
+                ]}
                 onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
               >
                 {sheet ? <SheetFooterBase /> : null}
-                {footer}
+                {footerBeside ? (
+                  // Under the details column of a split page, in the same proportions.
+                  <>
+                    <View style={styles.footerMedia} />
+                    <View style={styles.footerBody}>{footer}</View>
+                  </>
+                ) : (
+                  footer
+                )}
               </View>
             ) : null}
           </View>
@@ -549,6 +587,12 @@ const stylesFor = themedStyles((colors) => ({
     maxWidth: tokens.layout.phoneColumn,
     alignSelf: 'center',
   },
+  columnWide: {
+    maxWidth: '100%',
+  },
+  footerCentred: {
+    marginHorizontal: 'auto',
+  },
   fill: {
     flex: 1,
   },
@@ -567,6 +611,17 @@ const stylesFor = themedStyles((colors) => ({
     left: 0,
     right: 0,
     bottom: 0,
+  },
+  footerBeside: {
+    flexDirection: 'row',
+    gap: tokens.spacing[8] - tokens.spacing[3],
+    paddingHorizontal: tokens.layout.pageGutterCompact - tokens.spacing[3],
+  },
+  footerMedia: {
+    flex: tokens.layout.detailMediaFlex,
+  },
+  footerBody: {
+    flex: tokens.layout.detailBodyFlex,
   },
   footerBase: {
     position: 'absolute',

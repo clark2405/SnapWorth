@@ -5,7 +5,12 @@ import type { ViewProps } from 'react-native';
 // and a stack keeps the screens below the top one. Left alone the browser lays out and paints
 // all of them, every frame. A screen out of view skips rendering its contents instead, which
 // keeps its state and scroll position for when it comes back.
-const css = '[data-sw-screen="away"]{content-visibility:hidden;visibility:hidden}';
+//
+// Pages also don't rubber-band past their ends: a desktop page has nothing above its top, and
+// Safari's bounce would pull a tab's colour band down off the top edge and show the page behind.
+const css =
+  '[data-sw-screen="away"]{content-visibility:hidden;visibility:hidden}' +
+  'html,body,[data-sw-screen] div{overscroll-behavior:none}';
 
 let injected = false;
 

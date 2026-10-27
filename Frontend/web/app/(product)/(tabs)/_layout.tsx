@@ -1,16 +1,18 @@
 import { Tabs } from 'expo-router';
 
 import { requestScrollToTop, TabBar } from '@snapworth/shared/components';
-import { useTheme } from '@snapworth/shared/design';
+import { useTheme, useWideLayout } from '@snapworth/shared/design';
 
 import { tabs, type TabKey } from '../../../src/places';
 
 /**
  * The four places, kept alive side by side: switching shows a tab that's already built, with
- * its scroll position and state, instead of building it again. They share the floating tab bar.
+ * its scroll position and state, instead of building it again. On a phone-sized window they
+ * share the floating tab bar; wider, the sidebar beside the whole app takes its place.
  */
 export default function TabsLayout() {
   const { colors } = useTheme();
+  const wide = useWideLayout();
 
   return (
     <Tabs
@@ -21,6 +23,7 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: colors.canvas },
       }}
       tabBar={({ state, navigateToTab }) => {
+        if (wide) return null;
         const active = state.routes[state.index];
         const activeKey = active?.name as TabKey | undefined;
         return (
