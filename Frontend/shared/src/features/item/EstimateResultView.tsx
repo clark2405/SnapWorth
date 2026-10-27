@@ -58,6 +58,7 @@ import {
   TextField,
   useToast,
   DetailHero,
+  DetailLayout,
   DetailSheet,
   WorthySays,
 } from '../../components';
@@ -170,6 +171,7 @@ export function EstimateResultView({
     <Screen
       ambient="history"
       bleedTop={!asSheet}
+      width="split"
       sheet={asSheet}
       header={
         // In the sheet the title stays up from the start: the photo is behind the sheet, so the
@@ -213,197 +215,201 @@ export function EstimateResultView({
       }
       contentStyle={styles.content}
     >
-      {asSheet ? null : (
-        <DetailHero photos={photosOf(item)} heightRatio={estimated ? 0.5 : 0.62}>
-          {status === 'estimating' ? <ScanOverlay /> : null}
-        </DetailHero>
-      )}
-
-      {/* Only an estimate that resolves here gets the reveal; one opened from History is known. */}
-      <DetailSheet
-        reveal={resolvedHere.current}
-        style={[styles.sheet, asSheet ? styles.inSheet : null]}
+      <DetailLayout
+        hero={
+          asSheet ? null : (
+            <DetailHero photos={photosOf(item)} heightRatio={estimated ? 0.5 : 0.62}>
+              {status === 'estimating' ? <ScanOverlay /> : null}
+            </DetailHero>
+          )
+        }
       >
-        {status === 'estimating' ? <EstimatingStatus /> : null}
-        {status === 'failed' ? (
-          <Problem
-            icon={CircleAlert}
-            title="We couldn’t estimate this item."
-            body="Your photo is saved in History. Try again, or come back to it later."
-            onRetry={onRetry}
-          />
-        ) : null}
-        {status === 'offline' ? (
-          <Problem
-            icon={WifiOff}
-            title="You’re offline."
-            body="Your photo is saved. Reconnect and try again to get the estimate."
-            onRetry={onRetry}
-          />
-        ) : null}
+        {/* Only an estimate that resolves here gets the reveal; one opened from History is known. */}
+        <DetailSheet
+          reveal={resolvedHere.current}
+          style={[styles.sheet, asSheet ? styles.inSheet : null]}
+        >
+          {status === 'estimating' ? <EstimatingStatus /> : null}
+          {status === 'failed' ? (
+            <Problem
+              icon={CircleAlert}
+              title="We couldn’t estimate this item."
+              body="Your photo is saved in History. Try again, or come back to it later."
+              onRetry={onRetry}
+            />
+          ) : null}
+          {status === 'offline' ? (
+            <Problem
+              icon={WifiOff}
+              title="You’re offline."
+              body="Your photo is saved. Reconnect and try again to get the estimate."
+              onRetry={onRetry}
+            />
+          ) : null}
 
-        {estimated ? (
-          <>
-            {/* The appraisal hangs on its price tag, stamped with how sure the AI is. */}
-            <Reveal index={0} style={styles.headline}>
-              <SWText variant="caption" tone="textMuted">
-                {item.category}
-              </SWText>
-              <View style={styles.tagRow}>
-                <TagShape
-                  hanging
-                  tilt={tokens.tilt.start}
-                  swing={resolvedHere.current}
-                  style={styles.priceTag}
-                >
-                  <SWText variant="stamp" color={colors.kraftInk}>
-                    AI Estimate
-                  </SWText>
-                  <CountUp
-                    variant="priceHero"
-                    color={colors.kraftInk}
-                    value={value}
-                    format={formatPeso}
-                    from={resolvedHere.current ? undefined : value}
-                    durationMs={1100}
-                    accessibilityLiveRegion="polite"
-                  />
-                </TagShape>
-                <Stamp
-                  label={`${previewValuation.confidence} confidence`}
-                  side="end"
-                  // Stamped once the count has landed on the price.
-                  land={resolvedHere.current ? { delay: 1250 } : undefined}
-                  style={styles.confidence}
-                />
-              </View>
-              <SWText variant="bodyMedium" tone="textMuted">
-                AI estimate, not a sale price
-              </SWText>
-            </Reveal>
-
-            <Reveal index={1}>
-              <PriceRangeBar
-                low={low}
-                high={high}
-                estimate={value}
-                confidence={previewValuation.confidence}
-                format={formatPeso}
-                showConfidence={false}
-                animate={resolvedHere.current}
-              />
-            </Reveal>
-
-            <Tip id="list" />
-
-            <Reveal index={2} style={styles.insights}>
-              <Insight
-                icon={Flame}
-                label={previewValuation.demand}
-                detail={previewValuation.demandDetail}
-              />
-              <Insight icon={Clock3} label={previewValuation.sellTime} />
-              <Insight
-                icon={Gem}
-                label={previewValuation.rarity}
-                detail="Fewer than 1 in 20 listings"
-              />
-            </Reveal>
-
-            <Reveal index={3} style={styles.section}>
-              <SectionTitle title="Condition" />
-              <ChoiceChips
-                options={previewConditions.map(({ key, label }) => ({ key, label }))}
-                value={condition}
-                onChange={setCondition}
-              />
-              <Animated.View key={condition} entering={FadeIn.duration(220)}>
-                <SWText variant="bodySmall" tone="textMuted">
-                  {previewConditions.find((c) => c.key === condition)?.hint}
+          {estimated ? (
+            <>
+              {/* The appraisal hangs on its price tag, stamped with how sure the AI is. */}
+              <Reveal index={0} style={styles.headline}>
+                <SWText variant="caption" tone="textMuted">
+                  {item.category}
                 </SWText>
-              </Animated.View>
-            </Reveal>
-
-            <Reveal index={3} delay={80}>
-              <Animated.View key={condition} entering={FadeIn.duration(220)}>
-                <WorthySays>{conditionLine(condition, low)}</WorthySays>
-              </Animated.View>
-            </Reveal>
-
-            <Reveal index={4} style={styles.section}>
-              <SectionTitle
-                title="Price trend"
-                detail={previewValuation.trendChange}
-                detailTone="success"
-              />
-              <Surface padding={tokens.spacing[4]}>
-                <Sparkline values={previewValuation.trend} height={72} />
-                <View style={styles.trendAxis}>
-                  <SWText variant="caption" tone="textMuted">
-                    12 weeks ago
-                  </SWText>
-                  <SWText variant="caption" tone="textMuted">
-                    Today
-                  </SWText>
-                </View>
-              </Surface>
-            </Reveal>
-
-            <Reveal index={4} delay={120} style={styles.section}>
-              <SectionTitle title="Recent sales" />
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.bleed}
-                contentContainerStyle={styles.comparables}
-              >
-                {previewValuation.comparables.map((comparable, index) => (
-                  <Animated.View
-                    key={comparable.id}
-                    entering={FadeInDown.delay(360 + index * 70)
-                      .springify()
-                      .damping(18)}
-                    style={styles.comparable}
+                <View style={styles.tagRow}>
+                  <TagShape
+                    hanging
+                    tilt={tokens.tilt.start}
+                    swing={resolvedHere.current}
+                    style={styles.priceTag}
                   >
-                    <Photo
-                      source={comparable.photo}
-                      label={comparable.photoLabel}
-                      aspectRatio={1}
-                      radius={tokens.radius.medium}
+                    <SWText variant="stamp" color={colors.kraftInk}>
+                      AI Estimate
+                    </SWText>
+                    <CountUp
+                      variant="priceHero"
+                      color={colors.kraftInk}
+                      value={value}
+                      format={formatPeso}
+                      from={resolvedHere.current ? undefined : value}
+                      durationMs={1100}
+                      accessibilityLiveRegion="polite"
                     />
-                    <SWText variant="priceSmall">{formatPeso(comparable.price)}</SWText>
-                    <SWText variant="caption" numberOfLines={2} style={styles.comparableTitle}>
-                      {comparable.title}
-                    </SWText>
-                    <SWText variant="caption" tone="textMuted" numberOfLines={1}>
-                      {comparable.soldAgo}
-                    </SWText>
-                    <SWText variant="caption" tone="textMuted" numberOfLines={1}>
-                      {comparable.source}
-                    </SWText>
-                  </Animated.View>
-                ))}
-              </ScrollView>
-            </Reveal>
+                  </TagShape>
+                  <Stamp
+                    label={`${previewValuation.confidence} confidence`}
+                    side="end"
+                    // Stamped once the count has landed on the price.
+                    land={resolvedHere.current ? { delay: 1250 } : undefined}
+                    style={styles.confidence}
+                  />
+                </View>
+                <SWText variant="bodyMedium" tone="textMuted">
+                  AI estimate, not a sale price
+                </SWText>
+              </Reveal>
 
-            <Reveal index={4} delay={200} style={styles.section}>
-              <SectionTitle title="Details" />
-              <Field label="Identified item">
-                <TextField
-                  value={title}
-                  onChangeText={setTitle}
-                  accessibilityLabel="Identified item"
+              <Reveal index={1}>
+                <PriceRangeBar
+                  low={low}
+                  high={high}
+                  estimate={value}
+                  confidence={previewValuation.confidence}
+                  format={formatPeso}
+                  showConfidence={false}
+                  animate={resolvedHere.current}
                 />
-              </Field>
-              <Field label="Category">
-                <SelectField value={item.category} accessibilityLabel="Category" />
-              </Field>
-            </Reveal>
-          </>
-        ) : null}
+              </Reveal>
 
-        <SavedNote sharing={placement} />
-      </DetailSheet>
+              <Tip id="list" />
+
+              <Reveal index={2} style={styles.insights}>
+                <Insight
+                  icon={Flame}
+                  label={previewValuation.demand}
+                  detail={previewValuation.demandDetail}
+                />
+                <Insight icon={Clock3} label={previewValuation.sellTime} />
+                <Insight
+                  icon={Gem}
+                  label={previewValuation.rarity}
+                  detail="Fewer than 1 in 20 listings"
+                />
+              </Reveal>
+
+              <Reveal index={3} style={styles.section}>
+                <SectionTitle title="Condition" />
+                <ChoiceChips
+                  options={previewConditions.map(({ key, label }) => ({ key, label }))}
+                  value={condition}
+                  onChange={setCondition}
+                />
+                <Animated.View key={condition} entering={FadeIn.duration(220)}>
+                  <SWText variant="bodySmall" tone="textMuted">
+                    {previewConditions.find((c) => c.key === condition)?.hint}
+                  </SWText>
+                </Animated.View>
+              </Reveal>
+
+              <Reveal index={3} delay={80}>
+                <Animated.View key={condition} entering={FadeIn.duration(220)}>
+                  <WorthySays>{conditionLine(condition, low)}</WorthySays>
+                </Animated.View>
+              </Reveal>
+
+              <Reveal index={4} style={styles.section}>
+                <SectionTitle
+                  title="Price trend"
+                  detail={previewValuation.trendChange}
+                  detailTone="success"
+                />
+                <Surface padding={tokens.spacing[4]}>
+                  <Sparkline values={previewValuation.trend} height={72} />
+                  <View style={styles.trendAxis}>
+                    <SWText variant="caption" tone="textMuted">
+                      12 weeks ago
+                    </SWText>
+                    <SWText variant="caption" tone="textMuted">
+                      Today
+                    </SWText>
+                  </View>
+                </Surface>
+              </Reveal>
+
+              <Reveal index={4} delay={120} style={styles.section}>
+                <SectionTitle title="Recent sales" />
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.bleed}
+                  contentContainerStyle={styles.comparables}
+                >
+                  {previewValuation.comparables.map((comparable, index) => (
+                    <Animated.View
+                      key={comparable.id}
+                      entering={FadeInDown.delay(360 + index * 70)
+                        .springify()
+                        .damping(18)}
+                      style={styles.comparable}
+                    >
+                      <Photo
+                        source={comparable.photo}
+                        label={comparable.photoLabel}
+                        aspectRatio={1}
+                        radius={tokens.radius.medium}
+                      />
+                      <SWText variant="priceSmall">{formatPeso(comparable.price)}</SWText>
+                      <SWText variant="caption" numberOfLines={2} style={styles.comparableTitle}>
+                        {comparable.title}
+                      </SWText>
+                      <SWText variant="caption" tone="textMuted" numberOfLines={1}>
+                        {comparable.soldAgo}
+                      </SWText>
+                      <SWText variant="caption" tone="textMuted" numberOfLines={1}>
+                        {comparable.source}
+                      </SWText>
+                    </Animated.View>
+                  ))}
+                </ScrollView>
+              </Reveal>
+
+              <Reveal index={4} delay={200} style={styles.section}>
+                <SectionTitle title="Details" />
+                <Field label="Identified item">
+                  <TextField
+                    value={title}
+                    onChangeText={setTitle}
+                    accessibilityLabel="Identified item"
+                  />
+                </Field>
+                <Field label="Category">
+                  <SelectField value={item.category} accessibilityLabel="Category" />
+                </Field>
+              </Reveal>
+            </>
+          ) : null}
+
+          <SavedNote sharing={placement} />
+        </DetailSheet>
+      </DetailLayout>
 
       <ShareCardSheet
         visible={sharing}

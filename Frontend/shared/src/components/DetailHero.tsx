@@ -12,7 +12,7 @@ import {
   type ViewProps,
 } from 'react-native';
 
-import { haptic, themedStyles, tokens, useThemedStyles } from '../design';
+import { haptic, held, themedStyles, tokens, useThemedStyles, useWideLayout } from '../design';
 import { ZoomTarget } from './NavLink';
 import { Photo } from './Photo';
 import { PhotoViewer, type ItemPhoto } from './PhotoViewer';
@@ -43,11 +43,20 @@ export function DetailHero({
   children,
 }: DetailHeroProps) {
   const styles = useThemedStyles(stylesFor);
-  const { width, height } = useWindowDimensions();
+  const window = useWindowDimensions();
+  const wide = useWideLayout();
+  // The photos page across the hero's own width: the window's on a phone, a column's on a wide
+  // window, where the hero is a framed square beside the details rather than a full-bleed band.
+  const [measured, setMeasured] = useState(0);
+  const width = wide ? measured || window.width / 2 : window.width;
   const [page, setPage] = useState(0);
   const [viewing, setViewing] = useState<number | null>(null);
   const all: readonly ItemPhoto[] = photos?.length ? photos : source ? [{ source, label }] : [];
-  const heroHeight = Math.round(height * heightRatio);
+  // Beside the details it fills the window's height (held in view as they scroll), so there's no
+  // empty column beneath it; never wider than a square, never taller than a tall portrait.
+  const heroHeight = wide
+    ? Math.round(Math.min(width * 1.35, Math.max(width, window.height - wideHeroRoom)))
+    : Math.round(window.height * heightRatio);
 
   const onPage = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const next = Math.round(event.nativeEvent.contentOffset.x / width);
@@ -63,7 +72,17 @@ export function DetailHero({
   };
 
   return (
-    <View style={[styles.hero, { height: heroHeight }]}>
+    <View
+      style={[styles.hero, wide ? styles.heroFramed : null, { height: heroHeight }]}
+      onLayout={
+        wide
+          ? (event) => {
+              const next = Math.round(event.nativeEvent.layout.width);
+              setMeasured((current) => (current === next ? current : next));
+            }
+          : undefined
+      }
+    >
       <ZoomTarget>
         <ScrollView
           horizontal
@@ -90,7 +109,7 @@ export function DetailHero({
       {children}
 
       {/* Sits clear of the sheet's rounded edge, which overlaps the bottom of the photo. */}
-      <View style={styles.footer} pointerEvents="box-none">
+      <View style={[styles.footer, wide ? styles.footerFramed : null]} pointerEvents="box-none">
         {all.length > 1 ? (
           <View style={styles.dots} pointerEvents="none">
             {all.map((_, index) => (
@@ -134,14 +153,49 @@ export function DetailSheet({
   ...props
 }: ViewProps & { readonly reveal?: boolean }) {
   const styles = useThemedStyles(stylesFor);
+  const wide = useWideLayout();
   return (
-    <View {...props} style={[styles.sheet, style]}>
+    <View {...props} style={[styles.sheet, style, wide ? styles.sheetBeside : null]}>
       <RevealStill still={!reveal}>{children}</RevealStill>
     </View>
   );
 }
 
+/**
+ * Places a detail page's photo and its sheet. On a phone the sheet overlaps the bottom of a
+ * full-width photo; on a wide window, the way a shop's product page reads on a desktop, the
+ * photo sits framed on the left and stays in view while the details scroll beside it.
+ */
+export function DetailLayout({
+  hero,
+  children,
+}: {
+  readonly hero: ReactNode;
+  readonly children: ReactNode;
+}) {
+  const styles = useThemedStyles(stylesFor);
+  const wide = useWideLayout();
+  // Without a photo (a page shown in a sheet) there's nothing to set beside the details.
+  if (!wide || !hero) {
+    return (
+      <>
+        {hero}
+        {children}
+      </>
+    );
+  }
+  return (
+    <View style={styles.split}>
+      <View style={styles.media}>{hero}</View>
+      <View style={styles.details}>{children}</View>
+    </View>
+  );
+}
+
 const dotSize = 6;
+
+/** What sits above and below the framed photo beside a detail page: the header, and air. */
+const wideHeroRoom = tokens.layout.headerCompact + tokens.spacing[4] + tokens.spacing[6];
 
 /** Taller than any screen, so the sheet's colour always reaches past the bottom edge. */
 const sheetRunout = 1200;
@@ -201,5 +255,38 @@ const stylesFor = themedStyles((colors) => ({
     backgroundColor: colors.canvas,
     paddingHorizontal: tokens.layout.pageGutterCompact,
     paddingTop: tokens.spacing[6],
+  },
+  // Beside the photo the sheet is a panel of its own: nothing to overlap, nothing to run past.
+  sheetBeside: {
+    marginTop: 0,
+    marginBottom: 0,
+    paddingBottom: tokens.spacing[6],
+    borderRadius: tokens.radius.xlarge,
+  },
+  heroFramed: {
+    borderRadius: tokens.radius.xlarge,
+    ...held(colors),
+  },
+  footerFramed: {
+    left: tokens.spacing[4],
+    right: tokens.spacing[4],
+    bottom: tokens.spacing[4],
+  },
+  split: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: tokens.spacing[8],
+    paddingHorizontal: tokens.layout.pageGutterCompact,
+  },
+  // Held in view as the details scroll, just under the header.
+  media: {
+    flex: tokens.layout.detailMediaFlex,
+    minWidth: 0,
+    position: 'sticky' as 'relative',
+    top: tokens.layout.headerCompact + tokens.spacing[4],
+  },
+  details: {
+    flex: tokens.layout.detailBodyFlex,
+    minWidth: 0,
   },
 }));

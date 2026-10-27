@@ -34,6 +34,7 @@ import {
   TextField,
   shareIcon,
   DetailHero,
+  DetailLayout,
   DetailSheet,
   Toggle,
   WorthySays,
@@ -140,6 +141,7 @@ export function ListingDetailView({
     <Screen
       ambient="market"
       bleedTop
+      width="split"
       header={
         <NavHeader
           title="Listing"
@@ -218,126 +220,126 @@ export function ListingDetailView({
     >
       {/* The zoom lands on the hero photo, which has no entrance of its own: a fade or slide on
           top of the zoom made opening and closing a listing stutter. */}
-      <DetailHero photos={photosOf(listing)} />
+      <DetailLayout hero={<DetailHero photos={photosOf(listing)} />}>
+        <DetailSheet style={styles.body}>
+          <Reveal index={1} style={styles.titleBlock}>
+            <Tag label={listing.category} tone="sand" />
+            <SWText variant="headingLarge" accessibilityRole="header">
+              {listing.title}
+            </SWText>
+            <AskingPriceBadge value={formatPeso(listing.askingPrice)} />
+          </Reveal>
 
-      <DetailSheet style={styles.body}>
-        <Reveal index={1} style={styles.titleBlock}>
-          <Tag label={listing.category} tone="sand" />
-          <SWText variant="headingLarge" accessibilityRole="header">
-            {listing.title}
-          </SWText>
-          <AskingPriceBadge value={formatPeso(listing.askingPrice)} />
-        </Reveal>
+          <Reveal index={2} style={styles.sections}>
+            <Surface padding={tokens.spacing[4]} contentStyle={styles.assessment}>
+              <SWText variant="headingSmall">Is the price fair?</SWText>
+              <PriceRangeBar
+                low={insight.estimateLow}
+                high={insight.estimateHigh}
+                estimate={insight.estimate}
+                confidence={insight.confidence}
+                asking={listing.askingPrice}
+                format={formatPeso}
+                animate={false}
+              />
+              <VerdictBar tally={tally} />
+            </Surface>
 
-        <Reveal index={2} style={styles.sections}>
-          <Surface padding={tokens.spacing[4]} contentStyle={styles.assessment}>
-            <SWText variant="headingSmall">Is the price fair?</SWText>
-            <PriceRangeBar
-              low={insight.estimateLow}
-              high={insight.estimateHigh}
-              estimate={insight.estimate}
-              confidence={insight.confidence}
-              asking={listing.askingPrice}
-              format={formatPeso}
-              animate={false}
-            />
-            <VerdictBar tally={tally} />
-          </Surface>
+            <WorthySays>
+              {askingLine(
+                {
+                  asking: listing.askingPrice,
+                  estimate: insight.estimate,
+                  low: insight.estimateLow,
+                  high: insight.estimateHigh,
+                },
+                owned,
+                formatPeso,
+              )}
+            </WorthySays>
 
-          <WorthySays>
-            {askingLine(
-              {
-                asking: listing.askingPrice,
-                estimate: insight.estimate,
-                low: insight.estimateLow,
-                high: insight.estimateHigh,
-              },
-              owned,
-              formatPeso,
-            )}
-          </WorthySays>
-
-          {owned ? (
-            <OwnerPanel
-              stats={previewMyListing.stats}
-              marking={markingSold}
-              onMarkSold={() => {
-                setMarkingSold(true);
-                setTimeout(() => {
-                  setMarkingSold(false);
-                  toast.show({ title: 'Marked as sold', celebrate: true });
-                  onMarkSold?.();
-                }, 700);
-              }}
-            />
-          ) : (
-            <PressableScale
-              accessibilityRole="link"
-              accessibilityLabel={`Seller ${listing.seller.handle}, rated ${listing.seller.rating} from ${listing.seller.sales} sales`}
-              onPress={onOpenSeller}
-            >
-              <Surface padding={tokens.spacing[3]}>
-                <View style={styles.seller}>
-                  <Avatar
-                    source={listing.seller.avatar}
-                    name={listing.seller.handle}
-                    size={40}
-                    ring
-                  />
-                  <View style={styles.sellerText}>
-                    <SWText variant="label">@{listing.seller.handle}</SWText>
-                    <Rating
-                      value={listing.seller.rating}
-                      detail={`${listing.seller.sales} sales`}
+            {owned ? (
+              <OwnerPanel
+                stats={previewMyListing.stats}
+                marking={markingSold}
+                onMarkSold={() => {
+                  setMarkingSold(true);
+                  setTimeout(() => {
+                    setMarkingSold(false);
+                    toast.show({ title: 'Marked as sold', celebrate: true });
+                    onMarkSold?.();
+                  }, 700);
+                }}
+              />
+            ) : (
+              <PressableScale
+                accessibilityRole="link"
+                accessibilityLabel={`Seller ${listing.seller.handle}, rated ${listing.seller.rating} from ${listing.seller.sales} sales`}
+                onPress={onOpenSeller}
+              >
+                <Surface padding={tokens.spacing[3]}>
+                  <View style={styles.seller}>
+                    <Avatar
+                      source={listing.seller.avatar}
+                      name={listing.seller.handle}
+                      size={40}
+                      ring
                     />
+                    <View style={styles.sellerText}>
+                      <SWText variant="label">@{listing.seller.handle}</SWText>
+                      <Rating
+                        value={listing.seller.rating}
+                        detail={`${listing.seller.sales} sales`}
+                      />
+                    </View>
+                    <ChevronRight size={20} strokeWidth={2} color={colors.textMuted} />
                   </View>
-                  <ChevronRight size={20} strokeWidth={2} color={colors.textMuted} />
-                </View>
-              </Surface>
-            </PressableScale>
-          )}
+                </Surface>
+              </PressableScale>
+            )}
 
-          <View style={styles.description}>
-            <SWText variant="overline" tone="textMuted" accessibilityRole="header">
-              About this item
-            </SWText>
-            <SWText variant="bodyMedium" tone="textSecondary">
-              {listing.description}
-            </SWText>
-          </View>
-
-          {owned ? null : (
-            <>
-              <Surface>
-                <ListRow
-                  label="Alert me if the price drops"
-                  trailing={
-                    <Toggle
-                      value={priceAlert}
-                      onValueChange={(value) =>
-                        requireAccount('alert', () => {
-                          setPriceAlert(value);
-                          if (value) {
-                            haptic('select');
-                            toast.show({
-                              title: 'Alert set',
-                              body: "We'll notify you if the price drops.",
-                            });
-                          }
-                        })
-                      }
-                      accessibilityLabel="Alert me if the price drops"
-                    />
-                  }
-                />
-              </Surface>
-              <SWText variant="caption" tone="textMuted">
-                {insight.watchers} people watching this listing
+            <View style={styles.description}>
+              <SWText variant="overline" tone="textMuted" accessibilityRole="header">
+                About this item
               </SWText>
-            </>
-          )}
-        </Reveal>
-      </DetailSheet>
+              <SWText variant="bodyMedium" tone="textSecondary">
+                {listing.description}
+              </SWText>
+            </View>
+
+            {owned ? null : (
+              <>
+                <Surface>
+                  <ListRow
+                    label="Alert me if the price drops"
+                    trailing={
+                      <Toggle
+                        value={priceAlert}
+                        onValueChange={(value) =>
+                          requireAccount('alert', () => {
+                            setPriceAlert(value);
+                            if (value) {
+                              haptic('select');
+                              toast.show({
+                                title: 'Alert set',
+                                body: "We'll notify you if the price drops.",
+                              });
+                            }
+                          })
+                        }
+                        accessibilityLabel="Alert me if the price drops"
+                      />
+                    }
+                  />
+                </Surface>
+                <SWText variant="caption" tone="textMuted">
+                  {insight.watchers} people watching this listing
+                </SWText>
+              </>
+            )}
+          </Reveal>
+        </DetailSheet>
+      </DetailLayout>
 
       <Sheet visible={offerOpen} onClose={() => setOfferOpen(false)} title="Make an offer">
         <ChoiceChips

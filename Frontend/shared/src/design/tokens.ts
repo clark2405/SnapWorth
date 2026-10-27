@@ -547,6 +547,13 @@ export const tokens = deepFreeze({
     contentMedium: 960,
     contentWide: 1440,
     phoneColumn: 480,
+    /** The web on a wide window: a tab's content, up to where lines and grids stay easy to scan. */
+    wideColumn: 1200,
+    /** The web on a wide window: a screen opened from a tab, at a comfortable reading width. */
+    readingColumn: 760,
+    /** A detail page on a wide window: the photo's share of the row beside the details' share. */
+    detailMediaFlex: 5,
+    detailBodyFlex: 6,
     navigationRailCompact: 72,
     navigationRailExpanded: 240,
     cardMinimum: 280,

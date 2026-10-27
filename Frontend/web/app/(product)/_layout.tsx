@@ -1,52 +1,66 @@
-import { Slot, usePathname, useRouter, type Href } from 'expo-router';
+import { Stack, usePathname, useRouter } from 'expo-router';
 import { View } from 'react-native';
 
-import {
-  ChatsIcon,
-  FeedIcon,
-  HistoryIcon,
-  MarketIcon,
-  requestScrollToTop,
-  TabBar,
-  type TabItem,
-} from '@snapworth/shared/components';
+import { requestScrollToTop, ScreenSkeleton, SideNav } from '@snapworth/shared/components';
+import { useLayoutClass, useTheme } from '@snapworth/shared/design';
+import { useAccountGate } from '@snapworth/shared/features/session';
 
-type TabKey = 'feed' | 'marketplace' | 'chat' | 'history';
+import { placeForPath, tabRoutes, tabs } from '../../src/places';
 
-const tabRoutes: Record<TabKey, Href> = {
-  feed: '/feed',
-  marketplace: '/marketplace',
-  chat: '/chat',
-  history: '/history',
-};
+/** Screens that open on a photo with their details beside or beneath it. */
+const detailRoutes = new Set(['listing/[id]', 'post/[id]', 'item/[id]', 'trend/[key]', 'ask/[id]']);
 
-// Places only: Snap is an action, so it lives in the Feed and History headers (and as Sell in
-// Market), not in the bar.
-const tabs = [
-  { key: 'feed', label: 'Feed', icon: FeedIcon },
-  { key: 'marketplace', label: 'Market', icon: MarketIcon },
-  { key: 'chat', label: 'Chats', icon: ChatsIcon },
-  { key: 'history', label: 'History', icon: HistoryIcon },
-] as const satisfies readonly TabItem<TabKey>[];
-
+/**
+ * The app behind the launch and sign-in screens. Screens opened from a tab stack over the tabs,
+ * so going back returns to the tab as it was. On a wide window a sidebar runs down the left of
+ * every screen, a rail of icons at tablet widths and labelled on a desktop.
+ */
 export default function ProductLayout() {
+  const { colors } = useTheme();
+  const layout = useLayoutClass();
   const pathname = usePathname();
   const router = useRouter();
-  const activeKey = (Object.keys(tabRoutes) as TabKey[]).find((key) => tabRoutes[key] === pathname);
+  const requireAccount = useAccountGate();
+
+  const stack = (
+    <Stack
+      // A screen opened for the first time shows its shape while its code arrives. The tabs bring
+      // their own (a band and a list).
+      screenLayout={({ route, children }) => (
+        <View style={{ flex: 1 }}>
+          {route.name === '(tabs)' ? null : (
+            <ScreenSkeleton kind={detailRoutes.has(route.name) ? 'detail' : 'page'} />
+          )}
+          {children}
+        </View>
+      )}
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: colors.canvas },
+        animation: 'fade',
+      }}
+    />
+  );
+  if (layout === 'compact') return stack;
+
+  const activeKey = placeForPath(pathname);
+  const onTab = activeKey !== undefined && tabRoutes[activeKey] === pathname;
 
   return (
-    <View style={{ flex: 1 }}>
-      <Slot />
-      {activeKey ? (
-        <TabBar
-          tabs={tabs}
-          activeKey={activeKey}
-          // Tapping the tab you are on takes its page back to the top.
-          onSelect={(key) =>
-            key === activeKey ? requestScrollToTop() : router.replace(tabRoutes[key])
-          }
-        />
-      ) : null}
+    <View style={{ flex: 1, flexDirection: 'row', backgroundColor: colors.canvas }}>
+      <SideNav
+        items={tabs}
+        rail={layout === 'medium'}
+        activeKey={activeKey}
+        // The place you're already on goes back to its top; anywhere else goes to that place.
+        onSelect={(key) =>
+          key === activeKey && onTab ? requestScrollToTop() : router.navigate(tabRoutes[key])
+        }
+        onSnap={() => requireAccount('snap', () => router.push('/capture'))}
+        onSearch={() => router.push('/search')}
+        onOpenProfile={() => router.push('/profile')}
+      />
+      <View style={{ flex: 1 }}>{stack}</View>
     </View>
   );
 }

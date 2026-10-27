@@ -1,6 +1,6 @@
 import { ArrowUp, ChevronRight, ShieldX, ShoppingBag, X } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
-import { TextInput, View } from 'react-native';
+import { Platform, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import {
@@ -24,6 +24,7 @@ import {
   useToast,
   shareIcon,
   DetailHero,
+  DetailLayout,
   DetailSheet,
   WorthySays,
 } from '../../components';
@@ -193,6 +194,7 @@ export function PostDetailView({
     <Screen
       ambient="feed"
       bleedTop
+      width="split"
       scrollRef={scrollRef}
       header={
         <NavHeader
@@ -281,6 +283,9 @@ export function PostDetailView({
                 accessibilityLabel={replyingTo ? 'Write a reply' : 'Write a comment'}
                 maxLength={commentBodyMaxLength}
                 multiline
+                // A browser's textarea starts two lines tall, leaving the placeholder floating at
+                // the top of the box; one line keeps it centred, and it still grows as you type.
+                numberOfLines={Platform.OS === 'web' ? 1 : undefined}
                 style={[
                   styles.composerInput,
                   typeStyle('bodyLarge'),
@@ -303,83 +308,88 @@ export function PostDetailView({
       }
       contentStyle={styles.content}
     >
-      <DetailHero photos={photosOf(post)} />
-
-      <DetailSheet
-        style={styles.body}
-        onLayout={(event) => {
-          bodyY.current = event.nativeEvent.layout.y;
-        }}
-      >
-        <Reveal index={0} style={styles.author}>
-          <Avatar source={post.author.avatar} name={post.author.handle} size={40} />
-          <View>
-            <SWText variant="label">@{post.author.handle}</SWText>
-            <SWText variant="caption" tone="textMuted">
-              {post.postedAgo}
-            </SWText>
-          </View>
-        </Reveal>
-
-        <Reveal index={1} style={styles.question}>
-          <EstimateBadge value={formatPeso(post.estimate)} size="hero" />
-          <SWText variant="bodyLarge">{post.body}</SWText>
-          <CrossPost post={post} onOpenListing={onOpenListing} onListForSale={onListForSale} />
-        </Reveal>
-
-        <Reveal index={2} style={styles.verdict}>
-          <WorthySays>{verdictLine(post.votes, post.estimate, formatPeso)}</WorthySays>
-          <VerdictBar tally={post.votes} />
-          <Tip id="vote" />
-          <VoteChips
-            tally={post.votes}
-            selected={vote}
-            onVote={(choice) =>
-              requireAccount('vote', () => {
-                voteTip.done();
-                setVote((current) => (current === choice ? null : choice));
-              })
-            }
-          />
-        </Reveal>
-
-        <View
-          style={styles.discussion}
+      <DetailLayout hero={<DetailHero photos={photosOf(post)} />}>
+        <DetailSheet
+          style={styles.body}
           onLayout={(event) => {
-            discussionY.current = event.nativeEvent.layout.y;
+            bodyY.current = event.nativeEvent.layout.y;
           }}
         >
-          <SWText variant="headingMedium" accessibilityRole="header">
-            {thread.status === 'ready'
-              ? `${count} ${count === 1 ? 'comment' : 'comments'}`
-              : 'Comments'}
-          </SWText>
-
-          {thread.status === 'loading' ? (
-            <SWText variant="bodySmall" tone="textMuted" accessibilityLiveRegion="polite">
-              Loading the discussion…
-            </SWText>
-          ) : thread.status === 'failed' ? (
-            <View style={styles.problem} accessibilityLiveRegion="polite">
-              <SWText variant="bodySmall" tone="textSecondary">
-                {thread.error ? failureCopy(thread.error) : 'The discussion did not load.'}
+          <Reveal index={0} style={styles.author}>
+            <Avatar source={post.author.avatar} name={post.author.handle} size={40} />
+            <View>
+              <SWText variant="label">@{post.author.handle}</SWText>
+              <SWText variant="caption" tone="textMuted">
+                {post.postedAgo}
               </SWText>
-              <Button label="Try again" variant="secondary" size="small" onPress={thread.reload} />
             </View>
-          ) : count === 0 ? (
-            <SWText variant="bodySmall" tone="textMuted">
-              No comments yet. Be the first to weigh in on the price.
-            </SWText>
-          ) : (
-            <CommentList
-              groups={thread.groups}
-              onReply={(comment) => requireAccount('comment', () => startReply(comment))}
-              onDelete={(comment) => void remove(comment)}
-              onReport={(comment) => requireAccount('report', () => void report(comment))}
+          </Reveal>
+
+          <Reveal index={1} style={styles.question}>
+            <EstimateBadge value={formatPeso(post.estimate)} size="hero" />
+            <SWText variant="bodyLarge">{post.body}</SWText>
+            <CrossPost post={post} onOpenListing={onOpenListing} onListForSale={onListForSale} />
+          </Reveal>
+
+          <Reveal index={2} style={styles.verdict}>
+            <WorthySays>{verdictLine(post.votes, post.estimate, formatPeso)}</WorthySays>
+            <VerdictBar tally={post.votes} />
+            <Tip id="vote" />
+            <VoteChips
+              tally={post.votes}
+              selected={vote}
+              onVote={(choice) =>
+                requireAccount('vote', () => {
+                  voteTip.done();
+                  setVote((current) => (current === choice ? null : choice));
+                })
+              }
             />
-          )}
-        </View>
-      </DetailSheet>
+          </Reveal>
+
+          <View
+            style={styles.discussion}
+            onLayout={(event) => {
+              discussionY.current = event.nativeEvent.layout.y;
+            }}
+          >
+            <SWText variant="headingMedium" accessibilityRole="header">
+              {thread.status === 'ready'
+                ? `${count} ${count === 1 ? 'comment' : 'comments'}`
+                : 'Comments'}
+            </SWText>
+
+            {thread.status === 'loading' ? (
+              <SWText variant="bodySmall" tone="textMuted" accessibilityLiveRegion="polite">
+                Loading the discussion…
+              </SWText>
+            ) : thread.status === 'failed' ? (
+              <View style={styles.problem} accessibilityLiveRegion="polite">
+                <SWText variant="bodySmall" tone="textSecondary">
+                  {thread.error ? failureCopy(thread.error) : 'The discussion did not load.'}
+                </SWText>
+                <Button
+                  label="Try again"
+                  variant="secondary"
+                  size="small"
+                  onPress={thread.reload}
+                />
+              </View>
+            ) : count === 0 ? (
+              <SWText variant="bodySmall" tone="textMuted">
+                No comments yet. Be the first to weigh in on the price.
+              </SWText>
+            ) : (
+              <CommentList
+                groups={thread.groups}
+                onReply={(comment) => requireAccount('comment', () => startReply(comment))}
+                onDelete={(comment) => void remove(comment)}
+                onReport={(comment) => requireAccount('report', () => void report(comment))}
+              />
+            )}
+          </View>
+        </DetailSheet>
+      </DetailLayout>
     </Screen>
   );
 }

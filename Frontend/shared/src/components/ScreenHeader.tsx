@@ -19,11 +19,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 
 import {
+  held,
   placeColors,
   themedStyles,
   tokens,
   useTheme,
   useThemedStyles,
+  useWideLayout,
   type PlaceColors,
 } from '../design';
 import { Wordmark } from './Brand';
@@ -140,6 +142,7 @@ export function LargeTitle({
   const styles = useThemedStyles(stylesFor);
   const { colors } = useTheme();
   const place = scroll?.place ? placeColors(colors, scroll.place) : null;
+  const wide = useWideLayout();
 
   const textStyle = useAnimatedStyle(() => {
     const y = scroll?.scrollY.value ?? 0;
@@ -161,7 +164,8 @@ export function LargeTitle({
       {place ? <PlaceBlock place={place} /> : null}
       {/* Overline, then the huge title sharing a line with its circular actions; any subtitle
           gets the full width beneath, so nothing wraps into a ragged line beside the buttons. */}
-      {brand ? <BrandRefresh place={place} /> : null}
+      {/* On a wide window the wordmark heads the sidebar instead. */}
+      {brand && !wide ? <BrandRefresh place={place} /> : null}
       {overline ? (
         <Animated.View style={[styles.overlineRow, textStyle]}>
           <Overline label={overline} icon={overlineIcon} color={place?.ink} />
@@ -205,12 +209,19 @@ function PlaceBlock({
   readonly reachUp?: boolean;
 }) {
   const styles = useThemedStyles(stylesFor);
+  const { width } = useWindowDimensions();
+  // On a phone the content's gutter is all there is to cover; on a wide window the content is
+  // a column in the middle, so the band runs on past it to both edges, as a page's header would.
+  const bleed = useWideLayout() ? width : tokens.layout.pageGutterCompact;
   return (
     <View
       pointerEvents="none"
-      style={[styles.block, { backgroundColor: place.fill, top: reachUp ? -2000 : 0 }]}
+      style={[
+        styles.block,
+        { backgroundColor: place.fill, top: reachUp ? -2000 : 0, left: -bleed, right: -bleed },
+      ]}
     >
-      <ScallopEdge color={place.fill} />
+      <ScallopEdge color={place.fill} span={width + bleed * 2} />
     </View>
   );
 }
@@ -219,9 +230,17 @@ function PlaceBlock({
  * The scalloped bottom edge of a colour block, like a ticket torn from a roll. It hangs just
  * below the bottom of whatever it is placed in, across the full width of the screen.
  */
-export function ScallopEdge({ color }: { readonly color: string }) {
+export function ScallopEdge({
+  color,
+  span,
+}: {
+  readonly color: string;
+  /** How wide the edge runs; the window's width unless the block reaches past it. */
+  readonly span?: number;
+}) {
   const styles = useThemedStyles(stylesFor);
-  const { width } = useWindowDimensions();
+  const window = useWindowDimensions();
+  const width = span ?? window.width;
   const count = Math.ceil(width / scallop) + 1;
   return (
     <Svg width={width} height={scallop / 2 + 1} style={styles.scallops} pointerEvents="none">
@@ -282,15 +301,21 @@ export function PlaceHero({
   const styles = useThemedStyles(stylesFor);
   const { colors } = useTheme();
   const place = scroll?.place ? placeColors(colors, scroll.place) : null;
+  const wide = useWideLayout();
   return (
     <View
-      style={[styles.hero, style]}
+      style={[
+        styles.hero,
+        // On a wide window it's a panel cut from the colour, set beside what follows it.
+        wide && place ? [styles.heroFramed, { backgroundColor: place.fill }] : null,
+        style,
+      ]}
       onLayout={(event) => {
         const { y, height } = event.nativeEvent.layout;
         register(y + height);
       }}
     >
-      {place ? <PlaceBlock place={place} /> : null}
+      {place && !wide ? <PlaceBlock place={place} /> : null}
       {children}
     </View>
   );
@@ -395,7 +420,7 @@ const sheetTopInset = tokens.spacing[5];
 const sheetNavMargin =
   tokens.layout.pageGutterCompact - (tokens.layout.headerCompact - tokens.focus.minimumTarget) / 2;
 
-const stylesFor = themedStyles(() => ({
+const stylesFor = themedStyles((colors) => ({
   wrap: {
     position: 'relative',
   },
@@ -442,6 +467,12 @@ const stylesFor = themedStyles(() => ({
     paddingBottom: tokens.spacing[8],
     marginBottom: tokens.spacing[8],
   },
+  heroFramed: {
+    marginBottom: 0,
+    padding: tokens.spacing[8],
+    borderRadius: tokens.radius.xlarge,
+    ...held(colors),
+  },
   // Pulled up over the title block's scallops, so the two read as one block.
   panel: {
     marginTop: -(tokens.spacing[6] + scallop),
@@ -452,8 +483,6 @@ const stylesFor = themedStyles(() => ({
   block: {
     position: 'absolute',
     bottom: 0,
-    left: -tokens.layout.pageGutterCompact,
-    right: -tokens.layout.pageGutterCompact,
   },
   scallops: {
     position: 'absolute',

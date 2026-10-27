@@ -8,7 +8,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Companion, RevealGate, ToastProvider, useToast } from '@snapworth/shared/components';
 import {
   ThemeProvider,
+  tokens,
   useTheme,
+  useWideLayout,
   type ThemePreference,
   type ThemePreferenceStore,
 } from '@snapworth/shared/design';
@@ -109,6 +111,7 @@ function WebCompanion({ ready }: { readonly ready: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const toast = useToast();
+  const wide = useWideLayout();
   const config = useMemo(
     () =>
       companionConfigFor(pathname, {
@@ -124,8 +127,11 @@ function WebCompanion({ ready }: { readonly ready: boolean }) {
       actions={config.actions}
       greeting={config.greeting}
       hint={config.hint}
-      hidden={!ready || config.hidden}
-      bottomOffset={config.lift === 'tabBar' ? 90 : 92}
+      // Beside a desktop conversation it would sit on the message box, and has nothing to add.
+      hidden={!ready || config.hidden || (wide && pathname === '/chat')}
+      // On a wide window there's no floating tab bar to ride above, only the page's edge; a
+      // screen's own bottom bar is still there to clear.
+      bottomOffset={config.lift === 'tabBar' ? (wide ? tokens.spacing[6] : 90) : 92}
       onAsk={(question) => router.push({ pathname: '/worthy', params: { q: question } })}
       onHoldSnap={() => router.push('/capture')}
     />

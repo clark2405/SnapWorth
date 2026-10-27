@@ -35,7 +35,7 @@ import {
   type SearchOrigin,
   type TagTone,
 } from '../../components';
-import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import { themedStyles, tokens, useTheme, useThemedStyles, useWideLayout } from '../../design';
 import {
   formatPeso,
   previewHistory,
@@ -119,6 +119,9 @@ export function HistoryView({
       .catch(() => undefined);
   };
 
+  // On a wide window the summary and filters sit in a column of their own beside the items.
+  const wide = useWideLayout();
+
   return (
     <Screen
       clearTabBar
@@ -149,63 +152,72 @@ export function HistoryView({
         }
       />
 
-      <Reveal index={0} style={styles.hero}>
-        {/* The screen's one feature slab: the number everything else here adds up to. */}
-        <Surface tone="feature" padding={tokens.spacing[5]} contentStyle={styles.heroContent}>
-          <Overline icon={Wallet} label="What it's all worth" tone="onFeatureDim" />
-          <CountUp
-            value={previewPortfolio.total}
-            format={formatPeso}
-            variant="priceHero"
-            tone="onFeature"
-          />
-          <View style={styles.heroMeta}>
-            <Tag label={previewPortfolio.changeLabel} tone="mint" />
-          </View>
-          <Sparkline values={previewPortfolio.series} height={56} color={colors.onFeature} />
-        </Surface>
-      </Reveal>
+      <View style={wide ? styles.split : null}>
+        <View style={wide ? styles.aside : null}>
+          <Reveal index={0} style={styles.hero}>
+            {/* The screen's one feature slab: the number everything else here adds up to. */}
+            <Surface tone="feature" padding={tokens.spacing[5]} contentStyle={styles.heroContent}>
+              <Overline icon={Wallet} label="What it's all worth" tone="onFeatureDim" />
+              <CountUp
+                value={previewPortfolio.total}
+                format={formatPeso}
+                variant="priceHero"
+                tone="onFeature"
+              />
+              <View style={styles.heroMeta}>
+                <Tag label={previewPortfolio.changeLabel} tone="mint" />
+              </View>
+              <Sparkline values={previewPortfolio.series} height={56} color={colors.onFeature} />
+            </Surface>
+          </Reveal>
 
-      <Reveal index={1} style={styles.filters}>
-        <ChoiceChips options={filters} value={filter} onChange={setFilter} scroll />
-      </Reveal>
-
-      {visible.length === 0 ? (
-        <Animated.View entering={FadeIn} exiting={FadeOut}>
-          <EmptyState
-            icon={PackageSearch}
-            title="Nothing in this pile"
-            body="Nothing matches this filter yet. Try another, or snap something new."
-            actionLabel={filter === 'all' ? undefined : 'Show all'}
-            onAction={filter === 'all' ? undefined : () => setFilter('all')}
-          />
-        </Animated.View>
-      ) : (
-        <Surface padding={tokens.spacing[2]}>
-          {visible.map((item, index) => (
-            <Animated.View
-              key={item.id}
-              entering={FadeInDown.springify().damping(18)}
-              exiting={FadeOut.duration(160)}
-              layout={LinearTransition.springify().damping(20)}
-            >
-              <Reveal index={index + 2}>
-                {index > 0 ? <Divider style={styles.divider} /> : null}
-                <HistoryRow
-                  item={item}
-                  onOpen={() => onOpenItem?.(item.id)}
-                  onList={() => onListItem?.(item.id)}
-                  onShare={() => shareItem(item)}
-                  onDelete={() => deleteItem(item)}
-                />
-              </Reveal>
+          <Reveal index={1} style={styles.filters}>
+            {/* The side column is narrow, so its chips wrap instead of scrolling. */}
+            <ChoiceChips options={filters} value={filter} onChange={setFilter} scroll={!wide} />
+          </Reveal>
+        </View>
+        <View style={wide ? styles.main : null}>
+          {visible.length === 0 ? (
+            <Animated.View entering={FadeIn} exiting={FadeOut}>
+              <EmptyState
+                icon={PackageSearch}
+                title="Nothing in this pile"
+                body="Nothing matches this filter yet. Try another, or snap something new."
+                actionLabel={filter === 'all' ? undefined : 'Show all'}
+                onAction={filter === 'all' ? undefined : () => setFilter('all')}
+              />
             </Animated.View>
-          ))}
-        </Surface>
-      )}
+          ) : (
+            <Surface padding={tokens.spacing[2]}>
+              {visible.map((item, index) => (
+                <Animated.View
+                  key={item.id}
+                  entering={FadeInDown.springify().damping(18)}
+                  exiting={FadeOut.duration(160)}
+                  layout={LinearTransition.springify().damping(20)}
+                >
+                  <Reveal index={index + 2}>
+                    {index > 0 ? <Divider style={styles.divider} /> : null}
+                    <HistoryRow
+                      item={item}
+                      onOpen={() => onOpenItem?.(item.id)}
+                      onList={() => onListItem?.(item.id)}
+                      onShare={() => shareItem(item)}
+                      onDelete={() => deleteItem(item)}
+                    />
+                  </Reveal>
+                </Animated.View>
+              ))}
+            </Surface>
+          )}
+        </View>
+      </View>
     </Screen>
   );
 }
+
+/** The summary column beside the items on a wide window. */
+const asideWidth = 360;
 
 function HistoryRow({
   item,
@@ -264,6 +276,18 @@ const stylesFor = themedStyles(() => ({
   },
   hero: {
     marginBottom: tokens.spacing[6],
+  },
+  split: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: tokens.spacing[8],
+  },
+  aside: {
+    width: asideWidth,
+  },
+  main: {
+    flex: 1,
+    minWidth: 0,
   },
   heroContent: {
     gap: tokens.spacing[3],
