@@ -37,7 +37,7 @@ export function SellerProfileView({
 
   if (!seller) {
     return (
-      <Screen header={<NavHeader title="Seller" onBack={onBack} />}>
+      <Screen ambient="market" header={<NavHeader title="Seller" onBack={onBack} />}>
         <EmptyState
           icon={UserX}
           title="Seller not found"
@@ -53,6 +53,7 @@ export function SellerProfileView({
 
   return (
     <Screen
+      ambient="market"
       header={
         <NavHeader
           title={`@${seller.user.handle}`}

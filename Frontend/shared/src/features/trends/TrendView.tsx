@@ -60,7 +60,7 @@ export function TrendView({
 
   if (!trend || !detail) {
     return (
-      <Screen header={<NavHeader title="Trending" onBack={onBack} banded />}>
+      <Screen ambient="feed" header={<NavHeader title="Trending" onBack={onBack} banded />}>
         <EmptyState
           icon={Flame}
           title="This trend has cooled off"
@@ -79,6 +79,7 @@ export function TrendView({
 
   return (
     <Screen
+      ambient="feed"
       bleedTop
       header={
         <NavHeader

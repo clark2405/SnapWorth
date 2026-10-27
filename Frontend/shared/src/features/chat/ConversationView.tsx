@@ -328,6 +328,7 @@ export function ConversationView({
 
   return (
     <Screen
+      ambient="chat"
       scroll={false}
       header={
         <NavHeader

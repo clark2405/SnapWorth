@@ -168,6 +168,7 @@ export function EstimateResultView({
 
   return (
     <Screen
+      ambient="history"
       bleedTop={!asSheet}
       sheet={asSheet}
       header={

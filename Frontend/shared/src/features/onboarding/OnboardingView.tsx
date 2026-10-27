@@ -257,7 +257,7 @@ export function OnboardingView({
 
   return (
     <View style={styles.root}>
-      <AmbientBackdrop mood="feed" />
+      <AmbientBackdrop mood="feed" print="full" />
       <RevealGate open={opened}>
         <View style={[styles.column, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
           <Reveal index={0} style={styles.topBar}>

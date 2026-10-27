@@ -191,6 +191,7 @@ export function PostDetailView({
 
   return (
     <Screen
+      ambient="feed"
       bleedTop
       scrollRef={scrollRef}
       header={

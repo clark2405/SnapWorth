@@ -82,7 +82,7 @@ export function AccountGateView({ title, intent, onBack }: AccountGateViewProps)
 
   if (place && pile) {
     return (
-      <Screen clearTabBar place={place}>
+      <Screen clearTabBar place={place} ambient={place} quiet>
         <LargeTitle brand title={title} />
         <GuestScene place={place} pile={pile} title={copy.title} body={copy.body}>
           <Button label="Create free account" onPress={createAccount} />
@@ -94,6 +94,7 @@ export function AccountGateView({ title, intent, onBack }: AccountGateViewProps)
 
   return (
     <Screen
+      quiet
       clearTabBar={!onBack}
       header={onBack ? <NavHeader title={title} onBack={onBack} /> : undefined}
     >
