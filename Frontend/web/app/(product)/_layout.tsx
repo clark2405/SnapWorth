@@ -1,11 +1,14 @@
 import { Stack, usePathname, useRouter } from 'expo-router';
 import { View } from 'react-native';
 
-import { requestScrollToTop, SideNav } from '@snapworth/shared/components';
+import { requestScrollToTop, ScreenSkeleton, SideNav } from '@snapworth/shared/components';
 import { useLayoutClass, useTheme } from '@snapworth/shared/design';
 import { useAccountGate } from '@snapworth/shared/features/session';
 
 import { placeForPath, tabRoutes, tabs } from '../../src/places';
+
+/** Screens that open on a photo with their details beside or beneath it. */
+const detailRoutes = new Set(['listing/[id]', 'post/[id]', 'item/[id]', 'trend/[key]', 'ask/[id]']);
 
 /**
  * The app behind the launch and sign-in screens. Screens opened from a tab stack over the tabs,
@@ -21,6 +24,16 @@ export default function ProductLayout() {
 
   const stack = (
     <Stack
+      // A screen opened for the first time shows its shape while its code arrives. The tabs bring
+      // their own (a band and a list).
+      screenLayout={({ route, children }) => (
+        <View style={{ flex: 1 }}>
+          {route.name === '(tabs)' ? null : (
+            <ScreenSkeleton kind={detailRoutes.has(route.name) ? 'detail' : 'page'} />
+          )}
+          {children}
+        </View>
+      )}
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: colors.canvas },

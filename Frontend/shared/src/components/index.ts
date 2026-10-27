@@ -23,6 +23,7 @@ export * from './Reveal';
 export * from './Screen';
 export * from './scroll-signal';
 export * from './ScreenHeader';
+export * from './ScreenSkeleton';
 export * from './ScrollEdge';
 export * from './SearchButton';
 export * from './SegmentedControl';
