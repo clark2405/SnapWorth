@@ -100,6 +100,7 @@ export function CreatePostView({
 
   return (
     <Screen
+      ambient="feed"
       header={<NavHeader title="Ask the community" onBack={onBack} banded />}
       footer={
         <BottomBar>

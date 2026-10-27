@@ -98,7 +98,7 @@ export function LoginView({
     onContinueWithGoogle ? onContinueWithGoogle() : onSubmit?.({ mode, email, password });
 
   return (
-    <Screen place="feed" ambient="feed" contentStyle={styles.content}>
+    <Screen place="feed" ambient="feed" quiet contentStyle={styles.content}>
       <PlaceHero title={text.title}>
         <Reveal index={0} style={styles.brand}>
           <Wordmark ink={brand.ink} lensColor={brand.lens} />

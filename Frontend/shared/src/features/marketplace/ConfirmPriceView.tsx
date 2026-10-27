@@ -96,6 +96,7 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
 
   return (
     <Screen
+      ambient="market"
       header={<NavHeader title="List for sale" onBack={onBack} banded />}
       footer={
         <BottomBar>

@@ -91,6 +91,11 @@ export interface ScreenProps {
   readonly contentStyle?: StyleProp<ViewStyle>;
   /** Which area's warm blobs drift behind the screen. Every screen has them; tabs re-tint. */
   readonly ambient?: AmbientBackdropProps['mood'];
+  /**
+   * A quiet screen with room to spare, such as logging in: the backdrop's print covers the whole
+   * page. Otherwise it keeps to the edges, out from behind busy content.
+   */
+  readonly quiet?: boolean;
   /** Enables pull-to-refresh. Resolve the promise when the new content is in. */
   readonly onRefresh?: () => Promise<void> | void;
   /**
@@ -128,6 +133,7 @@ export function Screen({
   clearTabBar = false,
   contentStyle,
   ambient = 'calm',
+  quiet = false,
   onRefresh,
   bleedTop = false,
   transparent = false,
@@ -266,6 +272,7 @@ export function Screen({
   // A bare tab page carries its backdrop inside the scroll view, held still against it, so the
   // scroll view can come first. Only there: inside a form sheet the same layer covers the content.
   const backdropInScroll = bare;
+  const print = quiet ? 'full' : 'edges';
 
   const scroller = scroll ? (
     <Animated.ScrollView
@@ -292,7 +299,9 @@ export function Screen({
         ) : undefined
       }
     >
-      {backdropInScroll ? <PinnedBackdrop mood={ambient} scrollY={scrollY} base={base} /> : null}
+      {backdropInScroll ? (
+        <PinnedBackdrop mood={ambient} print={print} scrollY={scrollY} base={base} />
+      ) : null}
       {children}
     </Animated.ScrollView>
   ) : (
@@ -332,7 +341,7 @@ export function Screen({
   const page = (
     <ScreenScrollContext.Provider value={context}>
       <View style={[styles.root, transparent ? styles.clear : null]}>
-        {transparent || backdropInScroll ? null : <AmbientBackdrop mood={ambient} />}
+        {transparent || backdropInScroll ? null : <AmbientBackdrop mood={ambient} print={print} />}
         <KeyboardAvoidingView
           style={styles.fill}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -434,10 +443,12 @@ function PlaceStatusBar({
 /** The ambient backdrop laid inside a scroll view, moved with the offset so it stays put. */
 function PinnedBackdrop({
   mood,
+  print,
   scrollY,
   base,
 }: {
   readonly mood: AmbientBackdropProps['mood'];
+  readonly print: AmbientBackdropProps['print'];
   readonly scrollY: SharedValue<number>;
   readonly base: SharedValue<number>;
 }) {
@@ -448,7 +459,7 @@ function PinnedBackdrop({
   }));
   return (
     <Animated.View pointerEvents="none" style={[styles.pinned, { height }, pinned]}>
-      <AmbientBackdrop mood={mood} />
+      <AmbientBackdrop mood={mood} print={print} />
     </Animated.View>
   );
 }

@@ -63,6 +63,7 @@ export function VotesView({ onBack, onOpenPost, onBrowseFeed }: VotesViewProps) 
 
   return (
     <Screen
+      ambient="feed"
       header={<NavHeader title="Your votes" onBack={onBack} banded />}
       contentStyle={styles.content}
     >

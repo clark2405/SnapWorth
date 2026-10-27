@@ -138,6 +138,7 @@ export function ListingDetailView({
 
   return (
     <Screen
+      ambient="market"
       bleedTop
       header={
         <NavHeader

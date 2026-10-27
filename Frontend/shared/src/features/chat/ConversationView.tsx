@@ -281,6 +281,9 @@ export function ConversationView({
         options={quickReplies}
         value={null}
         scroll
+        // The bar's corners round in close to the row, so the chips slide out of sight inside its
+        // padding rather than at its edge, where they'd poke past the curve.
+        bleed={0}
         onChange={(key) => {
           if (key === 'offer') setSheet('offer');
           else if (key === 'pickup') setSheet('meetup');
@@ -328,6 +331,7 @@ export function ConversationView({
 
   return (
     <Screen
+      ambient="chat"
       scroll={false}
       header={
         <NavHeader

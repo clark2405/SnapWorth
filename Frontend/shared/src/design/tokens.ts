@@ -35,6 +35,8 @@ const duration = {
   slow: 680,
   /** One breath of the ambient layer behind every screen. */
   ambientLoop: 7000,
+  /** The backdrop changing from one screen's look into the next: slow enough to read as one move. */
+  backdropMorph: 820,
   stepTransition: 280,
   popRise: 100,
   popSettle: 180,
@@ -621,6 +623,8 @@ export const tokens = deepFreeze({
     easing,
     bezier: {
       expressive: [0.16, 1, 0.3, 1],
+      /** A soft start and a long landing, for a change that should feel like one continuous move. */
+      morph: [0.33, 0, 0.15, 1],
       exit: [0.4, 0, 1, 1],
     },
     entrance: {
@@ -629,6 +633,18 @@ export const tokens = deepFreeze({
     ambient: {
       /** Opacity of the warm blobs at the peak of their breath. */
       peakOpacity: { light: 0.9, dark: 0.75, night: 0.8 },
+      /**
+       * Opacity of the price-gun print: lighter where it covers the whole page, a touch stronger
+       * where it only runs down the edges.
+       */
+      printOpacity: {
+        full: { light: 0.13, dark: 0.17, night: 0.15 },
+        edges: { light: 0.18, dark: 0.22, night: 0.2 },
+      },
+      /** What a mask keeps in full: white, so only each stop's opacity decides how much shows. */
+      maskKeep: '#FFFFFF',
+      /** Opacity of the cut-paper stickers along the edges. */
+      stickerOpacity: { light: 0.3, dark: 0.36, night: 0.34 },
     },
     /**
      * Springs for anything the finger drives or that should feel physical. Durations are
