@@ -36,6 +36,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-router',
     'expo-font',
     'expo-web-browser',
+    // iOS 27 closes apps at launch that haven't adopted the scene life cycle.
+    './plugins/with-scene-lifecycle.cjs',
     [
       'expo-image-picker',
       {
