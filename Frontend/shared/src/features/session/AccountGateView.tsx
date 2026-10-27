@@ -60,13 +60,6 @@ const piles: Partial<Record<GatedScreen, readonly PileTag[]>> = {
   ],
 };
 
-// Where each tag of a pile lands; each leans the way everything on its side does.
-const pileSlots = [
-  { style: { left: 0, top: 58 }, tilt: tokens.tilt.start },
-  { style: { right: 0, top: 10 }, tilt: tokens.tilt.end },
-  { style: { right: tokens.spacing[8], top: 104 }, tilt: tokens.tilt.end },
-] as const;
-
 export interface AccountGateViewProps {
   /** The screen's own name, so a guest still knows where they are. */
   readonly title: string;
@@ -132,26 +125,30 @@ function GuestScene({
   const ink = placeColors(colors, place).ink;
   return (
     <PlacePanel style={styles.scene}>
+      {/* Worthy on the left, the tags in a stepped column on the right: laid out in flow rather
+          than pinned, so no tag can land on another or on Worthy whatever its price's width.
+          They all sit on the end side, so they all lean the end side's way. */}
       <Reveal index={1} style={styles.pile}>
-        <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          {pile.map((tag, index) => {
-            const slot = pileSlots[index % pileSlots.length];
-            return (
-              <View key={tag.label} style={[styles.pileTag, slot?.style]}>
-                <TagShape tilt={slot?.tilt} style={styles.tag}>
-                  <SWText variant="stamp" color={colors.kraftInk}>
-                    {tag.label}
-                  </SWText>
-                  <SWText variant="priceMedium" color={colors.kraftInk}>
-                    {tag.price}
-                  </SWText>
-                </TagShape>
-              </View>
-            );
-          })}
-        </View>
-        <View style={styles.worthy}>
-          <Worthy size={88} mood="attentive" />
+        <Worthy size={88} mood="attentive" />
+        <View
+          style={styles.tags}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          {pile.map((tag, index) => (
+            <TagShape
+              key={tag.label}
+              tilt={tokens.tilt.end}
+              style={[styles.tag, index % 2 === 1 ? styles.tagStep : null]}
+            >
+              <SWText variant="stamp" color={colors.kraftInk}>
+                {tag.label}
+              </SWText>
+              <SWText variant="priceMedium" color={colors.kraftInk}>
+                {tag.price}
+              </SWText>
+            </TagShape>
+          ))}
         </View>
       </Reveal>
       <Reveal index={2} style={styles.copy}>
@@ -178,21 +175,24 @@ const stylesFor = themedStyles(() => ({
     gap: tokens.spacing[5],
   },
   pile: {
-    height: 168,
-    marginTop: tokens.spacing[2],
+    marginTop: tokens.spacing[4],
+    marginBottom: tokens.spacing[2],
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: tokens.spacing[6],
   },
-  pileTag: {
-    position: 'absolute',
+  tags: {
+    alignItems: 'flex-start',
+    gap: tokens.spacing[3],
   },
   tag: {
     paddingVertical: tokens.spacing[2],
     paddingRight: tokens.spacing[4],
   },
-  worthy: {
-    position: 'absolute',
-    left: '50%',
-    marginLeft: -44,
-    top: 30,
+  // The middle tag steps in, so the column reads as a little stack rather than a list.
+  tagStep: {
+    marginLeft: tokens.spacing[6],
   },
   copy: {
     gap: tokens.spacing[2],
