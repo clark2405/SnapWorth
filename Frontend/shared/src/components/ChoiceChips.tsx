@@ -23,6 +23,12 @@ export interface ChoiceChipsProps<Key extends string> {
   readonly onChange: (key: Key) => void;
   /** Scroll sideways instead of wrapping, for long category lists. */
   readonly scroll?: boolean;
+  /**
+   * How far a scrolling row reaches past its container on each side, so chips can slide out of
+   * view at the edge. Defaults to the page gutter, for a row on the page; a row inside a box
+   * passes the box's own padding, so it stops at the box's edge.
+   */
+  readonly bleed?: number;
 }
 
 /**
@@ -35,6 +41,7 @@ export function ChoiceChips<Key extends string>({
   value,
   onChange,
   scroll = false,
+  bleed = tokens.layout.pageGutterCompact,
 }: ChoiceChipsProps<Key>) {
   const styles = useThemedStyles(stylesFor);
   const reduceMotion = useReducedMotion();
@@ -154,8 +161,8 @@ export function ChoiceChips<Key extends string>({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollRow}
-        style={styles.bleed}
+        contentContainerStyle={[styles.scrollRow, { paddingHorizontal: bleed }]}
+        style={[styles.bleed, { marginHorizontal: -bleed }]}
         accessibilityRole="radiogroup"
       >
         {indicator}
@@ -245,12 +252,10 @@ const stylesFor = themedStyles((colors) => ({
     gap: tokens.spacing[3],
   },
   bleed: {
-    marginHorizontal: -tokens.layout.pageGutterCompact,
     flexGrow: 0,
   },
   scrollRow: {
     gap: tokens.spacing[3],
-    paddingHorizontal: tokens.layout.pageGutterCompact,
     // Room for the shadows beneath the row, which a scroll view would otherwise clip.
     paddingBottom: chipShadow,
   },
