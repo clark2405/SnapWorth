@@ -1,49 +1,31 @@
-import { ArrowDown, ArrowUp, Check, type LucideIcon } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Platform,
+  Pressable,
   StatusBar,
   StyleSheet,
-  useWindowDimensions,
   View,
   type LayoutChangeEvent,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
-  Extrapolation,
   cancelAnimation,
   interpolate,
   interpolateColor,
   runOnJS,
-  scrollTo,
-  useAnimatedReaction,
-  useAnimatedRef,
-  useAnimatedScrollHandler,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  withDelay,
   withRepeat,
+  withSpring,
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import {
-  AmbientBackdrop,
-  CountUp,
-  EstimateMark,
-  LogoMark,
-  Photo,
-  PressableScale,
-  Reveal,
-  RevealGate,
-  ScallopEdge,
-  Sparkline,
-  Sticker,
-  SWText,
-  TagShape,
-  Wordmark,
-} from '../../components';
+import { LogoMark, PressableScale, Reveal, RevealGate, SWText, Wordmark } from '../../components';
 import {
   haptic,
   held,
@@ -52,15 +34,10 @@ import {
   tokens,
   useTheme,
   useThemedStyles,
-  type SemanticColorName,
 } from '../../design';
-import {
-  formatPeso,
-  previewItem,
-  previewListings,
-  previewPosts,
-  previewValuation,
-} from '../preview/sample-data';
+import { PrintLayer } from '../../components/BackdropPrint';
+import { Scene, Sheets, stage, type Arrival } from './OnboardingScene';
+import { SnapShutter, shutterClosesAt, shutterOpensAfter } from './SnapShutter';
 
 export interface OnboardingViewProps {
   /** The last step's primary action: start a new account. */
@@ -77,77 +54,42 @@ export interface OnboardingViewProps {
 }
 
 const steps = [
-  { key: 'snap', title: 'Snap anything.', body: 'One photo is all it takes.' },
-  { key: 'worth', title: 'Know its worth.', body: 'A fair range in seconds, not a guess.' },
-  { key: 'decide', title: 'Sell, or ask.', body: 'List it, or let the community weigh in.' },
+  {
+    key: 'snap',
+    title: 'Snap anything.',
+    body: 'One photo is all it takes. SnapWorth works out what it is.',
+  },
+  {
+    key: 'worth',
+    title: 'Know its worth.',
+    body: 'A fair range in seconds, from what things like it really sell for.',
+  },
+  {
+    key: 'decide',
+    title: 'Sell, or ask.',
+    body: 'List it at a fair price, or let the community weigh in first.',
+  },
 ] as const;
 
 const lastIndex = steps.length - 1;
-const copyHeight = 124;
-const glideMs = 820;
 const curve = tokens.motion.bezier.expressive;
 const expressive = Easing.bezier(curve[0] ?? 0, curve[1] ?? 0, curve[2] ?? 1, curve[3] ?? 1);
-const clamp = Extrapolation.CLAMP;
+/** One spring for every move: firm, then soft, with nothing overshooting. */
+const settleSpring = { stiffness: 80, damping: 2 * Math.sqrt(80), mass: 1 } as const;
+/** Room the words, dots and buttons need under the scene. */
+const copyRoom = 304;
 
-/** Other things people value, drifting behind the hero on the first step: "anything". */
-const satellites = previewListings.slice(0, 4).map((listing, slot) => ({
-  key: listing.id,
-  photo: listing.photo,
-  label: listing.photoLabel,
-  x: [-0.4, 0.41, -0.42, 0.4][slot] ?? 0,
-  y: [-0.33, -0.2, 0.2, 0.34][slot] ?? 0,
-  tilt: [-12, 10, 8, -9][slot] ?? 0,
-  phase: slot * 0.23,
-}));
-
-const votes = previewPosts[0]?.votes ?? { too_high: 0, just_right: 0, too_low: 0 };
-
-interface Bubble {
-  readonly key: string;
-  readonly label: string;
-  readonly count: number;
-  readonly icon: LucideIcon;
-  readonly tone: SemanticColorName;
-  /** Resting place on the last step, as a share of the stage from its centre. */
-  readonly x: number;
-  readonly y: number;
-}
-
-const bubbles: readonly Bubble[] = [
-  {
-    key: 'just_right',
-    label: 'Just right',
-    count: votes.just_right,
-    icon: Check,
-    tone: 'success',
-    x: 0.2,
-    y: -0.24,
-  },
-  {
-    key: 'too_high',
-    label: 'Too high',
-    count: votes.too_high,
-    icon: ArrowUp,
-    tone: 'textSecondary',
-    x: 0.27,
-    y: -0.04,
-  },
-  {
-    key: 'too_low',
-    label: 'Too low',
-    count: votes.too_low,
-    icon: ArrowDown,
-    tone: 'textSecondary',
-    x: 0.19,
-    y: 0.15,
-  },
-];
+const clamp = (v: number, a: number, b: number) => {
+  'worklet';
+  return Math.min(b, Math.max(a, v));
+};
 
 /**
- * First-run introduction, told as one continuous scene rather than three slides. A single item
- * travels through it: it is framed and recognised, lifts to reveal its fair range, then tilts
- * aside as the community's votes arrive. Every layer is a function of the pager's offset on the
- * UI thread, so a swipe scrubs the story under the finger and Continue plays the same path.
+ * First-run introduction: a cover, then three steps played as one continuous scene in the app's
+ * own paper. Each step's colour block is laid over the last as you swipe; the jacket is snapped,
+ * priced on a hanging tag, then voted on; people rise from behind the scalloped edge. One number,
+ * the swipe position, drives all of it on the UI thread, so the scene follows the finger, and
+ * one spring settles it. The card and the tag can be picked up and played with.
  */
 export function OnboardingView({
   onGetStarted,
@@ -156,158 +98,217 @@ export function OnboardingView({
   mode = 'first-run',
 }: OnboardingViewProps) {
   const replay = mode === 'replay';
-  const finishLabel = replay ? 'Done' : 'Get started';
+  const finishLabel = replay ? 'Done' : 'Create free account';
   const insets = useSafeAreaInsets();
   const styles = useThemedStyles(stylesFor);
+  const { colors, name } = useTheme();
   const reduceMotion = useReducedMotion();
-  const pager = useAnimatedRef<Animated.ScrollView>();
   const [size, setSize] = useState({ width: 0, height: 0 });
+  const p = useSharedValue(0);
+  const start = useSharedValue(0);
+  const intro = useSharedValue(reduceMotion ? 1 : 0);
   const [index, setIndex] = useState(0);
-  const scrollX = useSharedValue(0);
-  const glide = useSharedValue(0);
-  const gliding = useSharedValue(false);
-  const settled = useSharedValue(0);
-  const idle = useSharedValue(0);
-  const width = size.width;
+  const [arrived, setArrived] = useState<Arrival>({ step: -1, run: 0, first: false });
+  const runs = useRef(0);
+  const reached = useRef(new Set<number>());
+  const arrive = (step: number) => {
+    runs.current += 1;
+    const first = !reached.current.has(step);
+    reached.current.add(step);
+    setArrived({ step, run: runs.current, first });
+  };
   // The introduction opens on its cover; the tour waits beneath until the cover rolls away.
   const [opened, setOpened] = useState(false);
   const [welcomed, setWelcomed] = useState(false);
-
-  useEffect(() => {
-    if (reduceMotion) return;
-    idle.value = withRepeat(withTiming(1, { duration: 5200, easing: Easing.linear }), -1, false);
-    return () => cancelAnimation(idle);
-  }, [idle, reduceMotion]);
-
-  const onLayout = (event: LayoutChangeEvent) => {
-    const { width: nextWidth, height } = event.nativeEvent.layout;
-    setSize({ width: nextWidth, height });
+  // Get started was pressed: the cover dives in and the shutter runs; the snap opens the tour.
+  const [leaving, setLeaving] = useState(false);
+  const beginSnap = () => {
+    setLeaving(true);
+    if (reduceMotion) snapped();
+  };
+  // The click: the cover is gone behind the shut iris. The first page comes alive as the iris
+  // opens, so it arrives with the blades instead of waiting, finished, behind them.
+  const snapped = () => {
+    setWelcomed(true);
+    setTimeout(() => setOpened(true), reduceMotion ? 0 : shutterOpensAfter);
   };
 
-  const land = (next: number) => {
-    haptic('select');
-    setIndex(next);
-  };
-
-  const onScroll = useAnimatedScrollHandler(
-    {
-      onScroll: (event) => {
-        scrollX.value = event.contentOffset.x;
-        if (width === 0) return;
-        const page = Math.min(lastIndex, Math.max(0, Math.round(event.contentOffset.x / width)));
-        if (page !== settled.value) {
-          settled.value = page;
-          runOnJS(land)(page);
-        }
-      },
-      onBeginDrag: () => {
-        // A finger always wins: catching the scene mid-glide hands it straight to the swipe.
-        if (gliding.value) {
-          cancelAnimation(glide);
-          gliding.value = false;
-        }
-      },
-    },
-    [width],
+  const width = Math.min(size.width, tokens.layout.phoneColumn);
+  const artTop = Math.max(0, insets.top - 40);
+  const k = clamp(
+    Math.min(width / stage.width, (size.height - copyRoom - insets.bottom - artTop) / stage.height),
+    0.7,
+    1.6,
   );
+  const blockHeight = artTop + stage.edge * k;
 
-  useAnimatedReaction(
-    () => glide.value,
-    (x) => {
-      if (gliding.value) scrollTo(pager, x, 0, false);
-    },
+  const settle = (step: number) => {
+    if (step !== index) haptic('select');
+    setIndex(step);
+    arrive(step);
+  };
+
+  // The first page comes in as the cover lifts away: one entrance, not a finished page uncovered.
+  useEffect(() => {
+    if (!opened) return;
+    intro.value = withTiming(1, { duration: reduceMotion ? 1 : 1000, easing: Easing.linear });
+    arrive(0);
+  }, [opened]);
+
+  // Light status-bar text on the red and the cobalt, dark on the marigold.
+  useEffect(() => {
+    if (Platform.OS === 'web' || !welcomed) return;
+    StatusBar.setBarStyle(index === 1 ? 'dark-content' : 'light-content', true);
+  }, [index, welcomed]);
+
+  const goTo = (target: number, velocity = 0) => {
+    'worklet';
+    const to = clamp(target, 0, lastIndex);
+    const done = (finished?: boolean) => {
+      'worklet';
+      if (finished) runOnJS(settle)(to);
+    };
+    p.value = reduceMotion
+      ? withTiming(to, { duration: 260 }, done)
+      : withSpring(to, { ...settleSpring, velocity }, done);
+  };
+
+  const pager = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetX([-12, 12])
+        .failOffsetY([-16, 16])
+        .onStart(() => {
+          cancelAnimation(p);
+          start.value = p.value;
+        })
+        .onUpdate((event) => {
+          let next = start.value - event.translationX / Math.max(width, 1);
+          // Past either end the scene gives a little, like a page held at its edge.
+          if (next < 0) next = -Math.pow(-next, 0.7) * 0.3;
+          if (next > lastIndex) next = lastIndex + Math.pow(next - lastIndex, 0.7) * 0.3;
+          p.value = next;
+        })
+        .onEnd((event) => {
+          const velocity = -event.velocityX / Math.max(width, 1);
+          const from = start.value;
+          const aim = clamp(p.value + velocity * 0.16, Math.floor(from) - 1, Math.ceil(from) + 1);
+          goTo(Math.round(aim), velocity);
+        }),
+    // goTo closes over settle, which reads the latest index through state.
+    [width, reduceMotion, index],
   );
 
   const advance = () => {
-    if (width === 0) return;
-    // Read the page from the offset, not React state, so a tap mid-glide still aims correctly.
-    const current = Math.min(lastIndex, Math.max(0, Math.round(scrollX.value / width)));
-    if (current >= lastIndex) {
+    if (index >= lastIndex) {
       onGetStarted?.();
       return;
     }
-    const target = (current + 1) * width;
-    if (reduceMotion) {
-      scrollTo(pager, target, 0, false);
-      return;
-    }
-    // A browser pages with CSS scroll snapping, which pulls every step of a scripted glide back
-    // to a page edge, so the move would land as a jump; its own smooth scroll glides with the snap.
-    if (Platform.OS === 'web') {
-      pager.current?.scrollTo({ x: target, animated: true });
-      return;
-    }
-    cancelAnimation(glide);
-    glide.value = scrollX.value;
-    gliding.value = true;
-    glide.value = withTiming(target, { duration: glideMs, easing: expressive }, () => {
-      gliding.value = false;
-    });
+    goTo(index + 1);
+  };
+
+  const onLayout = (event: LayoutChangeEvent) => {
+    const { width: w, height: h } = event.nativeEvent.layout;
+    setSize({ width: w, height: h });
   };
 
   const last = index === lastIndex;
-  const stageHeight = Math.max(0, size.height - copyHeight);
-
-  // Looking around stays on offer to the end; only replay's Close gives way to Done.
-  const skipStyle = useAnimatedStyle(() => ({
-    opacity: replay ? interpolate(scrollX.value / Math.max(width, 1), [1, 2], [1, 0], clamp) : 1,
-  }));
-  const continueStyle = useAnimatedStyle(() => {
-    const t = interpolate(scrollX.value / Math.max(width, 1), [1, 2], [0, 1], clamp);
-    return { opacity: 1 - t * 1.6, transform: [{ translateY: -t * 12 }] };
+  const nextStyle = useAnimatedStyle(() => {
+    const t = interpolate(p.value, [1.5, 2], [0, 1], 'clamp');
+    return { opacity: 1 - t * 1.6, transform: [{ translateY: -t * 10 }] };
   });
-  const startStyle = useAnimatedStyle(() => {
-    const t = interpolate(scrollX.value / Math.max(width, 1), [1, 2], [0, 1], clamp);
-    return { opacity: t * 1.6 - 0.6, transform: [{ translateY: (1 - t) * 12 }] };
+  // The camera pulling back from the photo just taken: the page settles from a little close.
+  const pullStyle = useAnimatedStyle(() => {
+    const t = 1 - Math.pow(1 - intro.value, 3);
+    return { transform: [{ scale: 1 + 0.07 * (1 - t) }] };
+  });
+  const whyStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(p.value, [1.5, 2], [0, 1], 'clamp'),
+  }));
+  const firstLinksStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(p.value, [1.5, 2], [1, 0], 'clamp'),
+  }));
+  const lastStyle = useAnimatedStyle(() => {
+    const t = interpolate(p.value, [1.5, 2], [0, 1], 'clamp');
+    return { opacity: t * 1.6 - 0.6, transform: [{ translateY: (1 - t) * 10 }] };
   });
 
   return (
-    <View style={styles.root}>
-      <AmbientBackdrop mood="feed" print="full" />
-      <RevealGate open={opened}>
-        <View style={[styles.column, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-          <Reveal index={0} style={styles.topBar}>
-            <Wordmark />
-            <Animated.View style={skipStyle} pointerEvents={last && replay ? 'none' : 'auto'}>
-              <PressableScale
-                accessibilityRole="button"
-                accessibilityLabel={
-                  replay ? 'Close the introduction' : 'Look around without an account'
-                }
-                onPress={onSkip}
-                hitSlop={tokens.spacing[2]}
-                style={styles.skip}
-              >
-                <SWText variant="label" tone="textSecondary">
-                  {replay ? 'Close' : 'Look around'}
-                </SWText>
-              </PressableScale>
-            </Animated.View>
-          </Reveal>
+    <View style={styles.root} onLayout={onLayout}>
+      {/* The paper under the sheets, printed with the price gun's pesos and eyelets. */}
+      {size.width > 0 ? (
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            { opacity: tokens.motion.ambient.printOpacity.full[name] },
+          ]}
+          pointerEvents="none"
+        >
+          <PrintLayer
+            ink={colors.borderStrong}
+            coverage="full"
+            width={size.width}
+            height={size.height}
+          />
+        </View>
+      ) : null}
+      {width > 0 ? (
+        <GestureDetector gesture={pager}>
+          <Animated.View style={[styles.column, { width }, pullStyle]}>
+            <Sheets
+              p={p}
+              width={width}
+              height={blockHeight}
+              top={insets.top + tokens.spacing[1]}
+              skipLabel={replay ? 'Close' : 'Skip'}
+              intro={intro}
+            />
+            <View
+              style={[styles.sceneSpot, { top: artTop, left: (width - stage.width * k) / 2 }]}
+              pointerEvents="box-none"
+            >
+              <Scene
+                p={p}
+                k={k}
+                arrived={arrived}
+                reduceMotion={reduceMotion}
+                pager={pager}
+                intro={intro}
+              />
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={replay ? 'Close the introduction' : 'Skip the introduction'}
+              onPress={onSkip}
+              hitSlop={tokens.spacing[2]}
+              disabled={last && !replay}
+              style={[styles.skipSpot, { top: insets.top }]}
+            />
 
-          <View style={styles.fill} onLayout={onLayout}>
-            {width > 0 && stageHeight > 0 ? (
-              <>
-                <Reveal index={1} style={[styles.stage, { height: stageHeight }]}>
-                  <Stage
-                    progress={scrollX}
-                    idle={idle}
-                    width={width}
-                    height={stageHeight}
-                    index={index}
-                    reduceMotion={reduceMotion}
-                  />
+            <RevealGate open={opened}>
+              <View
+                style={[
+                  styles.below,
+                  {
+                    top: blockHeight + tokens.spacing[4],
+                    paddingBottom: insets.bottom + tokens.spacing[2],
+                  },
+                ]}
+              >
+                <Reveal index={0} style={styles.dots}>
+                  <View
+                    accessible
+                    accessibilityRole="progressbar"
+                    accessibilityLabel={`Step ${index + 1} of ${steps.length}`}
+                    accessibilityValue={{ min: 1, max: steps.length, now: index + 1 }}
+                    style={styles.dotRow}
+                  >
+                    {steps.map((step, stepIndex) => (
+                      <Dot key={step.key} index={stepIndex} p={p} />
+                    ))}
+                  </View>
                 </Reveal>
-                <Animated.ScrollView
-                  ref={pager}
-                  horizontal
-                  pagingEnabled
-                  bounces={false}
-                  showsHorizontalScrollIndicator={false}
-                  onScroll={onScroll}
-                  scrollEventThrottle={16}
-                  style={styles.pager}
-                >
+                <Reveal index={1} style={styles.copy}>
                   {steps.map((step, stepIndex) => (
                     <Copy
                       key={step.key}
@@ -315,79 +316,182 @@ export function OnboardingView({
                       body={step.body}
                       index={stepIndex}
                       active={stepIndex === index}
-                      scrollX={scrollX}
-                      width={width}
-                      reduceMotion={reduceMotion}
+                      p={p}
                     />
                   ))}
-                </Animated.ScrollView>
-              </>
-            ) : null}
-          </View>
-
-          <Reveal index={2} style={styles.footer}>
-            <View
-              accessible
-              accessibilityRole="progressbar"
-              accessibilityLabel={`Step ${index + 1} of ${steps.length}`}
-              accessibilityValue={{ min: 1, max: steps.length, now: index + 1 }}
-              style={styles.dots}
-            >
-              {steps.map((step, stepIndex) => (
-                <Dot key={step.key} index={stepIndex} scrollX={scrollX} width={width} />
-              ))}
-            </View>
-
-            <PressableScale
-              accessibilityRole="button"
-              accessibilityLabel={last ? finishLabel : 'Continue'}
-              accessibilityHint={last && !replay ? 'Creates your SnapWorth account' : undefined}
-              haptic={last ? 'pop' : 'tap'}
-              onPress={advance}
-              style={({ pressed }) => [styles.primary, pressed ? styles.primaryPressed : null]}
-            >
-              <Animated.View style={[styles.primaryLabel, continueStyle]}>
-                <SWText variant="button" tone="onAccent">
-                  Continue
-                </SWText>
-              </Animated.View>
-              <Animated.View style={[styles.primaryLabel, startStyle]}>
-                <SWText variant="button" tone="onAccent">
-                  {finishLabel}
-                </SWText>
-              </Animated.View>
-            </PressableScale>
-
-            {replay ? null : (
-              <PressableScale
-                accessibilityRole="button"
-                accessibilityLabel="I already have an account. Sign in"
-                haptic="none"
-                onPress={onSignIn}
-                style={styles.signIn}
-              >
-                <SWText variant="bodyMedium" tone="textSecondary">
-                  Have an account?{' '}
-                  <SWText variant="label" tone="textPrimary">
-                    Sign in
-                  </SWText>
-                </SWText>
-              </PressableScale>
-            )}
-          </Reveal>
-        </View>
-      </RevealGate>
+                </Reveal>
+                <Reveal index={2} style={styles.actions}>
+                  {/* Why an account, said where the choice is made: looking is free, acting isn't. */}
+                  {replay ? null : (
+                    <Animated.View
+                      style={[styles.why, whyStyle]}
+                      pointerEvents="none"
+                      accessibilityElementsHidden={!last}
+                      importantForAccessibility={last ? 'auto' : 'no-hide-descendants'}
+                    >
+                      <SWText variant="caption" tone="textSecondary" align="center">
+                        Looking around is free. Snapping, voting and selling need a free account, so
+                        every price here comes from a real person.
+                      </SWText>
+                    </Animated.View>
+                  )}
+                  <PressableScale
+                    accessibilityRole="button"
+                    accessibilityLabel={last ? finishLabel : 'Continue'}
+                    accessibilityHint={
+                      last && !replay ? 'Creates your SnapWorth account' : undefined
+                    }
+                    haptic={last ? 'pop' : 'tap'}
+                    onPress={advance}
+                    style={({ pressed }) => [
+                      styles.primary,
+                      pressed ? styles.primaryPressed : null,
+                    ]}
+                  >
+                    <Animated.View style={[styles.primaryLabel, nextStyle]}>
+                      <SWText variant="button" tone="onAccent">
+                        Continue
+                      </SWText>
+                    </Animated.View>
+                    <Animated.View style={[styles.primaryLabel, lastStyle]}>
+                      <SWText variant="button" tone="onAccent">
+                        {finishLabel}
+                      </SWText>
+                    </Animated.View>
+                  </PressableScale>
+                  {replay ? (
+                    <View style={styles.linkLine} />
+                  ) : (
+                    // Until the last step, the way in for returning people; on it, the way past the
+                    // account for people who only want to look.
+                    <View style={styles.linkLine}>
+                      <Animated.View
+                        style={[styles.linkRow, firstLinksStyle]}
+                        pointerEvents={last ? 'none' : 'box-none'}
+                      >
+                        <SignInLink onSignIn={onSignIn} />
+                      </Animated.View>
+                      <Animated.View
+                        style={[styles.linkRow, whyStyle]}
+                        pointerEvents={last ? 'box-none' : 'none'}
+                        accessibilityElementsHidden={!last}
+                        importantForAccessibility={last ? 'auto' : 'no-hide-descendants'}
+                      >
+                        <PressableScale
+                          accessibilityRole="button"
+                          accessibilityLabel="Look around without an account"
+                          haptic="none"
+                          onPress={onSkip}
+                          style={styles.signIn}
+                        >
+                          <SWText variant="label" tone="textPrimary">
+                            Look around first
+                          </SWText>
+                        </PressableScale>
+                        <SWText variant="bodyMedium" tone="textMuted">
+                          ·
+                        </SWText>
+                        <SignInLink onSignIn={onSignIn} short />
+                      </Animated.View>
+                    </View>
+                  )}
+                </Reveal>
+              </View>
+            </RevealGate>
+          </Animated.View>
+        </GestureDetector>
+      ) : null}
       {welcomed ? null : (
         <WelcomeCover
-          leaving={opened}
-          onStart={() => setOpened(true)}
+          leaving={leaving}
+          onStart={beginSnap}
           onSignIn={replay ? undefined : onSignIn}
           onClose={replay ? onSkip : undefined}
-          onGone={() => setWelcomed(true)}
         />
+      )}
+      {reduceMotion ? null : (
+        <SnapShutter run={leaving} width={size.width} height={size.height} onSnap={snapped} />
       )}
     </View>
   );
+}
+
+function SignInLink({ onSignIn, short = false }: { onSignIn?: () => void; short?: boolean }) {
+  const styles = useThemedStyles(stylesFor);
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityLabel="I already have an account. Sign in"
+      haptic="none"
+      onPress={onSignIn}
+      style={styles.signIn}
+    >
+      {short ? (
+        <SWText variant="label" tone="textPrimary">
+          Sign in
+        </SWText>
+      ) : (
+        <SWText variant="bodyMedium" tone="textSecondary">
+          Have an account?{' '}
+          <SWText variant="label" tone="textPrimary">
+            Sign in
+          </SWText>
+        </SWText>
+      )}
+    </PressableScale>
+  );
+}
+
+/** A step's words: they sharpen into place as you arrive and fall away as you leave. */
+function Copy({
+  title,
+  body,
+  index,
+  active,
+  p,
+}: {
+  readonly title: string;
+  readonly body: string;
+  readonly index: number;
+  readonly active: boolean;
+  readonly p: SharedValue<number>;
+}) {
+  const styles = useThemedStyles(stylesFor);
+  const style = useAnimatedStyle(() => {
+    const a = Math.abs(p.value - index);
+    return {
+      opacity: clamp(1 - a * 1.9, 0, 1),
+      transform: [{ translateY: a * 10 }, { scale: 1 - Math.min(a, 1) * 0.04 }],
+    };
+  });
+  return (
+    <Animated.View
+      style={[styles.copyPage, style]}
+      pointerEvents="none"
+      accessibilityElementsHidden={!active}
+      importantForAccessibility={active ? 'auto' : 'no-hide-descendants'}
+    >
+      <SWText variant="displayMedium" align="center" accessibilityRole="header">
+        {title}
+      </SWText>
+      <SWText variant="bodyLarge" tone="textSecondary" align="center" style={styles.body}>
+        {body}
+      </SWText>
+    </Animated.View>
+  );
+}
+
+function Dot({ index, p }: { readonly index: number; readonly p: SharedValue<number> }) {
+  const styles = useThemedStyles(stylesFor);
+  const { colors } = useTheme();
+  const style = useAnimatedStyle(() => {
+    const near = Math.max(0, 1 - Math.abs(p.value - index));
+    return {
+      width: interpolate(near, [0, 1], [dot, dot * 3.4]),
+      backgroundColor: interpolateColor(near, [0, 1], [colors.borderStrong, colors.accent]),
+    };
+  });
+  return <Animated.View style={[styles.dot, style]} />;
 }
 
 /**
@@ -400,22 +504,21 @@ function WelcomeCover({
   onStart,
   onSignIn,
   onClose,
-  onGone,
 }: {
   readonly leaving: boolean;
   readonly onStart: () => void;
   readonly onSignIn?: () => void;
   readonly onClose?: () => void;
-  readonly onGone: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  const { height } = useWindowDimensions();
   const { colors, isDark } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const reduceMotion = useReducedMotion();
   const brand = placeColors(colors, 'feed');
-  const away = useSharedValue(0);
   const sway = useSharedValue(0);
+  const fade = useSharedValue(0);
+  const focus = useSharedValue(0);
+  const dive = useSharedValue(0);
 
   useEffect(() => {
     if (reduceMotion) return;
@@ -427,16 +530,19 @@ function WelcomeCover({
     return () => cancelAnimation(sway);
   }, [reduceMotion, sway]);
 
+  // Leaving is a snap: everything but Worthy steps back, the viewfinder finds his eye, and the
+  // cover dives into it until his dark lens fills the screen. The shutter takes it from there.
   useEffect(() => {
-    if (!leaving) return;
-    away.value = withTiming(
-      1,
-      { duration: reduceMotion ? 240 : 680, easing: expressive },
-      (finished) => {
-        if (finished) runOnJS(onGone)();
-      },
+    if (!leaving || reduceMotion) return;
+    cancelAnimation(sway);
+    sway.value = withTiming(0.5, { duration: 160 });
+    fade.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.cubic) });
+    focus.value = withTiming(1, { duration: 280, easing: expressive });
+    dive.value = withDelay(
+      240,
+      withTiming(1, { duration: shutterClosesAt - 200, easing: Easing.in(Easing.cubic) }),
     );
-  }, [away, leaving, onGone, reduceMotion]);
+  }, [dive, fade, focus, leaving, reduceMotion, sway]);
 
   // Light status-bar text on the red while the cover is up.
   useEffect(() => {
@@ -445,18 +551,29 @@ function WelcomeCover({
     return () => StatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
   }, [isDark]);
 
-  const coverStyle = useAnimatedStyle(() =>
-    reduceMotion
-      ? { opacity: 1 - away.value }
-      : { transform: [{ translateY: -away.value * (height + tokens.spacing[4]) }] },
-  );
   // The mark hangs from its string's loop and swings a little, as a tag on a rail does.
   const markStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${(sway.value - 0.5) * 7}deg` }],
   }));
+  const restStyle = useAnimatedStyle(() => ({
+    opacity: 1 - fade.value,
+    transform: [{ translateY: fade.value * 18 }],
+  }));
+  // Zoomed about the eye, so the lens stays put as everything around it grows past the edges.
+  const zoomStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 + dive.value * dive.value * 5 }],
+  }));
+  const lensStyle = useAnimatedStyle(() => ({
+    opacity: dive.value > 0 ? 1 : 0,
+    transform: [{ scale: 1 + dive.value * dive.value * 26 }],
+  }));
+  const focusStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(1, focus.value * 2) * (1 - dive.value * 3),
+    transform: [{ scale: 1.7 - 0.7 * focus.value }],
+  }));
 
   return (
-    <Animated.View
+    <View
       style={[
         styles.cover,
         {
@@ -464,38 +581,52 @@ function WelcomeCover({
           paddingTop: insets.top + tokens.spacing[2],
           paddingBottom: insets.bottom + tokens.spacing[4],
         },
-        coverStyle,
       ]}
     >
-      <ScallopEdge color={brand.fill} />
-      <View style={styles.coverTop}>
+      <Animated.View style={[styles.coverTop, restStyle]}>
         {onClose ? (
           <PressableScale
             accessibilityRole="button"
             accessibilityLabel="Close the introduction"
             onPress={onClose}
             hitSlop={tokens.spacing[2]}
-            style={styles.skip}
+            style={styles.coverClose}
           >
             <SWText variant="label" color={brand.ink}>
               Close
             </SWText>
           </PressableScale>
         ) : null}
-      </View>
+      </Animated.View>
       <View style={styles.coverCentre}>
         <Animated.View style={[styles.coverMark, markStyle]}>
-          <LogoMark size={156} />
+          <Animated.View style={[styles.zoom, zoomStyle]}>
+            <LogoMark size={markSize} />
+            <Animated.View style={[styles.lens, lensStyle]} />
+          </Animated.View>
+          {/* The viewfinder finding focus on the eye. */}
+          <Animated.View style={[styles.focus, focusStyle]} pointerEvents="none">
+            {focusCorners.map((corner) => (
+              <View key={corner} style={[styles.focusCorner, styles[corner]]} />
+            ))}
+          </Animated.View>
         </Animated.View>
-        <Wordmark height={44} ink={brand.ink} lensColor={brand.lens} />
-        <SWText variant="headingLarge" color={brand.ink} align="center" accessibilityRole="header">
-          Snap it. Know what it&apos;s worth.
-        </SWText>
-        <SWText variant="stamp" color={brand.ink}>
-          Fair prices for pre-loved things
-        </SWText>
+        <Animated.View style={[styles.coverWords, restStyle]}>
+          <Wordmark height={44} ink={brand.ink} lensColor={brand.lens} />
+          <SWText
+            variant="headingLarge"
+            color={brand.ink}
+            align="center"
+            accessibilityRole="header"
+          >
+            Snap it. Know what it&apos;s worth.
+          </SWText>
+          <SWText variant="stamp" color={brand.ink}>
+            Fair prices for pre-loved things
+          </SWText>
+        </Animated.View>
       </View>
-      <View style={styles.coverActions}>
+      <Animated.View style={[styles.coverActions, restStyle]}>
         <PressableScale
           accessibilityRole="button"
           accessibilityLabel="Get started"
@@ -523,704 +654,79 @@ function WelcomeCover({
             </SWText>
           </PressableScale>
         ) : null}
-      </View>
-    </Animated.View>
-  );
-}
-
-interface StageProps {
-  readonly progress: SharedValue<number>;
-  readonly idle: SharedValue<number>;
-  readonly width: number;
-  readonly height: number;
-  readonly index: number;
-  readonly reduceMotion: boolean;
-}
-
-/** The scene behind the pager. `progress` is the raw scroll offset; pages are `width` apart. */
-function Stage({ progress, idle, width, height, index, reduceMotion }: StageProps) {
-  const styles = useThemedStyles(stylesFor);
-  const { colors } = useTheme();
-  const cardWidth = Math.min(width * 0.56, height * 0.5);
-  const cardHeight = cardWidth * 1.25;
-  const lift = height * 0.1;
-  const heroBottomOnRange = -lift + (cardHeight * 0.78) / 2;
-  // The range sizes to the screen, not a fixed width, so the large price never runs off the card;
-  // only the narrowest phones drop to the medium price size.
-  const rangeWidth = Math.min(width - gutter * 2, rangeMaxWidth);
-  const priceVariant = rangeWidth >= rangeLargeMinWidth ? 'priceLarge' : 'priceMedium';
-
-  // Replay the range's count and trend line each time the second step is reached.
-  const [rangeRun, setRangeRun] = useState(0);
-  useEffect(() => {
-    if (index === 1) setRangeRun((run) => run + 1);
-  }, [index]);
-
-  const heroStyle = useAnimatedStyle(() => {
-    const p = progress.value / width;
-    const bob = reduceMotion ? 0 : Math.sin(idle.value * Math.PI * 2) * 5;
-    return {
-      transform: [
-        { translateX: interpolate(p, [0, 1, 2], [0, 0, -width * 0.14], clamp) },
-        { translateY: interpolate(p, [0, 1, 2], [0, -lift, -height * 0.04], clamp) + bob },
-        { scale: interpolate(p, [0, 1, 2], [1, 0.78, 0.8], clamp) },
-        { rotateZ: `${interpolate(p, [0, 1, 2], [0, 0, -7], clamp)}deg` },
-      ],
-    };
-  });
-
-  const finderStyle = useAnimatedStyle(() => {
-    const p = progress.value / width;
-    return {
-      opacity: interpolate(p, [0, 0.5], [1, 0], clamp),
-      transform: [{ scale: interpolate(p, [0, 0.5], [1, 1.12], clamp) }],
-    };
-  });
-
-  const detectStyle = useAnimatedStyle(() => {
-    const p = progress.value / width;
-    return {
-      opacity: interpolate(p, [0, 0.35], [1, 0], clamp),
-      transform: [{ translateY: interpolate(p, [0, 0.35], [0, 16], clamp) }],
-    };
-  });
-
-  const rangeStyle = useAnimatedStyle(() => {
-    const p = progress.value / width;
-    return {
-      opacity: interpolate(p, [0.3, 1, 1.55], [0, 1, 0], clamp),
-      transform: [
-        { translateX: interpolate(p, [1, 2], [0, -width * 0.45], clamp) },
-        { translateY: interpolate(p, [0, 1], [72, 0], clamp) },
-        { scale: interpolate(p, [0.3, 1, 2], [0.92, 1, 0.9], clamp) },
-      ],
-    };
-  });
-
-  // A block of colour behind the item, like the card a shop pins its stock to. It changes with
-  // the story, marigold to cobalt to the price-gun red, and follows the item as it moves.
-  const blockStyle = useAnimatedStyle(() => {
-    const p = progress.value / width;
-    return {
-      backgroundColor: interpolateColor(
-        p,
-        [0, 1, 2],
-        [colors.marigold, colors.cobalt, colors.accent],
-      ),
-      transform: [
-        { translateX: interpolate(p, [0, 1, 2], [0, 0, -width * 0.1], clamp) },
-        { translateY: interpolate(p, [0, 1, 2], [0, -lift * 0.9, -height * 0.03], clamp) },
-        { rotateZ: `${interpolate(p, [0, 1, 2], [-5, 4, -9], clamp)}deg` },
-        { scale: interpolate(p, [0, 1, 2], [1, 0.84, 0.88], clamp) },
-      ],
-    };
-  });
-
-  const priceStyle = useAnimatedStyle(() => {
-    const p = progress.value / width;
-    return {
-      opacity: interpolate(p, [1.5, 2], [0, 1], clamp),
-      transform: [
-        { translateY: interpolate(p, [1.5, 2], [24, 0], clamp) },
-        { rotateZ: `${interpolate(p, [1.5, 2], [0, -4], clamp)}deg` },
-      ],
-    };
-  });
-
-  return (
-    <View
-      style={styles.stageInner}
-      pointerEvents="none"
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-    >
-      <Animated.View
-        style={[
-          styles.block,
-          { width: cardWidth * 1.42, height: cardHeight * 1.12, borderRadius: cardWidth * 0.2 },
-          blockStyle,
-        ]}
-      />
-
-      {satellites.map((satellite) => (
-        <Satellite
-          key={satellite.key}
-          satellite={satellite}
-          progress={progress}
-          idle={idle}
-          width={width}
-          height={height}
-          size={cardWidth * 0.36}
-          reduceMotion={reduceMotion}
-        />
-      ))}
-
-      <Animated.View style={[{ width: cardWidth, height: cardHeight }, heroStyle]}>
-        <View style={styles.hero}>
-          <Photo
-            source={previewItem.photo}
-            label={previewItem.photoLabel}
-            radius={tokens.radius.xlarge}
-            style={styles.photo}
-          />
-          <Scan progress={progress} width={width} height={cardHeight} active={index === 0} />
-        </View>
-        <Animated.View style={[styles.finder, finderStyle]}>
-          {bracketCorners.map((corner) => (
-            <View key={corner} style={[styles.bracket, styles[corner]]} />
-          ))}
-        </Animated.View>
-        <Animated.View style={[styles.float, styles.detect, detectStyle]}>
-          <View style={styles.detectIcon}>
-            <EstimateMark size={7} />
-          </View>
-          <SWText variant="labelSmall">Nike windbreaker</SWText>
-          <SWText variant="caption" tone="textMuted">
-            90s
-          </SWText>
-        </Animated.View>
-      </Animated.View>
-
-      {/* The AI's range, so it wears the estimate's kraft tag. */}
-      <Animated.View
-        style={[
-          styles.rangeSpot,
-          { width: rangeWidth, top: height / 2 + heroBottomOnRange - tokens.spacing[4] },
-          rangeStyle,
-        ]}
-      >
-        <TagShape style={styles.range}>
-          <View style={styles.rangeHead}>
-            <SWText variant="stamp" color={colors.kraftInk}>
-              Fair range
-            </SWText>
-            <Sticker
-              label={previewValuation.trendChange.split(' ')[0] ?? ''}
-              tone="marigold"
-              side="end"
-            />
-          </View>
-          <View style={styles.rangeRow} key={`range-${rangeRun}`}>
-            <CountUp
-              variant={priceVariant}
-              color={colors.kraftInk}
-              value={previewValuation.low}
-              format={formatPeso}
-            />
-            <SWText variant={priceVariant} color={colors.kraftEdge}>
-              –
-            </SWText>
-            <CountUp
-              variant={priceVariant}
-              color={colors.kraftInk}
-              value={previewValuation.high}
-              format={formatPeso}
-              delayMs={80}
-            />
-          </View>
-          <View key={`trend-${rangeRun}`}>
-            <Sparkline values={previewValuation.trend} height={40} color={colors.kraftInk} />
-          </View>
-        </TagShape>
-      </Animated.View>
-
-      {bubbles.map((bubble, slot) => (
-        <VoteBubble
-          key={bubble.key}
-          bubble={bubble}
-          slot={slot}
-          progress={progress}
-          idle={idle}
-          width={width}
-          height={height}
-          reduceMotion={reduceMotion}
-        />
-      ))}
-
-      <Animated.View
-        style={[
-          styles.float,
-          styles.priceTag,
-          { top: height / 2 + cardHeight * 0.34, left: width / 2 - cardWidth * 0.62 },
-          priceStyle,
-        ]}
-      >
-        <SWText variant="caption" tone="textMuted">
-          Listed at
-        </SWText>
-        <SWText variant="priceSmall">{formatPeso(previewItem.estimate)}</SWText>
       </Animated.View>
     </View>
   );
 }
 
-function Satellite({
-  satellite,
-  progress,
-  idle,
-  width,
-  height,
-  size,
-  reduceMotion,
-}: {
-  readonly satellite: (typeof satellites)[number];
-  readonly progress: SharedValue<number>;
-  readonly idle: SharedValue<number>;
-  readonly width: number;
-  readonly height: number;
-  readonly size: number;
-  readonly reduceMotion: boolean;
-}) {
-  const styles = useThemedStyles(stylesFor);
-  const style = useAnimatedStyle(() => {
-    const p = progress.value / width;
-    const out = interpolate(p, [0, 0.8], [1, 1.7], clamp);
-    const bob = reduceMotion ? 0 : Math.sin((idle.value + satellite.phase) * Math.PI * 2) * 7;
-    return {
-      opacity: interpolate(p, [0, 0.6], [1, 0], clamp),
-      transform: [
-        { translateX: satellite.x * width * out },
-        { translateY: satellite.y * height * out + bob },
-        { rotateZ: `${satellite.tilt * interpolate(p, [0, 0.8], [1, 1.6], clamp)}deg` },
-        { scale: interpolate(p, [0, 0.8], [1, 0.8], clamp) },
-      ],
-    };
-  });
-  return (
-    <Animated.View style={[styles.satellite, { width: size, height: size * 1.25 }, style]}>
-      <Photo source={satellite.photo} label={satellite.label} style={styles.photo} />
-    </Animated.View>
-  );
-}
-
-function VoteBubble({
-  bubble,
-  slot,
-  progress,
-  idle,
-  width,
-  height,
-  reduceMotion,
-}: {
-  readonly bubble: Bubble;
-  readonly slot: number;
-  readonly progress: SharedValue<number>;
-  readonly idle: SharedValue<number>;
-  readonly width: number;
-  readonly height: number;
-  readonly reduceMotion: boolean;
-}) {
-  const styles = useThemedStyles(stylesFor);
-  const { colors } = useTheme();
-  const start = 1.2 + slot * 0.12;
-  const style = useAnimatedStyle(() => {
-    const p = progress.value / width;
-    const t = interpolate(p, [start, 2], [0, 1], clamp);
-    const eased = 1 - Math.pow(1 - t, 3);
-    const bob = reduceMotion ? 0 : Math.sin((idle.value + slot * 0.31) * Math.PI * 2) * 4;
-    return {
-      opacity: t,
-      transform: [
-        { translateX: bubble.x * width + (1 - eased) * width * 0.5 },
-        { translateY: bubble.y * height + bob },
-        { scale: 0.7 + eased * 0.3 },
-      ],
-    };
-  });
-  const Icon = bubble.icon;
-  // The community's pick is slapped on as a sticker; the rest are quieter.
-  if (bubble.key === 'just_right') {
-    return (
-      <Animated.View style={[styles.pickSpot, style]}>
-        <View style={[styles.bubble, styles.pick]}>
-          <Icon size={14} strokeWidth={2.6} color={colors.onMarigold} />
-          <SWText variant="sticker" color={colors.onMarigold}>
-            {bubble.label} · {bubble.count}
-          </SWText>
-        </View>
-      </Animated.View>
-    );
-  }
-  return (
-    <Animated.View style={[styles.float, styles.bubble, style]}>
-      <Icon size={14} strokeWidth={2.4} color={colors[bubble.tone]} />
-      <SWText variant="labelSmall" tone="textPrimary">
-        {bubble.label}
-      </SWText>
-      <SWText variant="labelSmall" tone="textMuted">
-        {bubble.count}
-      </SWText>
-    </Animated.View>
-  );
-}
-
-/** A thin line of light that sweeps the photo while the first step is framing it. */
-function Scan({
-  progress,
-  width,
-  height,
-  active,
-}: {
-  readonly progress: SharedValue<number>;
-  readonly width: number;
-  readonly height: number;
-  readonly active: boolean;
-}) {
-  const styles = useThemedStyles(stylesFor);
-  const reduceMotion = useReducedMotion();
-  const sweep = useSharedValue(0);
-
-  useEffect(() => {
-    if (!active || reduceMotion) {
-      cancelAnimation(sweep);
-      sweep.value = 0;
-      return;
-    }
-    sweep.value = withRepeat(
-      withTiming(1, { duration: 2200, easing: Easing.inOut(Easing.quad) }),
-      -1,
-      true,
-    );
-    return () => cancelAnimation(sweep);
-  }, [active, reduceMotion, sweep]);
-
-  const style = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value / width, [0, 0.4], [1, 0], clamp),
-    transform: [{ translateY: interpolate(sweep.value, [0, 1], [height * 0.08, height * 0.86]) }],
-  }));
-
-  if (reduceMotion) return null;
-  return <Animated.View style={[styles.scan, style]} />;
-}
-
-function Copy({
-  title,
-  body,
-  index,
-  active,
-  scrollX,
-  width,
-  reduceMotion,
-}: {
-  readonly title: string;
-  readonly body: string;
-  readonly index: number;
-  readonly active: boolean;
-  readonly scrollX: SharedValue<number>;
-  readonly width: number;
-  readonly reduceMotion: boolean;
-}) {
-  const styles = useThemedStyles(stylesFor);
-  const k = reduceMotion ? 0 : 1;
-  const titleStyle = useAnimatedStyle(() => {
-    const p = scrollX.value / width - index;
-    return {
-      opacity: interpolate(Math.abs(p), [0, 0.55], [1, 0], clamp),
-      transform: [{ translateX: p * width * 0.4 * k }],
-    };
-  });
-  const bodyStyle = useAnimatedStyle(() => {
-    const p = scrollX.value / width - index;
-    return {
-      opacity: interpolate(Math.abs(p), [0, 0.4], [1, 0], clamp),
-      transform: [{ translateX: p * width * 0.6 * k }],
-    };
-  });
-  return (
-    <View
-      style={[styles.page, { width }]}
-      accessibilityElementsHidden={!active}
-      importantForAccessibility={active ? 'auto' : 'no-hide-descendants'}
-    >
-      <View style={styles.copy}>
-        <Animated.View style={titleStyle}>
-          <SWText variant="displayHero" accessibilityRole="header" style={styles.center}>
-            {title}
-          </SWText>
-        </Animated.View>
-        <Animated.View style={bodyStyle}>
-          <SWText variant="bodyLarge" tone="textSecondary" style={styles.center}>
-            {body}
-          </SWText>
-        </Animated.View>
-      </View>
-    </View>
-  );
-}
-
-function Dot({
-  index,
-  scrollX,
-  width,
-}: {
-  readonly index: number;
-  readonly scrollX: SharedValue<number>;
-  readonly width: number;
-}) {
-  const styles = useThemedStyles(stylesFor);
-  const { colors } = useTheme();
-  const style = useAnimatedStyle(() => {
-    const near = width > 0 ? Math.max(0, 1 - Math.abs(scrollX.value / width - index)) : 0;
-    return {
-      width: interpolate(near, [0, 1], [dot, dot * 3.4]),
-      backgroundColor: interpolateColor(near, [0, 1], [colors.borderStrong, colors.textPrimary]),
-    };
-  });
-  return <Animated.View style={[styles.dot, style]} />;
-}
-
-const bracketCorners = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight'] as const;
+/** Worthy on the cover, and where his eye sits in him: the snap zooms about that point. */
+const markSize = 156;
+const eye = { x: markSize * 0.3837, y: markSize * 0.3037, pupil: markSize * 0.066 } as const;
+const focusBox = 58;
+const focusCorners = ['tl', 'tr', 'bl', 'br'] as const;
 
 const dot = 7;
-const bracket = tokens.layout.viewfinderBracket * 1.3;
-const stroke = tokens.layout.progressSegment;
 const gutter = tokens.layout.pageGutterCompact;
-const finderGap = tokens.spacing[3];
-const rangeMaxWidth = 364;
-/**
- * "₱2,100 – ₱2,850" in priceLarge is about 300pt; this leaves room for the tag's eyelet end and
- * its padding.
- */
-const rangeLargeMinWidth = 358;
 
-const stylesFor = themedStyles((colors, name) => ({
+const stylesFor = themedStyles((colors) => ({
   root: {
     flex: 1,
     backgroundColor: colors.canvas,
+    alignItems: 'center',
   },
   column: {
     flex: 1,
-    width: '100%',
-    maxWidth: tokens.layout.phoneColumn,
-    alignSelf: 'center',
+    overflow: 'hidden',
   },
-  fill: {
-    flex: 1,
-  },
-  topBar: {
-    minHeight: tokens.layout.headerCompact,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: gutter,
-    zIndex: 2,
-  },
-  skip: {
-    paddingVertical: tokens.spacing[2],
-    paddingLeft: tokens.spacing[3],
-  },
-  stage: {
+  sceneSpot: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
   },
-  stageInner: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pager: {
+  skipSpot: {
     position: 'absolute',
-    top: 0,
-    right: 0,
+    right: gutter - tokens.spacing[2],
+    width: 72,
+    height: 40,
+  },
+  below: {
+    position: 'absolute',
+    left: gutter,
+    right: gutter,
     bottom: 0,
-    left: 0,
-  },
-  page: {
-    flex: 1,
     justifyContent: 'flex-end',
-  },
-  hero: {
-    flex: 1,
-    borderRadius: tokens.radius.xlarge,
-    backgroundColor: colors.sunken,
-    overflow: 'hidden',
-    shadowColor: tokens.shadow[name],
-    shadowOpacity: 1,
-    shadowRadius: 30,
-    shadowOffset: { width: 0, height: 18 },
-    elevation: 12,
-  },
-  photo: {
-    width: '100%',
-    height: '100%',
-  },
-  satellite: {
-    position: 'absolute',
-    borderRadius: tokens.radius.large,
-    overflow: 'hidden',
-    backgroundColor: colors.sunken,
-  },
-  scan: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    height: 2,
-    backgroundColor: tokens.overlay.text,
-    shadowColor: tokens.overlay.text,
-    shadowOpacity: 1,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  finder: {
-    position: 'absolute',
-    top: -finderGap,
-    right: -finderGap,
-    bottom: -finderGap,
-    left: -finderGap,
-  },
-  bracket: {
-    position: 'absolute',
-    width: bracket,
-    height: bracket,
-    borderColor: colors.textPrimary,
-  },
-  topLeft: {
-    top: 0,
-    left: 0,
-    borderTopWidth: stroke,
-    borderLeftWidth: stroke,
-    borderTopLeftRadius: tokens.radius.medium,
-  },
-  topRight: {
-    top: 0,
-    right: 0,
-    borderTopWidth: stroke,
-    borderRightWidth: stroke,
-    borderTopRightRadius: tokens.radius.medium,
-  },
-  bottomLeft: {
-    bottom: 0,
-    left: 0,
-    borderBottomWidth: stroke,
-    borderLeftWidth: stroke,
-    borderBottomLeftRadius: tokens.radius.medium,
-  },
-  bottomRight: {
-    bottom: 0,
-    right: 0,
-    borderBottomWidth: stroke,
-    borderRightWidth: stroke,
-    borderBottomRightRadius: tokens.radius.medium,
-  },
-  float: {
-    position: 'absolute',
-    backgroundColor: colors.surface,
-    borderWidth: tokens.border.hairline,
-    borderColor: colors.borderSubtle,
-    shadowColor: tokens.shadow[name],
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 14,
-  },
-  detect: {
-    bottom: -(tokens.spacing[12] + tokens.spacing[3]),
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.spacing[2],
-    paddingVertical: tokens.spacing[2],
-    paddingLeft: tokens.spacing[2],
-    paddingRight: tokens.spacing[4],
-    borderRadius: tokens.radius.full,
-  },
-  detectIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: tokens.radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-  },
-  block: {
-    position: 'absolute',
-  },
-  rangeSpot: {
-    position: 'absolute',
-    alignSelf: 'center',
-    shadowColor: tokens.shadow[name],
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-  },
-  range: {
-    gap: tokens.spacing[1],
-    paddingTop: tokens.spacing[4],
-    paddingRight: tokens.spacing[4],
-    paddingBottom: tokens.spacing[3],
-  },
-  rangeHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  rangeRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: tokens.spacing[1],
-    marginBottom: tokens.spacing[1],
-  },
-  bubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.spacing[1] + 2,
-    paddingVertical: tokens.spacing[2] + 2,
-    paddingHorizontal: tokens.spacing[3] + 2,
-    borderRadius: tokens.radius.full,
-  },
-  pickSpot: {
-    position: 'absolute',
-  },
-  pick: {
-    backgroundColor: colors.marigold,
-    borderWidth: 2,
-    borderColor: colors.stickerOutline,
-    shadowColor: colors.stickerOutline,
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    shadowOffset: { width: 2, height: 2 },
-    transform: [{ rotate: `${tokens.tilt.end}deg` }],
-  },
-  priceTag: {
-    paddingVertical: tokens.spacing[2],
-    paddingHorizontal: tokens.spacing[3] + 2,
-    borderRadius: tokens.radius.large,
-  },
-  copy: {
-    height: copyHeight,
-    paddingHorizontal: gutter,
-    justifyContent: 'center',
-    gap: tokens.spacing[2],
-  },
-  center: {
-    textAlign: 'center',
-  },
-  footer: {
-    paddingHorizontal: gutter,
-    paddingTop: tokens.spacing[3],
-    paddingBottom: tokens.spacing[2],
-    gap: tokens.spacing[4],
+    gap: tokens.spacing[3],
   },
   dots: {
+    alignItems: 'center',
+  },
+  dotRow: {
     flexDirection: 'row',
-    alignSelf: 'center',
     gap: tokens.spacing[2] - 2,
-    marginBottom: tokens.spacing[1],
   },
   dot: {
     height: dot,
     borderRadius: tokens.radius.full,
   },
+  copy: {
+    height: 108,
+  },
+  copyPage: {
+    ...StyleSheet.absoluteFill,
+    justifyContent: 'center',
+  },
+  body: {
+    marginTop: tokens.spacing[2],
+  },
+  actions: {
+    gap: tokens.spacing[2],
+  },
+  // Cut like everything else you can press and hold in the app: ink outline, hard shadow.
   primary: {
     height: tokens.layout.primaryButton,
     borderRadius: tokens.radius.full,
     backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
+    ...held(colors),
   },
   primaryPressed: {
     backgroundColor: colors.accentPressed,
@@ -1230,13 +736,32 @@ const stylesFor = themedStyles((colors, name) => ({
   },
   signIn: {
     alignSelf: 'center',
-    paddingVertical: tokens.spacing[2],
+    paddingVertical: tokens.spacing[1],
+  },
+  why: {
+    minHeight: 34,
+    justifyContent: 'center',
+    marginBottom: tokens.spacing[1],
+  },
+  linkLine: {
+    height: 30,
+  },
+  linkRow: {
+    ...StyleSheet.absoluteFill,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: tokens.spacing[2],
   },
   cover: {
     ...StyleSheet.absoluteFill,
     paddingHorizontal: gutter,
     justifyContent: 'space-between',
     zIndex: 10,
+  },
+  coverClose: {
+    paddingVertical: tokens.spacing[2],
+    paddingLeft: tokens.spacing[3],
   },
   coverTop: {
     minHeight: tokens.layout.headerCompact,
@@ -1252,6 +777,49 @@ const stylesFor = themedStyles((colors, name) => ({
   coverMark: {
     marginBottom: tokens.spacing[4],
     transformOrigin: 'top left',
+  },
+  coverWords: {
+    alignItems: 'center',
+    gap: tokens.spacing[4],
+  },
+  zoom: {
+    width: markSize,
+    height: markSize,
+    // As a string: the web ignores the array form and would zoom about the mark's middle.
+    transformOrigin: `${eye.x}px ${eye.y}px`,
+  },
+  // The pupil, which grows into the dark of the lens the cover dives into.
+  lens: {
+    position: 'absolute',
+    left: eye.x - eye.pupil,
+    top: eye.y - eye.pupil,
+    width: eye.pupil * 2,
+    height: eye.pupil * 2,
+    borderRadius: eye.pupil,
+    backgroundColor: tokens.color.light.textPrimary,
+  },
+  focus: {
+    position: 'absolute',
+    left: eye.x - focusBox / 2,
+    top: eye.y - focusBox / 2,
+    width: focusBox,
+    height: focusBox,
+  },
+  focusCorner: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderColor: tokens.overlay.text,
+  },
+  tl: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 8 },
+  tr: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 8 },
+  bl: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 8 },
+  br: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: 3,
+    borderRightWidth: 3,
+    borderBottomRightRadius: 8,
   },
   coverActions: {
     gap: tokens.spacing[3],
