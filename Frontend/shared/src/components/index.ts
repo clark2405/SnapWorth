@@ -15,6 +15,7 @@ export * from './IconButton';
 export * from './LikeButton';
 export * from './NavLink';
 export * from './ListRow';
+export * from './PasswordField';
 export * from './Photo';
 export * from './PhotoViewer';
 export * from './PressableScale';

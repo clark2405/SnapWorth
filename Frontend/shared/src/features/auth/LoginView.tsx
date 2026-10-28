@@ -4,6 +4,8 @@ import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanim
 
 import {
   Button,
+  ChoiceChips,
+  PasswordField,
   Field,
   PlaceHero,
   PressableScale,
@@ -43,6 +45,15 @@ export interface LoginViewProps {
   readonly onContinueWithGoogle?: () => void;
   readonly onClose?: () => void;
 }
+
+const genders = [
+  { key: 'male', label: 'Male' },
+  { key: 'female', label: 'Female' },
+  { key: 'non_binary', label: 'Non-binary' },
+  { key: 'prefer_not_to_say', label: 'Prefer not to say' },
+] as const;
+
+type Gender = (typeof genders)[number]['key'];
 
 const modes = [
   { key: 'login', label: 'Log in' },
@@ -201,11 +212,10 @@ export function LoginView({
                 </View>
                 <View style={half}>
                   <Field label="Password">
-                    <TextField
+                    <PasswordField
                       value={password}
                       onChangeText={setPassword}
                       placeholder={mode === 'login' ? 'Your password' : 'At least 8 characters'}
-                      secureTextEntry
                       autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                       textContentType={mode === 'login' ? 'password' : 'newPassword'}
                       accessibilityLabel="Password"
@@ -221,11 +231,10 @@ export function LoginView({
                   >
                     <View style={half}>
                       <Field label="Confirm Password">
-                        <TextField
+                        <PasswordField
                           value={confirmPassword}
                           onChangeText={setConfirmPassword}
                           placeholder="Repeat your password"
-                          secureTextEntry
                           textContentType="newPassword"
                           accessibilityLabel="Confirm Password"
                         />
@@ -243,13 +252,16 @@ export function LoginView({
                         />
                       </Field>
                     </View>
-                    <View style={half}>
+                    {/* A choice, not a blank to fill: quicker to answer, and the same few values
+                        come back every time. The whole row, since the chips need the width. */}
+                    <View style={styles.genderRow}>
                       <Field label="Gender">
-                        <TextField
-                          value={gender}
-                          onChangeText={setGender}
-                          placeholder="e.g. Male, Female, Other"
-                          accessibilityLabel="Gender"
+                        <ChoiceChips
+                          options={genders}
+                          value={gender === '' ? null : (gender as Gender)}
+                          onChange={(choice) =>
+                            setGender((current) => (current === choice ? '' : choice))
+                          }
                         />
                       </Field>
                     </View>
@@ -318,6 +330,9 @@ const stylesFor = themedStyles((colors) => ({
     flexWrap: 'wrap',
     columnGap: tokens.spacing[4],
     rowGap: tokens.spacing[4],
+  },
+  genderRow: {
+    width: '100%',
   },
   half: {
     flexBasis: '45%',

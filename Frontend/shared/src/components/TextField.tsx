@@ -56,6 +56,8 @@ export interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   readonly size?: 'regular' | 'large';
   /** Leading glyph, e.g. a search icon. */
   readonly leading?: ReactNode;
+  /** A control at the field's end, e.g. a button that shows a password. */
+  readonly trailing?: ReactNode;
 }
 
 /**
@@ -66,6 +68,7 @@ export function TextField({
   prefix,
   size = 'regular',
   leading,
+  trailing,
   onFocus,
   onBlur,
   ...rest
@@ -109,6 +112,7 @@ export function TextField({
         ]}
         {...rest}
       />
+      {trailing}
     </Animated.View>
   );
 }
