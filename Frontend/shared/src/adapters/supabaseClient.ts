@@ -7,6 +7,14 @@ declare const process: {
 let client: SupabaseClient | undefined;
 
 /**
+ * Whether a Supabase project is set up for this build. Without one the apps still run (see
+ * Backend/README.md): signing in starts a session on this device instead.
+ */
+export function isSupabaseConfigured(): boolean {
+  return Boolean(process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY);
+}
+
+/**
  * The auth client, created on first use rather than on import: every screen that imports the
  * auth feature (and the web's static render) must load without a Supabase project configured.
  */

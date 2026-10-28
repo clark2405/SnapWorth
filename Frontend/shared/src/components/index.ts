@@ -31,6 +31,8 @@ export * from './SearchButton';
 export * from './SegmentedControl';
 export * from './ShareButton';
 export * from './Sheet';
+export * from './SignInHandoff';
+export * from './sign-in-handoff';
 export * from './Sparkline';
 export * from './Surface';
 export * from './SWText';
