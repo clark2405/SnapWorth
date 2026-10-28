@@ -49,7 +49,8 @@ import {
   useWideLayout,
   type Place,
 } from '../design';
-import { AmbientBackdrop, type AmbientBackdropProps } from './AmbientBackdrop';
+import { AmbientBackdrop, useBackdropClaim, type AmbientBackdropProps } from './AmbientBackdrop';
+import { BackdropHostContext, ScreenPresenceContext } from './backdrop-host';
 import { useScreenVisibility } from './screen-visibility';
 import { ScrollEdge } from './ScrollEdge';
 import { contentScrolling, onScrollToTopRequest } from './scroll-signal';
@@ -303,6 +304,13 @@ export function Screen({
   // scroll view can come first. Only there: inside a form sheet the same layer covers the content.
   const backdropInScroll = bare;
   const print = quiet ? 'full' : 'edges';
+  // Under a shared backdrop (the web's tabs) the page stays clear and only names its look.
+  const hosted = useContext(BackdropHostContext) && !transparent;
+  useBackdropClaim(ambient, print, hosted);
+  const present = useContext(ScreenPresenceContext);
+  useEffect(() => {
+    present?.();
+  }, [present]);
 
   const scroller = scroll ? (
     <Animated.ScrollView
@@ -370,8 +378,10 @@ export function Screen({
 
   const page = (
     <ScreenScrollContext.Provider value={context}>
-      <View style={[styles.root, transparent ? styles.clear : null]} {...visibility}>
-        {transparent || backdropInScroll ? null : <AmbientBackdrop mood={ambient} print={print} />}
+      <View style={[styles.root, transparent || hosted ? styles.clear : null]} {...visibility}>
+        {transparent || hosted || backdropInScroll ? null : (
+          <AmbientBackdrop mood={ambient} print={print} />
+        )}
         <KeyboardAvoidingView
           style={styles.fill}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}

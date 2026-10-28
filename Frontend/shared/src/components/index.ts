@@ -1,4 +1,5 @@
 export * from './AmbientBackdrop';
+export * from './backdrop-host';
 export * from './AskingPriceBadge';
 export * from './Brand';
 export * from './BrandIcons';

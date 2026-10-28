@@ -128,36 +128,59 @@ function useBackdropStyles() {
   }, []);
 }
 
-function Backdrop({ mood, print }: { readonly mood: AmbientArea; readonly print: PrintCoverage }) {
-  useBackdropStyles();
-  const { colors, name } = useTheme();
+/**
+ * A screen's say in the backdrop: while it's in view, its look is the one shown. It opens in the
+ * look that was showing and takes over only once it has stayed in view a moment, so passing
+ * through on the way to another screen changes nothing.
+ */
+export function useBackdropClaim(
+  mood: AmbientArea | 'none',
+  print: PrintCoverage,
+  enabled: boolean,
+): boolean {
   const focused = useIsFocused();
-  const own = useMemo(() => ({ mood, print }), [mood, print]);
-  const shown = useSyncExternalStore(watch, readShownLook, readShownLook);
-
-  // A screen only takes over once it has been drawn and a frame has gone by, so it opens in the
-  // look that was showing and then changes into its own, as one move.
   const [inView, setInView] = useState(false);
   useEffect(() => {
-    if (!focused) {
+    if (!enabled || !focused) {
       setInView(false);
       return;
     }
-    let second = 0;
-    const first = requestAnimationFrame(() => {
-      second = requestAnimationFrame(() => setInView(true));
-    });
-    return () => {
-      cancelAnimationFrame(first);
-      cancelAnimationFrame(second);
-    };
-  }, [focused]);
-
+    // It takes over only once it's drawn and has stayed in view a moment: one passed through on
+    // the way to another leaves the backdrop alone, so it changes once, for where you land.
+    const settle = setTimeout(() => setInView(true), tokens.motion.duration.backdropSettle);
+    return () => clearTimeout(settle);
+  }, [enabled, focused]);
   useEffect(() => {
-    if (inView) show(own);
-  }, [inView, own]);
-  const look = inView || !shown ? own : shown;
+    if (inView && mood !== 'none') show({ mood, print });
+  }, [inView, mood, print]);
+  return inView;
+}
 
+/**
+ * The one backdrop drawn behind a group of screens that share it (see `BackdropHostContext`).
+ * It's always the same element, so a change of look is one CSS transition that a quick run of
+ * switches simply redirects from wherever it has got to, never a jump between two drawings.
+ */
+export function SharedBackdrop() {
+  const shown = useSyncExternalStore(watch, readShownLook, readShownLook);
+  const focused = useIsFocused();
+  return <BackdropView look={shown ?? fallbackLook} focused={focused} />;
+}
+
+const fallbackLook: Look = { mood: 'feed', print: 'edges' };
+
+function Backdrop({ mood, print }: { readonly mood: AmbientArea; readonly print: PrintCoverage }) {
+  const focused = useIsFocused();
+  const own = useMemo(() => ({ mood, print }), [mood, print]);
+  const shown = useSyncExternalStore(watch, readShownLook, readShownLook);
+  const inView = useBackdropClaim(mood, print, true);
+  // Out of view it shows whatever is showing, so it comes into view matching it.
+  return <BackdropView look={inView || !shown ? own : shown} focused={focused} />;
+}
+
+function BackdropView({ look, focused }: { readonly look: Look; readonly focused: boolean }) {
+  useBackdropStyles();
+  const { colors, name } = useTheme();
   const ink = lookInk(colors, look.mood);
   const tints = tokens.ambient[name][look.mood];
   const peak = tokens.motion.ambient.peakOpacity[name];

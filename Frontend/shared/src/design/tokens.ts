@@ -37,6 +37,11 @@ const duration = {
   ambientLoop: 7000,
   /** The backdrop changing from one screen's look into the next: slow enough to read as one move. */
   backdropMorph: 820,
+  /**
+   * How long a screen must stay in view before the backdrop changes for it. A screen passed
+   * through on the way somewhere else (a quick run of tab switches) never changes it at all.
+   */
+  backdropSettle: 240,
   stepTransition: 280,
   popRise: 100,
   popSettle: 180,
