@@ -8,7 +8,12 @@ import { LogBox, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { NavLinkProvider, RevealGate, ToastProvider } from '@snapworth/shared/components';
+import {
+  NavLinkProvider,
+  RevealGate,
+  SignInHandoff,
+  ToastProvider,
+} from '@snapworth/shared/components';
 import { ThemeProvider, useTheme } from '@snapworth/shared/design';
 import { AppServicesProvider, type BackendConfig } from '@snapworth/shared/composition';
 import { useSnapWorthFonts } from '@snapworth/shared/design/font-assets';
@@ -126,6 +131,8 @@ function Shell() {
             <Stack.Screen name="list/[id]" options={{ presentation: 'modal' }} />
           </Stack>
           <CompanionHost ready={launched} />
+          {/* Signing in closes the screen into Worthy's tag and opens it onto the app. */}
+          <SignInHandoff />
         </RevealGate>
         {launched ? null : (
           <SplashView ready onExit={() => setRevealOpen(true)} onDone={() => setLaunched(true)} />

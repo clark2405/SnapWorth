@@ -5,7 +5,13 @@ import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { Companion, RevealGate, ToastProvider, useToast } from '@snapworth/shared/components';
+import {
+  Companion,
+  RevealGate,
+  SignInHandoff,
+  ToastProvider,
+  useToast,
+} from '@snapworth/shared/components';
 import {
   ThemeProvider,
   tokens,
@@ -98,6 +104,8 @@ function Shell() {
             }}
           />
           <WebCompanion ready={launched} />
+          {/* Signing in closes the screen into Worthy's tag and opens it onto the app. */}
+          <SignInHandoff />
         </RevealGate>
         {launched ? null : (
           <SplashView ready onExit={() => setRevealOpen(true)} onDone={() => setLaunched(true)} />

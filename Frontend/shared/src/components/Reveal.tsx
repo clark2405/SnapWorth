@@ -1,6 +1,6 @@
 import { useIsFocused } from 'expo-router';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
+import type { StyleProp, ViewProps, ViewStyle } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -56,6 +56,8 @@ export interface RevealProps {
   readonly style?: StyleProp<ViewStyle>;
   /** Extra wait before this group starts, e.g. to follow a hero. */
   readonly delay?: number;
+  /** As a View's: `box-none` lets touches on the group's empty space reach what lies beneath. */
+  readonly pointerEvents?: ViewProps['pointerEvents'];
 }
 
 /**
@@ -63,7 +65,7 @@ export interface RevealProps {
  * cascading 50ms per sibling. Transform and opacity only, never scale, so type stays crisp.
  * With reduced motion it becomes a short cross-fade with no travel.
  */
-export function Reveal({ children, index = 0, style, delay = 0 }: RevealProps) {
+export function Reveal({ children, index = 0, style, delay = 0, pointerEvents }: RevealProps) {
   const reduceMotion = useReducedMotion();
   const gateOpen = useContext(RevealGateContext);
   const still = useContext(RevealStillContext);
@@ -98,5 +100,9 @@ export function Reveal({ children, index = 0, style, delay = 0 }: RevealProps) {
   // a sheet is still sliding in). So once the entrance is over, or when there is none, the
   // content renders plainly: React commits it in place, where it can't be lost.
   const plain = still || offstage || settled;
-  return <Animated.View style={plain ? style : [style, animated]}>{children}</Animated.View>;
+  return (
+    <Animated.View style={plain ? style : [style, animated]} pointerEvents={pointerEvents}>
+      {children}
+    </Animated.View>
+  );
 }

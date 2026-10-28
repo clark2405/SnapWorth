@@ -2,7 +2,13 @@ import { Tabs, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { View } from 'react-native';
 
-import { requestScrollToTop, ScreenSkeleton, TabBar } from '@snapworth/shared/components';
+import {
+  BackdropHostContext,
+  requestScrollToTop,
+  SharedBackdrop,
+  TabBar,
+  WithSkeleton,
+} from '@snapworth/shared/components';
 import { useTheme, useWideLayout } from '@snapworth/shared/design';
 
 import { tabRoutes, tabs, type TabKey } from '../../../src/places';
@@ -31,43 +37,52 @@ export default function TabsLayout() {
     return () => clearTimeout(timer);
   }, [router]);
 
+  // One backdrop for all four tabs, drawn once behind them: switching tabs changes it in place,
+  // so a quick run of switches is one continuous change rather than a jump between drawings.
   return (
-    <Tabs
-      // Anything not loaded yet shows its shape, in its colour, rather than an empty page.
-      screenLayout={({ route, children }) => (
-        <View style={{ flex: 1 }}>
-          <ScreenSkeleton kind="tab" place={tabs.find((tab) => tab.key === route.name)?.place} />
-          {children}
-        </View>
-      )}
-      screenOptions={{
-        headerShown: false,
-        // The backdrop's morph carries the change of place; a second animation would fight it.
-        animation: 'none',
-        sceneStyle: { backgroundColor: colors.canvas },
-      }}
-      tabBar={({ state, navigateToTab }) => {
-        if (wide) return null;
-        const active = state.routes[state.index];
-        const activeKey = active?.name as TabKey | undefined;
-        return (
-          <TabBar
-            tabs={tabs}
-            activeKey={activeKey}
-            // Tapping the tab you are on takes its page back to the top.
-            onSelect={(key) => {
-              if (key === activeKey) return requestScrollToTop();
-              const route = state.routes.find((entry) => entry.name === key);
-              if (route) navigateToTab(route.key);
-            }}
-          />
-        );
-      }}
-    >
-      <Tabs.Screen name="feed" />
-      <Tabs.Screen name="marketplace" />
-      <Tabs.Screen name="chat" />
-      <Tabs.Screen name="history" />
-    </Tabs>
+    <BackdropHostContext.Provider value>
+      <View style={{ flex: 1, backgroundColor: colors.canvas }}>
+        <SharedBackdrop />
+        <Tabs
+          // Anything not loaded yet shows its shape, in its colour, rather than an empty page.
+          screenLayout={({ route, children }) => (
+            <View style={{ flex: 1 }}>
+              <WithSkeleton kind="tab" place={tabs.find((tab) => tab.key === route.name)?.place}>
+                {children}
+              </WithSkeleton>
+            </View>
+          )}
+          screenOptions={{
+            headerShown: false,
+            // The backdrop's morph carries the change of place; a second animation would fight it.
+            animation: 'none',
+            // Clear, so the one backdrop behind all four shows through (see below).
+            sceneStyle: { backgroundColor: 'transparent' },
+          }}
+          tabBar={({ state, navigateToTab }) => {
+            if (wide) return null;
+            const active = state.routes[state.index];
+            const activeKey = active?.name as TabKey | undefined;
+            return (
+              <TabBar
+                tabs={tabs}
+                activeKey={activeKey}
+                // Tapping the tab you are on takes its page back to the top.
+                onSelect={(key) => {
+                  if (key === activeKey) return requestScrollToTop();
+                  const route = state.routes.find((entry) => entry.name === key);
+                  if (route) navigateToTab(route.key);
+                }}
+              />
+            );
+          }}
+        >
+          <Tabs.Screen name="feed" />
+          <Tabs.Screen name="marketplace" />
+          <Tabs.Screen name="chat" />
+          <Tabs.Screen name="history" />
+        </Tabs>
+      </View>
+    </BackdropHostContext.Provider>
   );
 }

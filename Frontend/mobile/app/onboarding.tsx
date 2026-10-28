@@ -1,8 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
+import { closeIntoTag, openFromTag } from '@snapworth/shared/components';
 import { OnboardingView } from '@snapworth/shared/features/onboarding';
-
-import { markIntroSeen } from '../src/intro-store';
 
 export default function OnboardingRoute() {
   const router = useRouter();
@@ -14,17 +13,25 @@ export default function OnboardingRoute() {
     return <OnboardingView mode="replay" onGetStarted={close} onSkip={close} />;
   }
 
-  // However the introduction is left, later launches go straight to the account step.
-  const leave = (href: '/signup' | '/login') => {
-    void markIntroSeen();
-    router.replace(href);
+  const leave = (href: '/signup' | '/login') => router.replace(href);
+  // Looking around plays the same hand-off as signing in: the introduction closes into the tag,
+  // the feed opens out of it.
+  const lookAround = async () => {
+    await closeIntoTag({
+      stamp: 'JUST LOOKING',
+      eyebrow: 'Guest pass',
+      waiting: 'Opening the feed',
+    });
+    router.replace('/feed');
+    openFromTag();
   };
 
   return (
     <OnboardingView
       onGetStarted={() => leave('/signup')}
       onSignIn={() => leave('/login')}
-      onSkip={() => leave('/login')}
+      // Looking around needs no account; one is asked for when the person first acts.
+      onSkip={() => void lookAround()}
     />
   );
 }

@@ -37,6 +37,11 @@ const duration = {
   ambientLoop: 7000,
   /** The backdrop changing from one screen's look into the next: slow enough to read as one move. */
   backdropMorph: 820,
+  /**
+   * How long a screen must stay in view before the backdrop changes for it. A screen passed
+   * through on the way somewhere else (a quick run of tab switches) never changes it at all.
+   */
+  backdropSettle: 240,
   stepTransition: 280,
   popRise: 100,
   popSettle: 180,
@@ -294,6 +299,50 @@ export const tokens = deepFreeze({
       chat: ['#2C2040', '#3A1F27', '#241833'],
       calm: ['#2C2040', '#241833', '#3A1F27'],
     },
+  },
+  /**
+   * The introduction's drawings: flat colour with one shade tone per material, no outlines. They
+   * are pictures, so they keep these colours in every appearance; the brand colours they sit on
+   * come from the theme.
+   */
+  illustration: {
+    /** Each skin tone with its shade, for necks, ears and far arms. */
+    skin: {
+      light: ['#F4CDAA', '#E2B08A'],
+      tan: ['#D49A6E', '#BC8156'],
+      deep: ['#8E5A3B', '#77482D'],
+    },
+    hair: '#2A1D16',
+    hairShine: '#4A3A30',
+    denim: '#2343C4',
+    denimShade: '#17257A',
+    sneaker: '#FFF8EE',
+    phone: '#1A1714',
+    phoneScreen: '#3A3633',
+    /** Shirt colours with their pattern or shade tone. */
+    shirt: {
+      marigold: ['#FFC21A', '#F0A400', '#E09400'],
+      red: ['#D63A14', '#E8634A', '#B82F10'],
+      cream: ['#FFF8EE', '#C9D3F5', '#E6DED0'],
+    },
+    /** The windbreaker on the card: teal, purple trim. */
+    jacket: '#35C2BE',
+    jacketTrim: '#7A4FD0',
+    hanger: '#1A1714',
+    cardStock: '#FFF8EE',
+    box: '#D9B57E',
+    boxShade: '#C9A16A',
+    boxTape: '#E9CFA2',
+    boxPrint: '#B48B57',
+    stick: '#B8935C',
+    leaf: '#1D6B47',
+    leafLight: '#2F8A5E',
+    pot: '#E2C595',
+    potShade: '#C9A16A',
+    coin: '#FFC21A',
+    coinRim: '#E09400',
+    coinMark: '#B87800',
+    light: '#FFF8EE',
   },
   /**
    * Translucent layers for controls that sit over live media (the camera viewfinder, a photo

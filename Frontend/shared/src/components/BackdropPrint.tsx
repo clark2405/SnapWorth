@@ -132,7 +132,9 @@ type Four<T> = readonly [T, T, T, T];
 
 /**
  * Where each place's stickers sit. Every place has four, so going from one screen to another
- * each sticker can travel to its new spot instead of vanishing.
+ * each sticker can travel to its new spot instead of vanishing. Each keeps to its own edge in
+ * every place (the first and third on the end side, the others on the start side), so a change of
+ * place moves a sticker a little way up or down its edge, never across the content.
  */
 export const stickerLayouts: Record<AmbientArea, Four<StickerSlot>> = {
   feed: [
@@ -154,10 +156,10 @@ export const stickerLayouts: Record<AmbientArea, Four<StickerSlot>> = {
     { shape: 'tag', side: 'start', x: -0.08, y: 0.86, size: 140 },
   ],
   chat: [
-    { shape: 'scallop', side: 'start', x: 0.02, y: 0.3, size: 108 },
-    { shape: 'tag', side: 'end', x: 1.04, y: 0.44, size: 146 },
-    { shape: 'scallop', side: 'start', x: 0.0, y: 0.66, size: 96 },
-    { shape: 'coin', side: 'end', x: 0.93, y: 0.84, size: 100 },
+    { shape: 'tag', side: 'end', x: 1.04, y: 0.3, size: 146 },
+    { shape: 'scallop', side: 'start', x: 0.02, y: 0.44, size: 108 },
+    { shape: 'coin', side: 'end', x: 0.93, y: 0.66, size: 100 },
+    { shape: 'scallop', side: 'start', x: 0.0, y: 0.84, size: 96 },
   ],
   calm: [
     { shape: 'scallop', side: 'end', x: 0.92, y: 0.26, size: 116 },

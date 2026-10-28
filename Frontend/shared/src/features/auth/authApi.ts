@@ -1,4 +1,6 @@
-import { getSupabase } from '../../adapters/supabaseClient';
+import { getSupabase, isSupabaseConfigured } from '../../adapters/supabaseClient';
+
+export { isSupabaseConfigured };
 import type { AuthInput } from './LoginView';
 
 export async function performAuth({ mode, email, password, fullName, gender }: AuthInput) {

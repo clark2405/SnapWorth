@@ -1,5 +1,5 @@
 import { useIsFocused } from 'expo-router';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
@@ -21,6 +21,7 @@ import {
   useWideLayout,
   type Place,
 } from '../design';
+import { ScreenPresenceContext } from './backdrop-host';
 
 export interface ScreenSkeletonProps {
   /**
@@ -41,6 +42,24 @@ export function ScreenSkeleton({ kind, place }: ScreenSkeletonProps) {
   const focused = useIsFocused();
   if (!focused) return null;
   return <Skeleton kind={kind} place={place} />;
+}
+
+/**
+ * A screen with its skeleton beneath it until the screen has drawn: then the skeleton leaves, so
+ * it's never painted under a page, and a page with a clear background shows what's behind it.
+ */
+export function WithSkeleton({
+  children,
+  ...skeleton
+}: ScreenSkeletonProps & { readonly children: ReactNode }) {
+  const [ready, setReady] = useState(false);
+  const arrived = useCallback(() => setReady(true), []);
+  return (
+    <ScreenPresenceContext.Provider value={arrived}>
+      {ready ? null : <ScreenSkeleton {...skeleton} />}
+      {children}
+    </ScreenPresenceContext.Provider>
+  );
 }
 
 /** How long a load can take before the skeleton shows at all. */

@@ -1,7 +1,7 @@
 import { Stack, usePathname, useRouter } from 'expo-router';
 import { View } from 'react-native';
 
-import { requestScrollToTop, ScreenSkeleton, SideNav } from '@snapworth/shared/components';
+import { requestScrollToTop, SideNav, WithSkeleton } from '@snapworth/shared/components';
 import { useLayoutClass, useTheme } from '@snapworth/shared/design';
 import { useAccountGate } from '@snapworth/shared/features/session';
 
@@ -28,10 +28,13 @@ export default function ProductLayout() {
       // their own (a band and a list).
       screenLayout={({ route, children }) => (
         <View style={{ flex: 1 }}>
-          {route.name === '(tabs)' ? null : (
-            <ScreenSkeleton kind={detailRoutes.has(route.name) ? 'detail' : 'page'} />
+          {route.name === '(tabs)' ? (
+            children
+          ) : (
+            <WithSkeleton kind={detailRoutes.has(route.name) ? 'detail' : 'page'}>
+              {children}
+            </WithSkeleton>
           )}
-          {children}
         </View>
       )}
       screenOptions={{

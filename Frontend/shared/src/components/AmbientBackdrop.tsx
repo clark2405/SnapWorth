@@ -1,9 +1,17 @@
 import { useIsFocused } from 'expo-router';
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { Image, StyleSheet, View, useWindowDimensions, type ViewStyle } from 'react-native';
+import {
+  Dimensions,
+  Image,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+  type ViewStyle,
+} from 'react-native';
 import Animated, {
   Easing,
   cancelAnimation,
+  makeMutable,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -57,29 +65,6 @@ interface Look {
 
 const sameLook = (a: Look, b: Look) => a.mood === b.mood && a.print === b.print;
 
-/**
- * The look on screen right now. Each screen's backdrop sits in this look whenever the screen is
- * out of view, so the moment it comes into view it matches what was just there, and then changes
- * into its own: switching screens reads as one backdrop changing, never as a cut.
- */
-let shownLook: Look | null = null;
-const watchers = new Set<() => void>();
-
-function show(look: Look) {
-  if (shownLook && sameLook(shownLook, look)) return;
-  shownLook = look;
-  watchers.forEach((watcher) => watcher());
-}
-
-function watch(watcher: () => void) {
-  watchers.add(watcher);
-  return () => {
-    watchers.delete(watcher);
-  };
-}
-
-const readShownLook = () => shownLook;
-
 const morphCurve = tokens.motion.bezier.morph;
 const morphTiming = {
   duration: tokens.motion.duration.backdropMorph,
@@ -92,6 +77,8 @@ const morphTiming = {
 };
 /** How long after a morph should have landed its end state is committed outright. */
 const settleMargin = 120;
+/** A layer this faint at the start of a morph is dropped rather than faded. */
+const faintest = 0.02;
 
 interface StickerPose {
   readonly x: number;
@@ -107,12 +94,154 @@ function posesFor(look: Look, width: number, height: number): readonly StickerPo
   }));
 }
 
+/** A look on its way out, and how strongly it showed when the current change of look began. */
+interface Leaving {
+  readonly look: Look;
+  readonly from: number;
+}
+
+/**
+ * The backdrop's one change of look, shared by every screen. Each screen draws its own copy, but
+ * they all draw from this, at the same `progress`, so the screen you switch to shows exactly the
+ * frame the last one was showing. A new look arriving mid-change starts from what's on screen:
+ * each look fades out from the strength it has at that moment, and the stickers set off from
+ * wherever they've got to. Nothing restarts, so a quick run of switches reads as one movement.
+ */
+interface Morph {
+  readonly id: number;
+  readonly target: Look;
+  /** How strongly the target already showed when this change began. */
+  readonly base: number;
+  readonly leaving: readonly Leaving[];
+  /** Where the stickers set off from, while they're travelling. */
+  readonly origin: readonly StickerPose[] | null;
+  /**
+   * This change's own progress. A new change gets a fresh one rather than resetting this, so a
+   * screen still drawing the last change holds its frame (the old value stops where it is) until
+   * it draws the new one, which starts from that same picture at 0: there's no frame in between.
+   */
+  readonly progress: SharedValue<number>;
+}
+
+let morph: Morph | null = null;
+const atRest = makeMutable(1);
+const watchers = new Set<() => void>();
+let settleTimer: ReturnType<typeof setTimeout> | undefined;
+
+function publish(next: Morph) {
+  morph = next;
+  watchers.forEach((watcher) => watcher());
+}
+
+function watch(watcher: () => void) {
+  watchers.add(watcher);
+  return () => {
+    watchers.delete(watcher);
+  };
+}
+
+const readMorph = () => morph;
+
+const settledMorph = (current: Morph): boolean =>
+  current.leaving.length === 0 && current.base >= 1 && current.origin === null;
+
+function retarget(look: Look, animate: boolean) {
+  const current = morph;
+  if (!current) {
+    publish({ id: 1, target: look, base: 1, leaving: [], origin: null, progress: atRest });
+    return;
+  }
+  if (sameLook(current.target, look)) return;
+  clearTimeout(settleTimer);
+  cancelAnimation(current.progress);
+  const id = current.id + 1;
+  if (!animate) {
+    publish({ id, target: look, base: 1, leaving: [], origin: null, progress: atRest });
+    return;
+  }
+
+  // How strongly each look shows right now.
+  const p = settledMorph(current) ? 1 : current.progress.value;
+  const showing: Leaving[] = [
+    ...current.leaving.map((layer) => ({ look: layer.look, from: layer.from * (1 - p) })),
+    { look: current.target, from: current.base + (1 - current.base) * p },
+  ];
+  const base = Math.min(
+    1,
+    showing.filter((layer) => sameLook(layer.look, look)).reduce((sum, l) => sum + l.from, 0),
+  );
+  const leaving: Leaving[] = [];
+  for (const layer of showing) {
+    if (sameLook(layer.look, look) || layer.from < faintest) continue;
+    const twin = leaving.find((entry) => sameLook(entry.look, layer.look));
+    if (twin) leaving.splice(leaving.indexOf(twin), 1, { ...twin, from: twin.from + layer.from });
+    else leaving.push(layer);
+  }
+
+  // The stickers set off from wherever they are now.
+  const { width, height } = Dimensions.get('window');
+  const ends = posesFor(current.target, width, height);
+  const starts = current.origin ?? ends;
+  const origin = ends.map((end, i) => {
+    const start = starts[i] ?? end;
+    return {
+      x: start.x + (end.x - start.x) * p,
+      y: start.y + (end.y - start.y) * p,
+      rotate: start.rotate + (end.rotate - start.rotate) * p,
+    };
+  });
+
+  const progress = makeMutable(0);
+  publish({ id, target: look, base, leaving: leaving.slice(-3), origin, progress });
+  progress.value = withTiming(1, morphTiming);
+  // An update to a view out of sight can be dropped, so the end is committed outright.
+  settleTimer = setTimeout(() => {
+    if (morph?.id === id) publish({ ...morph, base: 1, leaving: [], origin: null });
+  }, morphTiming.duration + settleMargin);
+}
+
+/**
+ * The blobs' slow breath, one for every screen, so a screen coming into view breathes in step
+ * with the one before it instead of starting its own breath over.
+ */
+const breath = makeMutable(0);
+let breathing = false;
+
+function startBreathing() {
+  if (breathing) return;
+  breathing = true;
+  breath.value = withRepeat(
+    withTiming(1, {
+      duration: tokens.motion.duration.ambientLoop,
+      easing: Easing.inOut(Easing.sin),
+    }),
+    -1,
+    true,
+  );
+}
+
 /**
  * Behind every screen: two or three huge, soft, warm blobs drifting on a slow loop, a price-gun
  * print, and a few cut-paper stickers stuck along the edges, all in the place's colour. When the
  * screen changes, the stickers travel to their new spots and change shape on the way, and the
  * print and blobs change colour and reach in place, so the backdrop moves as one piece.
  */
+/**
+ * Shared backdrops are a web arrangement (see the web file); the apps' native navigators keep each
+ * screen's own, kept in step by the shared change of look above.
+ */
+export function SharedBackdrop(): null {
+  return null;
+}
+
+export function useBackdropClaim(
+  _mood: AmbientArea | 'none',
+  _print: PrintCoverage,
+  _enabled: boolean,
+): boolean {
+  return false;
+}
+
 export function AmbientBackdrop({ mood = 'calm', print = 'edges' }: AmbientBackdropProps) {
   if (mood === 'none') return null;
   return <Backdrop mood={mood} print={print} />;
@@ -124,12 +253,11 @@ function Backdrop({ mood, print }: { readonly mood: AmbientArea; readonly print:
   const reduceMotion = useReducedMotion();
   const focused = useIsFocused();
   const own = useMemo(() => ({ mood, print }), [mood, print]);
-  const shown = useSyncExternalStore(watch, readShownLook, readShownLook);
+  const shared = useSyncExternalStore(watch, readMorph, readMorph);
 
   // A screen can be focused a moment before it's drawn: a tab opened for the first time is still
-  // being built. It only takes over once it has been laid out and a frame has gone by, so the
-  // screen being left keeps its own look while it's still in view, and the new one opens in that
-  // same look and then changes into its own.
+  // being built. It opens in the look that's showing, and changes into its own only once it has
+  // been laid out and stayed in view.
   const [laidOut, setLaidOut] = useState(false);
   const [inView, setInView] = useState(false);
   useEffect(() => {
@@ -137,101 +265,63 @@ function Backdrop({ mood, print }: { readonly mood: AmbientArea; readonly print:
       setInView(false);
       return;
     }
-    let second = 0;
-    const first = requestAnimationFrame(() => {
-      second = requestAnimationFrame(() => setInView(true));
-    });
-    return () => {
-      cancelAnimationFrame(first);
-      cancelAnimationFrame(second);
-    };
+    // It takes over only once it's drawn and has stayed in view a moment: one passed through on
+    // the way to another leaves the backdrop alone, so it changes once, for where you land.
+    const settle = setTimeout(() => setInView(true), tokens.motion.duration.backdropSettle);
+    return () => clearTimeout(settle);
   }, [focused, laidOut]);
 
-  // The screen in view sets the look; every other screen follows it, out of sight.
   useEffect(() => {
-    if (inView) show(own);
-  }, [inView, own]);
-  const target = inView || !shown ? own : shown;
-
-  // `from` is the look being left while a morph runs; null once the backdrop has settled.
-  const [from, setFrom] = useState<Look | null>(null);
-  const [to, setTo] = useState<Look>(target);
-  const [origin, setOrigin] = useState<readonly StickerPose[]>(() =>
-    posesFor(target, width, height),
-  );
-  const progress = useSharedValue(1);
+    if (inView) retarget(own, !reduceMotion);
+  }, [inView, own, reduceMotion]);
 
   useEffect(() => {
-    if (sameLook(target, to)) return;
-    // Out of view there's nothing to watch, so a hidden screen just takes the new look; only the
-    // screen in view spends frames on the morph.
-    if (reduceMotion || !focused) {
-      progress.value = 1;
-      setFrom(null);
-      setTo(target);
+    if (focused && !reduceMotion) startBreathing();
+  }, [focused, reduceMotion]);
+
+  // A screen being left keeps moving with the change until it's out of sight (a pushed screen
+  // slides over it); after that it holds still, so only what can be seen spends frames.
+  const [lingering, setLingering] = useState(false);
+  useEffect(() => {
+    if (focused) {
+      setLingering(true);
       return;
     }
-    // A morph cut short starts the next from wherever the stickers had got to, and from
-    // whichever look was showing more, so nothing jumps.
-    const p = from ? progress.value : 1;
-    const fromPoses = posesFor(from ?? to, width, height);
-    const toPoses = posesFor(to, width, height);
-    setOrigin(
-      toPoses.map((end, i) => {
-        const start = fromPoses[i] ?? end;
-        return {
-          x: start.x + (end.x - start.x) * p,
-          y: start.y + (end.y - start.y) * p,
-          rotate: start.rotate + (end.rotate - start.rotate) * p,
-        };
-      }),
-    );
-    setFrom(from && p < 0.5 ? from : to);
-    setTo(target);
-    progress.value = 0;
-    progress.value = withTiming(1, morphTiming);
-    // Updates to a screen out of view can be dropped, so the end state is committed outright.
-    const settle = setTimeout(() => setFrom(null), morphTiming.duration + settleMargin);
-    return () => clearTimeout(settle);
-    // Only a new target starts a morph; everything else is read as it stands at that moment.
-  }, [target.mood, target.print]);
+    const done = setTimeout(() => setLingering(false), morphTiming.duration + settleMargin);
+    return () => clearTimeout(done);
+  }, [focused]);
 
-  // The look being left, while there is one to leave.
-  const leaving = from !== null && !sameLook(from, to) ? from : null;
-  const breath = useBreath(focused, reduceMotion);
-  const destination = posesFor(to, width, height);
+  const current: Morph = shared ?? {
+    id: 0,
+    target: own,
+    base: 1,
+    leaving: [],
+    origin: null,
+    progress: atRest,
+  };
+  const live = (focused || lingering) && !reduceMotion && !settledMorph(current);
+  const view: Morph = live ? current : { ...current, base: 1, leaving: [], origin: null };
+  const target = view.target;
+  const ends = posesFor(target, width, height);
   const stickerOpacity = tokens.motion.ambient.stickerOpacity[name];
 
   return (
     <View style={styles.layer} onLayout={() => setLaidOut(true)}>
-      {leaving && leaving.mood !== to.mood ? (
-        <Fade progress={progress} out>
-          <Blobs mood={leaving.mood} breath={breath} width={width} height={height} />
-        </Fade>
-      ) : null}
-      <Fade progress={progress} still={!leaving || leaving.mood === to.mood} remount>
-        <Blobs mood={to.mood} breath={breath} width={width} height={height} />
-      </Fade>
-
-      {leaving ? (
-        <Fade progress={progress} out>
-          <Print look={leaving} width={width} height={height} />
-        </Fade>
-      ) : null}
-      <Fade progress={progress} still={!leaving} remount>
-        <Print look={to} width={width} height={height} />
-      </Fade>
+      <Layers view={view} keyOf={(look) => look.mood}>
+        {(look) => <Blobs mood={look.mood} width={width} height={height} />}
+      </Layers>
+      <Layers view={view} keyOf={(look) => `${look.mood}-${look.print}`}>
+        {(look) => <Print look={look} width={width} height={height} />}
+      </Layers>
 
       <View style={[styles.layer, { opacity: stickerOpacity }]}>
-        {destination.map((end, index) => (
+        {ends.map((end, index) => (
           <Sticker
             key={index}
             index={index}
-            from={leaving}
-            to={to}
-            start={origin[index] ?? end}
+            view={view}
+            start={view.origin?.[index] ?? end}
             end={end}
-            progress={progress}
           />
         ))}
       </View>
@@ -239,53 +329,104 @@ function Backdrop({ mood, print }: { readonly mood: AmbientArea; readonly print:
   );
 }
 
-/** The slow breath the blobs share; only the screen in view breathes. */
-function useBreath(focused: boolean, reduceMotion: boolean) {
-  const breath = useSharedValue(0);
-  useEffect(() => {
-    if (reduceMotion || !focused) return;
-    breath.value = withRepeat(
-      withTiming(1, {
-        duration: tokens.motion.duration.ambientLoop,
-        easing: Easing.inOut(Easing.sin),
-      }),
-      -1,
-      true,
-    );
-    return () => cancelAnimation(breath);
-  }, [breath, focused, reduceMotion]);
-  return breath;
+/** One drawing through a change of look: how strongly it starts, and whether it's leaving. */
+interface Layer<T> {
+  readonly key: string;
+  readonly item: T;
+  readonly from: number;
+  readonly out: boolean;
 }
 
-/** A layer fading in with the morph, or out with `out`; `still` holds it fully shown. */
+/**
+ * The drawings a change of look needs, each keyed by what it draws: the target fading up from how
+ * strongly it already shows, and each look on its way out fading down from its strength. Looks
+ * that draw the same thing fold into one. Keyed by what they draw, the drawing on screen when a
+ * change begins is the same element that fades out, never torn down and redrawn: a fresh copy
+ * shows at the wrong strength for a frame before its fade takes hold, which reads as a flash.
+ */
+function layersOf<T>(view: Morph, drawn: (look: Look) => { key: string; item: T } | null) {
+  const layers: Layer<T>[] = [];
+  const add = (look: Look, from: number, out: boolean) => {
+    const drawing = drawn(look);
+    if (!drawing) return;
+    const twin = layers.find((layer) => layer.key === drawing.key);
+    if (twin) {
+      const merged = { ...twin, from: Math.min(1, twin.from + from), out: twin.out && out };
+      layers.splice(layers.indexOf(twin), 1, merged);
+    } else layers.push({ key: drawing.key, item: drawing.item, from, out });
+  };
+  view.leaving.forEach((layer) => add(layer.look, layer.from, true));
+  add(view.target, view.base, false);
+  // The target draws on top, and a leaving look folded into it fades in with it, not out.
+  const target = drawn(view.target)?.key;
+  return [
+    ...layers.filter((layer) => layer.key !== target),
+    ...layers.filter((layer) => layer.key === target).map((layer) => ({ ...layer, out: false })),
+  ];
+}
+
+function Layers({
+  view,
+  keyOf,
+  children,
+}: {
+  readonly view: Morph;
+  readonly keyOf: (look: Look) => string;
+  readonly children: (look: Look) => ReactNode;
+}) {
+  const layers = layersOf(view, (look) => ({ key: keyOf(look), item: look }));
+  const settled = layers.length === 1 && (layers[0]?.from ?? 0) >= 1;
+  return (
+    <>
+      {layers.map((layer) => (
+        <Fade
+          key={layer.key}
+          progress={view.progress}
+          from={layer.from}
+          out={layer.out}
+          still={settled}
+          epoch={view.id}
+        >
+          {children(layer.item)}
+        </Fade>
+      ))}
+    </>
+  );
+}
+
+/**
+ * A layer through the change of look: fading in from `from` to full, or with `out`, from `from`
+ * to nothing. Its plain style starts at the strength the fade starts at, so the frame before the
+ * fade takes hold already matches. `still` holds it fully shown with a plain style; the tiny step
+ * in that value with each change (`epoch`) makes sure it's sent afresh, so a fade value left on
+ * the view by a dropped frame never lingers.
+ */
 function Fade({
   progress,
+  from,
   out = false,
   still = false,
+  epoch = 0,
   style = styles.layer,
-  remount = false,
   children,
 }: {
   readonly progress: SharedValue<number>;
+  readonly from: number;
   readonly out?: boolean;
   readonly still?: boolean;
+  readonly epoch?: number;
   readonly style?: ViewStyle;
-  readonly remount?: boolean;
   readonly children: ReactNode;
 }) {
   const fade = useAnimatedStyle(() => ({
-    opacity: out ? 1 - progress.value : progress.value,
+    opacity: out ? from * (1 - progress.value) : from + (1 - from) * progress.value,
   }));
-  // At rest the layer is set fully shown outright, so a dropped animation frame can't leave it
-  // part-faded. `remount` goes further and rebuilds it at rest, for layers that are cheap to.
-  return (
-    <Animated.View
-      key={remount ? (still ? 'rest' : 'fading') : undefined}
-      style={[style, still ? styles.shown : fade]}
-    >
-      {children}
-    </Animated.View>
-  );
+  const plain = { opacity: still ? 1 - (epoch % 2) * 0.001 : from };
+  return <Animated.View style={[style, plain, still ? null : fade]}>{children}</Animated.View>;
+}
+
+function paperFor(colors: ReturnType<typeof useTheme>['colors'], mood: AmbientArea): string {
+  return mood === 'calm' ? colors.kraft : placeColors(colors, mood).fill;
 }
 
 function useLookInk(mood: AmbientArea) {
@@ -318,28 +459,22 @@ function Print({
 }
 
 /**
- * One sticker. It travels from where it was to its spot on this screen, and its old shape and
- * colour fade into the new ones on the way.
+ * One sticker. It travels from where it was to its spot on this screen, and its old shapes and
+ * colours fade into the new one on the way.
  */
 function Sticker({
   index,
-  from,
-  to,
+  view,
   start,
   end,
-  progress,
 }: {
   readonly index: number;
-  readonly from: Look | null;
-  readonly to: Look;
+  readonly view: Morph;
   readonly start: StickerPose;
   readonly end: StickerPose;
-  readonly progress: SharedValue<number>;
 }) {
-  const toSlot = stickerLayouts[to.mood][index];
-  const fromSlot = from ? stickerLayouts[from.mood][index] : undefined;
-  const toInk = useLookInk(to.mood).paper;
-  const fromInk = useLookInk(from?.mood ?? to.mood).paper;
+  const { colors } = useTheme();
+  const progress = view.progress;
   const travel = useAnimatedStyle(() => {
     const p = progress.value;
     return {
@@ -350,35 +485,51 @@ function Sticker({
       ],
     };
   });
-  if (!toSlot) return null;
-  const rest = {
-    transform: [{ translateX: end.x }, { translateY: end.y }, { rotate: `${end.rotate}deg` }],
+  const layers = layersOf(view, (look) => {
+    const at = stickerLayouts[look.mood][index];
+    if (!at) return null;
+    const ink = paperFor(colors, look.mood);
+    return { key: `${at.shape}-${at.size}-${ink}`, item: { shape: at.shape, size: at.size, ink } };
+  });
+  if (layers.length === 0) return null;
+  const moving = view.origin !== null;
+  const settled = layers.length === 1 && (layers[0]?.from ?? 0) >= 1;
+  // Its plain place is where the travel starts (or, at rest, where it ends), so no frame shows it
+  // anywhere else; the step with each change sends it afresh, as with `Fade`.
+  const pose = moving ? start : end;
+  const nudge = moving ? 0 : (view.id % 2) * 0.01;
+  const place = {
+    transform: [
+      { translateX: pose.x + nudge },
+      { translateY: pose.y },
+      { rotate: `${pose.rotate}deg` },
+    ],
   };
-  const changes =
-    fromSlot !== undefined &&
-    (fromSlot.shape !== toSlot.shape || fromSlot.size !== toSlot.size || fromInk !== toInk);
   return (
-    <Animated.View key={from ? 'travel' : 'rest'} style={[styles.point, from ? travel : rest]}>
-      {changes && fromSlot ? (
-        <Fade progress={progress} out style={styles.point}>
-          <StickerArt shape={fromSlot.shape} size={fromSlot.size} ink={fromInk} />
+    <Animated.View style={[styles.point, place, moving ? travel : null]}>
+      {layers.map((layer) => (
+        <Fade
+          key={layer.key}
+          progress={progress}
+          from={layer.from}
+          out={layer.out}
+          still={settled}
+          epoch={view.id}
+          style={styles.point}
+        >
+          <StickerArt shape={layer.item.shape} size={layer.item.size} ink={layer.item.ink} />
         </Fade>
-      ) : null}
-      <Fade progress={progress} still={!changes} style={styles.point} remount>
-        <StickerArt shape={toSlot.shape} size={toSlot.size} ink={toInk} />
-      </Fade>
+      ))}
     </Animated.View>
   );
 }
 
 function Blobs({
   mood,
-  breath,
   width,
   height,
 }: {
   readonly mood: AmbientArea;
-  readonly breath: SharedValue<number>;
   readonly width: number;
   readonly height: number;
 }) {
@@ -392,7 +543,6 @@ function Blobs({
           key={index}
           tint={tints[index] ?? ''}
           peak={peak}
-          breath={breath}
           width={width}
           height={height}
           {...blob}
@@ -405,7 +555,6 @@ function Blobs({
 function Blob({
   tint,
   peak,
-  breath,
   width,
   height,
   x,
@@ -417,7 +566,6 @@ function Blob({
 }: {
   readonly tint: string;
   readonly peak: number;
-  readonly breath: SharedValue<number>;
   readonly width: number;
   readonly height: number;
   readonly x: number;

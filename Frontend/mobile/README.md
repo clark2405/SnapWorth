@@ -41,7 +41,7 @@ the old request; Retry estimates the same photo again. This prototype does not s
 or publish posts. Image processing is performed remotely by Gemini through Supabase;
 the provider notice was removed from the capture UI at the user's request.
 
-Startup shows the existing login screen after the first-run introduction. That login is
+Signed out, every launch opens the introduction, which leads to sign-up or login, or to the feed to look around as a guest; an account is asked for on acting. That login is
 still a local demo session. Estimation separately establishes a background Supabase anonymous
 session, so Anonymous Sign-Ins must be enabled in the Supabase project. The two flows will be
 unified when real email authentication is implemented.

@@ -4,7 +4,6 @@ import type * as ReactNative from 'react-native';
 import RootRoute from '../app/index';
 import OnboardingRoute from '../app/onboarding';
 import TabsLayout from '../app/(tabs)/_layout';
-import { hasSeenIntro, markIntroSeen } from './intro-store';
 
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
@@ -13,6 +12,13 @@ let mockReplay: string | undefined;
 let mockCanGoBack = false;
 
 jest.mock('expo/virtual/env', () => ({ env: process.env }));
+
+const mockCloseIntoTag = jest.fn(() => Promise.resolve());
+const mockOpenFromTag = jest.fn();
+jest.mock('@snapworth/shared/components', () => ({
+  closeIntoTag: (...args: unknown[]) => mockCloseIntoTag(...(args as [])),
+  openFromTag: () => mockOpenFromTag(),
+}));
 
 jest.mock('expo-router/unstable-native-tabs', () => {
   const { Text } = jest.requireActual<typeof ReactNative>('react-native');
@@ -66,43 +72,31 @@ jest.mock('@snapworth/shared/features/onboarding', () => ({
   },
 }));
 
-jest.mock('./intro-store', () => ({
-  hasSeenIntro: jest.fn(),
-  markIntroSeen: jest.fn(),
-}));
-
 beforeEach(() => {
   jest.clearAllMocks();
   mockIsGuest = true;
   mockReplay = undefined;
   mockCanGoBack = false;
-  jest.mocked(hasSeenIntro).mockResolvedValue(true);
-  jest.mocked(markIntroSeen).mockResolvedValue();
   delete process.env.EXPO_PUBLIC_DEV_START_ROUTE;
 });
 
-it('requires login when a returning viewer has no session', async () => {
+it('opens onboarding on every signed-out launch', () => {
   render(<RootRoute />);
-  await waitFor(() => expect(screen.getByText('/login')).toBeTruthy());
+  expect(screen.getByText('/onboarding')).toBeTruthy();
 });
 
-it('opens the feed for an existing in-memory session', async () => {
+it('opens the feed for an existing in-memory session', () => {
   mockIsGuest = false;
   render(<RootRoute />);
-  await waitFor(() => expect(screen.getByText('/feed')).toBeTruthy());
+  expect(screen.getByText('/feed')).toBeTruthy();
 });
 
-it('shows onboarding on the first launch', async () => {
-  jest.mocked(hasSeenIntro).mockResolvedValue(false);
-  render(<RootRoute />);
-  await waitFor(() => expect(screen.getByText('/onboarding')).toBeTruthy());
-});
-
-it('records skipped onboarding and requires login', () => {
+it('lets a guest look around, through the tag hand-off, when onboarding is skipped', async () => {
   render(<OnboardingRoute />);
   fireEvent.press(screen.getByText('Skip'));
-  expect(markIntroSeen).toHaveBeenCalledTimes(1);
-  expect(mockReplace).toHaveBeenCalledWith('/login');
+  await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/feed'));
+  expect(mockCloseIntoTag).toHaveBeenCalledWith(expect.objectContaining({ eyebrow: 'Guest pass' }));
+  expect(mockOpenFromTag).toHaveBeenCalledTimes(1);
 });
 
 it.each([
@@ -111,7 +105,6 @@ it.each([
 ])('preserves onboarding %s navigation', (button, route) => {
   render(<OnboardingRoute />);
   fireEvent.press(screen.getByText(button));
-  expect(markIntroSeen).toHaveBeenCalledTimes(1);
   expect(mockReplace).toHaveBeenCalledWith(route);
 });
 
@@ -121,13 +114,13 @@ it('returns to settings when replaying onboarding', () => {
   render(<OnboardingRoute />);
   fireEvent.press(screen.getByText('Skip'));
   expect(mockBack).toHaveBeenCalledTimes(1);
-  expect(markIntroSeen).not.toHaveBeenCalled();
+  expect(mockReplace).not.toHaveBeenCalled();
 });
 
-it('requires login when a guest navigates directly to app tabs', () => {
+it('lets a guest browse the app tabs', () => {
   render(<TabsLayout />);
-  expect(screen.getByText('/login')).toBeTruthy();
-  expect(screen.queryByText('App tabs')).toBeNull();
+  expect(screen.getByText('App tabs')).toBeTruthy();
+  expect(screen.queryByText('/login')).toBeNull();
 });
 
 it('keeps app tabs available to a signed-in session', () => {

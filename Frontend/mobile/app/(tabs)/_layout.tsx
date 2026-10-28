@@ -1,4 +1,3 @@
-import { Redirect } from 'expo-router';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { Platform, View } from 'react-native';
 
@@ -17,10 +16,8 @@ export default function TabsLayout() {
   const { colors } = useTheme();
   const { isGuest } = useSession();
 
-  // Screen previews remain available in development; normal navigation requires a session.
-  const previewing = __DEV__ && process.env.EXPO_PUBLIC_DEV_START_ROUTE;
-  if (isGuest && !previewing) return <Redirect href="/login" />;
-
+  // Anyone can look around: a guest browses the feed and the market, and is asked for an
+  // account only on acting (voting, saving, messaging, snapping), with the reason why.
   const tabs = (
     <NativeTabs
       // The brand's one accent marks where you are, as Apple suggests for the tint colour.
