@@ -18,6 +18,7 @@ import type {
   ListingDetail,
   MarketFilter,
   Message,
+  MeetupPurpose,
   ChatReportReason,
   OfferStatus,
   ModerationCase,
@@ -124,7 +125,7 @@ export interface ChatService {
   proposeMeetup(
     id: MessageId,
     conversationId: ConversationId,
-    meetup: { readonly place: string; readonly when: string },
+    meetup: MeetupProposal,
   ): Promise<SendResult>;
   respondToOffer(messageId: MessageId, accept: boolean): Promise<Result<OfferStatus, AppError>>;
   confirmMeetup(messageId: MessageId): Promise<Result<void, AppError>>;
@@ -135,6 +136,17 @@ export interface ChatService {
 }
 
 export type SendResult = Result<Message, AppError>;
+
+/**
+ * Where and when to meet, and why. With `spotKey` the place is that public meetup spot (its name
+ * comes from the spot); without one, `place` is whatever was typed.
+ */
+export interface MeetupProposal {
+  readonly purpose: MeetupPurpose;
+  readonly spotKey?: string;
+  readonly place?: string;
+  readonly when: string;
+}
 
 export interface AdminReviewService {
   listQueue(cursor?: Cursor): Promise<Result<Page<ModerationCase>, AppError>>;

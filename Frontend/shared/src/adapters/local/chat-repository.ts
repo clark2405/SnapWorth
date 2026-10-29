@@ -6,10 +6,12 @@ import type {
   ChatOffer,
   ConversationSummary,
   Message,
+  OutgoingMessage,
   PublicProfile,
 } from '../../types/entities';
 import type { ConversationId, MessageId } from '../../types/ids';
 import { newUuid } from '../../types/ids';
+import { findMeetupSpot } from '../../types/meetup-spots';
 import { err, ok } from '../../types/result';
 import type { KeyValueStore } from './comment-repository';
 
@@ -62,6 +64,18 @@ export interface LocalChatRepositoryOptions {
    */
   readonly simulateReplies?: { readonly delayMs: number; readonly replies: readonly string[] };
   readonly storageKey?: string;
+}
+
+/** Like the database: a spot decides the place's name and pin, whatever name was sent. */
+function meetupFrom(outgoing: Extract<OutgoingMessage, { kind: 'meetup' }>): ChatMeetup {
+  const spot = findMeetupSpot(outgoing.spotKey);
+  return {
+    place: spot?.name ?? outgoing.place,
+    when: outgoing.when,
+    status: 'proposed',
+    purpose: outgoing.purpose,
+    spot: spot ? { key: spot.key, lat: spot.lat, lng: spot.lng } : undefined,
+  };
 }
 
 const notFound = { kind: 'authorization', code: 'not_found_or_denied' } as const;
@@ -157,6 +171,7 @@ export function createLocalChatRepository(options: LocalChatRepositoryOptions): 
             body: last.body,
             offerPhp: last.offer?.amountPhp,
             meetupPlace: last.meetup?.place,
+            meetupPurpose: last.meetup?.purpose,
           }
         : undefined,
       latestActivityAt: last?.createdAt ?? conversation.lastReadAt,
@@ -309,10 +324,7 @@ export function createLocalChatRepository(options: LocalChatRepositoryOptions): 
           outgoing.kind === 'offer'
             ? { amountPhp: outgoing.amountPhp, status: 'pending' }
             : undefined,
-        meetup:
-          outgoing.kind === 'meetup'
-            ? { place: outgoing.place, when: outgoing.when, status: 'proposed' }
-            : undefined,
+        meetup: outgoing.kind === 'meetup' ? meetupFrom(outgoing) : undefined,
         createdAt: nowIso(),
       };
       const changed = await update(conversationId, (current) => ({

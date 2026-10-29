@@ -20,6 +20,14 @@ describe('the latest message in one line', () => {
     expect(describeLatest({ fromMe: true, body: '', meetupPlace: 'SM Megamall' })).toBe(
       'Pickup at SM Megamall',
     );
+    expect(
+      describeLatest({
+        fromMe: false,
+        body: '',
+        meetupPlace: 'Rizal Park',
+        meetupPurpose: 'viewing',
+      }),
+    ).toBe('Viewing at Rizal Park');
     expect(describeLatest({ fromMe: true, body: 'Hi!' })).toBe('Hi!');
     expect(describeLatest(undefined)).toBe('No messages yet');
   });

@@ -34,7 +34,8 @@ import {
   useToast,
 } from '../../components';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
-import type { ChatReportReason, Message } from '../../types/entities';
+import type { MeetupProposal } from '../../ports/services';
+import type { ChatReportReason, MeetupPurpose, Message } from '../../types/entities';
 import type { AppError } from '../../types/errors';
 import { formatPeso, previewPhotoByListingKey } from '../preview/sample-data';
 import { MeetupCard, OfferCard } from './ChatCards';
@@ -87,6 +88,7 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
   const [sheet, setSheet] = useState<OpenSheet>(null);
   const [counterTo, setCounterTo] = useState<number | undefined>(undefined);
   const [reported, setReported] = useState(false);
+  const [meetupPurpose, setMeetupPurpose] = useState<MeetupPurpose>('pickup');
   const scroller = useRef<ScrollView>(null);
   const grouped = useGroupedMessages(messages);
   const closed = conversation?.closed;
@@ -102,6 +104,7 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
         { key: 'agree', label: 'Sounds good' },
         { key: 'offer', label: 'Make an offer' },
         { key: 'pickup', label: 'Arrange pickup' },
+        { key: 'viewing', label: 'See it in person' },
       ] as const,
     [],
   );
@@ -150,7 +153,12 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
     });
   };
 
-  const proposeMeetup = (meetup: { readonly place: string; readonly when: string }) => {
+  const openMeetup = (purpose: MeetupPurpose) => {
+    setMeetupPurpose(purpose);
+    setSheet('meetup');
+  };
+
+  const proposeMeetup = (meetup: MeetupProposal) => {
     setSheet(null);
     void chat.proposeMeetup(meetup).then((result) => {
       if (!result.ok) complain(result.error);
@@ -237,7 +245,7 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
         bleed={0}
         onChange={(key) => {
           if (key === 'offer') setSheet('offer');
-          else if (key === 'pickup') setSheet('meetup');
+          else if (key === 'pickup' || key === 'viewing') openMeetup(key);
           else {
             const option = quickReplies.find((entry) => entry.key === key);
             if (option) send(option.label);
@@ -378,7 +386,7 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
                 mine={message.mine}
                 locked={Boolean(closed) || blocked}
                 onConfirm={() => confirmMeetup(message)}
-                onSuggestAnother={() => setSheet('meetup')}
+                onSuggestAnother={() => openMeetup(message.meetup?.purpose ?? 'pickup')}
               />
             ) : (
               <View style={[styles.bubble, message.mine ? styles.bubbleMine : styles.bubbleTheirs]}>
@@ -422,7 +430,8 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
         askingPrice={askingPrice}
         onClose={() => setSheet(null)}
         onOffer={() => setSheet('offer')}
-        onMeetup={() => setSheet('meetup')}
+        onMeetup={() => openMeetup('pickup')}
+        onViewing={() => openMeetup('viewing')}
       />
       <OfferSheet
         visible={sheet === 'offer'}
@@ -436,6 +445,7 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
         onSend={sendOffer}
       />
       <MeetupSheet
+        purpose={meetupPurpose}
         visible={sheet === 'meetup'}
         onClose={() => setSheet(null)}
         onSend={proposeMeetup}

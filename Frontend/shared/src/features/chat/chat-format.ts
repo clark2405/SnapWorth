@@ -34,7 +34,9 @@ export function describeLatest(latest: ConversationPreview | undefined): string 
     const offer = `Offered ${formatPeso(latest.offerPhp)}`;
     return latest.body ? `${offer} · ${latest.body}` : offer;
   }
-  if (latest.meetupPlace) return `Pickup at ${latest.meetupPlace}`;
+  if (latest.meetupPlace) {
+    return `${latest.meetupPurpose === 'viewing' ? 'Viewing' : 'Pickup'} at ${latest.meetupPlace}`;
+  }
   return latest.body;
 }
 

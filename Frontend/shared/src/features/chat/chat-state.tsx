@@ -10,9 +10,10 @@ import {
 } from 'react';
 
 import { useToast } from '../../components';
-import type { ChatService, SendResult } from '../../ports/services';
+import type { ChatService, MeetupProposal, SendResult } from '../../ports/services';
 import type { UtcDateTime } from '../../types/date-time';
 import type {
+  ChatMeetup,
   ChatReportReason,
   ConversationDetail,
   ConversationSummary,
@@ -21,6 +22,7 @@ import type {
 } from '../../types/entities';
 import type { AppError } from '../../types/errors';
 import type { ConversationId, MessageId } from '../../types/ids';
+import { findMeetupSpot } from '../../types/meetup-spots';
 import { ok, type Result } from '../../types/result';
 import { chatErrorCopy } from './chat-format';
 
@@ -153,10 +155,7 @@ export interface ConversationState {
   readonly reload: () => void;
   readonly sendText: (body: string) => Promise<SendResult>;
   readonly sendOffer: (amountPhp: number, note?: string) => Promise<SendResult>;
-  readonly proposeMeetup: (meetup: {
-    readonly place: string;
-    readonly when: string;
-  }) => Promise<SendResult>;
+  readonly proposeMeetup: (meetup: MeetupProposal) => Promise<SendResult>;
   /** Tries a failed message again, under the same id so it can only land once. */
   readonly retry: (messageId: MessageId) => Promise<SendResult | null>;
   readonly respondToOffer: (
@@ -171,7 +170,19 @@ export interface ConversationState {
 type Draft =
   | { readonly kind: 'text'; readonly body: string }
   | { readonly kind: 'offer'; readonly amountPhp: number; readonly note?: string }
-  | { readonly kind: 'meetup'; readonly place: string; readonly when: string };
+  | ({ readonly kind: 'meetup' } & MeetupProposal);
+
+/** How a proposal shows while it sends: a known spot already has its name and pin. */
+function optimisticMeetup(proposal: MeetupProposal): ChatMeetup {
+  const spot = findMeetupSpot(proposal.spotKey);
+  return {
+    place: spot?.name ?? proposal.place ?? '',
+    when: proposal.when,
+    status: 'proposed',
+    purpose: proposal.purpose,
+    spot: spot ? { key: spot.key, lat: spot.lat, lng: spot.lng } : undefined,
+  };
+}
 
 /** Adds or replaces a message by id, keeping the thread oldest first. */
 function upsert(messages: readonly Message[], message: Message): Message[] {
@@ -269,10 +280,7 @@ export function useConversation(conversationId: string | undefined): Conversatio
               : '',
         offer:
           draft.kind === 'offer' ? { amountPhp: draft.amountPhp, status: 'pending' } : undefined,
-        meetup:
-          draft.kind === 'meetup'
-            ? { place: draft.place, when: draft.when, status: 'proposed' }
-            : undefined,
+        meetup: draft.kind === 'meetup' ? optimisticMeetup(draft) : undefined,
         createdAt: now,
         delivery: { status: 'pending' },
       };
@@ -315,8 +323,7 @@ export function useConversation(conversationId: string | undefined): Conversatio
     [deliver, service],
   );
   const proposeMeetup = useCallback(
-    (meetup: { readonly place: string; readonly when: string }) =>
-      deliver(service.nextMessageId(), { kind: 'meetup', ...meetup }),
+    (meetup: MeetupProposal) => deliver(service.nextMessageId(), { kind: 'meetup', ...meetup }),
     [deliver, service],
   );
   const retry = useCallback(

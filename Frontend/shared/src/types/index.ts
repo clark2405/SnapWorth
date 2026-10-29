@@ -10,3 +10,4 @@ export * from './photo-estimate';
 export * from './result';
 export * from './state-transitions';
 export * from './workflow-states';
+export * from './meetup-spots';

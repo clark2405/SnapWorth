@@ -179,6 +179,42 @@ describe('offers and reads', () => {
   });
 });
 
+describe('meeting up', () => {
+  it('pins a pickup to a public spot, taking its name and pin from the spot', async () => {
+    const chat = setup();
+    const id = unwrap(await chat.start('lamp'));
+    const sent = unwrap(
+      await chat.proposeMeetup(chat.nextMessageId(), id, {
+        purpose: 'viewing',
+        spotKey: 'megamall',
+        place: 'My place, 42 Quiet Street',
+        when: 'Saturday, 2:00 PM',
+      }),
+    );
+    expect(sent.meetup).toEqual({
+      place: 'SM Megamall',
+      when: 'Saturday, 2:00 PM',
+      status: 'proposed',
+      purpose: 'viewing',
+      spot: { key: 'megamall', lat: 14.5849, lng: 121.0566 },
+    });
+    const [row] = unwrap(await chat.list());
+    expect(row?.latest).toMatchObject({ meetupPlace: 'SM Megamall', meetupPurpose: 'viewing' });
+  });
+
+  it('refuses a spot that is not on the list', async () => {
+    const chat = setup();
+    const id = unwrap(await chat.start('lamp'));
+    const result = await chat.proposeMeetup(chat.nextMessageId(), id, {
+      purpose: 'pickup',
+      spotKey: 'my-house',
+      when: 'Today, 6:00 PM',
+    });
+    expect(!result.ok && result.error).toMatchObject({ kind: 'validation', code: 'unknown_spot' });
+    expect(unwrap(await chat.get(id)).messages).toHaveLength(0);
+  });
+});
+
 describe('blocking', () => {
   it('stops messages both ways in every conversation with that person', async () => {
     const chat = setup();

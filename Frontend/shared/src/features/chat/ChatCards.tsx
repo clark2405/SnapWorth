@@ -1,10 +1,27 @@
-import { Archive, Check, CircleX, Clock3, HandCoins, MapPin, Repeat2 } from 'lucide-react-native';
-import { View } from 'react-native';
+import {
+  Archive,
+  Check,
+  CircleX,
+  Clock3,
+  Eye,
+  HandCoins,
+  MapPin,
+  Navigation,
+  Repeat2,
+} from 'lucide-react-native';
+import { useMemo } from 'react';
+import { Linking, Platform, View } from 'react-native';
 
 import { Button, SWText, Tag, type TagTone } from '../../components';
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import type { ChatMeetup, ChatOffer, OfferStatus } from '../../types/entities';
+import { findMeetupSpot } from '../../types/meetup-spots';
 import { formatPeso } from '../preview/sample-data';
+import { directionsUrl, frameAround, project } from './meetup-map-geo';
+import { MeetupMap } from './MeetupMap';
+
+/** The chat card's map: wide and short, so the card stays a card. */
+const mapAspect = 2.2;
 
 const offerStatus: Record<
   OfferStatus,
@@ -125,23 +142,65 @@ export function MeetupCard({
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const confirmed = meetup.status === 'confirmed';
+  const spot = meetup.spot;
+  const known = findMeetupSpot(spot?.key);
+  const frame = useMemo(
+    () =>
+      spot
+        ? frameAround([project(spot.lat, spot.lng)], mapAspect, { padding: 4, minimumWidth: 40 })
+        : null,
+    [spot],
+  );
+  const viewing = meetup.purpose === 'viewing';
 
   return (
     <View style={styles.card}>
+      {spot && frame ? (
+        <MeetupMap
+          compact
+          frame={frame}
+          pins={[{ key: spot.key, name: meetup.place, lat: spot.lat, lng: spot.lng }]}
+          selectedKey={spot.key}
+          agreed={confirmed}
+          accessibilityLabel={`Map showing ${meetup.place}${confirmed ? ', agreed' : ''}`}
+        />
+      ) : null}
       <View style={styles.meetupRow}>
         <View style={[styles.pin, confirmed ? styles.pinConfirmed : null]}>
-          <MapPin size={18} strokeWidth={2} color={confirmed ? colors.mintInk : colors.sandInk} />
+          {viewing ? (
+            <Eye size={18} strokeWidth={2} color={confirmed ? colors.mintInk : colors.sandInk} />
+          ) : (
+            <MapPin size={18} strokeWidth={2} color={confirmed ? colors.mintInk : colors.sandInk} />
+          )}
         </View>
         <View style={styles.meetupText}>
           <SWText variant="overline" tone="textMuted">
-            Pickup
+            {viewing ? 'See it in person' : 'Pickup'}
           </SWText>
           <SWText variant="headingSmall">{meetup.place}</SWText>
           <SWText variant="bodySmall" tone="textSecondary">
-            {meetup.when}
+            {known ? `${known.city} · ${meetup.when}` : meetup.when}
           </SWText>
         </View>
       </View>
+      {spot ? (
+        <Button
+          label="Directions"
+          variant="tertiary"
+          size="small"
+          icon={Navigation}
+          accessibilityHint="Opens the place in your maps app"
+          onPress={() =>
+            void Linking.openURL(
+              directionsUrl(
+                { name: meetup.place, city: known?.city, lat: spot.lat, lng: spot.lng },
+                Platform.OS === 'ios' ? 'ios' : 'other',
+              ),
+            )
+          }
+          containerStyle={styles.directions}
+        />
+      ) : null}
       {!mine && !confirmed && !locked ? (
         <View style={styles.answers}>
           <Button
@@ -211,6 +270,11 @@ const stylesFor = themedStyles((colors) => ({
   meetupRow: {
     flexDirection: 'row',
     gap: tokens.spacing[3],
+    marginTop: tokens.spacing[2],
+  },
+  directions: {
+    alignSelf: 'flex-start',
+    marginTop: tokens.spacing[1],
   },
   pin: {
     width: 40,

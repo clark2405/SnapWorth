@@ -392,12 +392,7 @@ export const previewConversation = {
   ] satisfies PreviewMessage[],
 } as const;
 
-/** Public places suggested for a handoff, and the times offered when arranging one. */
-export const previewMeetupSpots: readonly { readonly key: string; readonly label: string }[] = [
-  { key: 'greenbelt', label: 'Greenbelt 3, Makati' },
-  { key: 'ayala-triangle', label: 'Ayala Triangle Gardens' },
-  { key: 'megamall', label: 'SM Megamall' },
-];
+/** The days and times offered when arranging a meetup. */
 
 export const previewMeetupDays: readonly { readonly key: string; readonly label: string }[] = [
   { key: 'today', label: 'Today' },

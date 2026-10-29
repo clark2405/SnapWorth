@@ -2,6 +2,7 @@ import type { ChatRepository } from '../ports/chat';
 import type { ChatService, SendResult } from '../ports/services';
 import { parseMessageBody } from '../types/entities';
 import { newUuid, type MessageId } from '../types/ids';
+import { findMeetupSpot } from '../types/meetup-spots';
 import { err } from '../types/result';
 
 /** The largest offer the database accepts, in pesos. */
@@ -41,7 +42,11 @@ export function createChatService(repository: ChatRepository): ChatService {
     },
 
     async proposeMeetup(id, conversationId, meetup): Promise<SendResult> {
-      const place = meetup.place.trim();
+      const spot = findMeetupSpot(meetup.spotKey);
+      if (meetup.spotKey && !spot) {
+        return err({ kind: 'validation', code: 'unknown_spot', field: 'place' });
+      }
+      const place = spot?.name ?? meetup.place?.trim() ?? '';
       const when = meetup.when.trim();
       if (!place || place.length > meetupPlaceMaxLength) {
         return err({ kind: 'validation', code: place ? 'too_long' : 'empty', field: 'place' });
@@ -49,7 +54,13 @@ export function createChatService(repository: ChatRepository): ChatService {
       if (!when || when.length > meetupWhenMaxLength) {
         return err({ kind: 'validation', code: when ? 'too_long' : 'empty', field: 'when' });
       }
-      return repository.send(id, conversationId, { kind: 'meetup', place, when });
+      return repository.send(id, conversationId, {
+        kind: 'meetup',
+        purpose: meetup.purpose,
+        spotKey: spot?.key,
+        place,
+        when,
+      });
     },
 
     respondToOffer: (messageId, accept) => repository.respondToOffer(messageId, accept),

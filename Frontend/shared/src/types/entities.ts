@@ -266,17 +266,24 @@ export const parseMessageBody = (raw: string): Result<MessageBody, ValidationErr
 /** `countered` means a newer offer, from either side, replaced this one. */
 export type OfferStatus = 'pending' | 'accepted' | 'declined' | 'countered';
 export type MeetupStatus = 'proposed' | 'confirmed';
+/** A pickup hands the item over; a viewing is for seeing it in person before deciding. */
+export type MeetupPurpose = 'pickup' | 'viewing';
 
 export interface ChatOffer {
   readonly amountPhp: number;
   readonly status: OfferStatus;
 }
 
-/** A proposed pickup or handoff: where and when, and whether the other side has agreed. */
+/**
+ * A proposed pickup or viewing: where and when, and whether the other side has agreed. `spot` is
+ * set when the place is one of the public meetup spots, with the pin the server gave it.
+ */
 export interface ChatMeetup {
   readonly place: string;
   readonly when: string;
   readonly status: MeetupStatus;
+  readonly purpose: MeetupPurpose;
+  readonly spot?: { readonly key: string; readonly lat: number; readonly lng: number };
 }
 
 /**
@@ -299,7 +306,14 @@ export interface Message {
 export type OutgoingMessage =
   | { readonly kind: 'text'; readonly body: MessageBody }
   | { readonly kind: 'offer'; readonly amountPhp: number; readonly note?: MessageBody }
-  | { readonly kind: 'meetup'; readonly place: string; readonly when: string };
+  | {
+      readonly kind: 'meetup';
+      readonly purpose: MeetupPurpose;
+      /** One of the public meetup spots; it decides the place's name and pin. */
+      readonly spotKey?: string;
+      readonly place: string;
+      readonly when: string;
+    };
 
 /** The listing a conversation is about, as the conversation shows it. */
 export interface ChatListing {
@@ -316,6 +330,7 @@ export interface ConversationPreview {
   readonly body: string;
   readonly offerPhp?: number;
   readonly meetupPlace?: string;
+  readonly meetupPurpose?: MeetupPurpose;
 }
 
 export type ChatReportReason = 'scam' | 'harassment' | 'spam' | 'other';

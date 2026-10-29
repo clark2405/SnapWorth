@@ -2,7 +2,13 @@ import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 
 import type { ChatListener, ChatRepository } from '../../ports/chat';
 import type { UtcDateTime } from '../../types/date-time';
-import type { ConversationSummary, MeetupStatus, Message, OfferStatus } from '../../types/entities';
+import type {
+  ConversationSummary,
+  MeetupPurpose,
+  MeetupStatus,
+  Message,
+  OfferStatus,
+} from '../../types/entities';
 import type { AppError, OperationName } from '../../types/errors';
 import type { ConversationId, MessageId, UserId } from '../../types/ids';
 import { err, ok, type Result } from '../../types/result';
@@ -20,6 +26,10 @@ interface MessageRow {
   readonly meetup_place: string | null;
   readonly meetup_when: string | null;
   readonly meetup_status: MeetupStatus | null;
+  readonly meetup_purpose: MeetupPurpose | null;
+  readonly meetup_spot: string | null;
+  readonly meetup_lat: number | null;
+  readonly meetup_lng: number | null;
   readonly created_at: string;
 }
 
@@ -38,6 +48,7 @@ interface ConversationRow {
   readonly last_body: string | null;
   readonly last_offer_php: number | null;
   readonly last_meetup_place: string | null;
+  readonly last_meetup_purpose: MeetupPurpose | null;
   readonly last_from_me: boolean | null;
   readonly last_message_at: string;
   readonly unread_count: number;
@@ -45,7 +56,7 @@ interface ConversationRow {
 }
 
 const messageColumns =
-  'id, conversation_id, sender_id, kind, body, offer_php, offer_status, meetup_place, meetup_when, meetup_status, created_at';
+  'id, conversation_id, sender_id, kind, body, offer_php, offer_status, meetup_place, meetup_when, meetup_status, meetup_purpose, meetup_spot, meetup_lat, meetup_lng, created_at';
 
 const iso = (value: string) => new Date(value).toISOString() as UtcDateTime;
 
@@ -63,7 +74,17 @@ function messageFromRow(row: MessageRow, viewer: string): Message {
         : undefined,
     meetup:
       row.kind === 'meetup' && row.meetup_place && row.meetup_when && row.meetup_status
-        ? { place: row.meetup_place, when: row.meetup_when, status: row.meetup_status }
+        ? {
+            place: row.meetup_place,
+            when: row.meetup_when,
+            status: row.meetup_status,
+            purpose: row.meetup_purpose ?? 'pickup',
+            // The pin is the server's, taken from its list of public spots.
+            spot:
+              row.meetup_spot && row.meetup_lat !== null && row.meetup_lng !== null
+                ? { key: row.meetup_spot, lat: row.meetup_lat, lng: row.meetup_lng }
+                : undefined,
+          }
         : undefined,
     createdAt,
     delivery: { status: 'delivered', deliveredAt: createdAt },
@@ -93,6 +114,7 @@ function summaryFromRow(row: ConversationRow): ConversationSummary {
             body: row.last_body ?? '',
             offerPhp: row.last_offer_php ?? undefined,
             meetupPlace: row.last_meetup_place ?? undefined,
+            meetupPurpose: row.last_meetup_purpose ?? undefined,
           },
     latestActivityAt: iso(row.last_message_at),
     unread: row.unread_count,
@@ -209,6 +231,8 @@ export function createSupabaseChatRepository(client: SupabaseClient): ChatReposi
           offer_php: message.kind === 'offer' ? message.amountPhp : null,
           meetup_place: message.kind === 'meetup' ? message.place : null,
           meetup_when: message.kind === 'meetup' ? message.when : null,
+          meetup_purpose: message.kind === 'meetup' ? message.purpose : null,
+          meetup_spot: message.kind === 'meetup' ? (message.spotKey ?? null) : null,
         })
         .select(messageColumns)
         .single();

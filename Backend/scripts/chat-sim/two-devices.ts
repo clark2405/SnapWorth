@@ -297,16 +297,20 @@ async function main() {
 
   const meetupId = seller.chat.nextMessageId();
   await seller.chat.proposeMeetup(meetupId, conversation, {
-    place: "SM Megamall",
+    purpose: "viewing",
+    spotKey: "megamall",
     when: "Saturday, 2:00 PM",
   });
+  const pinned = await buyer.heardMessage(
+    (event) => event.message.id === meetupId,
+  );
   check(
-    Boolean(
-      await buyer.heardMessage(
-        (event) => event.message.meetup?.place === "SM Megamall",
-      ),
-    ),
-    "the seller proposes a pickup",
+    pinned?.message.meetup?.place === "SM Megamall" &&
+      pinned.message.meetup.purpose === "viewing" &&
+      pinned.message.meetup.spot?.lat === 14.5849 &&
+      pinned.message.meetup.spot?.lng === 121.0566,
+    "the seller pins a viewing at SM Megamall on the map, and the buyer gets the same pin",
+    pinned?.message.meetup,
   );
   const confirmed = await buyer.chat.confirmMeetup(meetupId);
   check(confirmed.ok, "the buyer confirms it");
@@ -492,6 +496,49 @@ async function main() {
     created_at: "2020-01-01T00:00:00Z",
   });
   check(backdate.status === 403, "nobody can backdate a message", backdate);
+  const ownPin = await raw("POST", "messages?select=id", buyerToken, {
+    conversation_id: conversation,
+    kind: "meetup",
+    meetup_spot: "megamall",
+    meetup_when: "Tonight",
+    meetup_lat: 14.6,
+    meetup_lng: 121.1,
+  });
+  check(
+    ownPin.status === 403,
+    "nobody can drop their own pin on the map",
+    ownPin,
+  );
+  const relabel = await raw(
+    "POST",
+    "messages?select=meetup_place,meetup_lat,meetup_lng",
+    buyerToken,
+    {
+      conversation_id: conversation,
+      kind: "meetup",
+      meetup_spot: "megamall",
+      meetup_place: "Quiet alley behind the mall",
+      meetup_when: "Tonight",
+    },
+  );
+  check(
+    relabel.status === 201 &&
+      relabel.body[0]?.meetup_place === "SM Megamall" &&
+      relabel.body[0]?.meetup_lat === 14.5849,
+    "a pin always shows the place it names: a made-up label is replaced with the spot's own",
+    relabel,
+  );
+  const offList = await raw("POST", "messages?select=id", buyerToken, {
+    conversation_id: conversation,
+    kind: "meetup",
+    meetup_spot: "my-house",
+    meetup_when: "Tonight",
+  });
+  check(
+    offList.status === 400,
+    "a place that is not on the public list is refused",
+    offList,
+  );
   const selfChat = await seller.chat.start("sim-camera");
   check(
     !selfChat.ok,
