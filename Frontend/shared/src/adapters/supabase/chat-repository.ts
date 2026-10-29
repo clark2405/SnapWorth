@@ -1,12 +1,13 @@
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 
-import type { ChatRepository } from '../../ports/chat';
+import type { ChatListener, ChatRepository } from '../../ports/chat';
 import type { UtcDateTime } from '../../types/date-time';
 import type { ConversationSummary, MeetupStatus, Message, OfferStatus } from '../../types/entities';
 import type { AppError, OperationName } from '../../types/errors';
 import type { ConversationId, MessageId, UserId } from '../../types/ids';
 import { err, ok, type Result } from '../../types/result';
 import { toAppError } from './errors';
+import { ensureSignedIn } from './session';
 
 interface MessageRow {
   readonly id: string;
@@ -107,15 +108,7 @@ function summaryFromRow(row: ConversationRow): ConversationSummary {
  * anonymously, the same way comments do.
  */
 export function createSupabaseChatRepository(client: SupabaseClient): ChatRepository {
-  async function viewerId(): Promise<Result<string, AppError>> {
-    const { data } = await client.auth.getSession();
-    if (data.session) return ok(data.session.user.id);
-    const signedIn = await client.auth.signInAnonymously();
-    if (signedIn.error || !signedIn.data.user) {
-      return err(toAppError(signedIn.error, 'authenticate'));
-    }
-    return ok(signedIn.data.user.id);
-  }
+  const viewerId = () => ensureSignedIn(client);
 
   async function conversationRows(
     target: string | null,
@@ -126,6 +119,41 @@ export function createSupabaseChatRepository(client: SupabaseClient): ChatReposi
     const { data, error } = await client.rpc('conversation_list', { target });
     if (error) return err(toAppError(error, operation));
     return ok(data as ConversationRow[]);
+  }
+
+  // One Realtime channel per device, shared by every screen that listens: supabase-js keeps one
+  // channel per name, and a joined channel takes no new listeners.
+  const listeners = new Set<ChatListener>();
+  let channel: RealtimeChannel | undefined;
+  let opening = 0;
+
+  function openChannel() {
+    const attempt = ++opening;
+    void viewerId().then((viewer) => {
+      if (attempt !== opening || listeners.size === 0 || !viewer.ok) return;
+      // Row-level security decides which changes reach this device: only its conversations.
+      channel = client
+        .channel(`chats:${viewer.value}`)
+        .on<MessageRow>(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'messages' },
+          (change) => {
+            if (change.eventType === 'DELETE') return;
+            const event = {
+              type: 'message' as const,
+              message: messageFromRow(change.new, viewer.value),
+            };
+            listeners.forEach((each) => each(event));
+          },
+        )
+        .subscribe();
+    });
+  }
+
+  function closeChannel() {
+    opening += 1;
+    if (channel) void client.removeChannel(channel);
+    channel = undefined;
   }
 
   return {
@@ -225,26 +253,11 @@ export function createSupabaseChatRepository(client: SupabaseClient): ChatReposi
     },
 
     subscribe(listener) {
-      let channel: RealtimeChannel | undefined;
-      let stopped = false;
-      void viewerId().then((viewer) => {
-        if (stopped || !viewer.ok) return;
-        // Row-level security decides which changes reach this device: only its conversations.
-        channel = client
-          .channel(`chats:${viewer.value}`)
-          .on<MessageRow>(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'messages' },
-            (change) => {
-              if (change.eventType === 'DELETE') return;
-              listener({ type: 'message', message: messageFromRow(change.new, viewer.value) });
-            },
-          )
-          .subscribe();
-      });
+      listeners.add(listener);
+      if (listeners.size === 1) openChannel();
       return () => {
-        stopped = true;
-        if (channel) void client.removeChannel(channel);
+        listeners.delete(listener);
+        if (listeners.size === 0) closeChannel();
       };
     },
   };

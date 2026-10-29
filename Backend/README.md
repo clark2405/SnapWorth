@@ -123,9 +123,16 @@ Google's unpaid API terms permit product-improvement use of inputs and outputs.
 ```sh
 Backend/scripts/test-db.sh         # migrations, RLS, seed: a throwaway local Postgres, no Docker
 Backend/scripts/test-functions.sh  # Edge Function typecheck and unit tests (needs Deno)
+Backend/scripts/chat-sim/run.sh    # two phones chatting, and a third trying to get in (needs Frontend's npm deps)
 ```
 
 `test-db.sh` needs Postgres 15+ server binaries (`initdb`, `pg_ctl`, `psql`). It applies a small stand-in for Supabase's `auth` schema and roles (`supabase/tests/support/supabase_stub.sql`), then the migrations, the seed, and every `*_test.sql`, acting as anonymous visitors, different signed-in users, and the server.
+
+### Chat on two devices
+
+`scripts/chat-sim/run.sh` checks chat end to end without Docker or a Supabase project. It starts Postgres with every migration and seed, puts `chat-sim/gateway.cjs` in front of it, and runs `two-devices.ts`. In that scenario, two phones (each its own Supabase client and account, running the app's real chat adapter and service) message, make and answer offers, and arrange a pickup. A third account, forged and edited tokens, and a signed-out visitor try to read, write, change and listen in on the conversation, through the app and through raw API calls.
+
+The gateway is a stand-in, not Supabase. It does what Supabase's gateway does for security: it checks the JWT, then runs each query in Postgres as that caller (`set local role` plus `request.jwt.claims`), so the database's row-level security, grants and functions decide everything, as they do behind PostgREST. Its Realtime stand-in reads each changed row again as each subscriber and sends it only if their select policy allows, which is the check Supabase Realtime makes. It covers only what the chat uses. To see the apps against it, run `scripts/chat-sim/start.sh` and set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` to the URL and key it prints.
 
 ## Directory map
 
@@ -133,6 +140,7 @@ Backend/scripts/test-functions.sh  # Edge Function typecheck and unit tests (nee
 Backend/
 ├── README.md
 ├── scripts/
+│   ├── chat-sim/            (local two-device chat check)
 │   ├── test-db.sh
 │   └── test-functions.sh
 └── supabase/
