@@ -1,9 +1,11 @@
 import { requireOptionalNativeModule } from 'expo';
 
+import type { WorthyAnswer } from '@snapworth/shared/features/companion';
+
 /**
- * The phone's own look at a snapped photo (`modules/snap-sense`): Vision on any iPhone, and
- * Apple Intelligence's image reading on iOS 27 devices that have it. Pricing never happens
- * here; this decides whether a photo is worth sending and what to tell the cloud about it.
+ * The phone's own intelligence (`modules/snap-sense`): a look at a snapped photo (Vision on any
+ * iPhone, Apple Intelligence's image reading on iOS 27), and Worthy's chat for the light
+ * questions (Apple Intelligence, iOS 26 on). Pricing never happens here.
  *
  * Android, Expo Go and the tests have no native module, so every call here resolves to
  * nothing and the camera prices the photo exactly as before.
@@ -44,6 +46,9 @@ interface SnapSenseModule {
   itemReaderStatus(): ItemReaderStatus;
   prepareItemReader(): void;
   readItem(uri: string): Promise<ItemImpression | null>;
+  worthyStatus(): ItemReaderStatus;
+  startWorthyChat(): void;
+  askWorthy(question: string): Promise<WorthyAnswer | null>;
 }
 
 const native = requireOptionalNativeModule<SnapSenseModule>('SnapSense');
@@ -81,6 +86,32 @@ export async function readItem(uri: string): Promise<ItemImpression | null> {
   });
   try {
     return await Promise.race([native.readItem(uri).catch(() => null), late]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** How long a chat answer may take before Worthy answers from the app instead. */
+const worthyTimeoutMs = 8000;
+
+export function worthyOnDevice(): boolean {
+  return native?.worthyStatus() === 'available';
+}
+
+/** Starts a fresh conversation, loading the model before the first question. */
+export function startWorthyChat(): void {
+  native?.startWorthyChat();
+}
+
+/** Worthy's on-device answer, or null when it can't give one in time. */
+export async function askWorthy(question: string): Promise<WorthyAnswer | null> {
+  if (!native || !worthyOnDevice()) return null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), worthyTimeoutMs);
+  });
+  try {
+    return await Promise.race([native.askWorthy(question).catch(() => null), late]);
   } finally {
     clearTimeout(timer);
   }

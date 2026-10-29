@@ -1,7 +1,7 @@
 import ExpoModulesCore
 
-/// The phone's own look at a snapped photo, before it goes to the cloud to be priced. Pricing
-/// stays in the cloud: these only say whether the photo is worth sending, and what's in it.
+/// The app's on-device intelligence: a look at a snapped photo before it goes to the cloud to be
+/// priced, and Worthy's chat for the light questions. Prices always come from the cloud.
 public class SnapSenseModule: Module {
   public func definition() -> ModuleDefinition {
     Name("SnapSense")
@@ -23,6 +23,20 @@ public class SnapSenseModule: Module {
 
     AsyncFunction("readItem") { (uri: URL) async -> ItemImpression? in
       await ItemReader.read(uri)
+    }
+
+    // Worthy's chat, answered on the phone for the light questions (see WorthyChat).
+    Function("worthyStatus") { () -> String in
+      WorthyChat.status()
+    }
+
+    // A fresh conversation, with the model loaded before the first question.
+    Function("startWorthyChat") {
+      WorthyChat.start()
+    }
+
+    AsyncFunction("askWorthy") { (question: String) async -> WorthyAnswer? in
+      await WorthyChat.ask(question)
     }
   }
 }

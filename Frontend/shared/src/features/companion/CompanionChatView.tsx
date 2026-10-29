@@ -28,6 +28,7 @@ import {
   previewPortfolio,
   previewValuation,
 } from '../preview/sample-data';
+import { settleAnswer, type WorthyAnswerer, type WorthyIntent } from './worthy-replies';
 
 type ReplyCard = 'range' | 'listing' | 'trend' | 'portfolio' | null;
 
@@ -36,22 +37,27 @@ interface ChatMessage {
   readonly role: 'user' | 'worthy';
   readonly text: string;
   readonly card: ReplyCard;
+  /** Answered by the model on this device, in its own words. */
+  readonly onDevice?: boolean;
 }
 
-function replyFor(question: string): { text: string; card: ReplyCard } {
-  if (/collection|portfolio|sell next/i.test(question)) {
-    return {
-      text: `Your ${previewPortfolio.itemCount} items add up to about ${formatPeso(previewPortfolio.total)}, ${previewPortfolio.changeLabel}. ${previewPortfolio.topMover.title} is your top mover.`,
-      card: 'portfolio',
-    };
+/** The app's own answer for an intent: words and the evidence card beneath them. */
+function replyForIntent(intent: WorthyIntent): { text: string; card: ReplyCard } {
+  switch (intent) {
+    case 'collection':
+      return {
+        text: `Your ${previewPortfolio.itemCount} items add up to about ${formatPeso(previewPortfolio.total)}, ${previewPortfolio.changeLabel}. ${previewPortfolio.topMover.title} is your top mover.`,
+        card: 'portfolio',
+      };
+    case 'price':
+      return { text: previewCompanionReplies.fairPrice, card: 'range' };
+    case 'listing':
+      return { text: previewCompanionReplies.listing, card: 'listing' };
+    case 'trend':
+      return { text: previewCompanionReplies.trend, card: 'trend' };
+    case 'chat':
+      return { text: previewCompanionReplies.fallback, card: null };
   }
-  if (/fair|offer|price\b|worth it/i.test(question))
-    return { text: previewCompanionReplies.fairPrice, card: 'range' };
-  if (/listing|write|describe/i.test(question))
-    return { text: previewCompanionReplies.listing, card: 'listing' };
-  if (/trend|heading|trending/i.test(question))
-    return { text: previewCompanionReplies.trend, card: 'trend' };
-  return { text: previewCompanionReplies.fallback, card: null };
 }
 
 const followUps = [
@@ -65,6 +71,11 @@ export interface CompanionChatViewProps {
   readonly initialQuestion?: string;
   readonly onBack?: () => void;
   readonly onUseListing?: () => void;
+  /**
+   * Answers on the device where it can (Apple Intelligence on iOS): it works out what's being
+   * asked and answers the light questions itself. Without it, Worthy goes by the question's words.
+   */
+  readonly answer?: WorthyAnswerer;
 }
 
 /**
@@ -81,7 +92,7 @@ export function CompanionChatView(props: CompanionChatViewProps) {
   );
 }
 
-function CompanionChat({ initialQuestion, onBack, onUseListing }: CompanionChatViewProps) {
+function CompanionChat({ initialQuestion, onBack, onUseListing, answer }: CompanionChatViewProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
@@ -95,24 +106,33 @@ function CompanionChat({ initialQuestion, onBack, onUseListing }: CompanionChatV
   // unless the person has scrolled up to reread something.
   const following = useRef(true);
 
-  const ask = useCallback((question: string) => {
-    following.current = true;
-    counter.current += 1;
-    const id = `${counter.current}`;
-    setMessages((current) => [
-      ...current,
-      { id: `u${id}`, role: 'user', text: question, card: null },
-    ]);
-    setThinking(true);
-    setTimeout(() => {
-      const reply = replyFor(question);
-      setThinking(false);
+  const ask = useCallback(
+    (question: string) => {
+      following.current = true;
+      counter.current += 1;
+      const id = `${counter.current}`;
       setMessages((current) => [
         ...current,
-        { id: `w${id}`, role: 'worthy', text: reply.text, card: reply.card },
+        { id: `u${id}`, role: 'user', text: question, card: null },
       ]);
-    }, 1200);
-  }, []);
+      setThinking(true);
+      const reply = (settled: ReturnType<typeof settleAnswer>) => {
+        const message: ChatMessage = settled.words
+          ? { id: `w${id}`, role: 'worthy', text: settled.words, card: null, onDevice: true }
+          : { id: `w${id}`, role: 'worthy', ...replyForIntent(settled.intent) };
+        setThinking(false);
+        setMessages((current) => [...current, message]);
+      };
+      if (answer) {
+        void answer(question)
+          .catch(() => null)
+          .then((found) => reply(settleAnswer(question, found)));
+      } else {
+        setTimeout(() => reply(settleAnswer(question, null)), 1200);
+      }
+    },
+    [answer],
+  );
 
   useEffect(() => {
     if (asked.current) return;
@@ -122,7 +142,8 @@ function CompanionChat({ initialQuestion, onBack, onUseListing }: CompanionChatV
 
   const submit = () => {
     const question = draft.trim();
-    if (!question) return;
+    // The device answers one question at a time.
+    if (!question || (answer && thinking)) return;
     setDraft('');
     ask(question);
   };
@@ -216,7 +237,7 @@ function CompanionChat({ initialQuestion, onBack, onUseListing }: CompanionChatV
           <Animated.View entering={FadeIn} style={styles.thinking}>
             <Worthy size={28} mood="thinking" />
             <SWText variant="labelMedium" tone="textMuted">
-              Checking recent sales…
+              {answer ? 'Thinking…' : 'Checking recent sales…'}
             </SWText>
           </Animated.View>
         ) : null}
@@ -261,6 +282,14 @@ function WorthyReply({
       <SWText variant="bodyLarge" accessibilityLabel={message.text}>
         {typed}
       </SWText>
+      {/* Only an iPhone answers on the device (see WorthyAnswerer), so the line can name it. */}
+      {done && message.onDevice ? (
+        <Animated.View entering={FadeIn.duration(300)}>
+          <SWText variant="caption" tone="textMuted">
+            Answered on your iPhone with Apple Intelligence
+          </SWText>
+        </Animated.View>
+      ) : null}
       {done && message.card ? (
         <Animated.View entering={FadeInDown.springify().damping(18)}>
           <ReplyCardView card={message.card} onUseListing={onUseListing} />
