@@ -15,7 +15,7 @@ const messages: Record<string, string> = {
 
 export function createPhotoPricingService(client: SupabaseClient): PhotoPricingService {
   return {
-    async estimate(image, signal) {
+    async estimate(image, signal, clues) {
       if (signal?.aborted) throw new Error('The estimate was canceled.');
       const { data, error } = await client.auth.getSession();
       if (error) throw new Error('Could not establish an estimation session. Please try again.');
@@ -26,7 +26,8 @@ export function createPhotoPricingService(client: SupabaseClient): PhotoPricingS
       }
       if (signal?.aborted) throw new Error('The estimate was canceled.');
       const response = await client.functions.invoke<unknown>('estimate-price', {
-        body: { image },
+        // Clues are optional: a function deployed before them ignores the field.
+        body: clues ? { image, clues } : { image },
         signal,
       });
       if (response.error) {

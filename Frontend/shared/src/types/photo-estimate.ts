@@ -22,8 +22,27 @@ export type PhotoEstimate =
       readonly highPhp: null;
     });
 
+/**
+ * What the phone read in the photo before sending it, passed to the cloud as hints. Text and
+ * codes are exactly as printed (a size tag, a model number); `looksLike` is the on-device
+ * model's first impression, which may be wrong. The cloud still prices from the photo itself.
+ */
+export interface PhotoClues {
+  readonly text: readonly string[];
+  readonly codes: readonly string[];
+  readonly looksLike?: {
+    readonly item: string;
+    readonly category: string;
+    readonly colours: readonly string[];
+  };
+}
+
 export interface PhotoPricingService {
-  estimate(image: CapturedItemImage, signal?: AbortSignal): Promise<PhotoEstimate>;
+  estimate(
+    image: CapturedItemImage,
+    signal?: AbortSignal,
+    clues?: PhotoClues,
+  ): Promise<PhotoEstimate>;
 }
 
 export function isPhotoEstimate(value: unknown): value is PhotoEstimate {

@@ -8,9 +8,19 @@ import { tokens } from '@snapworth/shared/design';
 import { CaptureView } from '@snapworth/shared/features/capture';
 import type {
   CapturedItemImage,
+  PhotoClues,
   PhotoEstimate,
   PhotoPricingService,
 } from '@snapworth/shared/types';
+
+import { measurePhoto, prepareItemReader, readItem } from '../snap-sense';
+import {
+  cluesFrom,
+  confirmedBrand,
+  photoProblem,
+  photoProblemCopy,
+  type PhotoProblem,
+} from './photo-check';
 
 export interface CameraCaptureProps {
   readonly active: boolean;
@@ -42,6 +52,12 @@ export function CameraCapture({
   const [estimate, setEstimate] = useState<PhotoEstimate>();
   const [estimating, setEstimating] = useState(false);
   const [estimateError, setEstimateError] = useState<string>();
+  // The phone's own look at the photo, before it's priced: a problem stops it being sent.
+  const [checking, setChecking] = useState(false);
+  const [problem, setProblem] = useState<PhotoProblem>();
+  const [looksLike, setLooksLike] = useState<string>();
+  const [clues, setClues] = useState<PhotoClues>();
+  const lookGeneration = useRef(0);
   const estimateGeneration = useRef(0);
   const estimateRequest = useRef<{
     controller: AbortController;
@@ -69,7 +85,7 @@ export function CameraCapture({
     [],
   );
 
-  const estimatePhoto = async (image: CapturedItemImage) => {
+  const estimatePhoto = async (image: CapturedItemImage, hints?: PhotoClues) => {
     if (estimateRequest.current) return;
     const generation = ++estimateGeneration.current;
     const controller = new AbortController();
@@ -86,7 +102,9 @@ export function CameraCapture({
     }, 75_000);
     estimateRequest.current = { controller, timer };
     try {
-      const result = await onEstimate(image, controller.signal);
+      const result = await (hints
+        ? onEstimate(image, controller.signal, hints)
+        : onEstimate(image, controller.signal));
       if (generation === estimateGeneration.current && !controller.signal.aborted)
         setEstimate(result);
     } catch (cause) {
@@ -105,6 +123,48 @@ export function CameraCapture({
       }
     }
   };
+
+  /**
+   * Checks the photo on the phone before it's priced. A dark, blurred or empty photo is held
+   * back with what to fix, since each estimate spends the day's small cloud allowance. A good
+   * one is read for its printed text and, with Apple Intelligence, a first impression of the
+   * item; both go to the cloud as clues.
+   */
+  const lookThenEstimate = async (uri: string, image: CapturedItemImage) => {
+    const look = ++lookGeneration.current;
+    setChecking(true);
+    const measurement = await measurePhoto(uri);
+    if (look !== lookGeneration.current) return;
+    const found = measurement ? photoProblem(measurement) : null;
+    if (found) {
+      setChecking(false);
+      setProblem(found);
+      setClues(cluesFrom(measurement, null));
+      return;
+    }
+    const impression = await readItem(uri);
+    if (look !== lookGeneration.current) return;
+    setChecking(false);
+    if (impression?.item.trim()) {
+      const brand = confirmedBrand(impression, measurement?.text ?? []);
+      setLooksLike(brand ? `${impression.item} · ${brand}` : impression.item);
+    }
+    const hints = cluesFrom(measurement, impression);
+    setClues(hints);
+    void estimatePhoto(image, hints);
+  };
+
+  const forgetLook = () => {
+    lookGeneration.current += 1;
+    setChecking(false);
+    setProblem(undefined);
+    setLooksLike(undefined);
+    setClues(undefined);
+  };
+
+  useEffect(() => {
+    if (running) prepareItemReader();
+  }, [running]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -146,7 +206,7 @@ export function CameraCapture({
         setEstimateError('This photo is too large to estimate. Please retake it.');
         return;
       }
-      void estimatePhoto(image);
+      void lookThenEstimate(photo.uri, image);
     } catch {
       if (captureSession === session.current)
         setError('Could not take the photo. Please try again.');
@@ -252,6 +312,32 @@ export function CameraCapture({
           resizeMode="contain"
           style={styles.photo}
         />
+        {checking ? (
+          <SWText
+            variant="headingLarge"
+            color={tokens.overlay.text}
+            accessibilityLiveRegion="polite"
+          >
+            Looking at your photo…
+          </SWText>
+        ) : null}
+        {problem ? (
+          <View accessibilityLiveRegion="polite" style={styles.problem}>
+            <SWText variant="headingLarge" color={tokens.overlay.text}>
+              {photoProblemCopy[problem].title}
+            </SWText>
+            <SWText color={tokens.overlay.text}>{photoProblemCopy[problem].body}</SWText>
+          </View>
+        ) : null}
+        {/* What the phone saw, while the cloud prices it: gone once the estimate names it. */}
+        {looksLike && !estimate ? (
+          <SWText color={tokens.overlay.text}>Looks like: {looksLike}</SWText>
+        ) : null}
+        {clues && clues.text.length > 0 && !estimate && !problem ? (
+          <SWText variant="caption" color={tokens.overlay.text}>
+            Read on the item: {clues.text.slice(0, 3).join(' · ')}
+          </SWText>
+        ) : null}
         {estimating ? (
           <SWText
             variant="headingLarge"
@@ -293,7 +379,17 @@ export function CameraCapture({
           </SWText>
         ) : null}
         {(estimateError || estimate?.status === 'unable_to_estimate') && photoData ? (
-          <Button label="Retry estimate" onPress={() => void estimatePhoto(photoData)} />
+          <Button label="Retry estimate" onPress={() => void estimatePhoto(photoData, clues)} />
+        ) : null}
+        {problem && photoData ? (
+          <Button
+            label="Price it anyway"
+            variant="secondary"
+            onPress={() => {
+              setProblem(undefined);
+              void estimatePhoto(photoData, clues);
+            }}
+          />
         ) : null}
         <SWText color={tokens.overlay.text} align="center">
           This photo and estimate have not been added to History.
@@ -302,6 +398,7 @@ export function CameraCapture({
           label="Retake photo"
           onPress={() => {
             stopEstimate();
+            forgetLook();
             setEstimating(false);
             setEstimate(undefined);
             setEstimateError(undefined);
@@ -375,6 +472,7 @@ const styles = StyleSheet.create({
   },
   review: { flexGrow: 1, paddingHorizontal: tokens.spacing[6], gap: tokens.spacing[4] },
   photo: { height: 240, width: '100%' },
+  problem: { gap: tokens.spacing[2] },
   error: {
     position: 'absolute',
     left: tokens.spacing[6],

@@ -20,6 +20,23 @@ const sampleEstimate = {
   assumptions: ['Condition is based on the photo.'],
 };
 
+// The native photo check: absent by default, as on Android, so pricing runs as it always did.
+const mockMeasurePhoto = jest.fn();
+const mockReadItem = jest.fn();
+jest.mock('../snap-sense', () => ({
+  measurePhoto: (uri: string) => mockMeasurePhoto(uri),
+  readItem: (uri: string) => mockReadItem(uri),
+  prepareItemReader: jest.fn(),
+}));
+const goodPhoto = {
+  brightness: 0.6,
+  sharpness: 700,
+  subject: 0.4,
+  looked: true,
+  text: [],
+  codes: [],
+};
+
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
@@ -110,6 +127,8 @@ beforeEach(() => {
     height: 100,
   });
   mockEstimate.mockReset().mockResolvedValue(sampleEstimate);
+  mockMeasurePhoto.mockReset().mockResolvedValue(null);
+  mockReadItem.mockReset().mockResolvedValue(null);
 });
 
 function openCamera(active = true) {
@@ -343,4 +362,77 @@ it('keeps an oversized photo for review without sending it to the AI', async () 
   expect(mockEstimate).not.toHaveBeenCalled();
   expect(screen.getByLabelText('Your captured photo')).toBeTruthy();
   expect(screen.queryByText('Retry estimate')).toBeNull();
+});
+
+it('holds back a photo too dark to price, and sends it only when asked', async () => {
+  mockMeasurePhoto.mockResolvedValue({ ...goodPhoto, brightness: 0.05 });
+  openCamera();
+  await readyCamera();
+  await act(async () => {
+    fireEvent.press(screen.getByText('Take photo'));
+  });
+  expect(await screen.findByText('Too dark to price')).toBeTruthy();
+  expect(mockMeasurePhoto).toHaveBeenCalledWith('file:///photo.jpg');
+  expect(mockReadItem).not.toHaveBeenCalled();
+  expect(mockEstimate).not.toHaveBeenCalled();
+
+  await act(async () => {
+    fireEvent.press(screen.getByText('Price it anyway'));
+  });
+  expect(mockEstimate).toHaveBeenCalledTimes(1);
+  expect(screen.queryByText('Too dark to price')).toBeNull();
+});
+
+it('sends what the phone read along with a good photo', async () => {
+  mockMeasurePhoto.mockResolvedValue({
+    ...goodPhoto,
+    text: ['NIKE', 'AIR JORDAN 1 RETRO HIGH OG'],
+  });
+  mockReadItem.mockResolvedValue({
+    item: 'high top sneakers',
+    category: 'shoes',
+    brand: 'Nike',
+    colours: ['red', 'black'],
+    usablePhoto: true,
+  });
+  let finish!: (estimate: typeof sampleEstimate) => void;
+  mockEstimate.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  openCamera();
+  await readyCamera();
+  await act(async () => {
+    fireEvent.press(screen.getByText('Take photo'));
+  });
+  await waitFor(() => expect(mockEstimate).toHaveBeenCalledTimes(1));
+  expect(mockEstimate.mock.calls[0][2]).toEqual({
+    text: ['NIKE', 'AIR JORDAN 1 RETRO HIGH OG'],
+    codes: [],
+    looksLike: { item: 'high top sneakers', category: 'shoes', colours: ['red', 'black'] },
+  });
+  // The brand is printed in the photo, so it's shown; the estimate replaces the first look.
+  expect(screen.getByText('Looks like: high top sneakers · Nike')).toBeTruthy();
+  await act(async () => finish(sampleEstimate));
+  expect(screen.queryByText(/Looks like/)).toBeNull();
+  expect(screen.getByText('Camera-tested jacket')).toBeTruthy();
+});
+
+it('forgets the last photo’s check on retake', async () => {
+  mockMeasurePhoto.mockResolvedValueOnce({ ...goodPhoto, sharpness: 5 });
+  openCamera();
+  await readyCamera();
+  await act(async () => {
+    fireEvent.press(screen.getByText('Take photo'));
+  });
+  expect(await screen.findByText('A little blurry')).toBeTruthy();
+  fireEvent.press(screen.getByText('Retake photo'));
+  await readyCamera();
+  await act(async () => {
+    fireEvent.press(screen.getByText('Take photo'));
+  });
+  expect(screen.queryByText('A little blurry')).toBeNull();
+  await waitFor(() => expect(mockEstimate).toHaveBeenCalledTimes(1));
 });
