@@ -345,6 +345,16 @@ export const tokens = deepFreeze({
     light: '#FFF8EE',
   },
   /**
+   * Holographic foil, the mark of anything the AI worked out: the pastel shift of a real foil
+   * sticker, the kind that marks a thing as checked. A material, so it keeps these colours in
+   * every appearance, with its own dark ink printed on it.
+   */
+  holo: {
+    stops: ['#FF9DBB', '#FFD978', '#8FE8C2', '#8CC4FF', '#C4A0FF'],
+    sheen: '#FFFFFF',
+    ink: '#2A1D33',
+  },
+  /**
    * Translucent layers for controls that sit over live media (the camera viewfinder, a photo
    * opened full screen), where a solid surface would hide what the user is looking at.
    */

@@ -29,10 +29,15 @@ export type AccountIntent =
   | 'sell'
   | 'chats'
   | 'history'
-  | 'profile';
+  | 'profile'
+  | 'worthy';
 
 /** Why an account is needed, in the words of what the person just tried to do. */
 export const accountIntentCopy: Record<AccountIntent, { title: string; body: string }> = {
+  worthy: {
+    title: 'Ask Worthy',
+    body: 'Create a free account and Worthy helps with your own snaps, listings and chats.',
+  },
   vote: {
     title: 'Vote on the price',
     body: 'Votes come from real accounts, so the community verdict stays fair.',

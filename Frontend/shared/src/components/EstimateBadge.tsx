@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../design';
+import { AiFoil, AiFoilDot } from './AiFoil';
 import { TagShape } from './PriceTag';
 import { SWText } from './SWText';
 
@@ -20,8 +21,9 @@ export interface EstimateBadgeProps {
 
 /**
  * The AI's number always hangs on a price tag: a manila tag with an eyelet, its label printed
- * in mono. It sets the estimate apart from asking prices, which are the seller's and always
- * bare. Text on the tag uses the tag's own ink in either appearance, since the tag stays manila.
+ * in mono, and the holographic AI foil on it (`AiFoil`), so it reads as the AI's at a glance.
+ * It sets the estimate apart from asking prices, which are the seller's and always bare. Text on
+ * the tag uses the tag's own ink in either appearance, since the tag stays manila.
  */
 export function EstimateBadge({ value, size = 'compact', range }: EstimateBadgeProps) {
   const { colors } = useTheme();
@@ -49,9 +51,7 @@ export function EstimateBadge({ value, size = 'compact', range }: EstimateBadgeP
     return (
       <View accessible accessibilityLabel={`AI estimate ${value}. ${estimateCaption}`}>
         <TagShape style={styles.compact}>
-          <SWText variant="stamp" color={colors.kraftInk}>
-            AI Est.
-          </SWText>
+          <AiFoil size="small" />
           <SWText variant="priceSmall" color={colors.kraftInk}>
             {value}
           </SWText>
@@ -67,6 +67,8 @@ export function EstimateBadge({ value, size = 'compact', range }: EstimateBadgeP
       style={styles.hero}
     >
       <TagShape hanging tilt={tokens.tilt.start} style={styles.heroTag}>
+        {/* Slapped across the tag's far corner, the way a foil sticker goes on a label. */}
+        <AiFoil size="large" shimmer style={styles.heroFoil} />
         <SWText variant="stamp" color={colors.kraftInk}>
           AI Estimate
         </SWText>
@@ -87,24 +89,14 @@ export function EstimateBadge({ value, size = 'compact', range }: EstimateBadgeP
 }
 
 /**
- * The estimate's signature: the tag's reinforced eyelet, which is also the lens in the logo.
- * Used wherever the AI's number appears without its full tag.
+ * The estimate's signature where the AI's number appears without its full tag: a dot of the
+ * same holographic foil, so it means the AI wherever it's seen.
  */
 export function EstimateMark({ size = 8 }: { readonly size?: number }) {
-  const styles = useThemedStyles(stylesFor);
-  return (
-    <View
-      accessibilityElementsHidden
-      importantForAccessibility="no"
-      style={[
-        styles.mark,
-        { width: size, height: size, borderRadius: size / 2, borderWidth: Math.max(1.5, size / 4) },
-      ]}
-    />
-  );
+  return <AiFoilDot size={size + 2} />;
 }
 
-const stylesFor = themedStyles((colors) => ({
+const stylesFor = themedStyles(() => ({
   compact: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
@@ -115,6 +107,12 @@ const stylesFor = themedStyles((colors) => ({
   },
   hero: {
     gap: tokens.spacing[3],
+  },
+  heroFoil: {
+    position: 'absolute',
+    top: -16,
+    right: -18,
+    transform: [{ rotate: `${tokens.tilt.end * 2}deg` }],
   },
   heroTag: {
     alignSelf: 'flex-start',
@@ -131,9 +129,5 @@ const stylesFor = themedStyles((colors) => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing[2],
-  },
-  mark: {
-    borderColor: colors.kraftEdge,
-    backgroundColor: colors.kraft,
   },
 }));

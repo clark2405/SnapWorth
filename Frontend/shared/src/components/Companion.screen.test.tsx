@@ -98,3 +98,31 @@ it('blocks hidden companion shortcuts and allows a new hold after returning', ()
   });
   expect(onHoldSnap).toHaveBeenCalledTimes(2);
 });
+
+it('asks the host before opening, and opens only when told to', () => {
+  let open: (() => void) | undefined;
+  const onRequestOpen = jest.fn((next: () => void) => {
+    open = next;
+  });
+  renderScreen(
+    <Companion
+      actions={[]}
+      greeting="Hello from Worthy"
+      onAsk={jest.fn()}
+      onRequestOpen={onRequestOpen}
+    />,
+  );
+  const orb = screen.getByRole('button', { name: 'Worthy, your pricing companion' });
+  fireEvent(orb, 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
+  expect(onRequestOpen).toHaveBeenCalledTimes(1);
+  // A guest's host shows the account sheet instead, so nothing opens.
+  act(() => {
+    jest.advanceTimersByTime(2000);
+  });
+  expect(screen.queryByPlaceholderText('Ask Worthy anything…')).toBeNull();
+  act(() => {
+    open?.();
+    jest.advanceTimersByTime(2000);
+  });
+  expect(screen.getByPlaceholderText('Ask Worthy anything…')).toBeTruthy();
+});

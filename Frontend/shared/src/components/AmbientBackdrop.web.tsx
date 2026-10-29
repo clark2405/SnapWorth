@@ -1,21 +1,33 @@
 import { useIsFocused } from 'expo-router';
-import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+} from 'react';
 
 import { placeColors, tokens, useTheme } from '../design';
 import printTile from './backdrop/print-tile-web.png';
 import {
   priceFace,
-  scallopPath,
   stickerLayouts,
   stickerLean,
   stickerOutline,
-  stickerPad,
   stickerShadow,
-  tagPath,
   type AmbientArea,
   type PrintCoverage,
   type StickerShape,
 } from './BackdropPrint';
+import {
+  cubicBezier,
+  formAt,
+  outlinePath,
+  stickerCanvas,
+  stickerForm,
+  type StickerForm,
+} from './sticker-form';
 
 export type { AmbientArea, PrintCoverage } from './BackdropPrint';
 
@@ -106,11 +118,6 @@ const css = `
 .sw-stickers{position:absolute;inset:0}
 .sw-sticker{position:absolute;width:0;height:0;transform-origin:0 0;transition:${morph('left')},${morph('top')},${morph('transform')}}
 .sw-sticker svg{position:absolute;overflow:visible}
-.sw-sticker .sw-ink{transition:${morph('fill')}}
-.sw-in{animation:sw-fade-in ${morphMs}ms ${morphEase} both}
-.sw-out{animation:sw-fade-out ${morphMs}ms ${morphEase} both}
-@keyframes sw-fade-in{from{opacity:0}to{opacity:1}}
-@keyframes sw-fade-out{from{opacity:1}to{opacity:0}}
 @media (prefers-reduced-motion:reduce){.sw-backdrop *{animation:none!important;transition:none!important}}
 `;
 
@@ -252,16 +259,21 @@ function lookInk(colors: ReturnType<typeof useTheme>['colors'], mood: AmbientAre
   return { print: place.fill, paper: place.fill, light: !place.dark };
 }
 
-interface StickerLayer {
-  readonly key: string;
-  readonly shape: StickerShape;
-  readonly size: number;
-  readonly state: 'rest' | 'in' | 'out';
+const easeMorph = cubicBezier(m1 ?? 0, m2 ?? 0, m3 ?? 1, m4 ?? 1);
+const canvas = stickerCanvas + stickerShadow;
+const centre = stickerCanvas / 2;
+
+function reducedMotion() {
+  return (
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
 }
 
 /**
- * One sticker's art. A change of colour fades on the shape itself; a change of shape or size
- * fades the old art out as the new fades in, while the sticker travels to its new spot.
+ * One sticker's art. A change of shape, size or colour turns it into the new one: its outline
+ * blends point by point and its colour with it (`sticker-form`), redrawn straight onto the SVG
+ * for the length of the change and still otherwise. A change that arrives mid-way sets off from
+ * the shape on screen.
  */
 function Sticker({
   shape,
@@ -272,126 +284,94 @@ function Sticker({
   readonly size: number;
   readonly ink: string;
 }) {
-  const key = `${shape}-${size}`;
-  const [layers, setLayers] = useState<readonly StickerLayer[]>([
-    { key, shape, size, state: 'rest' },
-  ]);
+  const { colors } = useTheme();
+  const target = useMemo(() => stickerForm(shape, size, ink), [shape, size, ink]);
+  const shown = useRef(target);
+  const paper = useRef<SVGPathElement>(null);
+  const shade = useRef<SVGPathElement>(null);
+  const eyelet = useRef<SVGGElement>(null);
+  const coin = useRef<SVGGElement>(null);
+  // The small print keeps the geometry of the shape it belongs to while it fades.
+  const [print, setPrint] = useState({ tag: target, coin: target });
 
   useEffect(() => {
-    setLayers((current) =>
-      current[current.length - 1]?.key === key
-        ? current
-        : [
-            ...current
-              .filter((layer) => layer.key !== key)
-              .map((layer) => ({ ...layer, state: 'out' as const })),
-            { key, shape, size, state: 'in' },
-          ],
-    );
-    const settle = setTimeout(
-      () => setLayers((current) => current.filter((layer) => layer.state !== 'out')),
-      morphMs + 120,
-    );
-    return () => clearTimeout(settle);
-  }, [key, shape, size]);
+    const from = shown.current;
+    setPrint((current) => ({
+      tag: target.tag > 0 ? target : from.tag > 0 ? from : current.tag,
+      coin: target.coin > 0 ? target : from.coin > 0 ? from : current.coin,
+    }));
+    const draw = (form: StickerForm) => {
+      const d = outlinePath(form.radii, centre, centre);
+      paper.current?.setAttribute('d', d);
+      shade.current?.setAttribute('d', d);
+      if (paper.current) paper.current.style.fill = form.ink;
+      if (eyelet.current) eyelet.current.style.opacity = String(form.tag);
+      if (coin.current) coin.current.style.opacity = String(form.coin);
+    };
+    if (from === target || reducedMotion()) {
+      shown.current = target;
+      draw(target);
+      return;
+    }
+    const start = performance.now();
+    let frame = 0;
+    const step = (now: number) => {
+      const raw = Math.min(1, (now - start) / morphMs);
+      shown.current = raw >= 1 ? target : formAt(from, target, easeMorph(raw));
+      draw(shown.current);
+      if (raw < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [target]);
 
+  const d = outlinePath(shown.current.radii, centre, centre);
   return (
-    <>
-      {layers.map((layer) => (
-        <StickerSvg
-          key={layer.key}
-          shape={layer.shape}
-          size={layer.size}
-          ink={ink}
-          className={layer.state === 'in' ? 'sw-in' : layer.state === 'out' ? 'sw-out' : undefined}
+    <svg width={canvas} height={canvas} style={{ left: -centre, top: -centre }}>
+      <path
+        ref={shade}
+        d={d}
+        fill={colors.heldShadow}
+        transform={`translate(${stickerShadow} ${stickerShadow})`}
+      />
+      <path
+        ref={paper}
+        d={d}
+        style={{ fill: shown.current.ink }}
+        stroke={colors.heldEdge}
+        strokeWidth={stickerOutline}
+        strokeLinejoin="round"
+      />
+      <g ref={eyelet} style={{ opacity: shown.current.tag }}>
+        <circle
+          cx={centre + print.tag.eyeletX}
+          cy={centre}
+          r={print.tag.eyeletR}
+          fill={colors.canvas}
+          stroke={colors.heldEdge}
+          strokeWidth={2}
         />
-      ))}
-    </>
-  );
-}
-
-/** The same cut-paper shapes as the apps' `StickerArt`, as inline SVG, centred on its parent. */
-function StickerSvg({
-  shape,
-  size,
-  ink,
-  className,
-}: {
-  readonly shape: StickerShape;
-  readonly size: number;
-  readonly ink: string;
-  readonly className?: string;
-}) {
-  const { colors } = useTheme();
-  const w = size;
-  const h = shape === 'tag' ? Math.round(size * 0.6) : size;
-  const cx = stickerPad + w / 2;
-  const cy = stickerPad + h / 2;
-  const edge = {
-    stroke: colors.heldEdge,
-    strokeWidth: stickerOutline,
-    strokeLinejoin: 'round' as const,
-  };
-  const offset = `translate(${stickerShadow} ${stickerShadow})`;
-  const inkStyle = { fill: ink };
-  const outline =
-    shape === 'tag'
-      ? tagPath(w, h, stickerPad, stickerPad)
-      : shape === 'scallop'
-        ? scallopPath(w / 2, 14, cx, cy)
-        : null;
-
-  return (
-    <svg
-      className={className}
-      width={w + stickerPad * 2 + stickerShadow}
-      height={h + stickerPad * 2 + stickerShadow}
-      style={{ left: -cx, top: -cy }}
-    >
-      {outline ? (
-        <>
-          <path d={outline} fill={colors.heldShadow} transform={offset} />
-          <path d={outline} className="sw-ink" style={inkStyle} {...edge} />
-          {shape === 'tag' ? (
-            <circle
-              cx={stickerPad + w * 0.17}
-              cy={cy}
-              r={h * 0.09}
-              fill={colors.canvas}
-              stroke={colors.heldEdge}
-              strokeWidth={2}
-            />
-          ) : null}
-        </>
-      ) : (
-        <>
-          <circle
-            cx={cx + stickerShadow}
-            cy={cy + stickerShadow}
-            r={w / 2}
-            fill={colors.heldShadow}
-          />
-          <circle cx={cx} cy={cy} r={w / 2} className="sw-ink" style={inkStyle} {...edge} />
-          <circle
-            cx={cx}
-            cy={cy}
-            r={w / 2 - 11}
-            fill="none"
-            stroke={colors.heldEdge}
-            strokeWidth={1.5}
-          />
-          <text
-            x={cx}
-            y={cy + w * 0.15}
-            fontSize={w * 0.42}
-            fontFamily={priceFace}
-            fill={colors.heldEdge}
-            textAnchor="middle"
-          >
-            ₱
-          </text>
-        </>
-      )}
+      </g>
+      <g ref={coin} style={{ opacity: shown.current.coin }}>
+        <circle
+          cx={centre}
+          cy={centre}
+          r={print.coin.coinSize / 2 - 11}
+          fill="none"
+          stroke={colors.heldEdge}
+          strokeWidth={1.5}
+        />
+        <text
+          x={centre}
+          y={centre + print.coin.coinSize * 0.15}
+          fontSize={print.coin.coinSize * 0.42}
+          fontFamily={priceFace}
+          fill={colors.heldEdge}
+          textAnchor="middle"
+        >
+          ₱
+        </text>
+      </g>
     </svg>
   );
 }
