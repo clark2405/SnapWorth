@@ -12,7 +12,9 @@ import Animated, {
   Easing,
   cancelAnimation,
   makeMutable,
+  useAnimatedProps,
   useAnimatedStyle,
+  useDerivedValue,
   useReducedMotion,
   useSharedValue,
   withRepeat,
@@ -21,16 +23,33 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 
+import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
+
 import { placeColors, tokens, useTheme } from '../design';
 import blobImage from './backdrop/blob.png';
 import {
   PrintLayer,
-  StickerArt,
+  priceFace,
   stickerLayouts,
   stickerLean,
+  stickerOutline,
+  stickerShadow,
   type AmbientArea,
   type PrintCoverage,
 } from './BackdropPrint';
+import {
+  blendForms,
+  formAt,
+  mixInk,
+  outlinePath,
+  outlinePoints,
+  printStrength,
+  stickerCanvas,
+  stickerForm,
+  type StickerForm,
+} from './sticker-form';
+
+const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 export type { AmbientArea, PrintCoverage } from './BackdropPrint';
 
@@ -94,6 +113,18 @@ function posesFor(look: Look, width: number, height: number): readonly StickerPo
   }));
 }
 
+/**
+ * The stickers' paper in the current theme. A change of look starts outside any screen, so the
+ * backdrop on screen keeps this up to date for it.
+ */
+let paperOf: (mood: AmbientArea) => string = () => tokens.color.light.kraft;
+
+function formsFor(look: Look): StickerForm[] {
+  return stickerLayouts[look.mood].map((slot) =>
+    stickerForm(slot.shape, slot.size, paperOf(look.mood)),
+  );
+}
+
 /** A look on its way out, and how strongly it showed when the current change of look began. */
 interface Leaving {
   readonly look: Look;
@@ -115,6 +146,8 @@ interface Morph {
   readonly leaving: readonly Leaving[];
   /** Where the stickers set off from, while they're travelling. */
   readonly origin: readonly StickerPose[] | null;
+  /** The shape and colour each sticker sets off from, while it's turning into its new one. */
+  readonly originForms: readonly StickerForm[] | null;
   /**
    * This change's own progress. A new change gets a fresh one rather than resetting this, so a
    * screen still drawing the last change holds its frame (the old value stops where it is) until
@@ -148,7 +181,15 @@ const settledMorph = (current: Morph): boolean =>
 function retarget(look: Look, animate: boolean) {
   const current = morph;
   if (!current) {
-    publish({ id: 1, target: look, base: 1, leaving: [], origin: null, progress: atRest });
+    publish({
+      id: 1,
+      target: look,
+      base: 1,
+      leaving: [],
+      origin: null,
+      originForms: null,
+      progress: atRest,
+    });
     return;
   }
   if (sameLook(current.target, look)) return;
@@ -156,7 +197,15 @@ function retarget(look: Look, animate: boolean) {
   cancelAnimation(current.progress);
   const id = current.id + 1;
   if (!animate) {
-    publish({ id, target: look, base: 1, leaving: [], origin: null, progress: atRest });
+    publish({
+      id,
+      target: look,
+      base: 1,
+      leaving: [],
+      origin: null,
+      originForms: null,
+      progress: atRest,
+    });
     return;
   }
 
@@ -191,12 +240,19 @@ function retarget(look: Look, animate: boolean) {
     };
   });
 
+  // And from whatever shape and colour they've turned into.
+  const endForms = formsFor(current.target);
+  const startForms = current.originForms ?? endForms;
+  const originForms = endForms.map((end, i) => formAt(startForms[i] ?? end, end, p));
+
   const progress = makeMutable(0);
-  publish({ id, target: look, base, leaving: leaving.slice(-3), origin, progress });
+  publish({ id, target: look, base, leaving: leaving.slice(-3), origin, originForms, progress });
   progress.value = withTiming(1, morphTiming);
   // An update to a view out of sight can be dropped, so the end is committed outright.
   settleTimer = setTimeout(() => {
-    if (morph?.id === id) publish({ ...morph, base: 1, leaving: [], origin: null });
+    if (morph?.id === id) {
+      publish({ ...morph, base: 1, leaving: [], origin: null, originForms: null });
+    }
   }, morphTiming.duration + settleMargin);
 }
 
@@ -248,9 +304,10 @@ export function AmbientBackdrop({ mood = 'calm', print = 'edges' }: AmbientBackd
 }
 
 function Backdrop({ mood, print }: { readonly mood: AmbientArea; readonly print: PrintCoverage }) {
-  const { name } = useTheme();
+  const { colors, name } = useTheme();
   const { width, height } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
+  paperOf = (area) => paperFor(colors, area);
   const focused = useIsFocused();
   const own = useMemo(() => ({ mood, print }), [mood, print]);
   const shared = useSyncExternalStore(watch, readMorph, readMorph);
@@ -297,12 +354,22 @@ function Backdrop({ mood, print }: { readonly mood: AmbientArea; readonly print:
     base: 1,
     leaving: [],
     origin: null,
+    originForms: null,
     progress: atRest,
   };
   const live = (focused || lingering) && !reduceMotion && !settledMorph(current);
-  const view: Morph = live ? current : { ...current, base: 1, leaving: [], origin: null };
+  const view: Morph = live
+    ? current
+    : { ...current, base: 1, leaving: [], origin: null, originForms: null };
   const target = view.target;
   const ends = posesFor(target, width, height);
+  const forms = useMemo(
+    () =>
+      stickerLayouts[target.mood].map((slot) =>
+        stickerForm(slot.shape, slot.size, paperFor(colors, target.mood)),
+      ),
+    [colors, target.mood],
+  );
   const stickerOpacity = tokens.motion.ambient.stickerOpacity[name];
 
   return (
@@ -318,10 +385,11 @@ function Backdrop({ mood, print }: { readonly mood: AmbientArea; readonly print:
         {ends.map((end, index) => (
           <Sticker
             key={index}
-            index={index}
             view={view}
             start={view.origin?.[index] ?? end}
             end={end}
+            from={view.originForms?.[index] ?? forms[index]}
+            to={forms[index]}
           />
         ))}
       </View>
@@ -459,21 +527,23 @@ function Print({
 }
 
 /**
- * One sticker. It travels from where it was to its spot on this screen, and its old shapes and
- * colours fade into the new one on the way.
+ * One sticker. It travels from where it was to its spot on this screen, and turns into its new
+ * shape and colour on the way: one outline blending point by point (`sticker-form`), never one
+ * drawing fading out under another.
  */
 function Sticker({
-  index,
   view,
   start,
   end,
+  from,
+  to,
 }: {
-  readonly index: number;
   readonly view: Morph;
   readonly start: StickerPose;
   readonly end: StickerPose;
+  readonly from: StickerForm | undefined;
+  readonly to: StickerForm | undefined;
 }) {
-  const { colors } = useTheme();
   const progress = view.progress;
   const travel = useAnimatedStyle(() => {
     const p = progress.value;
@@ -485,15 +555,8 @@ function Sticker({
       ],
     };
   });
-  const layers = layersOf(view, (look) => {
-    const at = stickerLayouts[look.mood][index];
-    if (!at) return null;
-    const ink = paperFor(colors, look.mood);
-    return { key: `${at.shape}-${at.size}-${ink}`, item: { shape: at.shape, size: at.size, ink } };
-  });
-  if (layers.length === 0) return null;
+  if (!to) return null;
   const moving = view.origin !== null;
-  const settled = layers.length === 1 && (layers[0]?.from ?? 0) >= 1;
   // Its plain place is where the travel starts (or, at rest, where it ends), so no frame shows it
   // anywhere else; the step with each change sends it afresh, as with `Fade`.
   const pose = moving ? start : end;
@@ -507,20 +570,156 @@ function Sticker({
   };
   return (
     <Animated.View style={[styles.point, place, moving ? travel : null]}>
-      {layers.map((layer) => (
-        <Fade
-          key={layer.key}
-          progress={progress}
-          from={layer.from}
-          out={layer.out}
-          still={settled}
-          epoch={view.id}
-          style={styles.point}
-        >
-          <StickerArt shape={layer.item.shape} size={layer.item.size} ink={layer.item.ink} />
-        </Fade>
-      ))}
+      {moving && from ? (
+        <TurningSticker key={view.id} from={from} to={to} progress={progress} />
+      ) : (
+        <StickerDrawing form={to} />
+      )}
     </Animated.View>
+  );
+}
+
+/** Each sticker draws on the same square, centred on its anchor, big enough for any shape. */
+const canvas = stickerCanvas + stickerShadow;
+const centre = stickerCanvas / 2;
+
+/** A sticker at rest. */
+function StickerDrawing({ form }: { readonly form: StickerForm }) {
+  const { colors } = useTheme();
+  const d = outlinePath(form.radii, centre, centre);
+  return (
+    <View style={styles.art}>
+      <Svg width={canvas} height={canvas}>
+        <Path
+          d={d}
+          fill={colors.heldShadow}
+          transform={`translate(${stickerShadow} ${stickerShadow})`}
+        />
+        <Path
+          d={d}
+          fill={form.ink}
+          stroke={colors.heldEdge}
+          strokeWidth={stickerOutline}
+          strokeLinejoin="round"
+        />
+      </Svg>
+      {form.tag > 0 ? (
+        <View style={[styles.detail, { opacity: form.tag }]}>
+          <Eyelet form={form} />
+        </View>
+      ) : null}
+      {form.coin > 0 ? (
+        <View style={[styles.detail, { opacity: form.coin }]}>
+          <CoinPrint form={form} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/** A sticker part way from one form to another, redrawn on the UI thread every frame. */
+function TurningSticker({
+  from,
+  to,
+  progress,
+}: {
+  readonly from: StickerForm;
+  readonly to: StickerForm;
+  readonly progress: SharedValue<number>;
+}) {
+  const { colors } = useTheme();
+  const outline = useDerivedValue(() => {
+    const t = progress.value;
+    const radii: number[] = [];
+    for (let i = 0; i < outlinePoints; i++) {
+      const a = from.radii[i] ?? 0;
+      radii.push(a + ((to.radii[i] ?? 0) - a) * t);
+    }
+    return outlinePath(radii, centre, centre);
+  });
+  const shadowProps = useAnimatedProps(() => ({ d: outline.value }));
+  const paperProps = useAnimatedProps(() => ({
+    d: outline.value,
+    fill: mixInk(from.ink, to.ink, progress.value),
+  }));
+  // The small print belongs to a shape, so it fades with the shape it belongs to: the old print
+  // is gone by halfway, before the new print starts, so the two never show together.
+  const details = blendForms(from, to, 1);
+  const tagFade = useAnimatedStyle(() => ({
+    opacity: printStrength(from.tag, to.tag, progress.value),
+  }));
+  const coinFade = useAnimatedStyle(() => ({
+    opacity: printStrength(from.coin, to.coin, progress.value),
+  }));
+  return (
+    <View style={styles.art}>
+      <Svg width={canvas} height={canvas}>
+        <AnimatedPath
+          animatedProps={shadowProps}
+          fill={colors.heldShadow}
+          transform={`translate(${stickerShadow} ${stickerShadow})`}
+        />
+        <AnimatedPath
+          animatedProps={paperProps}
+          stroke={colors.heldEdge}
+          strokeWidth={stickerOutline}
+          strokeLinejoin="round"
+        />
+      </Svg>
+      {from.tag > 0 || to.tag > 0 ? (
+        <Animated.View style={[styles.detail, tagFade]}>
+          <Eyelet form={details} />
+        </Animated.View>
+      ) : null}
+      {from.coin > 0 || to.coin > 0 ? (
+        <Animated.View style={[styles.detail, coinFade]}>
+          <CoinPrint form={details} />
+        </Animated.View>
+      ) : null}
+    </View>
+  );
+}
+
+function Eyelet({ form }: { readonly form: StickerForm }) {
+  const { colors } = useTheme();
+  return (
+    <Svg width={canvas} height={canvas}>
+      <Circle
+        cx={centre + form.eyeletX}
+        cy={centre}
+        r={form.eyeletR}
+        fill={colors.canvas}
+        stroke={colors.heldEdge}
+        strokeWidth={2}
+      />
+    </Svg>
+  );
+}
+
+function CoinPrint({ form }: { readonly form: StickerForm }) {
+  const { colors } = useTheme();
+  const size = form.coinSize;
+  return (
+    <Svg width={canvas} height={canvas}>
+      <Circle
+        cx={centre}
+        cy={centre}
+        r={size / 2 - 11}
+        fill="none"
+        stroke={colors.heldEdge}
+        strokeWidth={1.5}
+      />
+      <SvgText
+        x={centre}
+        y={centre + size * 0.15}
+        fontSize={size * 0.42}
+        fontFamily={priceFace}
+        fill={colors.heldEdge}
+        textAnchor="middle"
+      >
+        ₱
+      </SvgText>
+    </Svg>
   );
 }
 
@@ -643,5 +842,16 @@ const styles = StyleSheet.create({
   },
   shown: {
     opacity: 1,
+  },
+  // A sticker's square, centred on its anchor.
+  art: {
+    position: 'absolute',
+    left: -centre,
+    top: -centre,
+  },
+  detail: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
   },
 });
