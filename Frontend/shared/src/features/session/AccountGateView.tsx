@@ -1,4 +1,4 @@
-import { MessageSquare, UserRound, type LucideIcon } from 'lucide-react-native';
+import { MessageSquare, Sparkles, UserRound, type LucideIcon } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
 
@@ -26,13 +26,14 @@ import {
 } from '../../design';
 import { accountIntentCopy, useSession, type AccountIntent } from './session';
 
-type GatedScreen = Extract<AccountIntent, 'snap' | 'chats' | 'history' | 'profile'>;
+type GatedScreen = Extract<AccountIntent, 'snap' | 'chats' | 'history' | 'profile' | 'worthy'>;
 
 const icons: Record<GatedScreen, LucideIcon> = {
   snap: SnapIcon,
   chats: MessageSquare,
   history: HistoryIcon,
   profile: UserRound,
+  worthy: Sparkles,
 };
 
 /** The tabs a guest can open, and the place each one opens on. */

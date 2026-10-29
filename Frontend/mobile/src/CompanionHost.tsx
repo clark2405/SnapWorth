@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 
 import { Companion, useToast } from '@snapworth/shared/components';
 import { companionConfigFor } from '@snapworth/shared/features/companion';
+import { useAccountGate } from '@snapworth/shared/features/session';
 
 /**
  * Room above the bottom edge for the floating native tab bar with the Snap accessory riding on
@@ -20,6 +21,7 @@ export function CompanionHost({ ready }: { readonly ready: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const toast = useToast();
+  const requireAccount = useAccountGate();
 
   const config = useMemo(
     () =>
@@ -40,6 +42,8 @@ export function CompanionHost({ ready }: { readonly ready: boolean }) {
       bottomOffset={liftRoom[config.lift]}
       onAsk={(question) => router.push({ pathname: '/worthy', params: { q: question } })}
       onHoldSnap={() => router.push('/capture')}
+      // Worthy works with your own snaps, listings and chats: a guest is asked for an account.
+      onRequestOpen={(open) => requireAccount('worthy', open)}
     />
   );
 }

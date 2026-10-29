@@ -50,6 +50,11 @@ export interface CompanionProps {
   readonly onAsk: (question: string) => void;
   /** Press-and-hold shortcut: straight to the camera. */
   readonly onHoldSnap?: () => void;
+  /**
+   * Asked before Worthy opens, with the way to open it: call `open` to go ahead, or don't (for a
+   * guest the host shows why an account is needed instead). Without it, a tap opens straight away.
+   */
+  readonly onRequestOpen?: (open: () => void) => void;
   /** Distance from the bottom edge to rest above, e.g. the tab bar. */
   readonly bottomOffset?: number;
   readonly hidden?: boolean;
@@ -80,6 +85,7 @@ export function Companion({
   hint,
   onAsk,
   onHoldSnap,
+  onRequestOpen,
   bottomOffset = 0,
   hidden = false,
 }: CompanionProps) {
@@ -137,6 +143,12 @@ export function Companion({
     setOpen(true);
   }, []);
 
+  const requestOpen = useCallback(() => {
+    if (!onRequestOpen) return openPanel();
+    setShowHint(false);
+    onRequestOpen(openPanel);
+  }, [onRequestOpen, openPanel]);
+
   const closePanel = useCallback(() => {
     Keyboard.dismiss();
     setOpen(false);
@@ -174,7 +186,7 @@ export function Companion({
     .enabled(!hidden)
     .maxDuration(holdMs - 20)
     .onEnd((_event, success) => {
-      if (success) runOnJS(openPanel)();
+      if (success) runOnJS(requestOpen)();
     });
 
   const hold = Gesture.LongPress()
@@ -267,7 +279,7 @@ export function Companion({
             { top: restY + dragY + orbSize / 2 - 20 },
           ]}
         >
-          <Pressable onPress={openPanel} accessibilityRole="button" accessibilityLabel={hint}>
+          <Pressable onPress={requestOpen} accessibilityRole="button" accessibilityLabel={hint}>
             <GlassSurface style={styles.hintBubble}>
               <SWText variant="labelMedium" numberOfLines={2}>
                 {hint}
@@ -285,7 +297,7 @@ export function Companion({
           accessibilityActions={[{ name: 'activate' }, { name: 'longpress' }]}
           onAccessibilityAction={(event) => {
             if (event.nativeEvent.actionName === 'longpress') holdSnap();
-            else openPanel();
+            else requestOpen();
           }}
           style={[styles.orb, orbStyle]}
         >

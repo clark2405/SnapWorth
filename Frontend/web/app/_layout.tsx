@@ -24,7 +24,7 @@ import { companionConfigFor } from '@snapworth/shared/features/companion';
 import { AppServicesProvider, type BackendConfig } from '@snapworth/shared/composition';
 import { useSnapWorthFonts } from '@snapworth/shared/design/font-assets';
 import { SplashView } from '@snapworth/shared/features/launch';
-import { SessionProvider } from '@snapworth/shared/features/session';
+import { SessionProvider, useAccountGate } from '@snapworth/shared/features/session';
 import { TipsProvider } from '@snapworth/shared/features/tips';
 
 import { browserTipStore } from '../src/tip-store';
@@ -120,6 +120,7 @@ function WebCompanion({ ready }: { readonly ready: boolean }) {
   const router = useRouter();
   const toast = useToast();
   const wide = useWideLayout();
+  const requireAccount = useAccountGate();
   const config = useMemo(
     () =>
       companionConfigFor(pathname, {
@@ -142,6 +143,8 @@ function WebCompanion({ ready }: { readonly ready: boolean }) {
       bottomOffset={config.lift === 'tabBar' ? (wide ? tokens.spacing[6] : 90) : 92}
       onAsk={(question) => router.push({ pathname: '/worthy', params: { q: question } })}
       onHoldSnap={() => router.push('/capture')}
+      // Worthy works with your own snaps, listings and chats: a guest is asked for an account.
+      onRequestOpen={(open) => requireAccount('worthy', open)}
     />
   );
 }
