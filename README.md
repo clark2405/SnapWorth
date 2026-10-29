@@ -4,7 +4,7 @@
 
 SnapWorth is a mobile-first valuation and peer-to-peer marketplace app, built as the team project for Software Development 3. It runs on iOS, Android, and the web from a single Expo codebase, backed by Supabase.
 
-> **Status:** early development. The web workspace, shared domain types, and design system are in place. Screens are placeholders, and the backend is not built yet. See [Project status](#project-status).
+> **Status:** in development. Every screen is built for the web, iOS, and Android. Most run on sample data until their backend is ready. On Supabase today: the photo → AI estimate step, feed comments, and their moderation. Still to come: saving snaps to History, votes, listings, and chat. See [Project status](#project-status).
 
 ---
 
@@ -43,16 +43,28 @@ A feed post can be added to the marketplace later, and a listing can be reposted
 
 ## Tech stack
 
-| Layer                 | Technology                                                                                                         |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Frontend framework    | [Expo](https://docs.expo.dev) (React Native) + react-native-web, written in TypeScript (strict)                    |
-| Navigation            | [Expo Router](https://docs.expo.dev/router/introduction/): file-based routes shared by mobile screens and web URLs |
-| Styling               | [NativeWind](https://www.nativewind.dev) (Tailwind CSS)                                                            |
-| Backend               | [Supabase](https://supabase.com/docs): Auth, PostgreSQL with row-level security, Storage, Realtime                 |
-| AI price estimation   | Provider to be selected, accessed through `PricingAdapter`                                                         |
-| AI content moderation | Provider to be selected, accessed through `ModerationAdapter`                                                      |
-| Testing               | Jest, React Native Testing Library, fast-check (property tests), Playwright                                        |
-| Deployment            | EAS builds (iOS and Android), Vercel (web)                                                                         |
+| Layer                 | Technology                                                                                                                                                                          |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend framework    | [Expo](https://docs.expo.dev) (React Native) + react-native-web, written in TypeScript (strict)                                                                                     |
+| Navigation            | [Expo Router](https://docs.expo.dev/router/introduction/): file-based routes shared by mobile screens and web URLs                                                                  |
+| Styling               | Design tokens in `shared/src/design` and React Native styles, with a [NativeWind](https://www.nativewind.dev) preset on the web                                                     |
+| Animation             | Reanimated and Gesture Handler, with react-native-svg for the drawn pieces                                                                                                          |
+| Backend               | [Supabase](https://supabase.com/docs): Auth, PostgreSQL with row-level security, Edge Functions (Storage and Realtime planned)                                                      |
+| AI price estimation   | Google Gemini, called by the `estimate-price` Edge Function                                                                                                                         |
+| AI content moderation | OpenAI moderation, or local rules for development, chosen by `MODERATION_PROVIDER` in the `moderate-content` Edge Function                                                          |
+| On-device AI (iOS)    | Apple Vision checks a photo before upload. Apple Intelligence (Foundation Models) gives a first look at the item and answers Worthy's light questions (`mobile/modules/snap-sense`) |
+| Testing               | Jest, React Native Testing Library, fast-check (property tests), Playwright                                                                                                         |
+| Deployment            | EAS builds (iOS and Android) and Vercel (web), planned                                                                                                                              |
+
+--------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Frontend framework | [Expo](https://docs.expo.dev) (React Native) + react-native-web, written in TypeScript (strict) |
+| Navigation | [Expo Router](https://docs.expo.dev/router/introduction/): file-based routes shared by mobile screens and web URLs |
+| Styling | [NativeWind](https://www.nativewind.dev) (Tailwind CSS) |
+| Backend | [Supabase](https://supabase.com/docs): Auth, PostgreSQL with row-level security, Storage, Realtime |
+| AI price estimation | Provider to be selected, accessed through `PricingAdapter` |
+| AI content moderation | Provider to be selected, accessed through `ModerationAdapter` |
+| Testing | Jest, React Native Testing Library, fast-check (property tests), Playwright |
+| Deployment | EAS builds (iOS and Android), Vercel (web) |
 
 ---
 
@@ -85,24 +97,26 @@ Three design choices matter most:
 ```
 SnapWorth/
 ├── Frontend/                 npm workspace (run npm commands from here)
-│   ├── web/                  Expo Router website: route files, app config, Tailwind
+│   ├── web/                  Expo Router website: route files, app config
 │   │   └── app/              (auth)/ and (product)/ route groups
+│   ├── mobile/               Expo Router app for iOS and Android
+│   │   ├── app/              Route files
+│   │   ├── modules/snap-sense/  iOS native module: photo check, Apple Intelligence
+│   │   └── plugins/          Expo config plugins (the iOS 27 scene life cycle)
 │   ├── shared/               Code shared by the website and the mobile app
 │   │   └── src/
 │   │       ├── types/        Domain types: ids, money, entities, errors, workflow states
-│   │       ├── design/       Design tokens, theme, fonts, motion, NativeWind preset
-│   │       ├── ports/        Service and platform interfaces
-│   │       ├── features/     Feature views (currently placeholders)
-│   │       ├── components/   Reusable UI components (planned)
-│   │       ├── services/     Domain services (planned)
-│   │       └── adapters/     Supabase, pricing, and moderation adapters (planned)
-│   ├── mobile/               Expo Router app for iOS and Android
-│   └── scripts/              Workspace topology, dependency-pin, and architecture checks
+│   │       ├── design/       Design tokens, theme, fonts, motion, layout
+│   │       ├── components/   Reusable UI: the price tag, stickers, Worthy, backdrop, sheets
+│   │       ├── features/     Screens' views, one folder per feature
+│   │       ├── services/     Domain services (comments so far)
+│   │       ├── adapters/     Supabase adapters (auth, comments, pricing) and local stand-ins
+│   │       ├── composition/  Wires services to the app
+│   │       └── ports/        Service and platform interfaces
+│   └── scripts/              Workspace topology, dependency-pin, and source checks
 ├── Backend/                  Supabase: migrations, seed data, Edge Functions, tests
-├── agents/                   Guidance for AI coding agents
-│   ├── AGENTS.md             Start here
-│   ├── skills/               offbrand-design UI and motion skill
-│   └── specs/snapworth-web/  Requirements, design, and task plan
+├── agents/
+│   └── READ-FIRST.md         Read before changing anything: product rules, design, gotchas
 └── package.json              Root shortcuts to the Frontend scripts
 ```
 
@@ -172,43 +186,52 @@ The term runs 17 August to 12 December 2026. Features are delivered in scope tie
 
 **Done so far**
 
-- [x] Web-first npm workspace with strict TypeScript, ESLint, Prettier, Jest, and Playwright
-- [x] Architecture and dependency-pin checks
-- [x] Expo Router routes for every screen (placeholder views)
-- [x] Shared domain types and design system (tokens, theme, motion), with tests
+- [x] Web-first npm workspace with strict TypeScript, ESLint, Prettier, Jest, and Playwright, checked in CI
+- [x] Architecture, dependency-pin, and source checks (including no raw colours outside the tokens)
+- [x] Every screen built for the web, iOS, and Android, in the SnapWorth design language: place colours, the kraft price tag, stickers, and Worthy
+- [x] A desktop web layout: a sidebar, multi-column grids, and split views
+- [x] An animated onboarding tour, and guest browsing: anyone can look around, and an account is asked for, with the reason, only when they act
+- [x] Phone sign-in and sign-up with Supabase (email and Google). Without a project configured, it runs on a local session
+- [x] Snap → AI estimate on the phone: the camera sends the photo to the `estimate-price` Edge Function (Gemini)
+- [x] On-device AI on iOS:
+  - a photo check before upload (too dark, blurry, or no item) and reading of labels and barcodes
+  - with Apple Intelligence, a first look at the item and Worthy's answers to light questions
 - [x] Feed comments and replies end to end: Supabase schema with row-level security, fail-closed moderation Edge Function, comment service, and the threaded UI (see [Backend/README.md](Backend/README.md))
+- [x] iOS 27 support: the app adopts the scene life cycle so it opens on iOS 27
 
 **Next**
 
-- [ ] Shared UI components and domain services
-- [ ] Authentication, onboarding, and the responsive web shell
-- [ ] Capture → estimate → history core loop
-- [ ] Supabase schema, row-level security policies, and Edge Functions for the rest of the product (items, votes, listings, chat)
-- [ ] AI pricing and moderation provider selection (week 6 spike)
+- [ ] Save each snap and its estimate to History (Supabase schema, Storage, and services)
+- [ ] Votes, listings, chat, and the admin queue on Supabase, replacing their sample data
+- [ ] Web sign-in against Supabase (the web still starts a local session)
+- [ ] Worthy's chat in the cloud, for devices without Apple Intelligence, and real data behind Worthy's price, trend, and collection answers
+- [ ] Deploy the `estimate-price` update that uses the phone's photo clues
+- [ ] EAS and Vercel deployment
 
-The detailed task plan is in [agents/specs/snapworth-web/tasks.md](agents/specs/snapworth-web/tasks.md).
+The detailed task plan lives in `agents/specs/snapworth-web/`, which git keeps local (see `.gitignore`).
 
 ---
 
 ## Documentation
 
-| Document                                                   | Covers                                                           |
-| ---------------------------------------------------------- | ---------------------------------------------------------------- |
-| Software Requirements Specification (SRS) v01.00           | What the system must do                                          |
-| Software Design Document (SDD) v01.00                      | Architecture, data model, components, screens                    |
-| Software Project Management Plan (SPMP) v01.00             | Scope, schedule, budget, risks, team roles                       |
-| [agents/specs/snapworth-web/](agents/specs/snapworth-web/) | Implementation requirements, design, and tasks for the web build |
-| [Frontend/README.md](Frontend/README.md)                   | Workspace details and package management                         |
+| Document                                          | Covers                                                                                        |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Software Requirements Specification (SRS) v01.00  | What the system must do                                                                       |
+| Software Design Document (SDD) v01.00             | Architecture, data model, components, screens                                                 |
+| Software Project Management Plan (SPMP) v01.00    | Scope, schedule, budget, risks, team roles                                                    |
+| [agents/READ-FIRST.md](agents/READ-FIRST.md)      | Product rules, design language, AI split, and platform gotchas: read before changing anything |
+| `agents/specs/snapworth-web/` (local, not in git) | Implementation requirements, design, and tasks for the web build                              |
+| [Frontend/README.md](Frontend/README.md)          | Workspace details and package management                                                      |
 
 ---
 
 ## Team
 
-| Member                 | Role                                      | Responsible for                                           |
-| ---------------------- | ----------------------------------------- | --------------------------------------------------------- |
-| Ivan Clement P. Cañete | Team Leader: Full Stack / Project Manager | Schedule, architecture decisions, environment, deployment |
-| Aldrich A. Segura      | Full Stack                                | Supabase schema, RLS policies, services, AI adapters      |
-| Clark Jaca             | Frontend                                  | Screens, components, navigation, testing                  |
+| Member                 | Role                                      | Responsible for                                                                                                                        |
+| ---------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Ivan Clement P. Cañete | Team Leader: Full Stack / Project Manager | Schedule, architecture decisions, environment, deployment                                                                              |
+| Aldrich A. Segura      | Full Stack                                | Supabase schema, RLS policies, services, AI adapters                                                                                   |
+| Clark Jaca             | Frontend & Mobile                         | Screens, components, navigation, design system and motion, the iOS app's native code (including on-device Apple Intelligence), testing |
 
 ---
 
