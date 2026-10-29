@@ -1,4 +1,4 @@
-import { Archive, ArrowUp, Ban, Ellipsis, Plus } from 'lucide-react-native';
+import { Archive, ArrowUp, Ban, Ellipsis, MessageSquare, Plus } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, TextInput, View } from 'react-native';
 import Animated, {
@@ -19,6 +19,7 @@ import {
   BottomBar,
   Button,
   ChoiceChips,
+  EmptyState,
   hideWebFocusOutline,
   IconButton,
   NavHeader,
@@ -26,46 +27,31 @@ import {
   PressableScale,
   Reveal,
   Screen,
+  ScreenSkeleton,
   SWText,
   Surface,
   typeStyle,
   useToast,
 } from '../../components';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
-import {
-  formatPeso,
-  previewConversation,
-  previewConversations,
-  type PreviewMessage,
-} from '../preview/sample-data';
+import type { ChatReportReason, Message } from '../../types/entities';
+import type { AppError } from '../../types/errors';
+import { formatPeso, previewPhotoByListingKey } from '../preview/sample-data';
 import { MeetupCard, OfferCard } from './ChatCards';
 import { ChatActionsSheet, MeetupSheet, OfferSheet, SafetySheet } from './ChatSheets';
+import { chatErrorCopy, formatMessageTime } from './chat-format';
+import { useConversation } from './chat-state';
 
 export interface ConversationViewProps {
   readonly conversationId?: string;
   readonly onBack?: () => void;
-  readonly onViewItem?: () => void;
-  readonly onSend?: (body: string) => void;
-  /** A structured offer, new or countering theirs. */
-  readonly onSendOffer?: (amount: number) => void;
-  readonly onRespondToOffer?: (messageId: string, response: 'accept' | 'decline') => void;
-  readonly onProposeMeetup?: (meetup: { readonly place: string; readonly when: string }) => void;
-  readonly onConfirmMeetup?: (messageId: string) => void;
-  /** Report and block live in the header menu (SRS 3.1.10). */
-  readonly onReport?: (reason: string) => void;
-  readonly onBlock?: (blocked: boolean) => void;
+  readonly onViewItem?: (listingKey: string) => void;
 }
-
-const cannedReplies = [
-  'Sounds good — let me know when works for you.',
-  'Great, I can do that.',
-  'Perfect, talk soon!',
-] as const;
 
 type OpenSheet = 'actions' | 'offer' | 'meetup' | 'safety' | null;
 
 /** Groups consecutive messages from the same sender so only the last of a run shows its time. */
-function useGroupedMessages(messages: readonly PreviewMessage[]) {
+function useGroupedMessages(messages: readonly Message[]) {
   return useMemo(
     () =>
       messages.map((message, index) => {
@@ -73,7 +59,7 @@ function useGroupedMessages(messages: readonly PreviewMessage[]) {
         const previous = messages[index - 1];
         return {
           message,
-          showTime: !next || next.mine !== message.mine,
+          showTime: !next || next.mine !== message.mine || message.delivery.status !== 'delivered',
           isGroupStart: !previous || previous.mine !== message.mine,
         };
       }),
@@ -81,40 +67,30 @@ function useGroupedMessages(messages: readonly PreviewMessage[]) {
   );
 }
 
-export function ConversationView({
-  conversationId,
-  onBack,
-  onViewItem,
-  onSend,
-  onSendOffer,
-  onRespondToOffer,
-  onProposeMeetup,
-  onConfirmMeetup,
-  onReport,
-  onBlock,
-}: ConversationViewProps) {
+function timeLabel(message: Message): string {
+  if (message.delivery.status === 'pending') return 'Sending…';
+  if (message.delivery.status === 'failed') {
+    return message.delivery.retryable ? 'Not sent · Tap to try again' : 'Not sent';
+  }
+  return formatMessageTime(message.createdAt);
+}
+
+export function ConversationView({ conversationId, onBack, onViewItem }: ConversationViewProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
-  const summary = useMemo(
-    () =>
-      previewConversations.find((entry) => entry.id === conversationId) ?? previewConversations[0],
-    [conversationId],
-  );
-  const conversation = previewConversation;
-  const handle = summary?.with.handle ?? 'seller';
-  const askingPrice = conversation.item.askingPrice;
-  const [messages, setMessages] = useState<readonly PreviewMessage[]>(conversation.messages);
+  const chat = useConversation(conversationId);
+  const { conversation, messages, typing } = chat;
+  const handle = conversation?.other.handle ?? 'seller';
+  const askingPrice = conversation?.listing.askingPricePhp ?? 0;
   const [draft, setDraft] = useState('');
-  const [typing, setTyping] = useState(false);
   const [sheet, setSheet] = useState<OpenSheet>(null);
   const [counterTo, setCounterTo] = useState<number | undefined>(undefined);
-  const [blocked, setBlocked] = useState(false);
   const [reported, setReported] = useState(false);
   const scroller = useRef<ScrollView>(null);
-  const counter = useRef(0);
   const grouped = useGroupedMessages(messages);
-  const closed = summary?.closed;
+  const closed = conversation?.closed;
+  const blocked = conversation?.blockedByMe ?? false;
   const pendingTheirs = messages.some(
     (message) => !message.mine && message.offer?.status === 'pending',
   );
@@ -130,125 +106,108 @@ export function ConversationView({
     [],
   );
 
-  const nextId = (prefix: string) => {
-    counter.current += 1;
-    return `${prefix}-${counter.current}`;
-  };
-
-  /** Preview stand-in for the other person: a short pause, then an answer. */
-  const reply = useCallback((answer: (current: readonly PreviewMessage[]) => PreviewMessage[]) => {
-    setTyping(true);
-    setTimeout(() => {
-      setTyping(false);
-      setMessages((current) => answer(current));
-    }, 1200);
-  }, []);
+  // Offline sends stay in the thread, marked to retry; anything else is worth a word.
+  const complain = useCallback(
+    (error: AppError) => {
+      if (error.kind !== 'offline') toast.show(chatErrorCopy(error));
+    },
+    [toast],
+  );
 
   const send = useCallback(
     (body: string) => {
       const text = body.trim();
       if (!text) return;
-      const id = nextId('local');
-      onSend?.(text);
       haptic('tap');
-      setMessages((current) => [...current, { id, body: text, sentAt: 'Now', mine: true }]);
       setDraft('');
-      reply((current) => [
-        ...current,
-        {
-          id: `reply-${id}`,
-          body: cannedReplies[counter.current % cannedReplies.length] ?? cannedReplies[0]!,
-          sentAt: 'Now',
-          mine: false,
-        },
-      ]);
+      void chat.sendText(text).then((result) => {
+        if (!result.ok) complain(result.error);
+      });
     },
-    [onSend, reply],
+    [chat, complain],
   );
 
-  // A new offer replaces any still open on either side.
-  const settleOpenOffers = (current: readonly PreviewMessage[]) =>
-    current.map((message) =>
-      message.offer?.status === 'pending'
-        ? { ...message, offer: { ...message.offer, status: 'countered' as const } }
-        : message,
-    );
-
   const sendOffer = (amount: number) => {
-    const id = nextId('offer');
-    onSendOffer?.(amount);
     setSheet(null);
     setCounterTo(undefined);
-    setMessages((current) => [
-      ...settleOpenOffers(current),
-      { id, body: '', sentAt: 'Now', mine: true, offer: { amount, status: 'pending' } },
-    ]);
-    reply((current) => [
-      ...current.map((message) =>
-        message.id === id && message.offer
-          ? { ...message, offer: { ...message.offer, status: 'accepted' as const } }
-          : message,
-      ),
-      { id: `reply-${id}`, body: 'Deal! When can we meet?', sentAt: 'Now', mine: false },
-    ]);
+    void chat.sendOffer(amount).then((result) => {
+      if (!result.ok) complain(result.error);
+    });
   };
 
-  const respond = (message: PreviewMessage, response: 'accept' | 'decline') => {
-    onRespondToOffer?.(message.id, response);
+  const respond = (message: Message, response: 'accept' | 'decline') => {
     haptic(response === 'accept' ? 'success' : 'select');
-    setMessages((current) =>
-      current.map((entry) =>
-        entry.id === message.id && entry.offer
-          ? {
-              ...entry,
-              offer: { ...entry.offer, status: response === 'accept' ? 'accepted' : 'declined' },
-            }
-          : entry,
-      ),
-    );
-    if (response === 'accept') {
-      toast.show({
-        title: 'Offer accepted',
-        body: `${formatPeso(message.offer?.amount ?? 0)}. Arrange the pickup next.`,
-        celebrate: true,
-      });
-    }
+    void chat.respondToOffer(message.id, response === 'accept').then((result) => {
+      if (!result.ok) {
+        complain(result.error);
+      } else if (response === 'accept') {
+        toast.show({
+          title: 'Offer accepted',
+          body: `${formatPeso(message.offer?.amountPhp ?? 0)}. Arrange the pickup next.`,
+          celebrate: true,
+        });
+      }
+    });
   };
 
   const proposeMeetup = (meetup: { readonly place: string; readonly when: string }) => {
-    const id = nextId('meetup');
-    onProposeMeetup?.(meetup);
     setSheet(null);
-    setMessages((current) => [
-      ...current,
-      { id, body: '', sentAt: 'Now', mine: true, meetup: { ...meetup, status: 'proposed' } },
-    ]);
-    reply((current) => [
-      ...current.map((message) =>
-        message.id === id && message.meetup
-          ? { ...message, meetup: { ...message.meetup, status: 'confirmed' as const } }
-          : message,
-      ),
-      { id: `reply-${id}`, body: 'See you there!', sentAt: 'Now', mine: false },
-    ]);
+    void chat.proposeMeetup(meetup).then((result) => {
+      if (!result.ok) complain(result.error);
+    });
   };
 
-  const confirmMeetup = (message: PreviewMessage) => {
-    onConfirmMeetup?.(message.id);
+  const confirmMeetup = (message: Message) => {
     haptic('success');
-    setMessages((current) =>
-      current.map((entry) =>
-        entry.id === message.id && entry.meetup
-          ? { ...entry, meetup: { ...entry.meetup, status: 'confirmed' } }
-          : entry,
-      ),
-    );
+    void chat.confirmMeetup(message.id).then((result) => {
+      if (!result.ok) complain(result.error);
+    });
+  };
+
+  const retry = (message: Message) => {
+    if (message.delivery.status !== 'failed' || !message.delivery.retryable) return;
+    void chat.retry(message.id).then((result) => {
+      if (result && !result.ok) complain(result.error);
+    });
+  };
+
+  const setBlocked = (next: boolean) => {
+    setSheet(null);
+    void chat.setBlocked(next).then((result) => {
+      if (!result.ok) complain(result.error);
+      else toast.show({ title: next ? `@${handle} blocked` : `@${handle} unblocked` });
+    });
   };
 
   useEffect(() => {
     const timer = setTimeout(() => scroller.current?.scrollToEnd({ animated: true }), 80);
     return () => clearTimeout(timer);
   }, [messages, typing]);
+
+  if (chat.status === 'loading' && !conversation) return <ScreenSkeleton kind="detail" />;
+  if (!conversation) {
+    const missing = chat.error?.kind === 'authorization';
+    return (
+      <Screen ambient="chat" header={<NavHeader title="Chat" onBack={onBack} banded />}>
+        <EmptyState
+          icon={MessageSquare}
+          title={missing ? 'This conversation isn’t available' : 'Couldn’t load this chat'}
+          body={
+            missing
+              ? 'It may have been removed, or it belongs to someone else.'
+              : 'Check your connection and try again.'
+          }
+          actionLabel={missing ? undefined : 'Try again'}
+          onAction={missing ? undefined : chat.reload}
+        />
+      </Screen>
+    );
+  }
+
+  const listing = conversation.listing;
+  const itemPhoto = listing.photoUrl
+    ? { uri: listing.photoUrl }
+    : previewPhotoByListingKey[listing.key];
 
   const composer = closed ? (
     <View style={styles.notice} accessibilityLiveRegion="polite">
@@ -265,15 +224,7 @@ export function ConversationView({
       <SWText variant="bodySmall" tone="textSecondary" style={styles.noticeText}>
         You blocked @{handle}.
       </SWText>
-      <Button
-        label="Unblock"
-        variant="tertiary"
-        size="small"
-        onPress={() => {
-          setBlocked(false);
-          onBlock?.(false);
-        }}
-      />
+      <Button label="Unblock" variant="tertiary" size="small" onPress={() => setBlocked(false)} />
     </View>
   ) : (
     <View style={styles.footerColumn}>
@@ -310,6 +261,7 @@ export function ConversationView({
           selectionColor={colors.accent}
           accessibilityLabel="Message"
           returnKeyType="send"
+          maxLength={1000}
           style={[
             styles.composerInput,
             typeStyle('bodyLarge'),
@@ -359,21 +311,23 @@ export function ConversationView({
       >
         <Reveal index={0}>
           <PressableScale
-            accessibilityLabel={`View item, ${conversation.item.title}, asking ${formatPeso(askingPrice)}`}
-            onPress={onViewItem}
+            accessibilityLabel={`View item, ${listing.title}, asking ${formatPeso(askingPrice)}`}
+            onPress={() => onViewItem?.(listing.key)}
             haptic="select"
             depth="surface"
           >
             <Surface tone="raised" padding={tokens.spacing[3]} contentStyle={styles.itemContent}>
-              <Photo
-                source={conversation.item.photo}
-                label={conversation.item.title}
-                radius={tokens.radius.small}
-                style={styles.itemThumb}
-              />
+              {itemPhoto ? (
+                <Photo
+                  source={itemPhoto}
+                  label={listing.title}
+                  radius={tokens.radius.small}
+                  style={styles.itemThumb}
+                />
+              ) : null}
               <View style={styles.itemText}>
                 <SWText variant="headingSmall" numberOfLines={1}>
-                  {conversation.item.title}
+                  {listing.title}
                 </SWText>
                 <SWText variant="labelMedium" tone="textSecondary">
                   Asking {formatPeso(askingPrice)}
@@ -382,6 +336,14 @@ export function ConversationView({
             </Surface>
           </PressableScale>
         </Reveal>
+
+        {messages.length === 0 ? (
+          <SWText variant="bodySmall" tone="textMuted" style={styles.firstNote}>
+            {conversation.iAmSeller
+              ? `Say hi to @${handle}.`
+              : `Ask @${handle} about the item, make an offer, or arrange a pickup.`}
+          </SWText>
+        ) : null}
 
         {grouped.map(({ message, showTime, isGroupStart }, index) => (
           <Animated.View
@@ -393,6 +355,7 @@ export function ConversationView({
               message.offer || message.meetup ? styles.cardMessage : null,
               message.mine ? styles.mine : styles.theirs,
               isGroupStart ? styles.groupStart : null,
+              message.delivery.status === 'pending' ? styles.sending : null,
             ]}
           >
             {message.offer ? (
@@ -405,7 +368,7 @@ export function ConversationView({
                 onAccept={() => respond(message, 'accept')}
                 onDecline={() => respond(message, 'decline')}
                 onCounter={() => {
-                  setCounterTo(message.offer?.amount);
+                  setCounterTo(message.offer?.amountPhp);
                   setSheet('offer');
                 }}
               />
@@ -425,9 +388,24 @@ export function ConversationView({
               </View>
             )}
             {showTime ? (
-              <SWText variant="caption" tone="textMuted">
-                {message.sentAt}
-              </SWText>
+              message.delivery.status === 'failed' ? (
+                <PressableScale
+                  accessibilityRole="button"
+                  accessibilityLabel={`Message not sent. ${
+                    message.delivery.retryable ? 'Tap to try again.' : ''
+                  }`}
+                  onPress={() => retry(message)}
+                  haptic="select"
+                >
+                  <SWText variant="caption" tone="danger">
+                    {timeLabel(message)}
+                  </SWText>
+                </PressableScale>
+              ) : (
+                <SWText variant="caption" tone="textMuted">
+                  {timeLabel(message)}
+                </SWText>
+              )
             ) : null}
           </Animated.View>
         ))}
@@ -470,16 +448,16 @@ export function ConversationView({
         onClose={() => setSheet(null)}
         onReport={(reason) => {
           setReported(true);
-          onReport?.(reason);
-          toast.show({ title: 'Report sent', body: 'Our moderators will take a look.' });
+          void chat.report(reason as ChatReportReason).then((result) => {
+            if (result.ok) {
+              toast.show({ title: 'Report sent', body: 'Our moderators will take a look.' });
+            } else {
+              setReported(false);
+              complain(result.error);
+            }
+          });
         }}
-        onBlock={() => {
-          const next = !blocked;
-          setBlocked(next);
-          setSheet(null);
-          onBlock?.(next);
-          toast.show({ title: next ? `@${handle} blocked` : `@${handle} unblocked` });
-        }}
+        onBlock={() => setBlocked(!blocked)}
       />
     </Screen>
   );
@@ -562,6 +540,13 @@ const stylesFor = themedStyles((colors) => ({
   },
   groupStart: {
     marginTop: tokens.spacing[2],
+  },
+  sending: {
+    opacity: 0.6,
+  },
+  firstNote: {
+    textAlign: 'center',
+    paddingHorizontal: tokens.spacing[4],
   },
   mine: {
     alignSelf: 'flex-end',

@@ -216,7 +216,7 @@ function CommentRow({
 }
 
 /** The author's photo; demo accounts use their bundled photo, anyone else their initial. */
-function AuthorAvatar({
+export function AuthorAvatar({
   handle,
   avatarUrl,
   size,

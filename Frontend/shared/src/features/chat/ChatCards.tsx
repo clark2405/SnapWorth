@@ -3,15 +3,11 @@ import { View } from 'react-native';
 
 import { Button, SWText, Tag, type TagTone } from '../../components';
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
-import {
-  formatPeso,
-  type PreviewMeetup,
-  type PreviewOffer,
-  type PreviewOfferStatus,
-} from '../preview/sample-data';
+import type { ChatMeetup, ChatOffer, OfferStatus } from '../../types/entities';
+import { formatPeso } from '../preview/sample-data';
 
 const offerStatus: Record<
-  PreviewOfferStatus,
+  OfferStatus,
   {
     readonly mine: string;
     readonly theirs: string;
@@ -39,7 +35,7 @@ export function OfferCard({
   onCounter,
   onDecline,
 }: {
-  readonly offer: PreviewOffer;
+  readonly offer: ChatOffer;
   readonly note?: string;
   readonly mine: boolean;
   readonly askingPrice: number;
@@ -55,7 +51,7 @@ export function OfferCard({
   const status = expired
     ? { mine: 'No longer open', theirs: 'No longer open', tone: 'grave' as const, icon: Archive }
     : offerStatus[offer.status];
-  const gap = askingPrice - offer.amount;
+  const gap = askingPrice - offer.amountPhp;
   const versusAsking =
     gap === 0
       ? 'Full asking price'
@@ -68,7 +64,7 @@ export function OfferCard({
     <View
       style={[styles.card, settled ? styles.settled : null]}
       accessible={mine || offer.status !== 'pending'}
-      accessibilityLabel={`${mine ? 'Your offer' : 'Offer'} of ${formatPeso(offer.amount)}, ${versusAsking}. ${mine ? status.mine : status.theirs}.`}
+      accessibilityLabel={`${mine ? 'Your offer' : 'Offer'} of ${formatPeso(offer.amountPhp)}, ${versusAsking}. ${mine ? status.mine : status.theirs}.`}
     >
       <View style={styles.cardHead}>
         <HandCoins size={16} strokeWidth={2} color={colors.textMuted} />
@@ -80,7 +76,7 @@ export function OfferCard({
         variant="priceMedium"
         style={offer.status === 'countered' ? styles.struck : undefined}
       >
-        {formatPeso(offer.amount)}
+        {formatPeso(offer.amountPhp)}
       </SWText>
       <SWText variant="caption" tone="textSecondary">
         {versusAsking}
@@ -120,7 +116,7 @@ export function MeetupCard({
   onConfirm,
   onSuggestAnother,
 }: {
-  readonly meetup: PreviewMeetup;
+  readonly meetup: ChatMeetup;
   readonly mine: boolean;
   readonly locked?: boolean;
   readonly onConfirm: () => void;

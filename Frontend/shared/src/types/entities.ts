@@ -1,7 +1,6 @@
 import type { UtcDateTime } from './date-time';
 import type { AppError } from './errors';
 import type {
-  ClientMessageId,
   CommentId,
   ConversationId,
   ItemId,
@@ -246,32 +245,98 @@ export type MessageDeliveryState =
   | { readonly status: 'delivered'; readonly deliveredAt: UtcDateTime }
   | { readonly status: 'failed'; readonly error: AppError; readonly retryable: boolean };
 
+/** The most a chat message can say; the database enforces the same limit. */
+export const messageBodyMaxLength = 1000;
+
+/** A chat message's text is trimmed, 1 to 1,000 characters. */
+export const parseMessageBody = (raw: string): Result<MessageBody, ValidationError> => {
+  const body = raw.trim();
+  if (body.length === 0) return err({ kind: 'validation', code: 'empty', field: 'message' });
+  if (body.length > messageBodyMaxLength) {
+    return err({
+      kind: 'validation',
+      code: 'too_long',
+      field: 'message',
+      limit: String(messageBodyMaxLength),
+    });
+  }
+  return ok(body as MessageBody);
+};
+
+/** `countered` means a newer offer, from either side, replaced this one. */
+export type OfferStatus = 'pending' | 'accepted' | 'declined' | 'countered';
+export type MeetupStatus = 'proposed' | 'confirmed';
+
+export interface ChatOffer {
+  readonly amountPhp: number;
+  readonly status: OfferStatus;
+}
+
+/** A proposed pickup or handoff: where and when, and whether the other side has agreed. */
+export interface ChatMeetup {
+  readonly place: string;
+  readonly when: string;
+  readonly status: MeetupStatus;
+}
+
+/**
+ * One message in a conversation: plain text, a price offer (with an optional note in `body`),
+ * or a proposed pickup. Its id is chosen by the sender's device, so a resend never doubles it.
+ */
 export interface Message {
-  readonly id?: MessageId;
-  readonly clientId: ClientMessageId;
+  readonly id: MessageId;
   readonly conversationId: ConversationId;
   readonly senderId: UserId;
-  readonly body: MessageBody;
-  readonly delivery: MessageDeliveryState;
+  readonly mine: boolean;
+  readonly body: string;
+  readonly offer?: ChatOffer;
+  readonly meetup?: ChatMeetup;
   readonly createdAt: UtcDateTime;
+  readonly delivery: MessageDeliveryState;
 }
+
+/** What a new message says, before it has an id or a sender. */
+export type OutgoingMessage =
+  | { readonly kind: 'text'; readonly body: MessageBody }
+  | { readonly kind: 'offer'; readonly amountPhp: number; readonly note?: MessageBody }
+  | { readonly kind: 'meetup'; readonly place: string; readonly when: string };
+
+/** The listing a conversation is about, as the conversation shows it. */
+export interface ChatListing {
+  /** The listing's public key, the same one its link uses. */
+  readonly key: string;
+  readonly title: string;
+  readonly askingPricePhp: number;
+  readonly photoUrl?: string;
+}
+
+/** The latest message, as much as a list row needs to describe it. */
+export interface ConversationPreview {
+  readonly fromMe: boolean;
+  readonly body: string;
+  readonly offerPhp?: number;
+  readonly meetupPlace?: string;
+}
+
+export type ChatReportReason = 'scam' | 'harassment' | 'spam' | 'other';
 
 export interface ConversationSummary {
   readonly id: ConversationId;
-  readonly listingId: ListingId;
-  readonly otherParticipantId: UserId;
-  readonly listingPhoto: PhotoRef;
-  readonly latestMessage?: Message;
+  readonly listing: ChatListing;
+  readonly other: PublicProfile;
+  readonly iAmSeller: boolean;
+  readonly latest?: ConversationPreview;
   readonly latestActivityAt: UtcDateTime;
+  /** Messages from the other person the viewer hasn't read. */
+  readonly unread: number;
+  /** Set once the conversation is over: it lists under Past and can't be replied to. */
+  readonly closed?: 'sold' | 'archived';
+  readonly blockedByMe: boolean;
 }
 
-export interface ConversationDetail {
-  readonly id: ConversationId;
-  readonly listingId: ListingId;
-  readonly buyerId: UserId;
-  readonly sellerId: UserId;
+export interface ConversationDetail extends ConversationSummary {
+  /** Oldest first. */
   readonly messages: readonly Message[];
-  readonly blocked: boolean;
 }
 
 export type ModerationTargetType = 'feed_post' | 'comment' | 'listing';

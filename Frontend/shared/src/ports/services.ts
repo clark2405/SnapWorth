@@ -18,7 +18,8 @@ import type {
   ListingDetail,
   MarketFilter,
   Message,
-  MessageBody,
+  ChatReportReason,
+  OfferStatus,
   ModerationCase,
   ModerationStatus,
   Profile,
@@ -32,10 +33,10 @@ import type {
   SelectedImage,
 } from '../types/entities';
 import type {
-  ClientMessageId,
   CommentId,
   ConversationId,
   IdempotencyKey,
+  MessageId,
   ItemId,
   ListingId,
   ModerationCaseId,
@@ -45,6 +46,7 @@ import type {
 import type { AiEstimate, AskingPriceDraft } from '../types/money';
 import type { Cursor, Page } from '../types/pagination';
 import type { Result } from '../types/result';
+import type { ChatListener } from './chat';
 import type { Unsubscribe } from './platform';
 
 export interface AuthService {
@@ -102,20 +104,37 @@ export interface ListingService {
   get(listingId: ListingId): Promise<Result<ListingDetail, AppError>>;
 }
 
-export type MessageListener = (message: Message) => void;
-
+/**
+ * The viewer's chats with buyers and sellers. Every send validates its input first and is
+ * stored under an id chosen here, so a failed send can be retried without doubling.
+ */
 export interface ChatService {
-  openOrReuse(listingId: ListingId): Promise<Result<ConversationId, AppError>>;
-  listConversations(): Promise<Result<readonly ConversationSummary[], AppError>>;
-  getAuthorized(id: ConversationId): Promise<Result<ConversationDetail, AppError>>;
-  send(
-    id: ConversationId,
-    body: MessageBody,
-    clientId: ClientMessageId,
-  ): Promise<Result<Message, AppError>>;
-  subscribe(id: ConversationId, listener: MessageListener): Unsubscribe;
-  block(userId: UserId): Promise<Result<void, AppError>>;
+  start(listingKey: string): Promise<Result<ConversationId, AppError>>;
+  list(): Promise<Result<readonly ConversationSummary[], AppError>>;
+  get(id: ConversationId): Promise<Result<ConversationDetail, AppError>>;
+  /** A fresh id for a message about to be sent; pass it to `send` again to retry. */
+  nextMessageId(): MessageId;
+  sendText(id: MessageId, conversationId: ConversationId, body: string): Promise<SendResult>;
+  sendOffer(
+    id: MessageId,
+    conversationId: ConversationId,
+    amountPhp: number,
+    note?: string,
+  ): Promise<SendResult>;
+  proposeMeetup(
+    id: MessageId,
+    conversationId: ConversationId,
+    meetup: { readonly place: string; readonly when: string },
+  ): Promise<SendResult>;
+  respondToOffer(messageId: MessageId, accept: boolean): Promise<Result<OfferStatus, AppError>>;
+  confirmMeetup(messageId: MessageId): Promise<Result<void, AppError>>;
+  markRead(id: ConversationId): Promise<Result<void, AppError>>;
+  report(id: ConversationId, reason: ChatReportReason): Promise<Result<void, AppError>>;
+  setBlocked(userId: UserId, blocked: boolean): Promise<Result<void, AppError>>;
+  subscribe(listener: ChatListener): Unsubscribe;
 }
+
+export type SendResult = Result<Message, AppError>;
 
 export interface AdminReviewService {
   listQueue(cursor?: Cursor): Promise<Result<Page<ModerationCase>, AppError>>;

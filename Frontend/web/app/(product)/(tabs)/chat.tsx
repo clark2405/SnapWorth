@@ -6,7 +6,7 @@ import { themedStyles, tokens, useThemedStyles, useWideLayout } from '@snapworth
 import {
   ConversationListView,
   ConversationView,
-  firstConversationId,
+  useFirstOpenConversationId,
 } from '@snapworth/shared/features/chat';
 import { AccountGateView, useSession } from '@snapworth/shared/features/session';
 
@@ -19,7 +19,9 @@ export default function ConversationListRoute() {
   const styles = useThemedStyles(stylesFor);
   const { isGuest } = useSession();
   const wide = useWideLayout();
-  const [openId, setOpenId] = useState(firstConversationId);
+  const firstOpenId = useFirstOpenConversationId();
+  const [pickedId, setPickedId] = useState<string>();
+  const openId = pickedId ?? firstOpenId;
 
   if (isGuest) return <AccountGateView title="Chats" intent="chats" />;
 
@@ -27,7 +29,7 @@ export default function ConversationListRoute() {
     <ConversationListView
       selectedId={wide ? openId : undefined}
       onOpenConversation={(conversationId) =>
-        wide ? setOpenId(conversationId) : router.push(`/chat/${conversationId}`)
+        wide ? setPickedId(conversationId) : router.push(`/chat/${conversationId}`)
       }
       onOpenProfile={() => router.push('/profile')}
       onBrowseMarket={() => router.replace('/marketplace')}
@@ -40,7 +42,13 @@ export default function ConversationListRoute() {
       <View style={styles.list}>{list}</View>
       <View style={styles.conversation}>
         {/* A fresh conversation for each one opened, so drafts and sheets never carry over. */}
-        <ConversationView key={openId} conversationId={openId} />
+        {openId ? (
+          <ConversationView
+            key={openId}
+            conversationId={openId}
+            onViewItem={(listingKey) => router.push(`/listing/${listingKey}`)}
+          />
+        ) : null}
       </View>
     </View>
   );

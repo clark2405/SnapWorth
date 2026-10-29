@@ -7,9 +7,10 @@
 | Area                 | Where                                                  | What it does                                                                                                       |
 | -------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
 | Feed discussion      | `supabase/migrations/20261005000000_feed_comments.sql` | Profiles, feed posts, comments with one level of replies, reports, and the RLS policies that decide who sees what. |
+| Chats                | `supabase/migrations/20261029000000_chat.sql`          | Listings (the minimum a chat needs), conversations, messages, offers, pickups, blocks, reports, and their RLS.     |
 | Moderation           | `supabase/functions/moderate-content/`                 | Screens each new comment and approves or holds it. Fail-closed: nothing is public until it has been screened.      |
 | Moderation providers | `supabase/functions/_shared/providers/moderation.ts`   | `openai` (OpenAI's free moderation endpoint) for real use; `rules` (a fixed word list) for local development.      |
-| Development data     | `supabase/seed/01_feed_preview.sql`                    | The demo accounts, the two feed posts the app ships with, and their comments.                                      |
+| Development data     | `supabase/seed/`                                       | The demo accounts, the two feed posts the app ships with and their comments, and the market listings.              |
 | Tests                | `supabase/tests/`, `scripts/`                          | Database behaviour tests and Edge Function tests, run in CI on every push.                                         |
 
 ### How comments work
@@ -21,6 +22,19 @@
 - **Reporting:** only other people's comments, once each. Three reports hold an approved comment for review automatically.
 - **Limits:** 1 to 280 characters (trimmed), at most 10 comments a minute per account.
 - **Fail-closed moderation:** with no provider configured, comments are held for review. If the provider is temporarily down, the comment stays pending and the call can be retried.
+
+### How chats work
+
+- **Starting:** `start_conversation(listing_slug)` opens the caller's conversation with the listing's seller, or returns the one they already have. One conversation per buyer and listing; nobody can message themselves.
+- **Who sees what:** only the buyer and the seller see a conversation or its messages. Realtime applies the same rule, so new messages and answers stream only to those two.
+- **Messages:** text (1 to 1,000 characters, trimmed), a price offer with an optional note, or a proposed pickup (where and when). The device picks each message's id, so a resend after a dropped connection lands once.
+- **Offers and pickups:** a new offer from either side counters the one still open. Only the other person can answer, through `respond_to_offer` and `confirm_meetup`; a client can never write a status directly.
+- **Reading:** `mark_conversation_read`; `conversation_list()` counts what the caller hasn't read.
+- **Closing:** once a listing sells, its conversations are read-only and list under Past.
+- **Safety:** `set_block` stops messages both ways in every conversation between two people; the blocked person can't see who blocked them. Either person can report a conversation, once. Private messages are not put through moderation.
+- **Limits:** at most 30 messages a minute per account.
+
+The client's errors map from the database's codes: `SWCLO` (closed), `SWBLK` (blocked) and `SWOLD` (offer no longer open).
 
 ## Setting up a Supabase project
 

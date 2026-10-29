@@ -35,13 +35,7 @@ const image = {
   avatarJustinV,
 };
 
-export const pesoFormatter = new Intl.NumberFormat('en-PH', {
-  style: 'currency',
-  currency: 'PHP',
-  maximumFractionDigits: 0,
-});
-
-export const formatPeso = (amount: number): string => pesoFormatter.format(amount);
+export { formatPeso, pesoFormatter } from './peso';
 
 export interface PreviewUser {
   readonly handle: string;
@@ -1221,3 +1215,25 @@ export const previewCompanionReplies = {
   fallback:
     'Good question. From what I can see in recent SnapWorth sales and community votes, here is my read — and I can dig deeper if you snap a photo.',
 } as const;
+
+/**
+ * The listing a sample conversation is about. In the samples the viewer is the seller, with
+ * several buyers asking about the same item, so each title stands for one of the viewer's own
+ * listings.
+ */
+export const previewChatListingKey = (itemTitle: string): string =>
+  `my-${itemTitle
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')}`;
+
+/** Bundled photos by listing key, for listings that have no uploaded photo yet. */
+export const previewPhotoByListingKey: Readonly<Record<string, ImageSourcePropType>> =
+  Object.fromEntries([
+    ...previewListings.map((listing) => [listing.id, listing.photo] as const),
+    [previewMyListing.id, previewMyListing.photo] as const,
+    ...previewConversations.map(
+      (conversation) =>
+        [previewChatListingKey(conversation.itemTitle), conversation.itemPhoto] as const,
+    ),
+  ]);
