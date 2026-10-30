@@ -12,7 +12,6 @@ import Animated, {
   Easing,
   FadeIn,
   FadeOut,
-  LinearTransition,
   interpolate,
   runOnJS,
   useAnimatedStyle,
@@ -21,22 +20,23 @@ import Animated, {
   useSharedValue,
   withSpring,
   withTiming,
-  ZoomIn,
   ZoomOut,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
+  paperLayout,
   EmptyState,
   hideWebFocusOutline,
   Photo,
   PressableScale,
   Screen,
   ScrollEdge,
-  SWText,
-  typeStyle,
-  ZoomLink,
   type SearchOrigin,
+  stampIn,
+  typeStyle,
+  SWText,
+  ZoomLink,
 } from '../../components';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import {
@@ -269,7 +269,7 @@ export function SearchView({
             </Animated.View>
             {query.length > 0 ? (
               <Animated.View
-                entering={reduceMotion ? undefined : ZoomIn.springify().damping(16)}
+                entering={reduceMotion ? undefined : stampIn}
                 exiting={reduceMotion ? undefined : ZoomOut.duration(120)}
               >
                 <PressableScale
@@ -372,7 +372,7 @@ export function SearchView({
                       <Animated.View
                         key={term}
                         exiting={reduceMotion ? undefined : FadeOut.duration(160)}
-                        layout={reduceMotion ? undefined : LinearTransition.springify().damping(20)}
+                        layout={reduceMotion ? undefined : paperLayout}
                       >
                         <PressableScale
                           accessibilityRole="button"
@@ -465,7 +465,7 @@ export function SearchView({
                   key={`${result.kind}-${result.id}`}
                   entering={reduceMotion ? undefined : FadeIn.duration(220)}
                   exiting={reduceMotion ? undefined : FadeOut.duration(140)}
-                  layout={reduceMotion ? undefined : LinearTransition.springify().damping(20)}
+                  layout={reduceMotion ? undefined : paperLayout}
                 >
                   <ZoomLink
                     href={hrefFor(result)}

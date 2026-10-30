@@ -1,8 +1,17 @@
 import { MailCheck } from 'lucide-react-native';
 import { useState } from 'react';
-import Animated, { ZoomIn } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 
-import { Button, Field, NavHeader, Reveal, Screen, SWText, TextField } from '../../components';
+import {
+  Button,
+  Field,
+  NavHeader,
+  Reveal,
+  Screen,
+  stampIn,
+  SWText,
+  TextField,
+} from '../../components';
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 
 export interface ResetPasswordViewProps {
@@ -39,7 +48,7 @@ export function ResetPasswordView({ onBack, onSendLink, onBackToLogin }: ResetPa
         contentStyle={styles.content}
       >
         <Reveal index={0} style={styles.intro}>
-          <Animated.View entering={ZoomIn.springify().damping(14)} style={styles.icon}>
+          <Animated.View entering={stampIn} style={styles.icon}>
             <MailCheck size={24} strokeWidth={1.75} color={colors.success} />
           </Animated.View>
           <SWText variant="displayHero" accessibilityRole="header">

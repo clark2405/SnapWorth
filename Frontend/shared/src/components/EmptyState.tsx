@@ -1,12 +1,13 @@
 import type { LucideIcon } from 'lucide-react-native';
 import { View } from 'react-native';
-import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { held, placeColors, themedStyles, tokens, useTheme, useThemedStyles } from '../design';
 import { Button } from './Button';
 import { useScreenScroll } from './Screen';
 import { SWText } from './SWText';
 import { Worthy } from './Worthy';
+import { stampIn } from './paper-motion';
 
 export interface EmptyStateProps {
   readonly icon: LucideIcon;
@@ -38,11 +39,11 @@ export function EmptyState({
       {/* An empty screen is Worthy's to explain, holding up a tag with what belongs here. A
           failure keeps the plain red mark: nothing about it should look cheerful. */}
       {tone === 'error' ? (
-        <Animated.View entering={ZoomIn.springify().damping(14)} style={styles.icon}>
+        <Animated.View entering={stampIn} style={styles.icon}>
           <Icon size={24} strokeWidth={1.75} color={colors.danger} />
         </Animated.View>
       ) : (
-        <Animated.View entering={ZoomIn.springify().damping(14)} style={styles.worthy}>
+        <Animated.View entering={stampIn} style={styles.worthy}>
           <View style={[styles.disc, { backgroundColor: disc }]} />
           <Worthy size={84} mood="attentive" />
           <View style={styles.held}>

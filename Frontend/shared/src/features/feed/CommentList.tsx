@@ -1,9 +1,17 @@
 import { Clock3, CornerDownRight, Flag, ShieldAlert, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
-import { Avatar, IconButton, PressableScale, SWText, Tag } from '../../components';
+import {
+  paperIn,
+  paperLayout,
+  Avatar,
+  IconButton,
+  PressableScale,
+  SWText,
+  Tag,
+} from '../../components';
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import type { ThreadComment } from '../../types/entities';
 import { previewAvatarByHandle } from '../preview/sample-data';
@@ -64,10 +72,8 @@ function Thread({
 
   return (
     <Animated.View
-      entering={FadeInDown.springify()
-        .damping(18)
-        .delay(Math.min(index, 4) * 50)}
-      layout={LinearTransition.springify().damping(20)}
+      entering={paperIn(Math.min(index, 4) * 50)}
+      layout={paperLayout}
       style={styles.group}
     >
       {group.replies.length > 0 && spineEnd !== null ? (
@@ -94,7 +100,7 @@ function Thread({
             <Animated.View
               key={reply.id}
               entering={FadeIn.duration(tokens.motion.duration.base)}
-              layout={LinearTransition.springify().damping(20)}
+              layout={paperLayout}
               onLayout={
                 at === lastIndex ? (event) => setLastY(event.nativeEvent.layout.y) : undefined
               }

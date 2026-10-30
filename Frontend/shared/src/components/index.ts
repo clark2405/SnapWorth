@@ -52,3 +52,4 @@ export * from './Overline';
 export * from './Rating';
 export * from './Worthy';
 export * from './WorthySays';
+export * from './paper-motion';

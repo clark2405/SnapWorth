@@ -1,13 +1,14 @@
 import { ArrowUp, PenLine } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, TextInput, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 import {
+  paperIn,
+  paperLayout,
   BottomBar,
   Button,
   ChoiceChips,
-  Worthy,
   hideWebFocusOutline,
   NavHeader,
   Overline,
@@ -15,10 +16,11 @@ import {
   PriceRangeBar,
   Screen,
   Sparkline,
+  typeStyle,
   Surface,
   SWText,
-  typeStyle,
   useToast,
+  Worthy,
 } from '../../components';
 import { NightRoom, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import {
@@ -213,8 +215,8 @@ function CompanionChat({ initialQuestion, onBack, onUseListing, answer }: Compan
           message.role === 'user' ? (
             <Animated.View
               key={message.id}
-              entering={FadeInDown.springify().damping(18)}
-              layout={LinearTransition}
+              entering={paperIn()}
+              layout={paperLayout}
               style={styles.userBubble}
             >
               <SWText variant="bodyMedium" tone="onInverse">
@@ -278,7 +280,7 @@ function WorthyReply({
   }, [message.text]);
 
   return (
-    <Animated.View entering={FadeIn.duration(200)} layout={LinearTransition} style={styles.worthy}>
+    <Animated.View entering={FadeIn.duration(200)} layout={paperLayout} style={styles.worthy}>
       <SWText variant="bodyLarge" accessibilityLabel={message.text}>
         {typed}
       </SWText>
@@ -291,7 +293,7 @@ function WorthyReply({
         </Animated.View>
       ) : null}
       {done && message.card ? (
-        <Animated.View entering={FadeInDown.springify().damping(18)}>
+        <Animated.View entering={paperIn()}>
           <ReplyCardView card={message.card} onUseListing={onUseListing} />
         </Animated.View>
       ) : null}
