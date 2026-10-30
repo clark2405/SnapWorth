@@ -352,6 +352,7 @@ export function ListingDetailView({
 
       <Sheet visible={offerOpen} onClose={() => setOfferOpen(false)} title="Make an offer">
         <ChoiceChips
+          kind="action"
           options={insight.offerSuggestions.map((amount) => ({
             key: String(amount),
             label: formatPeso(amount),

@@ -237,6 +237,7 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
   ) : (
     <View style={styles.footerColumn}>
       <ChoiceChips
+        kind="action"
         options={quickReplies}
         value={null}
         scroll

@@ -103,6 +103,7 @@ export function OfferSheet({
       title={countering ? 'Counter offer' : 'Make an offer'}
     >
       <ChoiceChips
+        kind="action"
         options={suggestions.map((value) => ({ key: String(value), label: formatPeso(value) }))}
         value={amount > 0 ? String(amount) : null}
         onChange={setText}
@@ -230,6 +231,7 @@ export function MeetupSheet({
         />
         <ChoiceChips
           options={meetupSpots.map((spot) => ({ key: spot.key, label: spot.name }))}
+          label="Suggested place"
           value={spotKey}
           scroll
           onChange={suggest}
@@ -247,8 +249,14 @@ export function MeetupSheet({
         <SWText variant="overline" tone="textMuted">
           When
         </SWText>
-        <ChoiceChips options={previewMeetupDays} value={day} scroll onChange={setDay} />
-        <ChoiceChips options={previewMeetupTimes} value={time} scroll onChange={setTime} />
+        <ChoiceChips label="Day" options={previewMeetupDays} value={day} scroll onChange={setDay} />
+        <ChoiceChips
+          label="Time"
+          options={previewMeetupTimes}
+          value={time}
+          scroll
+          onChange={setTime}
+        />
       </View>
       <SWText variant="caption" tone="textMuted">
         {purpose === 'viewing'
@@ -315,7 +323,12 @@ export function SafetySheet({
           <SWText variant="overline" tone="textMuted">
             Report
           </SWText>
-          <ChoiceChips options={previewReportReasons} value={reason} onChange={setReason} />
+          <ChoiceChips
+            label="Reason"
+            options={previewReportReasons}
+            value={reason}
+            onChange={setReason}
+          />
           <Button
             label="Send report"
             variant="secondary"

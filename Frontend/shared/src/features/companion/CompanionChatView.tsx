@@ -247,6 +247,7 @@ function CompanionChat({ initialQuestion, onBack, onUseListing, answer }: Compan
         {!thinking && messages.length > 0 ? (
           <Animated.View entering={FadeIn.delay(400)} style={styles.followUps}>
             <ChoiceChips
+              kind="action"
               options={followUps}
               value={null}
               onChange={(key) => ask(followUps.find((f) => f.key === key)?.label ?? key)}
