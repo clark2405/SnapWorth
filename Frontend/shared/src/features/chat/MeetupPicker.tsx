@@ -36,7 +36,11 @@ export interface MeetupPickerProps {
   readonly accessibilityLabel: string;
 }
 
-const clamp = (value: number, low: number, high: number) => Math.min(Math.max(value, low), high);
+/** Runs inside the pinch gesture, on the UI thread, so it must be a worklet. */
+function clamp(value: number, low: number, high: number) {
+  'worklet';
+  return Math.min(Math.max(value, low), high);
+}
 
 /**
  * Pick any spot to meet: drag the map under the pin, pinch or use the buttons to zoom, and the
