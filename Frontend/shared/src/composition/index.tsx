@@ -79,10 +79,10 @@ function previewSeed(): LocalSeedComment[] {
 const previewSellerByListing: Readonly<Record<string, PreviewUser>> = {
   'polaroid-sun-600': previewUsers.mariaCruz,
   'air-jordan-1-bred': previewUsers.justinV,
-  'retro-walkman': previewUsers.manilaHype,
+  'retro-walkman': previewUsers.sugboHype,
   'keychron-keyboard': previewUsers.mariaCruz,
   'nike-teal-windbreaker': previewUsers.retroCurator,
-  'colour-block-windbreaker': previewUsers.manilaHype,
+  'colour-block-windbreaker': previewUsers.sugboHype,
   'black-puffer-jacket': previewUsers.justinV,
   'polaroid-film-bundle': previewUsers.mariaCruz,
 };
