@@ -4,7 +4,10 @@
  * name and pin from it, so a pin always shows the place it is labelled with. Keep the two in step;
  * `meetup-map-geo.test.ts` checks them against the migration. The places are in Cebu City, where
  * SnapWorth starts. Coordinates are from each place's Wikipedia entry (Fuente Osmeña Circle, which
- * has none, from Waze), cross-checked with other listings where they had it.
+ * has none, from Waze), cross-checked with other listings where they had it. SM Seaside's, JY
+ * Square's and Il Corso's are OpenStreetMap's own point for the mall (relation 7722019, nodes
+ * 1508435161 and 11468705743): Wikipedia's put SM Seaside's pin on the coastal road outside it.
+ * Every pin was checked against OpenStreetMap's outline of its place (October 2026).
  */
 
 export type MeetupArea =
@@ -73,6 +76,14 @@ export const meetupSpots: readonly MeetupSpot[] = [
     lng: 123.893135,
   },
   {
+    key: 'jy-square',
+    name: 'JY Square Mall',
+    city: 'Cebu City',
+    area: 'uptown',
+    lat: 10.330283,
+    lng: 123.898601,
+  },
+  {
     key: 'plaza-independencia',
     name: 'Plaza Independencia',
     city: 'Cebu City',
@@ -85,8 +96,16 @@ export const meetupSpots: readonly MeetupSpot[] = [
     name: 'SM Seaside City Cebu',
     city: 'Cebu City',
     area: 'srp',
-    lat: 10.280389,
-    lng: 123.881833,
+    lat: 10.281823,
+    lng: 123.88241,
+  },
+  {
+    key: 'il-corso',
+    name: 'Il Corso',
+    city: 'Cebu City',
+    area: 'srp',
+    lat: 10.26643,
+    lng: 123.877805,
   },
 ];
 
