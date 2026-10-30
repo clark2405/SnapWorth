@@ -124,6 +124,19 @@ export function useConversationList(): ConversationListState {
 }
 
 /**
+ * How many messages are waiting unread across the viewer's chats, for the Chats tab's badge.
+ * Pass `false` for a guest: nothing loads, and the count is 0.
+ */
+export function useUnreadChatCount(signedIn: boolean): number {
+  const { list, want } = useChatContext();
+  useEffect(() => {
+    if (signedIn) want();
+  }, [signedIn, want]);
+  if (!signedIn) return 0;
+  return list.conversations.reduce((total, conversation) => total + conversation.unread, 0);
+}
+
+/**
  * Opens (or reopens) the viewer's conversation about a listing. Resolves to its id, or null
  * after telling the viewer why it couldn't.
  */
