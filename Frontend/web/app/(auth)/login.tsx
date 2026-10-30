@@ -3,8 +3,13 @@ import { useEffect } from 'react';
 
 import { closeIntoTag, firstNameOf, openFromTag, useToast } from '@snapworth/shared/components';
 
-import { LoginView, isSupabaseConfigured, performAuth, type AuthInput } from '@snapworth/shared/features/auth';
-import { useSession } from '@snapworth/shared/features/session';
+import {
+  LoginView,
+  isSupabaseConfigured,
+  performAuth,
+  type AuthInput,
+} from '@snapworth/shared/features/auth';
+import { useSession, type SessionUser } from '@snapworth/shared/features/session';
 
 export default function LoginRoute() {
   const router = useRouter();
@@ -17,7 +22,7 @@ export default function LoginRoute() {
   useEffect(() => router.prefetch('/feed'), [router]);
 
   const done = async (input?: AuthInput) => {
-    let authUser: any = null;
+    let authUser: SessionUser | null = null;
 
     if (input?.email && input?.password && isSupabaseConfigured()) {
       try {

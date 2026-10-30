@@ -96,12 +96,24 @@ export interface SessionProviderProps {
   readonly children: ReactNode;
 }
 
+/**
+ * The signed-in person: a Supabase user, or one made on this device when no Supabase project is
+ * set up. Only the fields the app reads are listed, so both fit.
+ */
+export interface SessionUser {
+  readonly id: string;
+  readonly email?: string;
+  readonly created_at?: string;
+  readonly user_metadata?: Record<string, unknown>;
+  readonly app_metadata?: Record<string, unknown>;
+}
+
 interface SessionContextValue {
   readonly status: 'guest' | 'member';
-  readonly user: any | null; 
-  readonly startSession: (userData?: any) => void;
+  readonly user: SessionUser | null;
+  readonly startSession: (userData?: SessionUser | null) => void;
   readonly endSession: () => void;
-  readonly setUser: (userData: any) => void;
+  readonly setUser: (userData: SessionUser | null) => void;
   readonly requireAccount: (intent: AccountIntent, action?: () => void) => void;
   readonly createAccount: () => void;
   readonly signIn: () => void;
@@ -115,9 +127,9 @@ const SessionContext = createContext<SessionContextValue | null>(null);
  */
 export function SessionProvider({ onCreateAccount, onSignIn, children }: SessionProviderProps) {
   const [status, setStatus] = useState<'guest' | 'member'>('guest');
-  const [user, setUser] = useState<any | null>(null);
+  const [user, setUser] = useState<SessionUser | null>(null);
   const [asking, setAsking] = useState<AccountIntent | null>(null);
-  
+
   // The action that prompted the sheet, kept so it can finish once the person has an account.
   const pending = useRef<(() => void) | null>(null);
   const resume = useRef<(() => void) | null>(null);
@@ -128,15 +140,20 @@ export function SessionProvider({ onCreateAccount, onSignIn, children }: Session
     let active = true;
     try {
       const supabase = getSupabase();
-      void supabase.auth.getSession().then(({ data }) => {
-        if (!active) return;
-        if (data?.session?.user) {
-          setStatus('member');
-          setUser(data.session.user);
-        }
-      }).catch(() => {});
+      void supabase.auth
+        .getSession()
+        .then(({ data }) => {
+          if (!active) return;
+          if (data?.session?.user) {
+            setStatus('member');
+            setUser(data.session.user);
+          }
+        })
+        .catch(() => {});
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange((_event, session) => {
         if (!active) return;
         if (session?.user) {
           setStatus('member');
@@ -152,7 +169,8 @@ export function SessionProvider({ onCreateAccount, onSignIn, children }: Session
         subscription?.unsubscribe();
       };
     } catch {
-      // Supabase is not configured or reachable
+      // Supabase is not configured or reachable, so there is nothing to clean up.
+      return undefined;
     }
   }, []);
 
@@ -188,16 +206,21 @@ export function SessionProvider({ onCreateAccount, onSignIn, children }: Session
     () => ({
       status,
       user,
-      startSession: (userData?: any) => {
+      startSession: (userData?: SessionUser | null) => {
         setStatus('member');
         if (userData) {
           setUser(userData);
         } else if (isSupabaseConfigured()) {
           try {
-            void getSupabase().auth.getUser().then(({ data }) => {
-              if (data?.user) setUser(data.user);
-            }).catch(() => {});
-          } catch {}
+            void getSupabase()
+              .auth.getUser()
+              .then(({ data }) => {
+                if (data?.user) setUser(data.user);
+              })
+              .catch(() => {});
+          } catch {
+            // Supabase is not reachable; the session goes on without its details.
+          }
         }
       },
       endSession: () => {
@@ -206,11 +229,15 @@ export function SessionProvider({ onCreateAccount, onSignIn, children }: Session
         setUser(null);
         if (isSupabaseConfigured()) {
           try {
-            void getSupabase().auth.signOut().catch(() => {});
-          } catch {}
+            void getSupabase()
+              .auth.signOut()
+              .catch(() => {});
+          } catch {
+            // Supabase is not reachable; the session here has ended either way.
+          }
         }
       },
-      setUser: (userData: any) => setUser(userData),
+      setUser: (userData: SessionUser | null) => setUser(userData),
       requireAccount,
       createAccount: onCreateAccount,
       signIn: onSignIn,
@@ -264,8 +291,18 @@ function useSessionContext(): SessionContextValue {
 }
 
 export function useSession() {
-  const { status, user, startSession, endSession, setUser, createAccount, signIn } = useSessionContext();
-  return { status, user, isGuest: status === 'guest', startSession, endSession, setUser, createAccount, signIn };
+  const { status, user, startSession, endSession, setUser, createAccount, signIn } =
+    useSessionContext();
+  return {
+    status,
+    user,
+    isGuest: status === 'guest',
+    startSession,
+    endSession,
+    setUser,
+    createAccount,
+    signIn,
+  };
 }
 
 /**

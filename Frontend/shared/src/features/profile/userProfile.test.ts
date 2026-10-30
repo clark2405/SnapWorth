@@ -1,9 +1,22 @@
+import type { ImageSourcePropType } from 'react-native';
+
 import {
   avatarSourceFor,
   buildFallbackProfile,
   fetchUserProfile,
   formatJoinedDate,
 } from './userProfile';
+
+// These run in plain Node, which cannot load the device client (AsyncStorage, Expo env), and
+// cover the path where no Supabase project is configured.
+jest.mock('../../adapters/supabaseClient', () => ({
+  isSupabaseConfigured: () => false,
+  getSupabase: () => {
+    throw new Error('Supabase is not configured in unit tests');
+  },
+}));
+// The session context renders React Native views; these tests call the profile functions directly.
+jest.mock('../session', () => ({ useSession: jest.fn() }));
 
 describe('userProfile', () => {
   it('formats joined date accurately from ISO strings', () => {
@@ -41,7 +54,7 @@ describe('userProfile', () => {
   });
 
   it('resolves avatar source correctly for remote and fallback images', () => {
-    const fallbackImage = { testUri: 'fallback.png' } as any;
+    const fallbackImage: ImageSourcePropType = { uri: 'fallback.png' };
     const remote = avatarSourceFor('https://images.example.com/avatar.jpg', fallbackImage);
     expect(remote).toEqual({ uri: 'https://images.example.com/avatar.jpg' });
 

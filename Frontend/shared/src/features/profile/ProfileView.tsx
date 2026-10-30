@@ -44,13 +44,7 @@ import {
   useThemedStyles,
   type ThemePreference,
 } from '../../design';
-import {
-  formatPeso,
-  previewHeldContent,
-  previewPortfolio,
-  previewVotesCast,
-} from '../preview/sample-data';
-import { useSession } from '../session';
+import { formatPeso, previewHeldContent, previewPortfolio } from '../preview/sample-data';
 import { avatarSourceFor, useUserProfile } from './userProfile';
 
 export type ProfileDestination =
@@ -88,7 +82,7 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
   const styles = useThemedStyles(stylesFor);
   const { profile } = useUserProfile();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  
+
   const stats = [
     { label: 'Checked', value: profile.stats.checked },
     { label: 'Listed', value: profile.stats.listed },

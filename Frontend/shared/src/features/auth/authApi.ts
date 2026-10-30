@@ -60,6 +60,8 @@ export async function completeAuthFromUrl(url: string) {
 
   return {
     data: { session: null, user: null },
-    error: { message: 'Google sign-in did not return a session. Check the redirect URL in Supabase.' },
+    error: {
+      message: 'Google sign-in did not return a session. Check the redirect URL in Supabase.',
+    },
   };
 }

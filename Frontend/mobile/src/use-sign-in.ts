@@ -17,7 +17,7 @@ import {
   performGoogleAuth,
   type AuthInput,
 } from '@snapworth/shared/features/auth';
-import { useSession } from '@snapworth/shared/features/session';
+import { useSession, type SessionUser } from '@snapworth/shared/features/session';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -36,7 +36,7 @@ export function useSignIn() {
   const { return: returning } = useLocalSearchParams<{ return?: string }>();
   const configured = isSupabaseConfigured();
 
-  const enter = (userData?: any) => {
+  const enter = (userData?: SessionUser | null) => {
     startSession(userData);
     if (returning && router.canGoBack()) router.back();
     else router.replace('/feed');
@@ -101,11 +101,11 @@ export function useSignIn() {
       return;
     }
     try {
-      // If testing in Expo Go and encountering "site can't be reached", 
+      // If testing in Expo Go and encountering "site can't be reached",
       // replace Linking.createURL('') with your exact IP e.g., 'exp://192.168.1.10:8081'
       const redirectUrl = Linking.createURL('');
-      console.log("Redirect URL:", redirectUrl);
-      
+      console.log('Redirect URL:', redirectUrl);
+
       const { data, error } = await performGoogleAuth(redirectUrl);
       if (error) {
         cancelHandoff();

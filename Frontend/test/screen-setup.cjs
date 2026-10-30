@@ -14,6 +14,11 @@ jest.mock('react-native-reanimated', () => {
   return { ...mock, useReducedMotion: () => false };
 });
 
+// Supabase keeps the signed-in session in AsyncStorage on devices; the package ships this stand-in.
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+);
+
 jest.mock('expo-blur', () => {
   const { View } = require('react-native');
   return { BlurView: View };

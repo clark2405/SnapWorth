@@ -1,18 +1,10 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "customConditions": [
-      "react-native-legacy-deep-imports"
-    ],
-    "types": [
-      "react",
-      "react-native"
-    ]
+    "customConditions": ["react-native-legacy-deep-imports"],
+    "types": ["react", "react-native"]
   },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx"
-  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": [
     "src/**/*.test.ts",
     "src/**/*.test.tsx",

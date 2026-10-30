@@ -8,7 +8,7 @@ import {
   previewProfile,
   previewVotesCast,
 } from '../preview/sample-data';
-import { useSession } from '../session';
+import { useSession, type SessionUser } from '../session';
 
 export interface UserProfileDetails {
   readonly id: string;
@@ -55,8 +55,16 @@ export function formatJoinedDate(isoDate?: string | number | null): string {
   }
 }
 
+/** The first value that is a non-empty string. Metadata is whatever was saved, so check each. */
+function textOf(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.length > 0) return value;
+  }
+  return undefined;
+}
+
 /** Returns fallback profile details when Supabase is unconfigured or user details are missing. */
-export function buildFallbackProfile(user?: any | null): UserProfileDetails {
+export function buildFallbackProfile(user?: SessionUser | null): UserProfileDetails {
   if (!user) {
     return {
       id: 'demo-user',
@@ -82,29 +90,28 @@ export function buildFallbackProfile(user?: any | null): UserProfileDetails {
     };
   }
 
-  const meta = (user.user_metadata || {}) as Record<string, any>;
-  const emailName = user.email ? user.email.split('@')[0] : 'User';
-  const displayName = meta.full_name || meta.name || meta.displayName || emailName;
+  const meta = user.user_metadata ?? {};
+  const emailName = user.email?.split('@')[0];
+  const displayName = textOf(meta.full_name, meta.name, meta.displayName) ?? (emailName || 'User');
   const handle =
-    meta.handle ||
-    meta.username ||
-    (user.email ? user.email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '_') : 'user');
+    textOf(meta.handle, meta.username) ??
+    (emailName || 'user').toLowerCase().replace(/[^a-z0-9_]/g, '_');
 
   return {
     id: user.id || 'current-user',
     email: user.email || '',
     displayName,
     handle,
-    avatarUrl: meta.avatar_url || meta.picture || null,
-    location: meta.location || previewProfile.location,
-    bio: meta.bio || previewProfile.bio,
+    avatarUrl: textOf(meta.avatar_url, meta.picture) ?? null,
+    location: textOf(meta.location) ?? previewProfile.location,
+    bio: textOf(meta.bio) ?? previewProfile.bio,
     joined: formatJoinedDate(user.created_at),
-    rating: meta.rating || previewProfile.rating,
+    rating: textOf(meta.rating) ?? previewProfile.rating,
     isAdmin: Boolean(
       meta.role === 'admin' ||
-        meta.is_admin ||
-        user.app_metadata?.role === 'admin' ||
-        user.email?.endsWith('@snapworth.com'),
+      meta.is_admin ||
+      user.app_metadata?.role === 'admin' ||
+      user.email?.endsWith('@snapworth.com'),
     ),
     stats: {
       checked: previewHistory.length,
@@ -125,7 +132,7 @@ export function buildFallbackProfile(user?: any | null): UserProfileDetails {
  * 2. `public.profiles` row (handle, avatar_url)
  * 3. Actual activity metrics (listings count, chats count)
  */
-export async function fetchUserProfile(authUser?: any | null): Promise<UserProfileDetails> {
+export async function fetchUserProfile(authUser?: SessionUser | null): Promise<UserProfileDetails> {
   let user = authUser;
 
   if (isSupabaseConfigured()) {
@@ -174,7 +181,10 @@ export async function fetchUserProfile(authUser?: any | null): Promise<UserProfi
       // Query activity stats
       try {
         const [listedRes, soldRes, chatRes] = await Promise.allSettled([
-          supabase.from('listings').select('id', { count: 'exact', head: true }).eq('seller_id', user.id),
+          supabase
+            .from('listings')
+            .select('id', { count: 'exact', head: true })
+            .eq('seller_id', user.id),
           supabase
             .from('listings')
             .select('id', { count: 'exact', head: true })
@@ -230,7 +240,7 @@ export async function updateUserProfile(
 
   try {
     const supabase = getSupabase();
-    const userMetaUpdates: Record<string, any> = {};
+    const userMetaUpdates: Record<string, string | null> = {};
     if (updates.displayName !== undefined) userMetaUpdates.full_name = updates.displayName;
     if (updates.handle !== undefined) userMetaUpdates.handle = updates.handle;
     if (updates.location !== undefined) userMetaUpdates.location = updates.location;
@@ -248,7 +258,7 @@ export async function updateUserProfile(
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        const profileUpdates: Record<string, any> = {};
+        const profileUpdates: Record<string, string | null> = {};
         if (updates.handle !== undefined) profileUpdates.handle = updates.handle;
         if (updates.avatarUrl !== undefined) profileUpdates.avatar_url = updates.avatarUrl;
 

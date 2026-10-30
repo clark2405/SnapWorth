@@ -1,5 +1,14 @@
 import { authParamsFromUrl } from './authApi';
 
+// These run in plain Node, which cannot load the device client (AsyncStorage, Expo env), and
+// cover the path where no Supabase project is configured.
+jest.mock('../../adapters/supabaseClient', () => ({
+  isSupabaseConfigured: () => false,
+  getSupabase: () => {
+    throw new Error('Supabase is not configured in unit tests');
+  },
+}));
+
 describe('authParamsFromUrl', () => {
   it('reads a PKCE code from a custom-scheme query', () => {
     const params = authParamsFromUrl('snapworth://?code=abc123');
