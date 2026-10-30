@@ -4,9 +4,11 @@ import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import {
   createLocalChatRepository,
   createLocalCommentRepository,
+  createLocalHanapRepository,
   createSupabaseChatRepository,
   createSupabaseClient,
   createSupabaseCommentRepository,
+  createSupabaseHanapRepository,
   createPhotoPricingService,
   screenWithRules,
   type LocalSeedComment,
@@ -14,11 +16,13 @@ import {
 } from '../adapters';
 import { ChatServiceProvider } from '../features/chat/chat-state';
 import { CommentServiceProvider } from '../features/feed';
+import { HanapProvider } from '../features/hanap/hanap-state';
 import { CollectionsProvider } from '../features/history/collections';
 import { PaidPricesProvider } from '../features/history/paid-prices';
 import {
   previewChatListingKey,
   previewCollections,
+  previewHanap,
   previewConversation,
   previewConversations,
   previewListings,
@@ -30,6 +34,7 @@ import {
   type PreviewMessage,
   type PreviewUser,
 } from '../features/preview/sample-data';
+import type { HanapRepository } from '../ports/hanap';
 import type { ChatService, CommentService } from '../ports/services';
 import { createChatService, createCommentService } from '../services';
 import type { UtcDateTime } from '../types/date-time';
@@ -48,6 +53,7 @@ export interface AppServices {
   readonly backend: 'supabase' | 'device';
   readonly comments: CommentService;
   readonly chats: ChatService;
+  readonly hanap: HanapRepository;
   readonly pricing: PhotoPricingService;
 }
 
@@ -195,6 +201,7 @@ export function createAppServices(config: BackendConfig): AppServices {
       backend: 'supabase',
       comments: createCommentService(createSupabaseCommentRepository(client)),
       chats: createChatService(createSupabaseChatRepository(client)),
+      hanap: createSupabaseHanapRepository(client),
       pricing: createPhotoPricingService(client),
     };
   }
@@ -224,6 +231,15 @@ export function createAppServices(config: BackendConfig): AppServices {
         simulateReplies: { delayMs: 1200, replies: demoReplies },
       }),
     ),
+    hanap: createLocalHanapRepository({
+      store: AsyncStorage,
+      viewer: profileOf(previewProfile.user),
+      seed: previewHanap.map(({ minutesAgo, ...entry }) => ({
+        ...entry,
+        createdAt: new Date(Date.now() - minutesAgo * 60_000).toISOString() as UtcDateTime,
+      })),
+      screen: screenWithRules,
+    }),
   };
 }
 
@@ -250,6 +266,7 @@ export function AppServicesProvider({
     <PhotoPricingContext.Provider value={services.pricing}>
       <CommentServiceProvider service={services.comments}>
         <ChatServiceProvider service={services.chats}>
+          <HanapProvider repository={services.hanap}>
           {/* History is still sample data, so what people paid, and their collections, stay on the
               device for now. */}
           <PaidPricesProvider store={AsyncStorage} seed={previewPaidPrices}>
@@ -257,6 +274,7 @@ export function AppServicesProvider({
               {children}
             </CollectionsProvider>
           </PaidPricesProvider>
+          </HanapProvider>
         </ChatServiceProvider>
       </CommentServiceProvider>
     </PhotoPricingContext.Provider>

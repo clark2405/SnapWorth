@@ -12,6 +12,7 @@ export default function MarketplaceRoute() {
       onOpenListing={(listingId) => router.push(`/listing/${listingId}`)}
       onSell={() => requireAccount('sell', () => router.push('/capture'))}
       onOpenProfile={() => router.push('/profile')}
+      onOpenHanap={() => router.push('/hanap')}
     />
   );
 }

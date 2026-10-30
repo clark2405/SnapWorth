@@ -566,6 +566,46 @@ export const previewPaidPrices: Readonly<Record<string, number>> = {
   'air-jordan-1-retro': 6200,
 };
 
+/** Hanap posts a fresh install starts with: what people around Cebu are looking for. */
+export const previewHanap: readonly {
+  readonly id: string;
+  readonly authorHandle: string;
+  readonly body: string;
+  readonly maxPhp: number | null;
+  readonly minutesAgo: number;
+  readonly mine?: boolean;
+}[] = [
+  {
+    id: 'hanap-mine-windbreaker',
+    authorHandle: 'you',
+    body: 'Nike windbreaker, size M',
+    maxPhp: 3000,
+    minutesAgo: 90,
+    mine: true,
+  },
+  {
+    id: 'hanap-film-camera',
+    authorHandle: 'juan_thrifts',
+    body: 'Film camera that still works, Pentax or Canon',
+    maxPhp: 4000,
+    minutesAgo: 25,
+  },
+  {
+    id: 'hanap-jordans',
+    authorHandle: 'justin_v',
+    body: 'Jordan 1 size 10',
+    maxPhp: null,
+    minutesAgo: 180,
+  },
+  {
+    id: 'hanap-cassette',
+    authorHandle: 'maria_cruz',
+    body: 'Cassette player for my tita, any brand',
+    maxPhp: 1500,
+    minutesAgo: 420,
+  },
+];
+
 /** The preview owner's collections, seeding a fresh install. */
 export const previewCollections: readonly {
   readonly id: string;

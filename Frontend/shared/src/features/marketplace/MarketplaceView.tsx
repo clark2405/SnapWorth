@@ -27,6 +27,7 @@ import {
   previewMarketCategories,
   type PreviewListing,
 } from '../preview/sample-data';
+import { HanapEntry } from '../hanap/HanapEntry';
 import { ProfileButton } from '../profile/ProfileButton';
 import { Tip } from '../tips';
 import { ListingCard } from './ListingCard';
@@ -48,6 +49,8 @@ export interface MarketplaceViewProps {
   /** Every change to category, price range or location, for the listing query to follow. */
   readonly onFiltersChange?: (filters: MarketFilters) => void;
   readonly onOpenProfile?: () => void;
+  /** Opens Hanap, where buyers post what they're looking for. */
+  readonly onOpenHanap?: () => void;
 }
 
 // Preview-only: listings don't carry a category field yet, so map them locally against
@@ -74,6 +77,7 @@ export function MarketplaceView({
   onSell,
   onFiltersChange,
   onOpenProfile,
+  onOpenHanap,
 }: MarketplaceViewProps) {
   const styles = useThemedStyles(stylesFor);
   const [filters, setFilters] = useState<MarketFilters>(defaultMarketFilters);
@@ -160,6 +164,10 @@ export function MarketplaceView({
             onClear={() => update({ area: 'anywhere' })}
           />
         </View>
+      </Reveal>
+
+      <Reveal index={1} style={styles.hanap}>
+        <HanapEntry onOpen={onOpenHanap} />
       </Reveal>
 
       {underEstimate.length > 0 ? (
@@ -305,6 +313,9 @@ const stylesFor = themedStyles((colors) => ({
   },
   filters: {
     gap: tokens.spacing[3],
+    marginBottom: tokens.spacing[6],
+  },
+  hanap: {
     marginBottom: tokens.spacing[8],
   },
   pills: {

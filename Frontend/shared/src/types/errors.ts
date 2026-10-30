@@ -26,7 +26,10 @@ export type OperationName =
   | 'send_message'
   | 'block_user'
   | 'load_moderation_queue'
-  | 'resolve_moderation_case';
+  | 'resolve_moderation_case'
+  | 'load_hanap'
+  | 'publish_hanap'
+  | 'update_hanap';
 
 export type AppError =
   | {
