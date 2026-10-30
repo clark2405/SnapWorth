@@ -114,6 +114,23 @@ export function ThemeProvider({
   );
 }
 
+const printed: ThemeContextValue = Object.freeze({
+  name: 'light',
+  isDark: false,
+  colors: tokens.color.light,
+  preference: 'light',
+  setPreference: () => undefined,
+});
+
+/**
+ * The light palette, fixed, for what leaves the app: a tag shared as an image looks the same
+ * whoever made it and whatever their appearance. Unlike `ThemeProvider`, it changes nothing
+ * outside itself.
+ */
+export function PrintedTheme({ children }: { readonly children: ReactNode }) {
+  return <ThemeContext.Provider value={printed}>{children}</ThemeContext.Provider>;
+}
+
 /** A full-bleed veil in the outgoing canvas colour that fades away after a theme change. */
 function ThemeDip({ name }: { readonly name: ThemeName }) {
   const previous = useRef(name);

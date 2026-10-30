@@ -14,6 +14,7 @@ export default function HistoryRoute() {
     <HistoryView
       initialFilter={filter}
       onOpenItem={(itemId) => router.push(`/item/${itemId}`)}
+      onOpenCollection={(collectionId) => router.push(`/collection/${collectionId}`)}
       onListItem={(itemId) => router.push(`/list/${itemId}`)}
       onOpenProfile={() => router.push('/profile')}
     />

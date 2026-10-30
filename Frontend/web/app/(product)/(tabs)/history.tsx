@@ -16,6 +16,7 @@ export default function HistoryRoute() {
   return (
     <HistoryView
       initialFilter={filter}
+      onOpenCollection={(collectionId) => router.push(`/collection/${collectionId}`)}
       onOpenItem={(itemId) => router.push(`/item/${itemId}`)}
       onListItem={(itemId) => router.push(`/list/${itemId}`)}
       onSearch={wide ? undefined : () => router.push('/search?scope=history')}

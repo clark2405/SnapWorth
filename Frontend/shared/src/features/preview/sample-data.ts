@@ -556,6 +556,35 @@ export const previewHistory: readonly PreviewHistoryItem[] = [
 ];
 
 /**
+ * What the preview's owner paid for some of their things, for the flip tracker: ukay-ukay finds,
+ * a surplus-shop Walkman, and sneakers bought to resell. Seeds a fresh install.
+ */
+export const previewPaidPrices: Readonly<Record<string, number>> = {
+  'nike-neon-windbreaker': 180,
+  'black-puffer-jacket': 350,
+  'sony-walkman-wm': 650,
+  'air-jordan-1-retro': 6200,
+};
+
+/** The preview owner's collections, seeding a fresh install. */
+export const previewCollections: readonly {
+  readonly id: string;
+  readonly name: string;
+  readonly itemIds: readonly string[];
+}[] = [
+  {
+    id: 'ukay-jackets',
+    name: 'Ukay jackets',
+    itemIds: ['nike-neon-windbreaker', 'black-puffer-jacket', 'teal-half-zip'],
+  },
+  {
+    id: 'retro-tech',
+    name: 'Retro tech',
+    itemIds: ['polaroid-sun-600', 'sony-walkman-wm', 'keychron-k2'],
+  },
+];
+
+/**
  * Where each of the viewer's items is shared. An item can sit on the feed, the market, both,
  * or neither (private, the default for a fresh capture).
  */

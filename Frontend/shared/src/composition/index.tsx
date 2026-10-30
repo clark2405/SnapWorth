@@ -14,11 +14,15 @@ import {
 } from '../adapters';
 import { ChatServiceProvider } from '../features/chat/chat-state';
 import { CommentServiceProvider } from '../features/feed';
+import { CollectionsProvider } from '../features/history/collections';
+import { PaidPricesProvider } from '../features/history/paid-prices';
 import {
   previewChatListingKey,
+  previewCollections,
   previewConversation,
   previewConversations,
   previewListings,
+  previewPaidPrices,
   previewPostDetail,
   previewPosts,
   previewProfile,
@@ -245,7 +249,15 @@ export function AppServicesProvider({
   return (
     <PhotoPricingContext.Provider value={services.pricing}>
       <CommentServiceProvider service={services.comments}>
-        <ChatServiceProvider service={services.chats}>{children}</ChatServiceProvider>
+        <ChatServiceProvider service={services.chats}>
+          {/* History is still sample data, so what people paid, and their collections, stay on the
+              device for now. */}
+          <PaidPricesProvider store={AsyncStorage} seed={previewPaidPrices}>
+            <CollectionsProvider store={AsyncStorage} seed={previewCollections}>
+              {children}
+            </CollectionsProvider>
+          </PaidPricesProvider>
+        </ChatServiceProvider>
       </CommentServiceProvider>
     </PhotoPricingContext.Provider>
   );

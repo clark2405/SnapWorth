@@ -4,15 +4,19 @@ import {
   Handshake,
   Lock,
   PackageSearch,
+  TrendingUp,
   Vote,
   Wallet,
   type LucideIcon,
 } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { Share, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
+import { View } from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import {
+  paperIn,
+  paperLayout,
+  paperOut,
   Button,
   ChoiceChips,
   CountUp,
@@ -25,15 +29,15 @@ import {
   Reveal,
   Screen,
   SearchButton,
+  type SearchOrigin,
   SnapIcon,
   Sparkline,
   Surface,
   SWText,
   Tag,
+  type TagTone,
   useToast,
   ZoomLink,
-  type SearchOrigin,
-  type TagTone,
 } from '../../components';
 import { themedStyles, tokens, useTheme, useThemedStyles, useWideLayout } from '../../design';
 import {
@@ -44,9 +48,15 @@ import {
   type PreviewItemStatus,
 } from '../preview/sample-data';
 import { ProfileButton } from '../profile/ProfileButton';
+import { CollectionsStrip } from './CollectionsStrip';
+import { flipOf, flipTotals, gainLabel, type FlipTotals } from './flips';
+import { usePaidPrices } from './paid-prices';
+import { ShareTagSheet, type ShareableItem } from './ShareTagSheet';
 
 export interface HistoryViewProps {
   readonly onOpenItem?: (itemId: string) => void;
+  /** Opens a collection's page, e.g. `/collection/:id`. */
+  readonly onOpenCollection?: (collectionId: string) => void;
   readonly onDeleteItem?: (itemId: string) => void;
   /** Opens the listing flow for this item, e.g. `/list/:id`. */
   readonly onListItem?: (itemId: string) => void;
@@ -79,6 +89,7 @@ const filters: readonly { key: FilterKey; label: string }[] = [
 
 export function HistoryView({
   onOpenItem,
+  onOpenCollection,
   onDeleteItem,
   onListItem,
   onSearch,
@@ -91,6 +102,15 @@ export function HistoryView({
   const toast = useToast();
   const [items, setItems] = useState<readonly PreviewHistoryItem[]>(previewHistory);
   const [filter, setFilter] = useState<FilterKey>('all');
+  const { paid } = usePaidPrices();
+  const flips = useMemo(
+    () =>
+      flipTotals(
+        items.map((item) => ({ id: item.id, worth: item.estimate })),
+        paid,
+      ),
+    [items, paid],
+  );
 
   // The tab stays mounted, so follow a new deep link's filter as well as the first one.
   useEffect(() => {
@@ -109,15 +129,15 @@ export function HistoryView({
     toast.show({ title: 'Removed from history', body: item.title });
   };
 
-  const shareItem = (item: PreviewHistoryItem) => {
-    void Share.share({
-      message: `${item.title} — worth about ${formatPeso(item.estimate)} on SnapWorth.`,
-    })
-      .then((result) => {
-        if (result.action === Share.sharedAction) toast.show({ title: 'Item shared' });
-      })
-      .catch(() => undefined);
-  };
+  const [sharing, setSharing] = useState<ShareableItem | null>(null);
+  const shareItem = (item: PreviewHistoryItem) =>
+    setSharing({
+      id: item.id,
+      title: item.title,
+      photo: item.photo,
+      photoLabel: item.photoLabel,
+      worth: item.estimate,
+    });
 
   // On a wide window the summary and filters sit in a column of their own beside the items.
   const wide = useWideLayout();
@@ -168,7 +188,21 @@ export function HistoryView({
                 <Tag label={previewPortfolio.changeLabel} tone="mint" />
               </View>
               <Sparkline values={previewPortfolio.series} height={56} color={colors.onFeature} />
+              {flips ? <FlipSummary totals={flips} /> : null}
             </Surface>
+          </Reveal>
+
+          <Reveal index={1}>
+            <CollectionsStrip
+              items={items.map((item) => ({
+                id: item.id,
+                title: item.title,
+                worth: item.estimate,
+                photo: item.photo,
+                photoLabel: item.photoLabel,
+              }))}
+              onOpenCollection={onOpenCollection}
+            />
           </Reveal>
 
           <Reveal index={1} style={styles.filters}>
@@ -188,30 +222,35 @@ export function HistoryView({
               />
             </Animated.View>
           ) : (
-            <Surface padding={tokens.spacing[2]}>
-              {visible.map((item, index) => (
-                <Animated.View
-                  key={item.id}
-                  entering={FadeInDown.springify().damping(18)}
-                  exiting={FadeOut.duration(160)}
-                  layout={LinearTransition.springify().damping(20)}
-                >
-                  <Reveal index={index + 2}>
+            // The card eases to its new height as rows come and go, instead of snapping.
+            <Animated.View layout={paperLayout}>
+              <Surface padding={tokens.spacing[2]}>
+                {visible.map((item, index) => (
+                  // One entrance per row, staggered down the list: switching filters lays the new
+                  // rows down in a short cascade while the rest slide to their places.
+                  <Animated.View
+                    key={item.id}
+                    entering={paperIn(Math.min(index, 6) * 40)}
+                    exiting={paperOut}
+                    layout={paperLayout}
+                  >
                     {index > 0 ? <Divider style={styles.divider} /> : null}
                     <HistoryRow
                       item={item}
+                      paid={paid[item.id]}
                       onOpen={() => onOpenItem?.(item.id)}
                       onList={() => onListItem?.(item.id)}
                       onShare={() => shareItem(item)}
                       onDelete={() => deleteItem(item)}
                     />
-                  </Reveal>
-                </Animated.View>
-              ))}
-            </Surface>
+                  </Animated.View>
+                ))}
+              </Surface>
+            </Animated.View>
           )}
         </View>
       </View>
+      <ShareTagSheet item={sharing} onClose={() => setSharing(null)} />
     </Screen>
   );
 }
@@ -219,14 +258,34 @@ export function HistoryView({
 /** The summary column beside the items on a wide window. */
 const asideWidth = 360;
 
+/** On the total card: what was paid for the items with a price, and what they're worth now. */
+function FlipSummary({ totals }: { readonly totals: FlipTotals }) {
+  const styles = useThemedStyles(stylesFor);
+  return (
+    <View style={styles.flips}>
+      <SWText variant="bodySmall" tone="onFeatureDim" style={styles.flipsText}>
+        {`Paid ${formatPeso(totals.paid)} for ${totals.count} of these, now worth ${formatPeso(totals.worth)}`}
+      </SWText>
+      <Tag
+        label={totals.gain >= 0 ? `${gainLabel(totals.gain)} flip` : gainLabel(totals.gain)}
+        tone={totals.gain >= 0 ? 'mint' : 'grave'}
+        icon={TrendingUp}
+      />
+    </View>
+  );
+}
+
 function HistoryRow({
   item,
+  paid,
   onOpen,
   onList,
   onShare,
   onDelete,
 }: {
   item: PreviewHistoryItem;
+  /** What the owner paid for it, when they've noted it. */
+  paid?: number;
   onOpen: () => void;
   onList: () => void;
   onShare: () => void;
@@ -235,11 +294,14 @@ function HistoryRow({
   const styles = useThemedStyles(stylesFor);
   const { colors } = useTheme();
   const status = statusTag[item.status];
+  const flip = paid === undefined ? null : flipOf(paid, item.estimate);
 
   return (
     <ZoomLink
       href={`/item/${item.id}`}
-      label={`${item.title}, AI estimate ${formatPeso(item.estimate)}, ${status.label}, captured ${item.capturedOn}`}
+      label={`${item.title}, AI estimate ${formatPeso(item.estimate)}${
+        flip ? `, paid ${formatPeso(flip.paid)}, ${gainLabel(flip.gain)}` : ''
+      }, ${status.label}, captured ${item.capturedOn}`}
       onPress={onOpen}
       style={styles.row}
       menu={[
@@ -261,7 +323,15 @@ function HistoryRow({
         <SWText variant="labelSmall" tone="textSecondary" numberOfLines={1}>
           {formatPeso(item.estimate)} est. · {item.capturedOn}
         </SWText>
-        <Tag label={status.label} tone={status.tone} icon={status.icon} />
+        <View style={styles.tags}>
+          <Tag label={status.label} tone={status.tone} icon={status.icon} />
+          {flip ? (
+            <Tag
+              label={`Paid ${formatPeso(flip.paid)} · ${gainLabel(flip.gain)}`}
+              tone={flip.gain >= 0 ? 'mint' : 'grave'}
+            />
+          ) : null}
+        </View>
       </View>
       <ChevronRight size={18} strokeWidth={1.75} color={colors.textMuted} />
     </ZoomLink>
@@ -314,6 +384,22 @@ const stylesFor = themedStyles(() => ({
   text: {
     flex: 1,
     gap: 3,
+  },
+  tags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: tokens.spacing[1],
+  },
+  flips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: tokens.spacing[2],
+    paddingTop: tokens.spacing[3],
+  },
+  flipsText: {
+    flexShrink: 1,
   },
   divider: {
     marginLeft: tokens.spacing[3] + 56 + tokens.spacing[3],
