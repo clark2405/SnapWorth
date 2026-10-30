@@ -12,7 +12,8 @@ log="$(mktemp)"
 
 "$here/start.sh" >"$log" 2>&1 &
 stack=$!
-trap 'kill "$stack" 2>/dev/null; wait "$stack" 2>/dev/null; rm -f "$log"' EXIT
+# Stopping the stack makes it exit 143 (terminated); that is expected, not a failure of the run.
+trap 'kill "$stack" 2>/dev/null; wait "$stack" 2>/dev/null || true; rm -f "$log"' EXIT
 
 for _ in $(seq 1 60); do
   grep -q '"anonKey"' "$log" && break
