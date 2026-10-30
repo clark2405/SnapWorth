@@ -7,13 +7,13 @@ declare const process: {
  * set `EXPO_PUBLIC_MAP_TILES_URL` (and `EXPO_PUBLIC_MAP_TILES_ATTRIBUTION`, which the provider's
  * terms require on the map) to change it, or to `none` to turn the map off.
  *
- * The default is CARTO's Voyager style of OpenStreetMap: real, community-mapped streets in a
- * light, quiet style, so the app's own pin, stickers and buttons on top stay easy to see. CARTO's
- * free basemaps have usage limits and need a license for commercial use, so pick a provider and
- * plan before launch.
+ * The default is OpenStreetMap's own tiles: real, community-mapped streets, free to show with
+ * credit, for building and testing only. Their policy allows light use and forbids leaning on them
+ * in a released app, so pick a provider and plan before launch. (CARTO's free basemaps, the
+ * earlier default, now need an API key: without one every tile reads "API key required".)
  */
-const defaultTiles = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png';
-const defaultAttribution = '© OpenStreetMap contributors © CARTO';
+const defaultTiles = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const defaultAttribution = '© OpenStreetMap contributors';
 
 export interface TileSource {
   readonly url: (z: number, x: number, y: number) => string;
