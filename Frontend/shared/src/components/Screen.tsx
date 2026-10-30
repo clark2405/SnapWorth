@@ -189,9 +189,15 @@ export function Screen({
   const bare = Platform.OS === 'ios' && scroll && !transparent && clearTabBar && !footer;
   const offsetBase = bare ? insets.top : 0;
   const base = useSharedValue(offsetBase);
+  // The scroll view's own last offset. The top inset can settle after the first scroll event on a
+  // tab's first open, so when it changes the position is worked out again from the offset;
+  // otherwise the page reads as pulled down by the inset until the next scroll, and the wordmark,
+  // which follows a pull, sits up under the status bar.
+  const rawOffset = useSharedValue<number | null>(null);
   useEffect(() => {
     base.value = offsetBase;
-  }, [base, offsetBase]);
+    if (rawOffset.value !== null) scrollY.value = rawOffset.value + offsetBase;
+  }, [base, offsetBase, rawOffset, scrollY]);
 
   // Tapping the tab you are already on brings its page back to the top, as in every system app.
   // Native tabs announce the repeat tap through the navigator; the web's tab bar asks directly.
@@ -220,6 +226,7 @@ export function Screen({
 
   const onScroll = useAnimatedScrollHandler({
     onScroll: (event, context: { lastY?: number }) => {
+      rawOffset.value = event.contentOffset.y;
       const y = event.contentOffset.y + base.value;
       const delta = y - (context.lastY ?? y);
       context.lastY = y;
