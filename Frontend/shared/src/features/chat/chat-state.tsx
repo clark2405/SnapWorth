@@ -157,6 +157,36 @@ export function useMessageSeller(): (listingKey: string) => Promise<Conversation
   );
 }
 
+/**
+ * Makes an offer on a listing: opens (or reopens) the viewer's chat with its seller and sends the
+ * offer there, where the seller can accept, decline or counter it. Resolves to the chat's id, or
+ * null after telling the viewer why it couldn't.
+ */
+export function useOfferToSeller(): (
+  listingKey: string,
+  amountPhp: number,
+) => Promise<ConversationId | null> {
+  const { service, refresh } = useChatContext();
+  const toast = useToast();
+  return useCallback(
+    async (listingKey, amountPhp) => {
+      const started = await service.start(listingKey);
+      if (!started.ok) {
+        toast.show(chatErrorCopy(started.error));
+        return null;
+      }
+      const sent = await service.sendOffer(service.nextMessageId(), started.value, amountPhp);
+      void refresh();
+      if (!sent.ok) {
+        toast.show(chatErrorCopy(sent.error));
+        return null;
+      }
+      return started.value;
+    },
+    [refresh, service, toast],
+  );
+}
+
 export interface ConversationState {
   readonly status: ChatLoadStatus;
   readonly error: AppError | null;

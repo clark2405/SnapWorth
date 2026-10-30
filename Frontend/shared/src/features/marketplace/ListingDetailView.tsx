@@ -57,6 +57,11 @@ export interface ListingDetailViewProps {
   readonly listingId?: string;
   readonly onBack?: () => void;
   readonly onMessageSeller?: () => void;
+  /**
+   * Sends an offer to the seller, into the chat about this listing. Resolves true once it's sent;
+   * false when it couldn't be (the host has already said why).
+   */
+  readonly onSendOffer?: (amountPhp: number) => Promise<boolean>;
   readonly onOpenSeller?: () => void;
   /** Owner only: repost this listing to the feed so the community can vote on its price. */
   readonly onAskFeed?: () => void;
@@ -81,6 +86,7 @@ export function ListingDetailView({
   listingId,
   onBack,
   onMessageSeller,
+  onSendOffer,
   onOpenSeller,
   onAskFeed,
   onEditPrice,
@@ -124,17 +130,20 @@ export function ListingDetailView({
     return `Within the AI range of ${formatPeso(insight.estimateLow)}–${formatPeso(insight.estimateHigh)}.`;
   })();
 
-  const sendOffer = () => {
-    if (offerAmount <= 0) return;
+  // The offer goes into the chat with the seller, as an offer they can accept, decline or
+  // counter. If it can't be sent, the sheet stays open with the amount still in it.
+  const sendOffer = async () => {
+    if (offerAmount <= 0 || !onSendOffer) return;
     setSendingOffer(true);
-    setTimeout(() => {
-      setSendingOffer(false);
-      setOfferOpen(false);
-      toast.show({
-        title: 'Offer sent',
-        body: `${formatPeso(offerAmount)} sent to @${listing.seller.handle}.`,
-      });
-    }, 800);
+    const sent = await onSendOffer(offerAmount);
+    setSendingOffer(false);
+    if (!sent) return;
+    setOfferOpen(false);
+    setOfferText('');
+    toast.show({
+      title: 'Offer sent',
+      body: `${formatPeso(offerAmount)} to @${listing.seller.handle}. They can accept, decline or counter it.`,
+    });
   };
 
   return (
@@ -367,7 +376,7 @@ export function ListingDetailView({
           label="Send offer"
           disabled={offerAmount <= 0}
           loading={sendingOffer}
-          onPress={sendOffer}
+          onPress={() => void sendOffer()}
         />
       </Sheet>
     </Screen>

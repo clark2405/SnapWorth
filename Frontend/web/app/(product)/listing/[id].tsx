@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { useMessageSeller } from '@snapworth/shared/features/chat';
+import { useMessageSeller, useOfferToSeller } from '@snapworth/shared/features/chat';
 import { ListingDetailView } from '@snapworth/shared/features/marketplace';
 
 import { useShareLink } from '../../../src/share-link';
@@ -10,6 +10,7 @@ export default function ListingDetailRoute() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const listingId = Array.isArray(id) ? id[0] : id;
   const messageSeller = useMessageSeller();
+  const offerToSeller = useOfferToSeller();
   const share = useShareLink();
 
   return (
@@ -19,6 +20,12 @@ export default function ListingDetailRoute() {
       onMessageSeller={async () => {
         const conversationId = listingId ? await messageSeller(listingId) : null;
         if (conversationId) router.push(`/chat/${conversationId}`);
+      }}
+      // The offer lands in the chat with the seller, which opens on it.
+      onSendOffer={async (amountPhp) => {
+        const conversationId = listingId ? await offerToSeller(listingId, amountPhp) : null;
+        if (conversationId) router.push(`/chat/${conversationId}`);
+        return conversationId !== null;
       }}
       // Preview wiring: every sample listing detail belongs to the one sample seller.
       onOpenSeller={() => router.push('/seller/mariacruz')}
