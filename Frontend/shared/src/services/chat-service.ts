@@ -2,7 +2,7 @@ import type { ChatRepository } from '../ports/chat';
 import type { ChatService, SendResult } from '../ports/services';
 import { parseMessageBody } from '../types/entities';
 import { newUuid, type MessageId } from '../types/ids';
-import { findMeetupSpot } from '../types/meetup-spots';
+import { findMeetupSpot, withinPinBounds } from '../types/meetup-spots';
 import { err } from '../types/result';
 
 /** The largest offer the database accepts, in pesos. */
@@ -54,10 +54,15 @@ export function createChatService(repository: ChatRepository): ChatService {
       if (!when || when.length > meetupWhenMaxLength) {
         return err({ kind: 'validation', code: when ? 'too_long' : 'empty', field: 'when' });
       }
+      const location = spot ? { lat: spot.lat, lng: spot.lng } : meetup.location;
+      if (location && !withinPinBounds(location.lat, location.lng)) {
+        return err({ kind: 'validation', code: 'out_of_range', field: 'location' });
+      }
       return repository.send(id, conversationId, {
         kind: 'meetup',
         purpose: meetup.purpose,
         spotKey: spot?.key,
+        location,
         place,
         when,
       });

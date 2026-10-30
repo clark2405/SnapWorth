@@ -14,20 +14,20 @@ describe('chat list times', () => {
 describe('the latest message in one line', () => {
   it('says what an offer or a pickup is', () => {
     expect(describeLatest({ fromMe: false, body: '', offerPhp: 2050 })).toMatch(/^Offered ₱2,050$/);
-    expect(describeLatest({ fromMe: false, body: 'Makati?', offerPhp: 2050 })).toMatch(
-      /^Offered ₱2,050 · Makati\?$/,
+    expect(describeLatest({ fromMe: false, body: 'Ayala?', offerPhp: 2050 })).toMatch(
+      /^Offered ₱2,050 · Ayala\?$/,
     );
-    expect(describeLatest({ fromMe: true, body: '', meetupPlace: 'SM Megamall' })).toBe(
-      'Pickup at SM Megamall',
+    expect(describeLatest({ fromMe: true, body: '', meetupPlace: 'SM City Cebu' })).toBe(
+      'Pickup at SM City Cebu',
     );
     expect(
       describeLatest({
         fromMe: false,
         body: '',
-        meetupPlace: 'Rizal Park',
+        meetupPlace: 'Plaza Independencia',
         meetupPurpose: 'viewing',
       }),
-    ).toBe('Viewing at Rizal Park');
+    ).toBe('Viewing at Plaza Independencia');
     expect(describeLatest({ fromMe: true, body: 'Hi!' })).toBe('Hi!');
     expect(describeLatest(undefined)).toBe('No messages yet');
   });

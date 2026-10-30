@@ -245,7 +245,7 @@ select chat_tests.check_rejected(
   'an offer cannot be confirmed as a pickup'
 );
 
--- 5b. Meetups on the map: the spot decides the name and the pin.
+-- 5b. Meetups on the map: a pin anywhere, or a suggested place that decides its own name and pin.
 select chat_tests.check(
   (select meetup_purpose = 'pickup' and meetup_spot is null and meetup_lat is null
      from public.messages where id = '00000000-0000-4000-f000-000000000004'),
@@ -254,26 +254,52 @@ select chat_tests.check(
 insert into public.messages (id, conversation_id, kind, meetup_spot, meetup_place, meetup_when,
                              meetup_purpose)
 values ('00000000-0000-4000-f000-000000000005', (select id from chat_tests.ids where name = 'lamp'),
-        'meetup', 'megamall', 'My place, 42 Quiet Street', 'Sunday, 10:00 AM', 'viewing');
+        'meetup', 'sm-city-cebu', 'My place, 42 Quiet Street', 'Sunday, 10:00 AM', 'viewing');
 select chat_tests.check(
-  (select meetup_place = 'SM Megamall' and meetup_purpose = 'viewing'
-          and meetup_lat = (select lat from public.meetup_spots where key = 'megamall')
-          and meetup_lng = (select lng from public.meetup_spots where key = 'megamall')
+  (select meetup_place = 'SM City Cebu' and meetup_purpose = 'viewing'
+          and meetup_lat = (select lat from public.meetup_spots where key = 'sm-city-cebu')
+          and meetup_lng = (select lng from public.meetup_spots where key = 'sm-city-cebu')
      from public.messages where id = '00000000-0000-4000-f000-000000000005'),
   'a spot sets the place''s name and pin, whatever name the sender typed'
 );
 select chat_tests.check(
-  (select last_meetup_purpose = 'viewing' and last_meetup_place = 'SM Megamall'
+  (select last_meetup_purpose = 'viewing' and last_meetup_place = 'SM City Cebu'
      from public.conversation_list((select id from chat_tests.ids where name = 'lamp'))),
-  'the list says the latest message is a viewing at SM Megamall'
+  'the list says the latest message is a viewing at SM City Cebu'
+);
+insert into public.messages (id, conversation_id, kind, meetup_place, meetup_when, meetup_lat,
+                             meetup_lng)
+values ('00000000-0000-4000-f000-000000000007', (select id from chat_tests.ids where name = 'lamp'),
+        'meetup', 'Corner of the parking lot by Gate 2', 'Today, 6:00 PM', 10.3157, 123.8854);
+select chat_tests.check(
+  (select meetup_place = 'Corner of the parking lot by Gate 2' and meetup_spot is null
+          and meetup_lat = 10.3157 and meetup_lng = 123.8854 and meetup_purpose = 'pickup'
+     from public.messages where id = '00000000-0000-4000-f000-000000000007'),
+  'a pin can go anywhere, under the name its sender gave it'
+);
+insert into public.messages (id, conversation_id, kind, meetup_spot, meetup_when, meetup_lat,
+                             meetup_lng)
+values ('00000000-0000-4000-f000-000000000008', (select id from chat_tests.ids where name = 'lamp'),
+        'meetup', 'sm-city-cebu', 'Today', 10.4, 123.95);
+select chat_tests.check(
+  (select meetup_lat = 10.311111 and meetup_lng = 123.918056
+     from public.messages where id = '00000000-0000-4000-f000-000000000008'),
+  'a suggested place keeps its own pin, whatever coordinates were sent with it'
 );
 select chat_tests.check_rejected(
-  $$insert into public.messages (conversation_id, kind, meetup_spot, meetup_when, meetup_lat,
+  $$insert into public.messages (conversation_id, kind, meetup_place, meetup_when, meetup_lat,
                                  meetup_lng)
-    values ((select id from chat_tests.ids where name = 'lamp'), 'meetup', 'megamall', 'Today',
-            14.0, 121.0)$$,
-  array['42501'],
-  'nobody can send their own coordinates'
+    values ((select id from chat_tests.ids where name = 'lamp'), 'meetup', 'Shibuya', 'Today',
+            35.66, 139.70)$$,
+  array['23514'],
+  'a pin outside the Philippines is refused'
+);
+select chat_tests.check_rejected(
+  $$insert into public.messages (conversation_id, kind, meetup_place, meetup_when, meetup_lat)
+    values ((select id from chat_tests.ids where name = 'lamp'), 'meetup', 'Half a pin', 'Today',
+            14.6)$$,
+  array['23514'],
+  'half a pin is refused'
 );
 select chat_tests.check_rejected(
   $$insert into public.messages (conversation_id, kind, meetup_spot, meetup_when)
@@ -283,22 +309,23 @@ select chat_tests.check_rejected(
 );
 select chat_tests.check_rejected(
   $$insert into public.messages (conversation_id, kind, meetup_spot, meetup_when, meetup_purpose)
-    values ((select id from chat_tests.ids where name = 'lamp'), 'meetup', 'megamall', 'Today',
+    values ((select id from chat_tests.ids where name = 'lamp'), 'meetup', 'sm-city-cebu', 'Today',
             'party')$$,
   array['23514'],
   'a meetup is a pickup or a viewing, nothing else'
 );
-insert into public.messages (id, conversation_id, body, meetup_spot, meetup_purpose)
+insert into public.messages (id, conversation_id, body, meetup_spot, meetup_purpose, meetup_lat,
+                             meetup_lng)
 values ('00000000-0000-4000-f000-000000000006', (select id from chat_tests.ids where name = 'lamp'),
-        'Sounds good', 'megamall', 'viewing');
+        'Sounds good', 'sm-city-cebu', 'viewing', 10.3, 123.9);
 select chat_tests.check(
   (select meetup_spot is null and meetup_purpose is null and meetup_lat is null
      from public.messages where id = '00000000-0000-4000-f000-000000000006'),
-  'only a meetup carries a spot: one sent on a text message is dropped'
+  'only a meetup carries a place: one sent on a text message is dropped'
 );
 select chat_tests.check(
-  (select count(*) from public.meetup_spots) >= 15,
-  'everyone signed in can read the list of meetup spots'
+  (select count(*) from public.meetup_spots) = 7,
+  'everyone signed in can read all seven Cebu City meetup spots'
 );
 
 -- 6. Reports.

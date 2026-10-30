@@ -37,16 +37,23 @@ both apps.
 - Don't put a login wall in front of the tabs. One was added to `mobile/app/(tabs)/_layout.tsx` for
   the camera prototype and hid guest browsing completely. It has been removed.
 
-### Meetups happen in public
+### Meetups go wherever the two people choose
 
-- The meetup map (`shared/src/features/chat/MeetupMap.tsx`) offers only busy public places: the
-  list in `shared/src/types/meetup-spots.ts`, mirrored by the `meetup_spots` table. Don't add a
-  free pin, home addresses or "near me" locations; they put people meeting strangers at risk.
-- Coordinates come only from the server's list. A meetup names a spot by key and the database
-  fills in its name and pin, so nobody can send "SM Megamall" pointing somewhere quiet. Adding a
-  spot means adding it to both lists (a unit test compares them).
-- The map is drawn, not tiled: simplified real geography in `meetup-map-geo.ts`, printed in the
-  app's paper and ink. For the way there, Directions opens the phone's own maps app.
+- People pin a meetup anywhere they like (in the Philippines): they drag the map under a fixed
+  pin and name the spot (`MeetupPicker.tsx`). This was the product's call: a fixed list of
+  places was too limiting.
+- Busy public places are still suggested as shortcuts (`shared/src/types/meetup-spots.ts`,
+  mirrored by the `meetup_spots` table), and the sheet nudges people to pick somewhere busy and
+  public. A suggested place's name and pin always come from the server's list, so nobody can
+  send "SM City Cebu" pointing somewhere quiet. Adding a suggestion means adding it to both lists
+  (a unit test compares them).
+- The map is an online map provider's street tiles (`map-tiles.ts`, set with
+  `EXPO_PUBLIC_MAP_TILES_URL`), shown as they are. Don't draw our own map data or restyle the
+  tiles: only what sits around and on the map (frame, price-tag pin, name sticker, compass, zoom
+  buttons, notices) wears the app's design. If tiles can't load, the map says so. Directions opens
+  the exact pin in the phone's own maps app.
+- The suggested places' coordinates come from each place's Wikipedia entry, cross-checked with
+  other listings. Source any new one the same way; don't guess coordinates.
 
 ### Why we ask for an account
 

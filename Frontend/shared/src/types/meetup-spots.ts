@@ -2,10 +2,13 @@
  * The busy public places a buyer and seller can meet at, to hand an item over or to see it in
  * person first. The server keeps the same list (the `meetup_spots` table) and takes a meetup's
  * name and pin from it, so a pin always shows the place it is labelled with. Keep the two in step;
- * `meetup-spots.test.ts` checks them against the migration.
+ * `meetup-map-geo.test.ts` checks them against the migration. The places are in Cebu City, where
+ * SnapWorth starts. Coordinates are from each place's Wikipedia entry (Fuente Osmeña Circle, which
+ * has none, from Waze), cross-checked with other listings where they had it.
  */
 
-export type MeetupArea = 'makati' | 'bgc' | 'ortigas' | 'quezon-city' | 'manila';
+export type MeetupArea =
+  'downtown' | 'uptown' | 'business-park' | 'it-park' | 'reclamation' | 'srp';
 
 export interface MeetupSpot {
   readonly key: string;
@@ -17,151 +20,84 @@ export interface MeetupSpot {
 }
 
 export const meetupAreas: readonly { readonly key: MeetupArea; readonly label: string }[] = [
-  { key: 'makati', label: 'Makati' },
-  { key: 'bgc', label: 'BGC' },
-  { key: 'ortigas', label: 'Ortigas' },
-  { key: 'quezon-city', label: 'Quezon City' },
-  { key: 'manila', label: 'Manila & Pasay' },
+  { key: 'downtown', label: 'Downtown' },
+  { key: 'uptown', label: 'Uptown' },
+  { key: 'business-park', label: 'Cebu Business Park' },
+  { key: 'it-park', label: 'IT Park' },
+  { key: 'reclamation', label: 'North Reclamation' },
+  { key: 'srp', label: 'SRP' },
 ];
+
+/** Cebu City, where SnapWorth starts: the middle of the suggested places, for opening the map. */
+export const homeCity = { name: 'Cebu City', lat: 10.3055, lng: 123.9 } as const;
 
 export const meetupSpots: readonly MeetupSpot[] = [
   {
-    key: 'greenbelt',
-    name: 'Greenbelt 3',
-    city: 'Makati',
-    area: 'makati',
-    lat: 14.5522,
-    lng: 121.0213,
+    key: 'sm-city-cebu',
+    name: 'SM City Cebu',
+    city: 'Cebu City',
+    area: 'reclamation',
+    lat: 10.311111,
+    lng: 123.918056,
   },
   {
-    key: 'ayala-triangle',
-    name: 'Ayala Triangle Gardens',
-    city: 'Makati',
-    area: 'makati',
-    lat: 14.5571,
-    lng: 121.0237,
+    key: 'robinsons-galleria-cebu',
+    name: 'Robinsons Galleria Cebu',
+    city: 'Cebu City',
+    area: 'reclamation',
+    lat: 10.304167,
+    lng: 123.911111,
   },
   {
-    key: 'glorietta',
-    name: 'Glorietta',
-    city: 'Makati',
-    area: 'makati',
-    lat: 14.5509,
-    lng: 121.0254,
+    key: 'ayala-center-cebu',
+    name: 'Ayala Center Cebu',
+    city: 'Cebu City',
+    area: 'business-park',
+    lat: 10.317778,
+    lng: 123.905,
   },
   {
-    key: 'high-street',
-    name: 'Bonifacio High Street',
-    city: 'Taguig',
-    area: 'bgc',
-    lat: 14.5506,
-    lng: 121.0511,
+    key: 'ayala-central-bloc',
+    name: 'Ayala Malls Central Bloc, IT Park',
+    city: 'Cebu City',
+    area: 'it-park',
+    lat: 10.330556,
+    lng: 123.907222,
   },
   {
-    key: 'market-market',
-    name: 'Market! Market!',
-    city: 'Taguig',
-    area: 'bgc',
-    lat: 14.5497,
-    lng: 121.0563,
+    key: 'fuente-osmena',
+    name: 'Fuente Osmeña Circle',
+    city: 'Cebu City',
+    area: 'uptown',
+    lat: 10.309848,
+    lng: 123.893135,
   },
   {
-    key: 'sm-aura',
-    name: 'SM Aura Premier',
-    city: 'Taguig',
-    area: 'bgc',
-    lat: 14.5466,
-    lng: 121.0546,
+    key: 'plaza-independencia',
+    name: 'Plaza Independencia',
+    city: 'Cebu City',
+    area: 'downtown',
+    lat: 10.292917,
+    lng: 123.905556,
   },
   {
-    key: 'megamall',
-    name: 'SM Megamall',
-    city: 'Mandaluyong',
-    area: 'ortigas',
-    lat: 14.5849,
-    lng: 121.0566,
-  },
-  {
-    key: 'shangri-la',
-    name: 'Shangri-La Plaza',
-    city: 'Mandaluyong',
-    area: 'ortigas',
-    lat: 14.5813,
-    lng: 121.0538,
-  },
-  {
-    key: 'estancia',
-    name: 'Estancia, Capitol Commons',
-    city: 'Pasig',
-    area: 'ortigas',
-    lat: 14.5753,
-    lng: 121.0628,
-  },
-  {
-    key: 'sm-north',
-    name: 'SM North EDSA',
-    city: 'Quezon City',
-    area: 'quezon-city',
-    lat: 14.6565,
-    lng: 121.0293,
-  },
-  {
-    key: 'trinoma',
-    name: 'TriNoma',
-    city: 'Quezon City',
-    area: 'quezon-city',
-    lat: 14.6535,
-    lng: 121.0336,
-  },
-  {
-    key: 'up-town-center',
-    name: 'UP Town Center',
-    city: 'Quezon City',
-    area: 'quezon-city',
-    lat: 14.6504,
-    lng: 121.0751,
-  },
-  {
-    key: 'gateway',
-    name: 'Gateway Mall, Araneta City',
-    city: 'Quezon City',
-    area: 'quezon-city',
-    lat: 14.6221,
-    lng: 121.053,
-  },
-  {
-    key: 'eastwood',
-    name: 'Eastwood City',
-    city: 'Quezon City',
-    area: 'quezon-city',
-    lat: 14.6091,
-    lng: 121.0798,
-  },
-  {
-    key: 'mall-of-asia',
-    name: 'SM Mall of Asia',
-    city: 'Pasay',
-    area: 'manila',
-    lat: 14.5352,
-    lng: 120.9822,
-  },
-  {
-    key: 'rizal-park',
-    name: 'Rizal Park',
-    city: 'Manila',
-    area: 'manila',
-    lat: 14.5831,
-    lng: 120.9794,
-  },
-  {
-    key: 'robinsons-manila',
-    name: 'Robinsons Place Manila',
-    city: 'Manila',
-    area: 'manila',
-    lat: 14.5766,
-    lng: 120.9839,
+    key: 'sm-seaside-cebu',
+    name: 'SM Seaside City Cebu',
+    city: 'Cebu City',
+    area: 'srp',
+    lat: 10.280389,
+    lng: 123.881833,
   },
 ];
 
 export const findMeetupSpot = (key: string | undefined): MeetupSpot | undefined =>
   key ? meetupSpots.find((spot) => spot.key === key) : undefined;
+
+/** Where a meetup can be pinned: the Philippines. The database holds pins to the same box. */
+export const pinBounds = { south: 4.5, north: 21.5, west: 116, east: 127 } as const;
+
+export const withinPinBounds = (lat: number, lng: number) =>
+  lat >= pinBounds.south &&
+  lat <= pinBounds.north &&
+  lng >= pinBounds.west &&
+  lng <= pinBounds.east;

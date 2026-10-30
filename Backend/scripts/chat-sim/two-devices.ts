@@ -298,18 +298,19 @@ async function main() {
   const meetupId = seller.chat.nextMessageId();
   await seller.chat.proposeMeetup(meetupId, conversation, {
     purpose: "viewing",
-    spotKey: "megamall",
+    location: { lat: 10.3157, lng: 123.8854 },
+    place: "Corner of the parking lot by Gate 2",
     when: "Saturday, 2:00 PM",
   });
   const pinned = await buyer.heardMessage(
     (event) => event.message.id === meetupId,
   );
   check(
-    pinned?.message.meetup?.place === "SM Megamall" &&
+    pinned?.message.meetup?.place === "Corner of the parking lot by Gate 2" &&
       pinned.message.meetup.purpose === "viewing" &&
-      pinned.message.meetup.spot?.lat === 14.5849 &&
-      pinned.message.meetup.spot?.lng === 121.0566,
-    "the seller pins a viewing at SM Megamall on the map, and the buyer gets the same pin",
+      pinned.message.meetup.location?.lat === 10.3157 &&
+      pinned.message.meetup.location?.lng === 123.8854,
+    "the seller drops a pin anywhere on the map, and the buyer gets exactly that pin",
     pinned?.message.meetup,
   );
   const confirmed = await buyer.chat.confirmMeetup(meetupId);
@@ -496,18 +497,18 @@ async function main() {
     created_at: "2020-01-01T00:00:00Z",
   });
   check(backdate.status === 403, "nobody can backdate a message", backdate);
-  const ownPin = await raw("POST", "messages?select=id", buyerToken, {
+  const abroad = await raw("POST", "messages?select=id", buyerToken, {
     conversation_id: conversation,
     kind: "meetup",
-    meetup_spot: "megamall",
+    meetup_place: "Shibuya crossing",
     meetup_when: "Tonight",
-    meetup_lat: 14.6,
-    meetup_lng: 121.1,
+    meetup_lat: 35.66,
+    meetup_lng: 139.7,
   });
   check(
-    ownPin.status === 403,
-    "nobody can drop their own pin on the map",
-    ownPin,
+    abroad.status === 400,
+    "a pin outside the Philippines is refused",
+    abroad,
   );
   const relabel = await raw(
     "POST",
@@ -516,16 +517,16 @@ async function main() {
     {
       conversation_id: conversation,
       kind: "meetup",
-      meetup_spot: "megamall",
+      meetup_spot: "sm-city-cebu",
       meetup_place: "Quiet alley behind the mall",
       meetup_when: "Tonight",
     },
   );
   check(
     relabel.status === 201 &&
-      relabel.body[0]?.meetup_place === "SM Megamall" &&
-      relabel.body[0]?.meetup_lat === 14.5849,
-    "a pin always shows the place it names: a made-up label is replaced with the spot's own",
+      relabel.body[0]?.meetup_place === "SM City Cebu" &&
+      relabel.body[0]?.meetup_lat === 10.311111,
+    "a suggested place always shows where it really is: a made-up label is replaced with its own",
     relabel,
   );
   const offList = await raw("POST", "messages?select=id", buyerToken, {

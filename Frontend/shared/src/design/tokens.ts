@@ -139,13 +139,8 @@ export const colorLight = {
   // outline with a hard shadow offset beneath it, so stickers and tags belong on it.
   heldEdge: ink,
   heldShadow: ink,
-  // The meetup map, printed on the same paper: land is the page, the bay a pale cobalt wash with
-  // printed waves, parks a pale jeepney green, and roads paper strips with an ink edge.
+  // The paper behind the meetup map's street tiles, shown while they load.
   mapLand: '#FBF3E6',
-  mapWater: '#D6DEF6',
-  mapWaves: '#9DAEE6',
-  mapPark: '#D3E8D4',
-  mapRoad: '#FFFFFF',
 } as const;
 
 export const colorDark = {
@@ -206,12 +201,7 @@ export const colorDark = {
   // At night the outline turns cream so it still reads; the shadow stays a deep ink.
   heldEdge: '#E6DAC6',
   heldShadow: '#000000',
-  // At night the map is the charcoal page; water and parks keep their hue, deepened.
   mapLand: '#241C14',
-  mapWater: '#1C2440',
-  mapWaves: '#3A4C8E',
-  mapPark: '#1F3324',
-  mapRoad: '#3A3027',
 } as const satisfies Record<keyof typeof colorLight, string>;
 
 /**
@@ -274,10 +264,6 @@ export const colorNight = {
   heldEdge: '#E6DCF0',
   heldShadow: '#000000',
   mapLand: '#1E1726',
-  mapWater: '#1D1F3E',
-  mapWaves: '#3B4486',
-  mapPark: '#1F2E2A',
-  mapRoad: '#33283F',
 } as const satisfies Record<keyof typeof colorLight, string>;
 
 export const tokens = deepFreeze({

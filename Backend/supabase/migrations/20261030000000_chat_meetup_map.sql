@@ -1,41 +1,37 @@
 -- Meetups on a map: each pickup, or a viewing for someone who wants to see the item in person,
--- can be pinned to one of a list of busy public places. The places, with their coordinates, live
--- here on the server. A message names a spot by its key, and the trigger copies the spot's name
--- and coordinates onto it, so a pin always shows the place it is labelled with: nobody can send
--- "SM Megamall" pointing somewhere quiet. Clients cannot write coordinates at all.
+-- carries a pin the two people agree on. The pin can go anywhere in the Philippines. A list of
+-- busy public places is kept here as suggestions: a meetup that names one of them by key gets the
+-- place's name and coordinates from this table, so a suggested place always shows where it
+-- really is, whatever the sender's app sent.
 
 create table public.meetup_spots (
   key text primary key check (key ~ '^[a-z0-9-]{2,48}$'),
   name text not null check (char_length(name) between 1 and 120),
   city text not null,
-  -- The part of Metro Manila the map zooms to.
-  area text not null check (area in ('makati', 'bgc', 'ortigas', 'quezon-city', 'manila')),
-  lat double precision not null check (lat between 14.3 and 14.8),
-  lng double precision not null check (lng between 120.9 and 121.2),
+  -- The part of the city the place is in.
+  area text not null check (
+    area in ('downtown', 'uptown', 'business-park', 'it-park', 'reclamation', 'srp')
+  ),
+  lat double precision not null check (lat between 4.5 and 21.5),
+  lng double precision not null check (lng between 116 and 127),
   active boolean not null default true
 );
 
 comment on table public.meetup_spots is
   'Public places buyers and sellers can meet. Keep in step with meetup-spots.ts in the app.';
 
+-- Busy public places in Cebu City, where SnapWorth starts. Coordinates are from each place's
+-- Wikipedia entry (Fuente Osmeña Circle, which has none, from Waze), cross-checked with
+-- latlong.net, Sygic, Travelprofy and findlatitudeandlongitude.com where they list it
+-- (October 2026).
 insert into public.meetup_spots (key, name, city, area, lat, lng) values
-  ('greenbelt', 'Greenbelt 3', 'Makati', 'makati', 14.5522, 121.0213),
-  ('ayala-triangle', 'Ayala Triangle Gardens', 'Makati', 'makati', 14.5571, 121.0237),
-  ('glorietta', 'Glorietta', 'Makati', 'makati', 14.5509, 121.0254),
-  ('high-street', 'Bonifacio High Street', 'Taguig', 'bgc', 14.5506, 121.0511),
-  ('market-market', 'Market! Market!', 'Taguig', 'bgc', 14.5497, 121.0563),
-  ('sm-aura', 'SM Aura Premier', 'Taguig', 'bgc', 14.5466, 121.0546),
-  ('megamall', 'SM Megamall', 'Mandaluyong', 'ortigas', 14.5849, 121.0566),
-  ('shangri-la', 'Shangri-La Plaza', 'Mandaluyong', 'ortigas', 14.5813, 121.0538),
-  ('estancia', 'Estancia, Capitol Commons', 'Pasig', 'ortigas', 14.5753, 121.0628),
-  ('sm-north', 'SM North EDSA', 'Quezon City', 'quezon-city', 14.6565, 121.0293),
-  ('trinoma', 'TriNoma', 'Quezon City', 'quezon-city', 14.6535, 121.0336),
-  ('up-town-center', 'UP Town Center', 'Quezon City', 'quezon-city', 14.6504, 121.0751),
-  ('gateway', 'Gateway Mall, Araneta City', 'Quezon City', 'quezon-city', 14.6221, 121.053),
-  ('eastwood', 'Eastwood City', 'Quezon City', 'quezon-city', 14.6091, 121.0798),
-  ('mall-of-asia', 'SM Mall of Asia', 'Pasay', 'manila', 14.5352, 120.9822),
-  ('rizal-park', 'Rizal Park', 'Manila', 'manila', 14.5831, 120.9794),
-  ('robinsons-manila', 'Robinsons Place Manila', 'Manila', 'manila', 14.5766, 120.9839);
+  ('sm-city-cebu', 'SM City Cebu', 'Cebu City', 'reclamation', 10.311111, 123.918056),
+  ('robinsons-galleria-cebu', 'Robinsons Galleria Cebu', 'Cebu City', 'reclamation', 10.304167, 123.911111),
+  ('ayala-center-cebu', 'Ayala Center Cebu', 'Cebu City', 'business-park', 10.317778, 123.905),
+  ('ayala-central-bloc', 'Ayala Malls Central Bloc, IT Park', 'Cebu City', 'it-park', 10.330556, 123.907222),
+  ('fuente-osmena', 'Fuente Osmeña Circle', 'Cebu City', 'uptown', 10.309848, 123.893135),
+  ('plaza-independencia', 'Plaza Independencia', 'Cebu City', 'downtown', 10.292917, 123.905556),
+  ('sm-seaside-cebu', 'SM Seaside City Cebu', 'Cebu City', 'srp', 10.280389, 123.881833);
 
 alter table public.meetup_spots enable row level security;
 create policy "Active meetup spots are public"
@@ -52,8 +48,9 @@ grant select on public.meetup_spots to anon, authenticated;
 alter table public.messages
   add column meetup_purpose text check (meetup_purpose in ('pickup', 'viewing')),
   add column meetup_spot text references public.meetup_spots (key),
-  add column meetup_lat double precision,
-  add column meetup_lng double precision;
+  -- A pin anywhere in the Philippines; the app holds pins to the same box.
+  add column meetup_lat double precision check (meetup_lat between 4.5 and 21.5),
+  add column meetup_lng double precision check (meetup_lng between 116 and 127);
 
 update public.messages set meetup_purpose = 'pickup' where kind = 'meetup';
 
@@ -75,12 +72,13 @@ alter table public.messages add constraint messages_shape check (
       meetup_place is not null and meetup_when is not null and meetup_status is not null
       and meetup_purpose is not null
       and (meetup_lat is null) = (meetup_lng is null)
-      and (meetup_spot is null) = (meetup_lat is null)
+      and (meetup_spot is null or meetup_lat is not null)
       and offer_php is null and offer_status is null
   end
 );
 
-grant insert (meetup_purpose, meetup_spot) on public.messages to authenticated;
+grant insert (meetup_purpose, meetup_spot, meetup_lat, meetup_lng)
+  on public.messages to authenticated;
 
 create or replace function public.prepare_message()
 returns trigger
@@ -121,11 +119,9 @@ begin
   new.created_at := now();
   new.offer_status := case when new.kind = 'offer' then 'pending'::public.offer_status end;
   new.meetup_status := case when new.kind = 'meetup' then 'proposed'::public.meetup_status end;
-  -- Coordinates only ever come from the spots table, so a pin always shows the place it names.
-  new.meetup_lat := null;
-  new.meetup_lng := null;
   if new.kind = 'meetup' then
     new.meetup_purpose := coalesce(new.meetup_purpose, 'pickup');
+    -- A suggested place's name and pin come from the list, whatever the sender's app sent.
     if new.meetup_spot is not null then
       select s.name, s.lat, s.lng
         into spot
@@ -144,6 +140,8 @@ begin
   else
     new.meetup_purpose := null;
     new.meetup_spot := null;
+    new.meetup_lat := null;
+    new.meetup_lng := null;
   end if;
 
   if new.kind = 'offer' then

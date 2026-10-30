@@ -2,14 +2,16 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { meetupAreas, meetupSpots } from '../../types/meetup-spots';
+import { withinPinBounds } from '../../types/meetup-spots';
 import {
   directionsUrl,
-  frameForArea,
-  inside,
+  distanceMeters,
+  frameAt,
+  maximumZoom,
   project,
-  spotsIn,
-  water,
-  world,
+  settleCamera,
+  tilesFor,
+  unproject,
 } from './meetup-map-geo';
 
 describe('the meetup spots', () => {
@@ -36,52 +38,75 @@ describe('the meetup spots', () => {
     expect(rows).toEqual(meetupSpots.map((spot) => ({ ...spot })));
   });
 
-  it('all sit on land, inside the drawing', () => {
-    for (const spot of meetupSpots) {
-      const point = project(spot.lat, spot.lng);
-      expect(inside(point, water.bay)).toBe(false);
-      expect(inside(point, water.lake)).toBe(false);
-      expect(point.x).toBeGreaterThan(world.x);
-      expect(point.x).toBeLessThan(world.x + world.width);
-      expect(point.y).toBeGreaterThan(world.y);
-      expect(point.y).toBeLessThan(world.y + world.height);
-    }
-  });
-
-  it('every area has spots, and every spot an area', () => {
-    for (const area of meetupAreas) expect(spotsIn(area.key).length).toBeGreaterThan(0);
+  it('every spot is in one of the areas', () => {
     const areas = new Set(meetupAreas.map((area) => area.key));
     for (const spot of meetupSpots) expect(areas.has(spot.area)).toBe(true);
   });
 });
 
-describe('zooming to an area', () => {
-  it.each([...meetupAreas.map((area) => area.key), 'all' as const])(
-    '%s shows all its spots, in the map’s shape',
-    (area) => {
-      const aspect = 1.45;
-      const frame = frameForArea(area, aspect);
-      expect(frame.width / frame.height).toBeCloseTo(aspect, 5);
-      for (const spot of spotsIn(area)) {
-        const { x, y } = project(spot.lat, spot.lng);
-        expect(x).toBeGreaterThan(frame.x);
-        expect(x).toBeLessThan(frame.x + frame.width);
-        expect(y).toBeGreaterThan(frame.y);
-        expect(y).toBeLessThan(frame.y + frame.height);
-      }
-    },
-  );
+describe('the projection', () => {
+  it('goes from coordinates to map points and back', () => {
+    for (const spot of meetupSpots) {
+      const back = unproject(project(spot.lat, spot.lng));
+      expect(back.lat).toBeCloseTo(spot.lat, 9);
+      expect(back.lng).toBeCloseTo(spot.lng, 9);
+    }
+  });
+
+  it('lines the street tiles up with the pins', () => {
+    // SM City Cebu is in tile 3457/1930 at zoom 12 on every standard (Web Mercator) tile server.
+    const smCityCebu = project(10.311111, 123.918056);
+    const size = { width: 400, height: 300 };
+    const camera = { center: smCityCebu, zoom: 12 };
+    const tile = tilesFor(frameAt(camera, size), size).find(
+      (each) => each.z === 12 && each.x === 3457 && each.y === 1930,
+    );
+    expect(tile).toBeDefined();
+    // The pin sits in the middle of the view, which must fall inside that tile.
+    expect(tile!.left).toBeLessThanOrEqual(200);
+    expect(tile!.left + tile!.size).toBeGreaterThan(200);
+    expect(tile!.top).toBeLessThanOrEqual(150);
+    expect(tile!.top + tile!.size).toBeGreaterThan(150);
+    expect(tile!.size).toBeCloseTo(256, 5);
+  });
+
+  it('covers the whole view with tiles, at any zoom', () => {
+    const size = { width: 390, height: 260 };
+    for (const zoom of [11, 13.4, 16.5, 18.5]) {
+      const tiles = tilesFor(frameAt({ center: project(10.31, 123.9), zoom }, size), size);
+      expect(Math.min(...tiles.map((tile) => tile.left))).toBeLessThanOrEqual(0);
+      expect(Math.min(...tiles.map((tile) => tile.top))).toBeLessThanOrEqual(0);
+      expect(Math.max(...tiles.map((tile) => tile.left + tile.size))).toBeGreaterThanOrEqual(390);
+      expect(Math.max(...tiles.map((tile) => tile.top + tile.size))).toBeGreaterThanOrEqual(260);
+    }
+  });
+});
+
+describe('moving the map', () => {
+  it('keeps the pin over the Philippines and the zoom in range', () => {
+    const settled = settleCamera({ center: project(35.68, 139.69), zoom: 30 });
+    const { lat, lng } = unproject(settled.center);
+    expect(withinPinBounds(lat, lng)).toBe(true);
+    expect(settled.zoom).toBe(maximumZoom);
+  });
+
+  it('measures how far the pin has moved', () => {
+    const smCityCebu = { lat: 10.311111, lng: 123.918056 };
+    const galleria = { lat: 10.304167, lng: 123.911111 };
+    expect(distanceMeters(smCityCebu, galleria)).toBeGreaterThan(1000);
+    expect(distanceMeters(smCityCebu, galleria)).toBeLessThan(1200);
+  });
 });
 
 describe('directions', () => {
-  const megamall = { name: 'SM Megamall', city: 'Mandaluyong', lat: 14.5849, lng: 121.0566 };
+  const pin = { name: 'By the main entrance', lat: 10.311111, lng: 123.918056 };
 
-  it('opens Apple Maps on an iPhone and Google Maps elsewhere, searching by name and city', () => {
-    expect(directionsUrl(megamall, 'ios')).toBe(
-      'https://maps.apple.com/?q=SM%20Megamall%2C%20Mandaluyong&sll=14.5849,121.0566',
+  it('opens the exact pin in Apple Maps on an iPhone and Google Maps elsewhere', () => {
+    expect(directionsUrl(pin, 'ios')).toBe(
+      'https://maps.apple.com/?ll=10.311111,123.918056&q=By%20the%20main%20entrance',
     );
-    expect(directionsUrl(megamall, 'other')).toBe(
-      'https://www.google.com/maps/search/?api=1&query=SM%20Megamall%2C%20Mandaluyong',
+    expect(directionsUrl(pin, 'other')).toBe(
+      'https://www.google.com/maps/search/?api=1&query=10.311111,123.918056',
     );
   });
 });

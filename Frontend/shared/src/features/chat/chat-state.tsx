@@ -172,7 +172,7 @@ type Draft =
   | { readonly kind: 'offer'; readonly amountPhp: number; readonly note?: string }
   | ({ readonly kind: 'meetup' } & MeetupProposal);
 
-/** How a proposal shows while it sends: a known spot already has its name and pin. */
+/** How a proposal shows while it sends, pin and all. */
 function optimisticMeetup(proposal: MeetupProposal): ChatMeetup {
   const spot = findMeetupSpot(proposal.spotKey);
   return {
@@ -180,7 +180,8 @@ function optimisticMeetup(proposal: MeetupProposal): ChatMeetup {
     when: proposal.when,
     status: 'proposed',
     purpose: proposal.purpose,
-    spot: spot ? { key: spot.key, lat: spot.lat, lng: spot.lng } : undefined,
+    location: spot ? { lat: spot.lat, lng: spot.lng } : proposal.location,
+    spotKey: spot?.key,
   };
 }
 

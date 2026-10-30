@@ -66,7 +66,7 @@ export interface LocalChatRepositoryOptions {
   readonly storageKey?: string;
 }
 
-/** Like the database: a spot decides the place's name and pin, whatever name was sent. */
+/** Like the database: a suggested spot decides the place's name and pin; any other pin is kept. */
 function meetupFrom(outgoing: Extract<OutgoingMessage, { kind: 'meetup' }>): ChatMeetup {
   const spot = findMeetupSpot(outgoing.spotKey);
   return {
@@ -74,7 +74,8 @@ function meetupFrom(outgoing: Extract<OutgoingMessage, { kind: 'meetup' }>): Cha
     when: outgoing.when,
     status: 'proposed',
     purpose: outgoing.purpose,
-    spot: spot ? { key: spot.key, lat: spot.lat, lng: spot.lng } : undefined,
+    location: spot ? { lat: spot.lat, lng: spot.lng } : outgoing.location,
+    spotKey: spot?.key,
   };
 }
 

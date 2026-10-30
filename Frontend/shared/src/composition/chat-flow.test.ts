@@ -180,26 +180,59 @@ describe('offers and reads', () => {
 });
 
 describe('meeting up', () => {
-  it('pins a pickup to a public spot, taking its name and pin from the spot', async () => {
+  it('pins a meetup anywhere, under the name its sender gives it', async () => {
+    const chat = setup();
+    const id = unwrap(await chat.start('lamp'));
+    const sent = unwrap(
+      await chat.proposeMeetup(chat.nextMessageId(), id, {
+        purpose: 'pickup',
+        location: { lat: 10.3157, lng: 123.8854 },
+        place: '  Corner of the parking lot by Gate 2 ',
+        when: 'Today, 6:00 PM',
+      }),
+    );
+    expect(sent.meetup).toEqual({
+      place: 'Corner of the parking lot by Gate 2',
+      when: 'Today, 6:00 PM',
+      status: 'proposed',
+      purpose: 'pickup',
+      location: { lat: 10.3157, lng: 123.8854 },
+      spotKey: undefined,
+    });
+  });
+
+  it('a suggested place keeps its own name and pin, whatever was sent with it', async () => {
     const chat = setup();
     const id = unwrap(await chat.start('lamp'));
     const sent = unwrap(
       await chat.proposeMeetup(chat.nextMessageId(), id, {
         purpose: 'viewing',
-        spotKey: 'megamall',
+        spotKey: 'sm-city-cebu',
+        location: { lat: 10.4, lng: 123.95 },
         place: 'My place, 42 Quiet Street',
         when: 'Saturday, 2:00 PM',
       }),
     );
-    expect(sent.meetup).toEqual({
-      place: 'SM Megamall',
-      when: 'Saturday, 2:00 PM',
-      status: 'proposed',
+    expect(sent.meetup).toMatchObject({
+      place: 'SM City Cebu',
       purpose: 'viewing',
-      spot: { key: 'megamall', lat: 14.5849, lng: 121.0566 },
+      location: { lat: 10.311111, lng: 123.918056 },
+      spotKey: 'sm-city-cebu',
     });
     const [row] = unwrap(await chat.list());
-    expect(row?.latest).toMatchObject({ meetupPlace: 'SM Megamall', meetupPurpose: 'viewing' });
+    expect(row?.latest).toMatchObject({ meetupPlace: 'SM City Cebu', meetupPurpose: 'viewing' });
+  });
+
+  it('refuses a pin outside the Philippines', async () => {
+    const chat = setup();
+    const id = unwrap(await chat.start('lamp'));
+    const result = await chat.proposeMeetup(chat.nextMessageId(), id, {
+      purpose: 'pickup',
+      location: { lat: 35.66, lng: 139.7 },
+      place: 'Shibuya',
+      when: 'Today',
+    });
+    expect(!result.ok && result.error).toMatchObject({ kind: 'validation', code: 'out_of_range' });
   });
 
   it('refuses a spot that is not on the list', async () => {

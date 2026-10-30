@@ -9,7 +9,6 @@ import {
   Navigation,
   Repeat2,
 } from 'lucide-react-native';
-import { useMemo } from 'react';
 import { Linking, Platform, View } from 'react-native';
 
 import { Button, SWText, Tag, type TagTone } from '../../components';
@@ -17,11 +16,8 @@ import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import type { ChatMeetup, ChatOffer, OfferStatus } from '../../types/entities';
 import { findMeetupSpot } from '../../types/meetup-spots';
 import { formatPeso } from '../preview/sample-data';
-import { directionsUrl, frameAround, project } from './meetup-map-geo';
+import { directionsUrl } from './meetup-map-geo';
 import { MeetupMap } from './MeetupMap';
-
-/** The chat card's map: wide and short, so the card stays a card. */
-const mapAspect = 2.2;
 
 const offerStatus: Record<
   OfferStatus,
@@ -142,25 +138,16 @@ export function MeetupCard({
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const confirmed = meetup.status === 'confirmed';
-  const spot = meetup.spot;
-  const known = findMeetupSpot(spot?.key);
-  const frame = useMemo(
-    () =>
-      spot
-        ? frameAround([project(spot.lat, spot.lng)], mapAspect, { padding: 4, minimumWidth: 40 })
-        : null,
-    [spot],
-  );
+  const location = meetup.location;
+  const known = findMeetupSpot(meetup.spotKey);
   const viewing = meetup.purpose === 'viewing';
 
   return (
     <View style={styles.card}>
-      {spot && frame ? (
+      {location ? (
         <MeetupMap
-          compact
-          frame={frame}
-          pins={[{ key: spot.key, name: meetup.place, lat: spot.lat, lng: spot.lng }]}
-          selectedKey={spot.key}
+          lat={location.lat}
+          lng={location.lng}
           agreed={confirmed}
           accessibilityLabel={`Map showing ${meetup.place}${confirmed ? ', agreed' : ''}`}
         />
@@ -183,7 +170,7 @@ export function MeetupCard({
           </SWText>
         </View>
       </View>
-      {spot ? (
+      {location ? (
         <Button
           label="Directions"
           variant="tertiary"
@@ -193,7 +180,7 @@ export function MeetupCard({
           onPress={() =>
             void Linking.openURL(
               directionsUrl(
-                { name: meetup.place, city: known?.city, lat: spot.lat, lng: spot.lng },
+                { name: meetup.place, lat: location.lat, lng: location.lng },
                 Platform.OS === 'ios' ? 'ios' : 'other',
               ),
             )

@@ -1,7 +1,6 @@
 import { Ban, Eye, Flag, HandCoins, MapPin } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
 
 import {
   Button,
@@ -23,9 +22,9 @@ import {
 } from '../preview/sample-data';
 import type { MeetupProposal } from '../../ports/services';
 import type { MeetupPurpose } from '../../types/entities';
-import { findMeetupSpot, meetupAreas, type MeetupArea } from '../../types/meetup-spots';
-import { frameForArea, spotsIn } from './meetup-map-geo';
-import { MeetupMap } from './MeetupMap';
+import { findMeetupSpot, homeCity, meetupSpots } from '../../types/meetup-spots';
+import { distanceMeters, project, unproject, type Camera } from './meetup-map-geo';
+import { MeetupPicker, placingZoom } from './MeetupPicker';
 
 /** The composer's plus: what a chat about an item needs beyond words. */
 export function ChatActionsSheet({
@@ -55,7 +54,7 @@ export function ChatActionsSheet({
         />
         <ListRow
           label="Arrange pickup"
-          detail="A public place on the map and a time"
+          detail="A spot on the map and a time"
           icon={MapPin}
           onPress={onMeetup}
         />
@@ -137,19 +136,17 @@ export function OfferSheet({
   );
 }
 
-/** Which side of its spots each area's chip sits on the wide map, so no two overlap. */
-const clusterSide: Record<MeetupArea, 'start' | 'end' | 'center'> = {
-  makati: 'start',
-  manila: 'center',
-  bgc: 'end',
-  ortigas: 'end',
-  'quezon-city': 'center',
-};
+/** Where the map opens: Cebu City, with all its suggested places in view. */
+const overview: Camera = { center: project(homeCity.lat, homeCity.lng), zoom: 12.6 };
+/** How close a suggestion opens, so its streets are clear. */
+const spotZoom = 16.5;
+/** Dragged further than this from a suggested place, the pin is no longer that place. */
+const leaveSpotMeters = 60;
 
 /**
  * Where and when to meet: to hand the item over, or for the buyer to see it in person first.
- * Places are picked on the map from busy public spots only; the chips below it list the same
- * spots, for anyone who'd rather not aim at a pin.
+ * The pin goes anywhere: drag the map under it and name the spot. Busy public places are
+ * suggested as shortcuts, since they're the safest places to meet a stranger.
  */
 export function MeetupSheet({
   visible,
@@ -165,51 +162,46 @@ export function MeetupSheet({
   const styles = useThemedStyles(stylesFor);
   const { height: screenHeight } = useWindowDimensions();
   const [purpose, setPurpose] = useState<MeetupPurpose>(initialPurpose);
-  const [area, setArea] = useState<MeetupArea | 'all'>('all');
-  const [spot, setSpot] = useState<string | null>(null);
+  const [camera, setCamera] = useState<Camera>(overview);
+  const [spotKey, setSpotKey] = useState<string | null>(null);
+  const [name, setName] = useState('');
   const [day, setDay] = useState<string | null>(null);
   const [time, setTime] = useState<string | null>(null);
   // A shorter map on a short phone, so the whole sheet still fits.
-  const aspect = screenHeight < 760 ? 1.9 : 1.45;
-  const frame = useMemo(() => frameForArea(area, aspect), [area, aspect]);
-  const spots = spotsIn(area);
-  // Zoomed out, the spots are too close to tell apart, so each area is one chip to zoom into.
-  const clusters = useMemo(
-    () =>
-      area === 'all'
-        ? meetupAreas.map((entry) => {
-            const inArea = spotsIn(entry.key);
-            return {
-              key: entry.key,
-              label: entry.label,
-              count: inArea.length,
-              lat: inArea.reduce((sum, each) => sum + each.lat, 0) / inArea.length,
-              lng: inArea.reduce((sum, each) => sum + each.lng, 0) / inArea.length,
-              side: clusterSide[entry.key],
-            };
-          })
-        : [],
-    [area],
-  );
-  const pick = (key: string) => {
-    setSpot(key);
-    const picked = findMeetupSpot(key);
-    if (picked && area === 'all') setArea(picked.area);
-  };
+  const aspect = screenHeight < 760 ? 2.1 : 1.55;
 
   useEffect(() => {
     if (!visible) return;
     setPurpose(initialPurpose);
-    setArea('all');
-    setSpot(null);
+    setCamera(overview);
+    setSpotKey(null);
+    setName('');
     setDay(null);
     setTime(null);
   }, [initialPurpose, visible]);
 
+  const moveTo = (next: Camera) => {
+    setCamera(next);
+    const spot = findMeetupSpot(spotKey ?? undefined);
+    if (spot && distanceMeters(spot, unproject(next.center)) > leaveSpotMeters) {
+      // The pin has left the suggested place, so it's the person's own spot now.
+      setSpotKey(null);
+      setName((current) => (current === spot.name ? '' : current));
+    }
+  };
+
+  const suggest = (key: string) => {
+    const spot = findMeetupSpot(key);
+    if (!spot) return;
+    setSpotKey(spot.key);
+    setName(spot.name);
+    setCamera({ center: project(spot.lat, spot.lng), zoom: spotZoom });
+  };
+
   const label = (options: typeof previewMeetupDays, key: string | null) =>
     options.find((option) => option.key === key)?.label ?? '';
-  const ready = spot !== null && day !== null && time !== null;
-  const areaName = meetupAreas.find((entry) => entry.key === area)?.label ?? 'Metro Manila';
+  const placed = camera.zoom >= placingZoom;
+  const ready = placed && name.trim().length > 0 && day !== null && time !== null;
 
   return (
     <Sheet
@@ -229,28 +221,26 @@ export function MeetupSheet({
         <SWText variant="overline" tone="textMuted">
           Where
         </SWText>
-        <ChoiceChips
-          options={[{ key: 'all', label: 'All' }, ...meetupAreas]}
-          value={area}
-          scroll
-          onChange={(next) => setArea(next as MeetupArea | 'all')}
+        <MeetupPicker
+          camera={camera}
+          onCameraChange={moveTo}
+          label={name.trim() || undefined}
+          aspect={aspect}
+          accessibilityLabel="Map for choosing where to meet"
         />
-        <Animated.View key={area} entering={FadeIn.duration(tokens.motion.duration.base)}>
-          <MeetupMap
-            frame={frame}
-            pins={area === 'all' ? [] : spots}
-            clusters={clusters}
-            onSelectCluster={(key) => setArea(key as MeetupArea)}
-            selectedKey={spot ?? undefined}
-            onSelect={pick}
-            accessibilityLabel={`Map of ${areaName} with ${spots.length} public meetup spots`}
-          />
-        </Animated.View>
         <ChoiceChips
-          options={spots.map((entry) => ({ key: entry.key, label: entry.name }))}
-          value={spot}
+          options={meetupSpots.map((spot) => ({ key: spot.key, label: spot.name }))}
+          value={spotKey}
           scroll
-          onChange={pick}
+          onChange={suggest}
+        />
+        <TextField
+          value={name}
+          onChangeText={setName}
+          placeholder="Name the spot, e.g. Jollibee by the main entrance"
+          accessibilityLabel="Name the spot"
+          maxLength={120}
+          returnKeyType="done"
         />
       </View>
       <View style={styles.group}>
@@ -262,22 +252,24 @@ export function MeetupSheet({
       </View>
       <SWText variant="caption" tone="textMuted">
         {purpose === 'viewing'
-          ? 'Only busy public places are on the map. Take your time looking it over.'
-          : 'Only busy public places are on the map. Check the item before you pay.'}
+          ? 'Pick somewhere busy and public, and take your time looking it over.'
+          : 'Pick somewhere busy and public, and check the item before you pay.'}
       </SWText>
       <View style={styles.footer}>
         <Button
           label="Send proposal"
           disabled={!ready}
           haptic="pop"
-          onPress={() =>
-            spot &&
+          onPress={() => {
+            const { lat, lng } = unproject(camera.center);
             onSend({
               purpose,
-              spotKey: spot,
+              spotKey: spotKey ?? undefined,
+              location: { lat, lng },
+              place: name.trim(),
               when: `${label(previewMeetupDays, day)}, ${label(previewMeetupTimes, time)}`,
-            })
-          }
+            });
+          }}
         />
       </View>
     </Sheet>

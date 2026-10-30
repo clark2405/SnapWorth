@@ -274,16 +274,24 @@ export interface ChatOffer {
   readonly status: OfferStatus;
 }
 
+/** Where on the map a meetup is pinned. */
+export interface MeetupLocation {
+  readonly lat: number;
+  readonly lng: number;
+}
+
 /**
- * A proposed pickup or viewing: where and when, and whether the other side has agreed. `spot` is
- * set when the place is one of the public meetup spots, with the pin the server gave it.
+ * A proposed pickup or viewing: where and when, and whether the other side has agreed.
+ * `location` is the pin the two people agree on; `spotKey` is set when it is one of the suggested
+ * public places, whose name and pin then come from the server's list.
  */
 export interface ChatMeetup {
   readonly place: string;
   readonly when: string;
   readonly status: MeetupStatus;
   readonly purpose: MeetupPurpose;
-  readonly spot?: { readonly key: string; readonly lat: number; readonly lng: number };
+  readonly location?: MeetupLocation;
+  readonly spotKey?: string;
 }
 
 /**
@@ -309,8 +317,10 @@ export type OutgoingMessage =
   | {
       readonly kind: 'meetup';
       readonly purpose: MeetupPurpose;
-      /** One of the public meetup spots; it decides the place's name and pin. */
+      /** One of the suggested public places; it decides the place's name and pin. */
       readonly spotKey?: string;
+      /** Anywhere else, pinned on the map. */
+      readonly location?: MeetupLocation;
       readonly place: string;
       readonly when: string;
     };

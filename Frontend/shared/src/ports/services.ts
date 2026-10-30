@@ -18,6 +18,7 @@ import type {
   ListingDetail,
   MarketFilter,
   Message,
+  MeetupLocation,
   MeetupPurpose,
   ChatReportReason,
   OfferStatus,
@@ -138,12 +139,14 @@ export interface ChatService {
 export type SendResult = Result<Message, AppError>;
 
 /**
- * Where and when to meet, and why. With `spotKey` the place is that public meetup spot (its name
- * comes from the spot); without one, `place` is whatever was typed.
+ * Where and when to meet, and why. `location` is wherever the proposer dropped the pin, and
+ * `place` what they called it. With `spotKey` the pin is one of the suggested public places, and
+ * its name and pin come from that place instead.
  */
 export interface MeetupProposal {
   readonly purpose: MeetupPurpose;
   readonly spotKey?: string;
+  readonly location?: MeetupLocation;
   readonly place?: string;
   readonly when: string;
 }

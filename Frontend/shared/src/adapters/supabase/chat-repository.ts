@@ -79,11 +79,11 @@ function messageFromRow(row: MessageRow, viewer: string): Message {
             when: row.meetup_when,
             status: row.meetup_status,
             purpose: row.meetup_purpose ?? 'pickup',
-            // The pin is the server's, taken from its list of public spots.
-            spot:
-              row.meetup_spot && row.meetup_lat !== null && row.meetup_lng !== null
-                ? { key: row.meetup_spot, lat: row.meetup_lat, lng: row.meetup_lng }
+            location:
+              row.meetup_lat !== null && row.meetup_lng !== null
+                ? { lat: row.meetup_lat, lng: row.meetup_lng }
                 : undefined,
+            spotKey: row.meetup_spot ?? undefined,
           }
         : undefined,
     createdAt,
@@ -233,6 +233,11 @@ export function createSupabaseChatRepository(client: SupabaseClient): ChatReposi
           meetup_when: message.kind === 'meetup' ? message.when : null,
           meetup_purpose: message.kind === 'meetup' ? message.purpose : null,
           meetup_spot: message.kind === 'meetup' ? (message.spotKey ?? null) : null,
+          // A suggested spot's pin is filled in by the database; any other pin is sent as is.
+          meetup_lat:
+            message.kind === 'meetup' && !message.spotKey ? (message.location?.lat ?? null) : null,
+          meetup_lng:
+            message.kind === 'meetup' && !message.spotKey ? (message.location?.lng ?? null) : null,
         })
         .select(messageColumns)
         .single();
