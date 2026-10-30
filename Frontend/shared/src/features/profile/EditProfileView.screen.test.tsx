@@ -1,4 +1,4 @@
-import { act, fireEvent, screen } from '@testing-library/react-native';
+import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import { renderScreen } from '../../testing/render-screen';
 import { EditProfileView } from './EditProfileView';
@@ -27,7 +27,7 @@ describe('EditProfileView', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
   });
 
-  it('lowercases a username as it is typed and confirms the save', () => {
+  it('lowercases a username as it is typed and confirms the save', async () => {
     const onSaved = jest.fn();
     renderScreen(<EditProfileView onSaved={onSaved} />);
 
@@ -35,8 +35,8 @@ describe('EditProfileView', () => {
     expect(screen.getByLabelText('Username')).toHaveDisplayValue('ricothrifts');
 
     fireEvent.press(screen.getByRole('button', { name: 'Save' }));
-    act(() => jest.runAllTimers());
 
-    expect(onSaved).toHaveBeenCalledTimes(1);
+    // Saving goes through the profile service, so the confirmation comes once it answers.
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
   });
 });

@@ -11,12 +11,13 @@ import {
   setHandoffName,
 } from '@snapworth/shared/components';
 import {
+  completeAuthFromUrl,
   isSupabaseConfigured,
   performAuth,
   performGoogleAuth,
   type AuthInput,
 } from '@snapworth/shared/features/auth';
-import { useSession } from '@snapworth/shared/features/session';
+import { useSession, type SessionUser } from '@snapworth/shared/features/session';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -35,8 +36,8 @@ export function useSignIn() {
   const { return: returning } = useLocalSearchParams<{ return?: string }>();
   const configured = isSupabaseConfigured();
 
-  const enter = () => {
-    startSession();
+  const enter = (userData?: SessionUser | null) => {
+    startSession(userData);
     if (returning && router.canGoBack()) router.back();
     else router.replace('/feed');
     openFromTag();
@@ -53,7 +54,15 @@ export function useSignIn() {
     });
     if (!configured) {
       await closing;
-      enter();
+      enter({
+        id: 'local_user',
+        email: input.email,
+        user_metadata: {
+          full_name: input.fullName || (input.email ? input.email.split('@')[0] : 'Demo User'),
+          gender: input.gender,
+        },
+        created_at: new Date().toISOString(),
+      });
       return;
     }
 
@@ -72,7 +81,7 @@ export function useSignIn() {
       }
       setHandoffName(firstNameOf(data.user?.user_metadata?.full_name));
       await closing;
-      enter();
+      enter(data.user);
     } catch (failure) {
       // No connection, or a project that can't be reached: say so rather than crash.
       cancelHandoff();
@@ -83,18 +92,56 @@ export function useSignIn() {
   const google = async () => {
     if (!configured) {
       await closeIntoTag({ stamp: 'WELCOME' });
-      enter();
+      enter({
+        id: 'google_user',
+        email: 'google_user@snapworth.com',
+        user_metadata: { full_name: 'Google User' },
+        created_at: new Date().toISOString(),
+      });
       return;
     }
     try {
-      const redirectUrl = Linking.createURL('/feed');
+      // If testing in Expo Go and encountering "site can't be reached",
+      // replace Linking.createURL('') with your exact IP e.g., 'exp://192.168.1.10:8081'
+      const redirectUrl = Linking.createURL('');
+      console.log('Redirect URL:', redirectUrl);
+
       const { data, error } = await performGoogleAuth(redirectUrl);
       if (error) {
+        cancelHandoff();
         Alert.alert('Google sign-in failed', error.message);
         return;
       }
-      if (data?.url) await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+      if (!data?.url) {
+        cancelHandoff();
+        Alert.alert('Google sign-in failed', 'Could not start Google sign-in.');
+        return;
+      }
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+      if (result.type !== 'success' || !('url' in result) || !result.url) {
+        cancelHandoff();
+        if (result.type === 'cancel' || result.type === 'dismiss') return;
+        Alert.alert('Google sign-in failed', 'Sign-in was not completed.');
+        return;
+      }
+
+      const completed = await completeAuthFromUrl(result.url);
+      if (completed.error) {
+        cancelHandoff();
+        Alert.alert('Google sign-in failed', completed.error.message);
+        return;
+      }
+
+      const name = firstNameOf(
+        completed.data.user?.user_metadata?.full_name ?? completed.data.user?.user_metadata?.name,
+      );
+      const closing = closeIntoTag({ stamp: 'WELCOME', name });
+      setHandoffName(name);
+      await closing;
+      enter(completed.data.user);
     } catch (failure) {
+      cancelHandoff();
       Alert.alert('Google sign-in failed', messageOf(failure));
     }
   };

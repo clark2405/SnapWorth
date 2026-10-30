@@ -2,8 +2,8 @@ import { UserRound } from 'lucide-react-native';
 
 import { Avatar, PressableScale, useScreenScroll } from '../../components';
 import { placeColors, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
-import { previewProfile } from '../preview/sample-data';
 import { useAccountGate, useSession } from '../session';
+import { avatarSourceFor, useUserProfile } from './userProfile';
 
 /**
  * The signed-in user's avatar in a top-level header; opens the profile and settings. A guest
@@ -13,6 +13,7 @@ export function ProfileButton({ onPress }: { readonly onPress?: () => void }) {
   const styles = useThemedStyles(stylesFor);
   const { colors } = useTheme();
   const { isGuest } = useSession();
+  const { profile } = useUserProfile();
   const requireAccount = useAccountGate();
   // On a tab's colour block the ring and mark take the block's ink, so they keep their contrast.
   const place = useScreenScroll()?.place;
@@ -29,7 +30,11 @@ export function ProfileButton({ onPress }: { readonly onPress?: () => void }) {
       {isGuest ? (
         <UserRound size={20} strokeWidth={2} color={ink ?? colors.textSecondary} />
       ) : (
-        <Avatar source={previewProfile.user.avatar} name={previewProfile.user.handle} size={36} />
+        <Avatar
+          source={avatarSourceFor(profile.avatarUrl)}
+          name={profile.displayName || profile.handle}
+          size={36}
+        />
       )}
     </PressableScale>
   );

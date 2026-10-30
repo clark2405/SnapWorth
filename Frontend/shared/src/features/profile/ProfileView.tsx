@@ -44,14 +44,8 @@ import {
   useThemedStyles,
   type ThemePreference,
 } from '../../design';
-import {
-  formatPeso,
-  previewHeldContent,
-  previewPortfolio,
-  previewConversations,
-  previewProfile,
-  previewVotesCast,
-} from '../preview/sample-data';
+import { formatPeso, previewHeldContent, previewPortfolio } from '../preview/sample-data';
+import { avatarSourceFor, useUserProfile } from './userProfile';
 
 export type ProfileDestination =
   | 'edit-profile'
@@ -86,8 +80,9 @@ const appearanceOptions: readonly { readonly key: ThemePreference; readonly labe
 export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: ProfileViewProps) {
   const { colors, preference, setPreference } = useTheme();
   const styles = useThemedStyles(stylesFor);
+  const { profile } = useUserProfile();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const profile = previewProfile;
+
   const stats = [
     { label: 'Checked', value: profile.stats.checked },
     { label: 'Listed', value: profile.stats.listed },
@@ -105,23 +100,44 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
           onPress={() => onOpen?.('edit-profile')}
           style={styles.identity}
         >
-          <Avatar source={profile.user.avatar} name={profile.user.handle} size={72} ring />
+          <Avatar
+            source={avatarSourceFor(profile.avatarUrl)}
+            name={profile.displayName || profile.handle}
+            size={72}
+            ring
+          />
           <View style={styles.identityText}>
             <SWText variant="displayMedium" accessibilityRole="header">
               {profile.displayName}
             </SWText>
             <View style={styles.handleRow}>
-              <SWText variant="bodySmall" tone="textSecondary">
-                @{profile.user.handle} ·
+              <SWText variant="bodySmall" tone="accent">
+                @{profile.handle}
               </SWText>
+              {profile.email ? (
+                <SWText variant="bodySmall" tone="textSecondary">
+                  · {profile.email} ·
+                </SWText>
+              ) : (
+                <SWText variant="bodySmall" tone="textSecondary">
+                  ·
+                </SWText>
+              )}
               <Rating value={profile.rating} variant="bodySmall" tone="textSecondary" />
             </View>
-            <SWText variant="caption" tone="textMuted">
-              {profile.location}
-            </SWText>
-            <SWText variant="caption" tone="textMuted">
-              {profile.joined}
-            </SWText>
+            {profile.bio ? (
+              <SWText variant="bodySmall" tone="textSecondary" numberOfLines={2}>
+                {profile.bio}
+              </SWText>
+            ) : null}
+            <View style={styles.metaRow}>
+              <SWText variant="caption" tone="textMuted">
+                {profile.location}
+              </SWText>
+              <SWText variant="caption" tone="textMuted">
+                · {profile.joined}
+              </SWText>
+            </View>
           </View>
           <ChevronRight size={18} strokeWidth={2} color={colors.textMuted} />
         </PressableScale>
@@ -168,19 +184,19 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
           <ListRow
             label="Your listings"
             icon={PriceTagIcon}
-            value={String(profile.stats.listed)}
+            value={String(profile.activity.listings)}
             onPress={() => onOpen?.('listings')}
           />
           <ListRow
             label="Votes cast"
             icon={Vote}
-            value={String(previewVotesCast.length)}
+            value={String(profile.activity.votes)}
             onPress={() => onOpen?.('votes')}
           />
           <ListRow
             label="Conversations"
             icon={MessagesSquare}
-            value={String(previewConversations.length)}
+            value={String(profile.activity.conversations)}
             onPress={() => onOpen?.('conversations')}
           />
         </ListGroup>
@@ -276,6 +292,12 @@ const stylesFor = themedStyles(() => ({
     gap: tokens.spacing[1],
   },
   handleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing[1],
+    flexWrap: 'wrap',
+  },
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing[1],

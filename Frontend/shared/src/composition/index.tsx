@@ -5,13 +5,13 @@ import {
   createLocalChatRepository,
   createLocalCommentRepository,
   createSupabaseChatRepository,
-  createSupabaseClient,
   createSupabaseCommentRepository,
   createPhotoPricingService,
   screenWithRules,
   type LocalSeedComment,
   type LocalSeedConversation,
 } from '../adapters';
+import { getSupabase } from '../adapters/supabaseClient';
 import { ChatServiceProvider } from '../features/chat/chat-state';
 import { CommentServiceProvider } from '../features/feed';
 import {
@@ -183,10 +183,7 @@ const demoReplies = [
  */
 export function createAppServices(config: BackendConfig): AppServices {
   if (config.supabaseUrl && config.supabaseAnonKey) {
-    const client = createSupabaseClient(
-      { url: config.supabaseUrl, anonKey: config.supabaseAnonKey },
-      AsyncStorage,
-    );
+    const client = getSupabase({ url: config.supabaseUrl, anonKey: config.supabaseAnonKey });
     return {
       backend: 'supabase',
       comments: createCommentService(createSupabaseCommentRepository(client)),

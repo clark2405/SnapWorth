@@ -5,4 +5,5 @@ export * from './PriceAlertsView';
 export * from './ProfileButton';
 export * from './ProfileView';
 export * from './SellerProfileView';
+export * from './userProfile';
 export * from './VotesView';
