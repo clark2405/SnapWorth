@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { getSupabase, isSupabaseConfigured } from '../../adapters/supabaseClient';
 import { Button, Sheet, SWText } from '../../components';
 import { tokens } from '../../design';
 
@@ -97,9 +98,10 @@ export interface SessionProviderProps {
 
 interface SessionContextValue {
   readonly status: 'guest' | 'member';
-  /** Marks the viewer signed in, then finishes whatever they were trying to do. */
-  readonly startSession: () => void;
+  readonly user: any | null; 
+  readonly startSession: (userData?: any) => void;
   readonly endSession: () => void;
+  readonly setUser: (userData: any) => void;
   readonly requireAccount: (intent: AccountIntent, action?: () => void) => void;
   readonly createAccount: () => void;
   readonly signIn: () => void;
@@ -113,10 +115,46 @@ const SessionContext = createContext<SessionContextValue | null>(null);
  */
 export function SessionProvider({ onCreateAccount, onSignIn, children }: SessionProviderProps) {
   const [status, setStatus] = useState<'guest' | 'member'>('guest');
+  const [user, setUser] = useState<any | null>(null);
   const [asking, setAsking] = useState<AccountIntent | null>(null);
+  
   // The action that prompted the sheet, kept so it can finish once the person has an account.
   const pending = useRef<(() => void) | null>(null);
   const resume = useRef<(() => void) | null>(null);
+
+  // Sync session with Supabase on mount
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    let active = true;
+    try {
+      const supabase = getSupabase();
+      void supabase.auth.getSession().then(({ data }) => {
+        if (!active) return;
+        if (data?.session?.user) {
+          setStatus('member');
+          setUser(data.session.user);
+        }
+      }).catch(() => {});
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (!active) return;
+        if (session?.user) {
+          setStatus('member');
+          setUser(session.user);
+        } else {
+          setStatus('guest');
+          setUser(null);
+        }
+      });
+
+      return () => {
+        active = false;
+        subscription?.unsubscribe();
+      };
+    } catch {
+      // Supabase is not configured or reachable
+    }
+  }, []);
 
   useEffect(() => {
     if (status !== 'member' || !resume.current) return;
@@ -149,16 +187,35 @@ export function SessionProvider({ onCreateAccount, onSignIn, children }: Session
   const value = useMemo<SessionContextValue>(
     () => ({
       status,
-      startSession: () => setStatus('member'),
+      user,
+      startSession: (userData?: any) => {
+        setStatus('member');
+        if (userData) {
+          setUser(userData);
+        } else if (isSupabaseConfigured()) {
+          try {
+            void getSupabase().auth.getUser().then(({ data }) => {
+              if (data?.user) setUser(data.user);
+            }).catch(() => {});
+          } catch {}
+        }
+      },
       endSession: () => {
         resume.current = null;
         setStatus('guest');
+        setUser(null);
+        if (isSupabaseConfigured()) {
+          try {
+            void getSupabase().auth.signOut().catch(() => {});
+          } catch {}
+        }
       },
+      setUser: (userData: any) => setUser(userData),
       requireAccount,
       createAccount: onCreateAccount,
       signIn: onSignIn,
     }),
-    [onCreateAccount, onSignIn, requireAccount, status],
+    [onCreateAccount, onSignIn, requireAccount, status, user],
   );
 
   const copy = asking ? accountIntentCopy[asking] : null;
@@ -207,8 +264,8 @@ function useSessionContext(): SessionContextValue {
 }
 
 export function useSession() {
-  const { status, startSession, endSession, createAccount, signIn } = useSessionContext();
-  return { status, isGuest: status === 'guest', startSession, endSession, createAccount, signIn };
+  const { status, user, startSession, endSession, setUser, createAccount, signIn } = useSessionContext();
+  return { status, user, isGuest: status === 'guest', startSession, endSession, setUser, createAccount, signIn };
 }
 
 /**
