@@ -2,24 +2,34 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 
 import {
+  createLocalChatRepository,
   createLocalCommentRepository,
+  createSupabaseChatRepository,
   createSupabaseClient,
   createSupabaseCommentRepository,
   createPhotoPricingService,
   screenWithRules,
   type LocalSeedComment,
+  type LocalSeedConversation,
 } from '../adapters';
+import { ChatServiceProvider } from '../features/chat/chat-state';
 import { CommentServiceProvider } from '../features/feed';
 import {
+  previewChatListingKey,
+  previewConversation,
+  previewConversations,
+  previewListings,
   previewPostDetail,
   previewPosts,
   previewProfile,
+  previewUsers,
+  type PreviewMessage,
   type PreviewUser,
 } from '../features/preview/sample-data';
-import type { CommentService } from '../ports/services';
-import { createCommentService } from '../services';
+import type { ChatService, CommentService } from '../ports/services';
+import { createChatService, createCommentService } from '../services';
 import type { UtcDateTime } from '../types/date-time';
-import type { PublicProfile } from '../types/entities';
+import type { ChatListing, PublicProfile } from '../types/entities';
 import type { UserId } from '../types/ids';
 import type { PhotoPricingService } from '../types/photo-estimate';
 
@@ -33,6 +43,7 @@ export interface AppServices {
   /** `supabase` when a project is configured; otherwise comments live on this device. */
   readonly backend: 'supabase' | 'device';
   readonly comments: CommentService;
+  readonly chats: ChatService;
   readonly pricing: PhotoPricingService;
 }
 
@@ -64,6 +75,107 @@ function previewSeed(): LocalSeedComment[] {
   );
 }
 
+/** Who sells each market listing; the backend's seed (02_chat_listings.sql) matches. */
+const previewSellerByListing: Readonly<Record<string, PreviewUser>> = {
+  'polaroid-sun-600': previewUsers.mariaCruz,
+  'air-jordan-1-bred': previewUsers.justinV,
+  'retro-walkman': previewUsers.manilaHype,
+  'keychron-keyboard': previewUsers.mariaCruz,
+  'nike-teal-windbreaker': previewUsers.retroCurator,
+  'colour-block-windbreaker': previewUsers.manilaHype,
+  'black-puffer-jacket': previewUsers.justinV,
+  'polaroid-film-bundle': previewUsers.mariaCruz,
+};
+
+function previewListingFor(key: string) {
+  const listing = previewListings.find((entry) => entry.id === key);
+  const seller = previewSellerByListing[key];
+  if (!listing || !seller) return undefined;
+  const chatListing: ChatListing = {
+    key: listing.id,
+    title: listing.title,
+    askingPricePhp: listing.askingPrice,
+  };
+  return { listing: chatListing, seller: profileOf(seller) };
+}
+
+/** Parses the samples' "10:30 AM", "Yesterday", "Mon" or "Sep 28" into a recent timestamp. */
+function sentAtToIso(sentAt: string, now: Date): UtcDateTime {
+  const day = new Date(now);
+  const time = /^(\d{1,2}):(\d{2}) (AM|PM)$/.exec(sentAt);
+  if (time) {
+    const hours = (Number(time[1]) % 12) + (time[3] === 'PM' ? 12 : 0);
+    day.setHours(hours, Number(time[2]), 0, 0);
+    if (day > now) day.setDate(day.getDate() - 1);
+    return day.toISOString() as UtcDateTime;
+  }
+  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  if (sentAt === 'Yesterday') day.setDate(day.getDate() - 1);
+  else if (weekdays.includes(sentAt)) {
+    const back = (day.getDay() - weekdays.indexOf(sentAt) + 7) % 7 || 7;
+    day.setDate(day.getDate() - back);
+  } else {
+    const parsed = new Date(`${sentAt}, ${now.getFullYear()}`);
+    if (!Number.isNaN(parsed.getTime())) day.setTime(parsed.getTime());
+    if (day > now) day.setFullYear(day.getFullYear() - 1);
+  }
+  day.setHours(12, 0, 0, 0);
+  return day.toISOString() as UtcDateTime;
+}
+
+function previewChatSeed(): LocalSeedConversation[] {
+  const now = new Date();
+  return previewConversations.map((conversation) => {
+    const listing: ChatListing = {
+      key: previewChatListingKey(conversation.itemTitle),
+      title: conversation.itemTitle,
+      askingPricePhp:
+        conversation.id === previewConversation.id
+          ? previewConversation.item.askingPrice
+          : (previewListings.find((entry) => entry.title === conversation.itemTitle)?.askingPrice ??
+            2000),
+    };
+    // The one sample with a whole thread; the rest start from their latest message.
+    const messages =
+      conversation.id === previewConversation.id
+        ? previewConversation.messages.map((message: PreviewMessage, index) => ({
+            id: `${conversation.id}-${message.id}`,
+            fromMe: message.mine,
+            body: message.body,
+            offer: message.offer
+              ? { amountPhp: message.offer.amount, status: message.offer.status }
+              : undefined,
+            createdAt: new Date(
+              Date.parse(sentAtToIso(message.sentAt, now)) + index,
+            ).toISOString() as UtcDateTime,
+          }))
+        : [
+            {
+              id: `${conversation.id}-latest`,
+              fromMe: conversation.lastFromMe,
+              body: conversation.lastMessage,
+              createdAt: sentAtToIso(conversation.sentAt, now),
+            },
+          ];
+    return {
+      id: conversation.id,
+      listing,
+      other: profileOf(conversation.with),
+      iAmSeller: true,
+      closed: conversation.closed,
+      unread: conversation.unread,
+      messages,
+    };
+  });
+}
+
+/** The other side of a demo chat, answering after a pause. */
+const demoReplies = [
+  'Sounds good — let me know when works for you.',
+  'Great, I can do that.',
+  'Perfect, talk soon!',
+] as const;
+
 /**
  * The app's composition root: the one place that chooses infrastructure. With a Supabase
  * project configured, comments are stored, moderated and shared there; without one they are
@@ -78,6 +190,7 @@ export function createAppServices(config: BackendConfig): AppServices {
     return {
       backend: 'supabase',
       comments: createCommentService(createSupabaseCommentRepository(client)),
+      chats: createChatService(createSupabaseChatRepository(client)),
       pricing: createPhotoPricingService(client),
     };
   }
@@ -96,6 +209,15 @@ export function createAppServices(config: BackendConfig): AppServices {
         viewer: profileOf(previewProfile.user),
         seed: previewSeed(),
         screen: screenWithRules,
+      }),
+    ),
+    chats: createChatService(
+      createLocalChatRepository({
+        store: AsyncStorage,
+        viewer: profileOf(previewProfile.user),
+        seed: previewChatSeed(),
+        findListing: previewListingFor,
+        simulateReplies: { delayMs: 1200, replies: demoReplies },
       }),
     ),
   };
@@ -122,7 +244,9 @@ export function AppServicesProvider({
   );
   return (
     <PhotoPricingContext.Provider value={services.pricing}>
-      <CommentServiceProvider service={services.comments}>{children}</CommentServiceProvider>
+      <CommentServiceProvider service={services.comments}>
+        <ChatServiceProvider service={services.chats}>{children}</ChatServiceProvider>
+      </CommentServiceProvider>
     </PhotoPricingContext.Provider>
   );
 }

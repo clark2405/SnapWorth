@@ -6,7 +6,7 @@ import type {
   ThreadComment,
 } from '../../types/entities';
 import type { UtcDateTime } from '../../types/date-time';
-import type { CommentId } from '../../types/ids';
+import { newUuid, type CommentId } from '../../types/ids';
 import { err, ok } from '../../types/result';
 
 /** The two calls of AsyncStorage (or localStorage) this store needs. */
@@ -43,17 +43,6 @@ export interface LocalCommentRepositoryOptions {
 
 /** Same threshold as the database: three reports hold a comment for review. */
 const reportsToHold = 3;
-
-function newId(): string {
-  const bytes = new Uint8Array(16);
-  const crypto = (globalThis as { crypto?: { getRandomValues?: (a: Uint8Array) => void } }).crypto;
-  if (crypto?.getRandomValues) crypto.getRandomValues(bytes);
-  else for (let i = 0; i < 16; i += 1) bytes[i] = Math.floor(Math.random() * 256);
-  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x40;
-  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
-  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
 
 /**
  * Comments kept on this device, for running the app before a Supabase project is configured.
@@ -137,7 +126,7 @@ export function createLocalCommentRepository(
         parentId = parent.parentId ?? parent.id;
       }
       const comment: StoredComment = {
-        id: newId(),
+        id: newUuid(),
         postKey,
         parentId,
         body,

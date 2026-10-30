@@ -139,6 +139,8 @@ export const colorLight = {
   // outline with a hard shadow offset beneath it, so stickers and tags belong on it.
   heldEdge: ink,
   heldShadow: ink,
+  // The paper behind the meetup map's street tiles, shown while they load.
+  mapLand: '#FBF3E6',
 } as const;
 
 export const colorDark = {
@@ -199,6 +201,7 @@ export const colorDark = {
   // At night the outline turns cream so it still reads; the shadow stays a deep ink.
   heldEdge: '#E6DAC6',
   heldShadow: '#000000',
+  mapLand: '#241C14',
 } as const satisfies Record<keyof typeof colorLight, string>;
 
 /**
@@ -260,6 +263,7 @@ export const colorNight = {
   onPlaceChat: '#F3ECDD',
   heldEdge: '#E6DCF0',
   heldShadow: '#000000',
+  mapLand: '#1E1726',
 } as const satisfies Record<keyof typeof colorLight, string>;
 
 export const tokens = deepFreeze({

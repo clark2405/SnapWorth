@@ -1,17 +1,26 @@
-import { Archive, Check, CircleX, Clock3, HandCoins, MapPin, Repeat2 } from 'lucide-react-native';
-import { View } from 'react-native';
+import {
+  Archive,
+  Check,
+  CircleX,
+  Clock3,
+  Eye,
+  HandCoins,
+  MapPin,
+  Navigation,
+  Repeat2,
+} from 'lucide-react-native';
+import { Linking, Platform, View } from 'react-native';
 
 import { Button, SWText, Tag, type TagTone } from '../../components';
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
-import {
-  formatPeso,
-  type PreviewMeetup,
-  type PreviewOffer,
-  type PreviewOfferStatus,
-} from '../preview/sample-data';
+import type { ChatMeetup, ChatOffer, OfferStatus } from '../../types/entities';
+import { findMeetupSpot } from '../../types/meetup-spots';
+import { formatPeso } from '../preview/sample-data';
+import { directionsUrl } from './meetup-map-geo';
+import { MeetupMap } from './MeetupMap';
 
 const offerStatus: Record<
-  PreviewOfferStatus,
+  OfferStatus,
   {
     readonly mine: string;
     readonly theirs: string;
@@ -39,7 +48,7 @@ export function OfferCard({
   onCounter,
   onDecline,
 }: {
-  readonly offer: PreviewOffer;
+  readonly offer: ChatOffer;
   readonly note?: string;
   readonly mine: boolean;
   readonly askingPrice: number;
@@ -55,7 +64,7 @@ export function OfferCard({
   const status = expired
     ? { mine: 'No longer open', theirs: 'No longer open', tone: 'grave' as const, icon: Archive }
     : offerStatus[offer.status];
-  const gap = askingPrice - offer.amount;
+  const gap = askingPrice - offer.amountPhp;
   const versusAsking =
     gap === 0
       ? 'Full asking price'
@@ -68,7 +77,7 @@ export function OfferCard({
     <View
       style={[styles.card, settled ? styles.settled : null]}
       accessible={mine || offer.status !== 'pending'}
-      accessibilityLabel={`${mine ? 'Your offer' : 'Offer'} of ${formatPeso(offer.amount)}, ${versusAsking}. ${mine ? status.mine : status.theirs}.`}
+      accessibilityLabel={`${mine ? 'Your offer' : 'Offer'} of ${formatPeso(offer.amountPhp)}, ${versusAsking}. ${mine ? status.mine : status.theirs}.`}
     >
       <View style={styles.cardHead}>
         <HandCoins size={16} strokeWidth={2} color={colors.textMuted} />
@@ -80,7 +89,7 @@ export function OfferCard({
         variant="priceMedium"
         style={offer.status === 'countered' ? styles.struck : undefined}
       >
-        {formatPeso(offer.amount)}
+        {formatPeso(offer.amountPhp)}
       </SWText>
       <SWText variant="caption" tone="textSecondary">
         {versusAsking}
@@ -120,7 +129,7 @@ export function MeetupCard({
   onConfirm,
   onSuggestAnother,
 }: {
-  readonly meetup: PreviewMeetup;
+  readonly meetup: ChatMeetup;
   readonly mine: boolean;
   readonly locked?: boolean;
   readonly onConfirm: () => void;
@@ -129,23 +138,56 @@ export function MeetupCard({
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const confirmed = meetup.status === 'confirmed';
+  const location = meetup.location;
+  const known = findMeetupSpot(meetup.spotKey);
+  const viewing = meetup.purpose === 'viewing';
 
   return (
     <View style={styles.card}>
+      {location ? (
+        <MeetupMap
+          lat={location.lat}
+          lng={location.lng}
+          agreed={confirmed}
+          accessibilityLabel={`Map showing ${meetup.place}${confirmed ? ', agreed' : ''}`}
+        />
+      ) : null}
       <View style={styles.meetupRow}>
         <View style={[styles.pin, confirmed ? styles.pinConfirmed : null]}>
-          <MapPin size={18} strokeWidth={2} color={confirmed ? colors.mintInk : colors.sandInk} />
+          {viewing ? (
+            <Eye size={18} strokeWidth={2} color={confirmed ? colors.mintInk : colors.sandInk} />
+          ) : (
+            <MapPin size={18} strokeWidth={2} color={confirmed ? colors.mintInk : colors.sandInk} />
+          )}
         </View>
         <View style={styles.meetupText}>
           <SWText variant="overline" tone="textMuted">
-            Pickup
+            {viewing ? 'See it in person' : 'Pickup'}
           </SWText>
           <SWText variant="headingSmall">{meetup.place}</SWText>
           <SWText variant="bodySmall" tone="textSecondary">
-            {meetup.when}
+            {known ? `${known.city} · ${meetup.when}` : meetup.when}
           </SWText>
         </View>
       </View>
+      {location ? (
+        <Button
+          label="Directions"
+          variant="tertiary"
+          size="small"
+          icon={Navigation}
+          accessibilityHint="Opens the place in your maps app"
+          onPress={() =>
+            void Linking.openURL(
+              directionsUrl(
+                { name: meetup.place, lat: location.lat, lng: location.lng },
+                Platform.OS === 'ios' ? 'ios' : 'other',
+              ),
+            )
+          }
+          containerStyle={styles.directions}
+        />
+      ) : null}
       {!mine && !confirmed && !locked ? (
         <View style={styles.answers}>
           <Button
@@ -215,6 +257,11 @@ const stylesFor = themedStyles((colors) => ({
   meetupRow: {
     flexDirection: 'row',
     gap: tokens.spacing[3],
+    marginTop: tokens.spacing[2],
+  },
+  directions: {
+    alignSelf: 'flex-start',
+    marginTop: tokens.spacing[1],
   },
   pin: {
     width: 40,

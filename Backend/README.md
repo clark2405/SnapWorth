@@ -7,9 +7,10 @@
 | Area                 | Where                                                  | What it does                                                                                                       |
 | -------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
 | Feed discussion      | `supabase/migrations/20261005000000_feed_comments.sql` | Profiles, feed posts, comments with one level of replies, reports, and the RLS policies that decide who sees what. |
+| Chats                | `supabase/migrations/20261029*_chat*.sql`              | Listings (the minimum a chat needs), conversations, messages, offers, pickups, blocks, reports, and their RLS.     |
 | Moderation           | `supabase/functions/moderate-content/`                 | Screens each new comment and approves or holds it. Fail-closed: nothing is public until it has been screened.      |
 | Moderation providers | `supabase/functions/_shared/providers/moderation.ts`   | `openai` (OpenAI's free moderation endpoint) for real use; `rules` (a fixed word list) for local development.      |
-| Development data     | `supabase/seed/01_feed_preview.sql`                    | The demo accounts, the two feed posts the app ships with, and their comments.                                      |
+| Development data     | `supabase/seed/`                                       | The demo accounts, the two feed posts the app ships with and their comments, and the market listings.              |
 | Tests                | `supabase/tests/`, `scripts/`                          | Database behaviour tests and Edge Function tests, run in CI on every push.                                         |
 
 ### How comments work
@@ -21,6 +22,20 @@
 - **Reporting:** only other people's comments, once each. Three reports hold an approved comment for review automatically.
 - **Limits:** 1 to 280 characters (trimmed), at most 10 comments a minute per account.
 - **Fail-closed moderation:** with no provider configured, comments are held for review. If the provider is temporarily down, the comment stays pending and the call can be retried.
+
+### How chats work
+
+- **Starting:** `start_conversation(listing_slug)` opens the caller's conversation with the listing's seller, or returns the one they already have. One conversation per buyer and listing; nobody can message themselves.
+- **Who sees what:** only the buyer and the seller see a conversation or its messages. Realtime applies the same rule, so new messages and answers stream only to those two.
+- **Messages:** text (1 to 1,000 characters, trimmed), a price offer with an optional note, or a proposed pickup (where and when). The device picks each message's id, so a resend after a dropped connection lands once.
+- **Meetups on the map:** a pickup, or a viewing for someone who wants to see the item in person first, carries a pin anywhere in the Philippines (`meetup_lat`, `meetup_lng`, held to that box) and the name its sender gave it. The busy public places in `meetup_spots` are offered as suggestions; a meetup that names one by key gets that place's name and pin from the table, whatever the app sent, so a suggested place always shows where it really is. Keep the list in step with `Frontend/shared/src/types/meetup-spots.ts`; a unit test compares them.
+- **Offers and pickups:** a new offer from either side counters the one still open. Only the other person can answer, through `respond_to_offer` and `confirm_meetup`; a client can never write a status directly.
+- **Reading:** `mark_conversation_read`; `conversation_list()` counts what the caller hasn't read.
+- **Closing:** once a listing sells, its conversations are read-only and list under Past.
+- **Safety:** `set_block` stops messages both ways in every conversation between two people; the blocked person can't see who blocked them. Either person can report a conversation, once. Private messages are not put through moderation.
+- **Limits:** at most 30 messages a minute per account.
+
+The client's errors map from the database's codes: `SWCLO` (closed), `SWBLK` (blocked) and `SWOLD` (offer no longer open).
 
 ## Setting up a Supabase project
 
@@ -109,9 +124,16 @@ Google's unpaid API terms permit product-improvement use of inputs and outputs.
 ```sh
 Backend/scripts/test-db.sh         # migrations, RLS, seed: a throwaway local Postgres, no Docker
 Backend/scripts/test-functions.sh  # Edge Function typecheck and unit tests (needs Deno)
+Backend/scripts/chat-sim/run.sh    # two phones chatting, and a third trying to get in (needs Frontend's npm deps)
 ```
 
 `test-db.sh` needs Postgres 15+ server binaries (`initdb`, `pg_ctl`, `psql`). It applies a small stand-in for Supabase's `auth` schema and roles (`supabase/tests/support/supabase_stub.sql`), then the migrations, the seed, and every `*_test.sql`, acting as anonymous visitors, different signed-in users, and the server.
+
+### Chat on two devices
+
+`scripts/chat-sim/run.sh` checks chat end to end without Docker or a Supabase project. It starts Postgres with every migration and seed, puts `chat-sim/gateway.cjs` in front of it, and runs `two-devices.ts`. In that scenario, two phones (each its own Supabase client and account, running the app's real chat adapter and service) message, make and answer offers, and arrange a pickup. A third account, forged and edited tokens, and a signed-out visitor try to read, write, change and listen in on the conversation, through the app and through raw API calls.
+
+The gateway is a stand-in, not Supabase. It does what Supabase's gateway does for security: it checks the JWT, then runs each query in Postgres as that caller (`set local role` plus `request.jwt.claims`), so the database's row-level security, grants and functions decide everything, as they do behind PostgREST. Its Realtime stand-in reads each changed row again as each subscriber and sends it only if their select policy allows, which is the check Supabase Realtime makes. It covers only what the chat uses. To see the apps against it, run `scripts/chat-sim/start.sh` and set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` to the URL and key it prints.
 
 ## Directory map
 
@@ -119,6 +141,7 @@ Backend/scripts/test-functions.sh  # Edge Function typecheck and unit tests (nee
 Backend/
 ├── README.md
 ├── scripts/
+│   ├── chat-sim/            (local two-device chat check)
 │   ├── test-db.sh
 │   └── test-functions.sh
 └── supabase/

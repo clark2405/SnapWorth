@@ -1,11 +1,12 @@
-import { Ban, Flag, HandCoins, MapPin } from 'lucide-react-native';
+import { Ban, Eye, Flag, HandCoins, MapPin } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import {
   Button,
   ChoiceChips,
   ListRow,
+  SegmentedControl,
   Sheet,
   Surface,
   SWText,
@@ -16,24 +17,31 @@ import { themedStyles, tokens, useThemedStyles } from '../../design';
 import {
   formatPeso,
   previewMeetupDays,
-  previewMeetupSpots,
   previewMeetupTimes,
   previewReportReasons,
 } from '../preview/sample-data';
+import type { MeetupProposal } from '../../ports/services';
+import type { MeetupPurpose } from '../../types/entities';
+import { findMeetupSpot, homeCity, meetupSpots } from '../../types/meetup-spots';
+import { distanceMeters, project, unproject, type Camera } from './meetup-map-geo';
+import { MeetupPicker, placingZoom } from './MeetupPicker';
 
-/** The composer's plus: the two things a chat about an item needs beyond words. */
+/** The composer's plus: what a chat about an item needs beyond words. */
 export function ChatActionsSheet({
   visible,
   askingPrice,
   onClose,
   onOffer,
   onMeetup,
+  onViewing,
 }: {
   readonly visible: boolean;
   readonly askingPrice: number;
   readonly onClose: () => void;
   readonly onOffer: () => void;
   readonly onMeetup: () => void;
+  /** Meet so the buyer can see the item in person before deciding. */
+  readonly onViewing: () => void;
 }) {
   return (
     <Sheet visible={visible} onClose={onClose}>
@@ -46,9 +54,15 @@ export function ChatActionsSheet({
         />
         <ListRow
           label="Arrange pickup"
-          detail="A public place and a time"
+          detail="A spot on the map and a time"
           icon={MapPin}
           onPress={onMeetup}
+        />
+        <ListRow
+          label="See it in person"
+          detail="Meet in public to look it over first"
+          icon={Eye}
+          onPress={onViewing}
         />
       </Surface>
     </Sheet>
@@ -122,61 +136,140 @@ export function OfferSheet({
   );
 }
 
-/** Where and when to hand the item over. Suggestions are public places only. */
+/** Where the map opens: Cebu City, with all its suggested places in view. */
+const overview: Camera = { center: project(homeCity.lat, homeCity.lng), zoom: 12.6 };
+/** How close a suggestion opens, so its streets are clear. */
+const spotZoom = 16.5;
+/** Dragged further than this from a suggested place, the pin is no longer that place. */
+const leaveSpotMeters = 60;
+
+/**
+ * Where and when to meet: to hand the item over, or for the buyer to see it in person first.
+ * The pin goes anywhere: drag the map under it and name the spot. Busy public places are
+ * suggested as shortcuts, since they're the safest places to meet a stranger.
+ */
 export function MeetupSheet({
   visible,
+  purpose: initialPurpose,
   onClose,
   onSend,
 }: {
   readonly visible: boolean;
+  readonly purpose: MeetupPurpose;
   readonly onClose: () => void;
-  readonly onSend: (meetup: { readonly place: string; readonly when: string }) => void;
+  readonly onSend: (proposal: MeetupProposal) => void;
 }) {
   const styles = useThemedStyles(stylesFor);
-  const [spot, setSpot] = useState<string | null>(null);
+  const { height: screenHeight } = useWindowDimensions();
+  const [purpose, setPurpose] = useState<MeetupPurpose>(initialPurpose);
+  const [camera, setCamera] = useState<Camera>(overview);
+  const [spotKey, setSpotKey] = useState<string | null>(null);
+  const [name, setName] = useState('');
   const [day, setDay] = useState<string | null>(null);
   const [time, setTime] = useState<string | null>(null);
+  // A shorter map on a short phone, so the whole sheet still fits.
+  const aspect = screenHeight < 760 ? 2.1 : 1.55;
 
   useEffect(() => {
     if (!visible) return;
-    setSpot(null);
+    setPurpose(initialPurpose);
+    setCamera(overview);
+    setSpotKey(null);
+    setName('');
     setDay(null);
     setTime(null);
-  }, [visible]);
+  }, [initialPurpose, visible]);
 
-  const label = (options: typeof previewMeetupSpots, key: string | null) =>
+  const moveTo = (next: Camera) => {
+    setCamera(next);
+    const spot = findMeetupSpot(spotKey ?? undefined);
+    if (spot && distanceMeters(spot, unproject(next.center)) > leaveSpotMeters) {
+      // The pin has left the suggested place, so it's the person's own spot now.
+      setSpotKey(null);
+      setName((current) => (current === spot.name ? '' : current));
+    }
+  };
+
+  const suggest = (key: string) => {
+    const spot = findMeetupSpot(key);
+    if (!spot) return;
+    setSpotKey(spot.key);
+    setName(spot.name);
+    setCamera({ center: project(spot.lat, spot.lng), zoom: spotZoom });
+  };
+
+  const label = (options: typeof previewMeetupDays, key: string | null) =>
     options.find((option) => option.key === key)?.label ?? '';
-  const ready = spot !== null && day !== null && time !== null;
+  const placed = camera.zoom >= placingZoom;
+  const ready = placed && name.trim().length > 0 && day !== null && time !== null;
 
   return (
-    <Sheet visible={visible} onClose={onClose} title="Arrange pickup">
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title={purpose === 'viewing' ? 'See it in person' : 'Arrange pickup'}
+    >
+      <SegmentedControl
+        options={[
+          { key: 'pickup', label: 'Pick up' },
+          { key: 'viewing', label: 'See it first' },
+        ]}
+        value={purpose}
+        onChange={setPurpose}
+      />
       <View style={styles.group}>
         <SWText variant="overline" tone="textMuted">
           Where
         </SWText>
-        <ChoiceChips options={previewMeetupSpots} value={spot} onChange={setSpot} />
+        <MeetupPicker
+          camera={camera}
+          onCameraChange={moveTo}
+          label={name.trim() || undefined}
+          aspect={aspect}
+          accessibilityLabel="Map for choosing where to meet"
+        />
+        <ChoiceChips
+          options={meetupSpots.map((spot) => ({ key: spot.key, label: spot.name }))}
+          value={spotKey}
+          scroll
+          onChange={suggest}
+        />
+        <TextField
+          value={name}
+          onChangeText={setName}
+          placeholder="Name the spot, e.g. Jollibee by the main entrance"
+          accessibilityLabel="Name the spot"
+          maxLength={120}
+          returnKeyType="done"
+        />
       </View>
       <View style={styles.group}>
         <SWText variant="overline" tone="textMuted">
           When
         </SWText>
-        <ChoiceChips options={previewMeetupDays} value={day} onChange={setDay} />
-        <ChoiceChips options={previewMeetupTimes} value={time} onChange={setTime} />
+        <ChoiceChips options={previewMeetupDays} value={day} scroll onChange={setDay} />
+        <ChoiceChips options={previewMeetupTimes} value={time} scroll onChange={setTime} />
       </View>
       <SWText variant="caption" tone="textMuted">
-        Meet somewhere public, and check the item before you pay.
+        {purpose === 'viewing'
+          ? 'Pick somewhere busy and public, and take your time looking it over.'
+          : 'Pick somewhere busy and public, and check the item before you pay.'}
       </SWText>
       <View style={styles.footer}>
         <Button
           label="Send proposal"
           disabled={!ready}
           haptic="pop"
-          onPress={() =>
+          onPress={() => {
+            const { lat, lng } = unproject(camera.center);
             onSend({
-              place: label(previewMeetupSpots, spot),
+              purpose,
+              spotKey: spotKey ?? undefined,
+              location: { lat, lng },
+              place: name.trim(),
               when: `${label(previewMeetupDays, day)}, ${label(previewMeetupTimes, time)}`,
-            })
-          }
+            });
+          }}
         />
       </View>
     </Sheet>

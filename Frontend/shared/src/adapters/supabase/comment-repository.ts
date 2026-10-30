@@ -7,6 +7,7 @@ import type { CommentId, UserId } from '../../types/ids';
 import { err, ok, type Result } from '../../types/result';
 import type { UtcDateTime } from '../../types/date-time';
 import { toAppError } from './errors';
+import { ensureSignedIn } from './session';
 
 interface ThreadRow {
   readonly id: string;
@@ -47,10 +48,8 @@ function fromRow(row: ThreadRow): ThreadComment {
  */
 export function createSupabaseCommentRepository(client: SupabaseClient): CommentRepository {
   async function ensureSession(): Promise<Result<void, ModerationError>> {
-    const { data } = await client.auth.getSession();
-    if (data.session) return ok(undefined);
-    const { error } = await client.auth.signInAnonymously();
-    return error ? err(toAppError(error, 'authenticate')) : ok(undefined);
+    const signedIn = await ensureSignedIn(client);
+    return signedIn.ok ? ok(undefined) : signedIn;
   }
 
   return {

@@ -7,5 +7,11 @@ export default function ConversationRoute() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const conversationId = Array.isArray(id) ? id[0] : id;
 
-  return <ConversationView conversationId={conversationId} onBack={() => router.back()} />;
+  return (
+    <ConversationView
+      conversationId={conversationId}
+      onBack={() => router.back()}
+      onViewItem={(listingKey) => router.push(`/listing/${listingKey}`)}
+    />
+  );
 }

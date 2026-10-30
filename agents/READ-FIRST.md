@@ -37,6 +37,24 @@ both apps.
 - Don't put a login wall in front of the tabs. One was added to `mobile/app/(tabs)/_layout.tsx` for
   the camera prototype and hid guest browsing completely. It has been removed.
 
+### Meetups go wherever the two people choose
+
+- People pin a meetup anywhere they like (in the Philippines): they drag the map under a fixed
+  pin and name the spot (`MeetupPicker.tsx`). This was the product's call: a fixed list of
+  places was too limiting.
+- Busy public places are still suggested as shortcuts (`shared/src/types/meetup-spots.ts`,
+  mirrored by the `meetup_spots` table), and the sheet nudges people to pick somewhere busy and
+  public. A suggested place's name and pin always come from the server's list, so nobody can
+  send "SM City Cebu" pointing somewhere quiet. Adding a suggestion means adding it to both lists
+  (a unit test compares them).
+- The map is an online map provider's street tiles (`map-tiles.ts`, set with
+  `EXPO_PUBLIC_MAP_TILES_URL`), shown as they are. Don't draw our own map data or restyle the
+  tiles: only what sits around and on the map (frame, price-tag pin, name sticker, compass, zoom
+  buttons, notices) wears the app's design. If tiles can't load, the map says so. Directions opens
+  the exact pin in the phone's own maps app.
+- The suggested places' coordinates come from each place's Wikipedia entry, cross-checked with
+  other listings. Source any new one the same way; don't guess coordinates.
+
 ### Why we ask for an account
 
 Give this reason, in these words or close to them, wherever someone is asked: every price and vote
@@ -77,12 +95,12 @@ comes from a real person."
   without Apple Intelligence. Never ship a feature that only works locally, and never make a flow
   depend on the local model.
 
-  | Job | Apple Intelligence iPhone | Every other device |
-  |---|---|---|
-  | Photo check (dark, blurry, no item), reading labels | Phone (Vision, any iPhone) | Skipped; the cloud prices the photo as it is |
-  | First look at the item ("Looks like: …") | Phone | Skipped; the cloud estimate names the item |
-  | Worthy's light questions (how-to, photo tips, wording) | Phone | Cloud model |
-  | Prices, trends, collection value, listing drafts | Cloud | Cloud |
+  | Job                                                    | Apple Intelligence iPhone  | Every other device                           |
+  | ------------------------------------------------------ | -------------------------- | -------------------------------------------- |
+  | Photo check (dark, blurry, no item), reading labels    | Phone (Vision, any iPhone) | Skipped; the cloud prices the photo as it is |
+  | First look at the item ("Looks like: …")               | Phone                      | Skipped; the cloud estimate names the item   |
+  | Worthy's light questions (how-to, photo tips, wording) | Phone                      | Cloud model                                  |
+  | Prices, trends, collection value, listing drafts       | Cloud                      | Cloud                                        |
 
 #### Handoff: the cloud AI belongs to another team member
 
@@ -91,6 +109,7 @@ the connection points are built, so the cloud work only needs to fill in the par
 contributors (people or agents) shouldn't build these parts; leave them to the owner.
 
 **What's done:**
+
 - On-device photo check, label reading and first look (`mobile/modules/snap-sense`).
 - On-device Worthy chat for Apple Intelligence iPhones.
 - `estimate-price` accepts the phone's `PhotoClues`, cut to size and marked as untrusted. That
@@ -114,6 +133,7 @@ contributors (people or agents) shouldn't build these parts; leave them to the o
 3. **Deploying `estimate-price`** with the clues change.
 
 **Keep these when you change it:**
+
 - Prices only come from the cloud.
 - The on-device model never states an amount of money.
 - Brands from it count only when printed in the photo (`confirmedBrand`).
@@ -144,6 +164,7 @@ material only for layout and content ideas.
   Keep foil for the AI only. The seller's asking price stays plain and the community's verdict
   stays a market sticker, so the three can be told apart at a glance. Only the headline estimate
   shimmers (`shimmer`), never a list of them, and the shimmer rests with reduced motion.
+
 - **Type:** Plus Jakarta Sans for reading and controls, Bricolage Grotesque for titles and every
   price, DM Mono for anything printed on a tag. Go through `SWText` variants.
 - **No raw colours in components:** `npm run validate` rejects any hex, `rgb()` or `hsl()` outside

@@ -4,7 +4,6 @@ import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import {
-  Avatar,
   Divider,
   Surface,
   EmptyState,
@@ -18,8 +17,12 @@ import {
   ZoomLink,
 } from '../../components';
 import { themedStyles, tokens, useThemedStyles } from '../../design';
-import { previewConversations, type PreviewConversationSummary } from '../preview/sample-data';
+import type { ConversationSummary } from '../../types/entities';
+import { AuthorAvatar } from '../feed/CommentList';
+import { previewPhotoByListingKey } from '../preview/sample-data';
 import { ProfileButton } from '../profile/ProfileButton';
+import { describeLatest, formatListTime } from './chat-format';
+import { useConversationList } from './chat-state';
 
 export interface ConversationListViewProps {
   readonly onOpenConversation?: (conversationId: string) => void;
@@ -30,7 +33,10 @@ export interface ConversationListViewProps {
 }
 
 /** The conversation a list opens on when it has room to show one beside it. */
-export const firstConversationId = previewConversations.find((entry) => !entry.closed)?.id;
+export function useFirstOpenConversationId(): string | undefined {
+  const { conversations } = useConversationList();
+  return conversations.find((entry) => !entry.closed)?.id;
+}
 
 export function ConversationListView({
   onOpenConversation,
@@ -40,18 +46,14 @@ export function ConversationListView({
 }: ConversationListViewProps) {
   const styles = useThemedStyles(stylesFor);
   const [view, setView] = useState<'open' | 'past'>('open');
-  const open = previewConversations.filter((conversation) => !conversation.closed);
-  const past = previewConversations.filter((conversation) => conversation.closed);
+  const list = useConversationList();
+  const open = list.conversations.filter((conversation) => !conversation.closed);
+  const past = list.conversations.filter((conversation) => conversation.closed);
   const conversations = view === 'open' ? open : past;
   const unread = open.reduce((total, conversation) => total + conversation.unread, 0);
 
   return (
-    <Screen
-      clearTabBar
-      place="chat"
-      ambient="chat"
-      onRefresh={() => new Promise((resolve) => setTimeout(resolve, 900))}
-    >
+    <Screen clearTabBar place="chat" ambient="chat" onRefresh={list.refresh}>
       <LargeTitle
         brand
         title="Chats"
@@ -59,7 +61,15 @@ export function ConversationListView({
         overline={unread > 0 ? `${unread} unread` : undefined}
         trailing={<ProfileButton onPress={onOpenProfile} />}
       />
-      {previewConversations.length === 0 ? (
+      {list.status === 'failed' && list.conversations.length === 0 ? (
+        <EmptyState
+          icon={MessageSquare}
+          title="Couldn’t load your chats"
+          body="Check your connection and try again."
+          actionLabel="Try again"
+          onAction={() => void list.refresh()}
+        />
+      ) : list.status === 'loading' ? null : list.conversations.length === 0 ? (
         <EmptyState
           icon={MessageSquare}
           title="No chats yet"
@@ -118,46 +128,54 @@ function ConversationRow({
   selected = false,
   onPress,
 }: {
-  conversation: PreviewConversationSummary;
+  conversation: ConversationSummary;
   selected?: boolean;
   onPress: () => void;
 }) {
   const styles = useThemedStyles(stylesFor);
   const unread = conversation.unread > 0;
-  const preview = `${conversation.lastFromMe ? 'You: ' : ''}${conversation.lastMessage}`;
+  const preview = `${conversation.latest?.fromMe ? 'You: ' : ''}${describeLatest(conversation.latest)}`;
+  const sentAt = formatListTime(conversation.latestActivityAt);
+  const handle = conversation.other.handle;
+  const title = conversation.listing.title;
+  const photo = conversation.listing.photoUrl
+    ? { uri: conversation.listing.photoUrl }
+    : previewPhotoByListingKey[conversation.listing.key];
 
   return (
     <ZoomLink
       href={`/chat/${conversation.id}`}
-      label={`Conversation with ${conversation.with.handle} about ${conversation.itemTitle}. ${
+      label={`Conversation with ${handle} about ${title}. ${
         unread ? `${conversation.unread} unread. ` : ''
-      }Last message: ${preview}, ${conversation.sentAt}`}
+      }Last message: ${preview}, ${sentAt}`}
       onPress={onPress}
       style={[styles.row, selected ? styles.rowSelected : null]}
     >
       <View style={styles.media}>
-        <Avatar source={conversation.with.avatar} name={conversation.with.handle} size={48} />
-        <View style={styles.itemBadge}>
-          <Photo
-            source={conversation.itemPhoto}
-            label={conversation.itemTitle}
-            radius={tokens.radius.small}
-            style={styles.itemThumb}
-          />
-        </View>
+        <AuthorAvatar handle={handle} avatarUrl={conversation.other.avatarUrl} size={48} />
+        {photo ? (
+          <View style={styles.itemBadge}>
+            <Photo
+              source={photo}
+              label={title}
+              radius={tokens.radius.small}
+              style={styles.itemThumb}
+            />
+          </View>
+        ) : null}
       </View>
       <View style={styles.text}>
         <View style={styles.topLine}>
           <SWText variant="headingSmall" numberOfLines={1} style={styles.handle}>
-            @{conversation.with.handle}
+            @{handle}
           </SWText>
           <SWText variant="caption" tone={unread ? 'textPrimary' : 'textMuted'}>
-            {conversation.sentAt}
+            {sentAt}
           </SWText>
         </View>
         <View style={styles.itemLine}>
           <SWText variant="caption" tone="textMuted" numberOfLines={1} style={styles.preview}>
-            {conversation.itemTitle}
+            {title}
           </SWText>
           {conversation.closed ? (
             <Tag label={conversation.closed === 'sold' ? 'Sold' : 'Archived'} tone="grave" />
