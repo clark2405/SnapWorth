@@ -4,8 +4,6 @@ import { ScrollView, TextInput, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
-  FadeInDown,
-  LinearTransition,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -16,6 +14,8 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import {
+  paperIn,
+  paperLayout,
   BottomBar,
   Button,
   ChoiceChips,
@@ -28,9 +28,10 @@ import {
   Reveal,
   Screen,
   ScreenSkeleton,
-  SWText,
-  Surface,
   typeStyle,
+  Surface,
+  SWText,
+  Tag,
   useToast,
 } from '../../components';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
@@ -39,7 +40,8 @@ import type { ChatReportReason, MeetupPurpose, Message } from '../../types/entit
 import type { AppError } from '../../types/errors';
 import { formatPeso, previewPhotoByListingKey } from '../preview/sample-data';
 import { MeetupCard, OfferCard } from './ChatCards';
-import { ChatActionsSheet, MeetupSheet, OfferSheet, SafetySheet } from './ChatSheets';
+import { ChatActionsSheet, MeetupSheet, OfferSheet, SafetySheet, SukiSheet } from './ChatSheets';
+import { useSuki } from './suki';
 import { chatErrorCopy, formatMessageTime } from './chat-format';
 import { useConversation } from './chat-state';
 
@@ -49,7 +51,7 @@ export interface ConversationViewProps {
   readonly onViewItem?: (listingKey: string) => void;
 }
 
-type OpenSheet = 'actions' | 'offer' | 'meetup' | 'safety' | null;
+type OpenSheet = 'actions' | 'offer' | 'meetup' | 'safety' | 'suki' | null;
 
 /** Groups consecutive messages from the same sender so only the last of a run shows its time. */
 function useGroupedMessages(messages: readonly Message[]) {
@@ -84,6 +86,8 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
   const { conversation, messages, typing } = chat;
   const handle = conversation?.other.handle ?? 'seller';
   const askingPrice = conversation?.listing.askingPricePhp ?? 0;
+  const iAmSeller = conversation?.iAmSeller ?? false;
+  const suki = useSuki(conversation ? { otherUserId: conversation.other.userId, iAmSeller } : null);
   const [draft, setDraft] = useState('');
   const [sheet, setSheet] = useState<OpenSheet>(null);
   const [counterTo, setCounterTo] = useState<number | undefined>(undefined);
@@ -341,6 +345,9 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
                 <SWText variant="labelMedium" tone="textSecondary">
                   Asking {formatPeso(askingPrice)}
                 </SWText>
+                {suki.discountPct === null ? null : (
+                  <Tag label={`Suki · ${suki.discountPct}% off`} tone="mint" />
+                )}
               </View>
             </Surface>
           </PressableScale>
@@ -357,8 +364,8 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
         {grouped.map(({ message, showTime, isGroupStart }, index) => (
           <Animated.View
             key={message.id}
-            entering={index === grouped.length - 1 ? FadeInDown.springify().damping(18) : undefined}
-            layout={LinearTransition.springify().damping(20)}
+            entering={index === grouped.length - 1 ? paperIn() : undefined}
+            layout={paperLayout}
             style={[
               styles.message,
               message.offer || message.meetup ? styles.cardMessage : null,
@@ -433,12 +440,16 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
         onOffer={() => setSheet('offer')}
         onMeetup={() => openMeetup('pickup')}
         onViewing={() => openMeetup('viewing')}
+        suki={
+          iAmSeller ? { discountPct: suki.discountPct, onOpen: () => setSheet('suki') } : undefined
+        }
       />
       <OfferSheet
         visible={sheet === 'offer'}
         askingPrice={askingPrice}
         initialAmount={counterTo}
         countering={pendingTheirs}
+        sukiPct={iAmSeller ? null : suki.discountPct}
         onClose={() => {
           setSheet(null);
           setCounterTo(undefined);
@@ -450,6 +461,29 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
         visible={sheet === 'meetup'}
         onClose={() => setSheet(null)}
         onSend={proposeMeetup}
+      />
+      <SukiSheet
+        visible={sheet === 'suki'}
+        handle={handle}
+        discountPct={suki.discountPct}
+        onClose={() => setSheet(null)}
+        onSave={(pct) => {
+          void suki.set(pct).then((saved) => {
+            if (!saved) {
+              toast.show({ title: 'Couldn’t save that', body: 'Try again in a moment.' });
+              return;
+            }
+            setSheet(null);
+            toast.show(
+              pct === null
+                ? { title: 'Suki discount ended' }
+                : {
+                    title: `@${handle} is your suki`,
+                    body: `${pct}% off everything you sell them.`,
+                  },
+            );
+          });
+        }}
       />
       <SafetySheet
         visible={sheet === 'safety'}

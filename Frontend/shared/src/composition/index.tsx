@@ -5,26 +5,29 @@ import {
   createLocalChatRepository,
   createLocalCommentRepository,
   createLocalHanapRepository,
+  createLocalSukiRepository,
   createSupabaseChatRepository,
   createSupabaseClient,
   createSupabaseCommentRepository,
   createSupabaseHanapRepository,
+  createSupabaseSukiRepository,
   createPhotoPricingService,
   screenWithRules,
   type LocalSeedComment,
   type LocalSeedConversation,
 } from '../adapters';
 import { ChatServiceProvider } from '../features/chat/chat-state';
+import { SukiProvider } from '../features/chat/suki';
 import { CommentServiceProvider } from '../features/feed';
 import { HanapProvider } from '../features/hanap/hanap-state';
 import { CollectionsProvider } from '../features/history/collections';
 import { PaidPricesProvider } from '../features/history/paid-prices';
 import {
   previewChatListingKey,
-  previewCollections,
-  previewHanap,
   previewConversation,
   previewConversations,
+  previewCollections,
+  previewHanap,
   previewListings,
   previewPaidPrices,
   previewPostDetail,
@@ -36,6 +39,7 @@ import {
 } from '../features/preview/sample-data';
 import type { HanapRepository } from '../ports/hanap';
 import type { ChatService, CommentService } from '../ports/services';
+import type { SukiRepository } from '../ports/suki';
 import { createChatService, createCommentService } from '../services';
 import type { UtcDateTime } from '../types/date-time';
 import type { ChatListing, PublicProfile } from '../types/entities';
@@ -54,6 +58,7 @@ export interface AppServices {
   readonly comments: CommentService;
   readonly chats: ChatService;
   readonly hanap: HanapRepository;
+  readonly suki: SukiRepository;
   readonly pricing: PhotoPricingService;
 }
 
@@ -202,6 +207,7 @@ export function createAppServices(config: BackendConfig): AppServices {
       comments: createCommentService(createSupabaseCommentRepository(client)),
       chats: createChatService(createSupabaseChatRepository(client)),
       hanap: createSupabaseHanapRepository(client),
+      suki: createSupabaseSukiRepository(client),
       pricing: createPhotoPricingService(client),
     };
   }
@@ -240,6 +246,11 @@ export function createAppServices(config: BackendConfig): AppServices {
       })),
       screen: screenWithRules,
     }),
+    // The windbreaker's buyer is already the preview owner's suki.
+    suki: createLocalSukiRepository({
+      store: AsyncStorage,
+      seed: { [`seller:${profileOf(previewUsers.sugboHype).userId}`]: 10 },
+    }),
   };
 }
 
@@ -267,13 +278,15 @@ export function AppServicesProvider({
       <CommentServiceProvider service={services.comments}>
         <ChatServiceProvider service={services.chats}>
           <HanapProvider repository={services.hanap}>
-          {/* History is still sample data, so what people paid, and their collections, stay on the
+            <SukiProvider repository={services.suki}>
+              {/* History is still sample data, so what people paid, and their collections, stay on the
               device for now. */}
-          <PaidPricesProvider store={AsyncStorage} seed={previewPaidPrices}>
-            <CollectionsProvider store={AsyncStorage} seed={previewCollections}>
-              {children}
-            </CollectionsProvider>
-          </PaidPricesProvider>
+              <PaidPricesProvider store={AsyncStorage} seed={previewPaidPrices}>
+                <CollectionsProvider store={AsyncStorage} seed={previewCollections}>
+                  {children}
+                </CollectionsProvider>
+              </PaidPricesProvider>
+            </SukiProvider>
           </HanapProvider>
         </ChatServiceProvider>
       </CommentServiceProvider>

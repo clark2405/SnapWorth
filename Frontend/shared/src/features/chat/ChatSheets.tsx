@@ -1,4 +1,4 @@
-import { Ban, Eye, Flag, HandCoins, MapPin } from 'lucide-react-native';
+import { Ban, Eye, Flag, HandCoins, HeartHandshake, MapPin } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
@@ -25,6 +25,8 @@ import type { MeetupPurpose } from '../../types/entities';
 import { findMeetupSpot, homeCity, meetupSpots } from '../../types/meetup-spots';
 import { distanceMeters, project, unproject, type Camera } from './meetup-map-geo';
 import { MeetupPicker, placingZoom } from './MeetupPicker';
+import { sukiDiscounts } from '../../ports/suki';
+import { sukiPrice } from './suki';
 
 /** The composer's plus: what a chat about an item needs beyond words. */
 export function ChatActionsSheet({
@@ -34,6 +36,7 @@ export function ChatActionsSheet({
   onOffer,
   onMeetup,
   onViewing,
+  suki,
 }: {
   readonly visible: boolean;
   readonly askingPrice: number;
@@ -42,6 +45,8 @@ export function ChatActionsSheet({
   readonly onMeetup: () => void;
   /** Meet so the buyer can see the item in person before deciding. */
   readonly onViewing: () => void;
+  /** For the seller: their suki discount for this buyer, and a way to change it. */
+  readonly suki?: { readonly discountPct: number | null; readonly onOpen: () => void };
 }) {
   return (
     <Sheet visible={visible} onClose={onClose}>
@@ -64,6 +69,18 @@ export function ChatActionsSheet({
           icon={Eye}
           onPress={onViewing}
         />
+        {suki ? (
+          <ListRow
+            label={suki.discountPct === null ? 'Make them your suki' : 'Suki discount'}
+            detail={
+              suki.discountPct === null
+                ? 'A standing discount for a regular'
+                : `${suki.discountPct}% off everything you sell them`
+            }
+            icon={HeartHandshake}
+            onPress={suki.onOpen}
+          />
+        ) : null}
       </Surface>
     </Sheet>
   );
@@ -75,6 +92,7 @@ export function OfferSheet({
   askingPrice,
   initialAmount,
   countering,
+  sukiPct = null,
   onClose,
   onSend,
 }: {
@@ -83,6 +101,8 @@ export function OfferSheet({
   readonly initialAmount?: number;
   /** True when answering their offer with a different number. */
   readonly countering: boolean;
+  /** The buyer's suki discount with this seller, when they're a suki. */
+  readonly sukiPct?: number | null;
   readonly onClose: () => void;
   readonly onSend: (amount: number) => void;
 }) {
@@ -94,7 +114,14 @@ export function OfferSheet({
   }, [initialAmount, visible]);
 
   const amount = Number(text.replace(/[,\s]/g, '')) || 0;
-  const suggestions = [0.9, 0.95, 1].map((factor) => Math.round((askingPrice * factor) / 50) * 50);
+  const suki = sukiPct === null ? null : sukiPrice(askingPrice, sukiPct);
+  // A suki's own price comes first; the rest are steps under the asking price.
+  const suggestions = [
+    ...new Set([
+      ...(suki === null ? [] : [suki]),
+      ...[0.9, 0.95, 1].map((factor) => Math.round((askingPrice * factor) / 50) * 50),
+    ]),
+  ];
 
   return (
     <Sheet
@@ -123,7 +150,9 @@ export function OfferSheet({
           ? amount < askingPrice
             ? `${formatPeso(askingPrice - amount)} under the asking price of ${formatPeso(askingPrice)}.`
             : `At or above the asking price of ${formatPeso(askingPrice)}.`
-          : `They're asking ${formatPeso(askingPrice)}.`}
+          : suki !== null
+            ? `Your suki price is ${formatPeso(suki)}, ${sukiPct}% off ${formatPeso(askingPrice)}.`
+            : `They're asking ${formatPeso(askingPrice)}.`}
       </SWText>
       <View style={styles.footer}>
         <Button
@@ -132,6 +161,56 @@ export function OfferSheet({
           haptic="pop"
           onPress={() => onSend(amount)}
         />
+      </View>
+    </Sheet>
+  );
+}
+
+/**
+ * The seller sets a standing discount for a regular buyer, their suki. Both of them see it in
+ * the chat, and the buyer's offers start from the suki price.
+ */
+export function SukiSheet({
+  visible,
+  handle,
+  discountPct,
+  onClose,
+  onSave,
+}: {
+  readonly visible: boolean;
+  readonly handle: string;
+  readonly discountPct: number | null;
+  readonly onClose: () => void;
+  /** The new discount, or `null` to end it. */
+  readonly onSave: (discountPct: number | null) => void;
+}) {
+  const styles = useThemedStyles(stylesFor);
+  const [choice, setChoice] = useState<string>(String(discountPct ?? 10));
+
+  useEffect(() => {
+    if (visible) setChoice(String(discountPct ?? 10));
+  }, [discountPct, visible]);
+
+  return (
+    <Sheet visible={visible} onClose={onClose} title={`@${handle} as your suki`}>
+      <SWText variant="bodySmall" tone="textSecondary">
+        A suki is a regular. Give them a standing discount on everything you sell them; you’ll both
+        see it here, and their offers start from it.
+      </SWText>
+      <ChoiceChips
+        options={sukiDiscounts.map((pct) => ({ key: String(pct), label: `${pct}% off` }))}
+        value={choice}
+        onChange={setChoice}
+      />
+      <View style={styles.footer}>
+        <Button
+          label={discountPct === null ? 'Make them my suki' : 'Save'}
+          haptic="pop"
+          onPress={() => onSave(Number(choice))}
+        />
+        {discountPct === null ? null : (
+          <Button label="End suki discount" variant="tertiary" onPress={() => onSave(null)} />
+        )}
       </View>
     </Sheet>
   );
@@ -356,6 +435,7 @@ const stylesFor = themedStyles(() => ({
     gap: tokens.spacing[2],
   },
   footer: {
+    gap: tokens.spacing[2],
     marginTop: tokens.spacing[2],
   },
   reported: {
