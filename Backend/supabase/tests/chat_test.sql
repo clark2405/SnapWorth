@@ -324,8 +324,8 @@ select chat_tests.check(
   'only a meetup carries a place: one sent on a text message is dropped'
 );
 select chat_tests.check(
-  (select count(*) from public.meetup_spots) = 7,
-  'everyone signed in can read all seven Cebu City meetup spots'
+  (select count(*) from public.meetup_spots) = 9,
+  'everyone signed in can read all nine Cebu City meetup spots'
 );
 
 -- 6. Reports.

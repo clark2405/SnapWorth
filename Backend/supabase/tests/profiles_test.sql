@@ -105,6 +105,7 @@ reset role;
 
 -- 4. Signed out, nothing changes.
 set role anon;
+select set_config('request.jwt.claim.sub', '', false); -- signed out: nobody's id
 select profile_tests.check_rejected(
   $$update public.profiles set handle = 'anon_was_here'
     where id = '00000000-0000-4000-f000-0000000000a1'$$,

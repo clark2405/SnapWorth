@@ -45,6 +45,7 @@ insert into auth.users (id, email, raw_user_meta_data) values
 
 -- 1. Signed-out visitors can look but not post.
 set role anon;
+select set_config('request.jwt.claim.sub', '', false); -- signed out: nobody's id
 select hanap_tests.check_rejected(
   $$insert into public.hanap_posts (body) values ('Nike windbreaker')$$,
   array['42501'],
@@ -55,8 +56,12 @@ reset role;
 -- 2. Hana posts; it is pending, so only she sees it.
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-4000-e000-00000000000a', false);
-insert into public.hanap_posts (id, body, max_php)
-values ('00000000-0000-4000-e100-000000000001', '  Nike   windbreaker, size M  ', 1500);
+insert into public.hanap_posts (body, max_php) values ('  Nike   windbreaker, size M  ', 1500);
+-- A client can't choose a post's id, so the test gives this one a known id to refer to.
+reset role;
+update public.hanap_posts set id = '00000000-0000-4000-e100-000000000001'
+ where body = 'Nike windbreaker, size M';
+set role authenticated;
 select hanap_tests.check(
   (select body from public.hanap_posts where id = '00000000-0000-4000-e100-000000000001')
     = 'Nike windbreaker, size M',
@@ -103,6 +108,7 @@ update public.hanap_posts
  where id = '00000000-0000-4000-e100-000000000001';
 
 set role anon;
+select set_config('request.jwt.claim.sub', '', false); -- signed out: nobody's id
 select hanap_tests.check(
   (select count(*) from public.hanap_posts) = 1,
   'signed-out visitors see an approved, open hanap'
@@ -137,6 +143,7 @@ update public.hanap_posts set status = 'found'
 reset role;
 
 set role anon;
+select set_config('request.jwt.claim.sub', '', false); -- signed out: nobody's id
 select hanap_tests.check(
   (select count(*) from public.hanap_posts) = 0,
   'a found hanap is no longer public'
