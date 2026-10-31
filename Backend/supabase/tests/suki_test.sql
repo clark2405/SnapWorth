@@ -41,7 +41,7 @@ grant execute on all functions in schema suki_tests to anon, authenticated, serv
 -- Sela sells; Bea has messaged her about a listing; Cora never has.
 insert into auth.users (id, email, raw_user_meta_data) values
   ('00000000-0000-4000-f000-00000000000a', 'sela@test', '{"handle":"sela"}'),
-  ('00000000-0000-4000-f000-00000000000b', 'bea@test', '{"handle":"bea_buys"}'),
+  ('00000000-0000-4000-f000-00000000000b', 'bea@test', '{"handle":"bea_suki"}'),
   ('00000000-0000-4000-f000-00000000000c', 'cora@test', '{"handle":"cora"}');
 insert into public.listings (id, slug, seller_id, title, asking_php)
 values ('00000000-0000-4000-f100-000000000001', 'sela-lamp',
@@ -68,6 +68,23 @@ select suki_tests.check_rejected(
     values ('00000000-0000-4000-f000-00000000000c', 10)$$,
   array['42501'],
   'a seller cannot make a stranger their suki'
+);
+-- The app changes a discount with a plain update of the rate.
+update public.suki_discounts set discount_pct = 15
+ where seller_id = '00000000-0000-4000-f000-00000000000a'
+   and buyer_id = '00000000-0000-4000-f000-00000000000b';
+select suki_tests.check(
+  (select count(*) = 1 and min(discount_pct) = 15 from public.suki_discounts),
+  'a seller can change their suki''s discount'
+);
+-- An upsert would also set the buyer, which isn't allowed, so the app never sends one.
+select suki_tests.check_rejected(
+  $$insert into public.suki_discounts (buyer_id, discount_pct)
+    values ('00000000-0000-4000-f000-00000000000b', 20)
+    on conflict (seller_id, buyer_id) do update
+      set buyer_id = excluded.buyer_id, discount_pct = excluded.discount_pct$$,
+  array['42501'],
+  'a suki can''t be moved to another buyer, even by an upsert'
 );
 select suki_tests.check_rejected(
   $$update public.suki_discounts set discount_pct = 80$$,
@@ -106,6 +123,7 @@ select suki_tests.check(
 reset role;
 
 set role anon;
+select set_config('request.jwt.claim.sub', '', false); -- signed out: nobody's id
 select suki_tests.check_rejected(
   $$select count(*) from public.suki_discounts$$,
   array['42501'],

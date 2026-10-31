@@ -30,20 +30,29 @@ export function createSupabaseSukiRepository(client: SupabaseClient): SukiReposi
     async set(buyerId, discountPct) {
       const viewer = await ensureSignedIn(client);
       if (!viewer.ok) return err(viewer.error);
-      const result =
-        discountPct === null
-          ? await client
-              .from('suki_discounts')
-              .delete()
-              .eq('seller_id', viewer.value)
-              .eq('buyer_id', buyerId)
-          : await client
-              .from('suki_discounts')
-              .upsert(
-                { buyer_id: buyerId, discount_pct: discountPct },
-                { onConflict: 'seller_id,buyer_id' },
-              );
-      if (result.error) return err(toAppError(result.error, 'send_message', 'suki'));
+      if (discountPct === null) {
+        const removed = await client
+          .from('suki_discounts')
+          .delete()
+          .eq('seller_id', viewer.value)
+          .eq('buyer_id', buyerId);
+        if (removed.error) return err(toAppError(removed.error, 'send_message', 'suki'));
+        return ok(undefined);
+      }
+      // Change the discount if there is one, else add it. Not an upsert: that would also set the
+      // buyer on a conflict, and only the rate may be changed.
+      const changed = await client
+        .from('suki_discounts')
+        .update({ discount_pct: discountPct })
+        .eq('seller_id', viewer.value)
+        .eq('buyer_id', buyerId)
+        .select('buyer_id');
+      if (changed.error) return err(toAppError(changed.error, 'send_message', 'suki'));
+      if (changed.data.length > 0) return ok(undefined);
+      const added = await client
+        .from('suki_discounts')
+        .insert({ buyer_id: buyerId, discount_pct: discountPct });
+      if (added.error) return err(toAppError(added.error, 'send_message', 'suki'));
       return ok(undefined);
     },
   };
