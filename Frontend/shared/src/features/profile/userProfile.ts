@@ -230,7 +230,18 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
   };
 }
 
-/** Updates user profile in Supabase (auth metadata and public.profiles row). */
+/** What to tell someone whose new handle the database refused, by Postgres error code. */
+function handleRefusal(code?: string): string {
+  if (code === '23505') return 'That handle is taken. Try another.';
+  if (code === '23514') return 'A handle is 3 to 24 lowercase letters, numbers or underscores.';
+  return 'Your handle couldn’t be saved. Try again.';
+}
+
+/**
+ * Updates user profile in Supabase. The handle goes to the `public.profiles` row first, since
+ * that's the one comments and chats show, and a handle someone else has is refused there before
+ * anything else is saved. The rest (name, place, bio, photo) is kept on the account.
+ */
 export async function updateUserProfile(
   updates: ProfileUpdateInput,
 ): Promise<{ success: boolean; error?: string }> {
@@ -240,6 +251,21 @@ export async function updateUserProfile(
 
   try {
     const supabase = getSupabase();
+
+    if (updates.handle !== undefined) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return { success: false, error: 'Sign in again to save your profile.' };
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ handle: updates.handle })
+        .eq('id', user.id)
+        .select('id');
+      // No row back means the database let nothing change.
+      if (error || !data?.length) return { success: false, error: handleRefusal(error?.code) };
+    }
+
     const userMetaUpdates: Record<string, string | null> = {};
     if (updates.displayName !== undefined) userMetaUpdates.full_name = updates.displayName;
     if (updates.handle !== undefined) userMetaUpdates.handle = updates.handle;
@@ -251,24 +277,6 @@ export async function updateUserProfile(
       data: userMetaUpdates,
     });
     if (userError) throw userError;
-
-    // Also attempt to update public.profiles if row exists
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        const profileUpdates: Record<string, string | null> = {};
-        if (updates.handle !== undefined) profileUpdates.handle = updates.handle;
-        if (updates.avatarUrl !== undefined) profileUpdates.avatar_url = updates.avatarUrl;
-
-        if (Object.keys(profileUpdates).length > 0) {
-          await supabase.from('profiles').update(profileUpdates).eq('id', user.id);
-        }
-      }
-    } catch {
-      // Ignore if profiles table is not directly updatable
-    }
 
     return { success: true };
   } catch (err) {
