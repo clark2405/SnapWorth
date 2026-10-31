@@ -24,6 +24,8 @@ done
 
 workdir="$(mktemp -d)"
 port="${PG_TEST_PORT:-54329}"
+# Empty unless root. Written `${as_db_user[@]+...}` below, since macOS's bash 3.2 treats an empty
+# array as unset under `set -u`.
 as_db_user=()
 if [[ "$(id -u)" == "0" ]]; then
   chown postgres "$workdir"
@@ -31,17 +33,17 @@ if [[ "$(id -u)" == "0" ]]; then
 fi
 
 cleanup() {
-  "${as_db_user[@]}" "$bin/pg_ctl" -D "$workdir/data" -m immediate stop >/dev/null 2>&1 || true
+  ${as_db_user[@]+"${as_db_user[@]}"} "$bin/pg_ctl" -D "$workdir/data" -m immediate stop >/dev/null 2>&1 || true
   rm -rf "$workdir"
 }
 trap cleanup EXIT
 
-"${as_db_user[@]}" "$bin/initdb" -D "$workdir/data" -U postgres --auth=trust >/dev/null
-"${as_db_user[@]}" "$bin/pg_ctl" -D "$workdir/data" -l "$workdir/server.log" -w \
+${as_db_user[@]+"${as_db_user[@]}"} "$bin/initdb" -D "$workdir/data" -U postgres --auth=trust >/dev/null
+${as_db_user[@]+"${as_db_user[@]}"} "$bin/pg_ctl" -D "$workdir/data" -l "$workdir/server.log" -w \
   -o "-p $port -k $workdir -c listen_addresses=''" start >/dev/null
 
 run_sql() {
-  "${as_db_user[@]}" "$bin/psql" -X -q -h "$workdir" -p "$port" -U postgres -d postgres \
+  ${as_db_user[@]+"${as_db_user[@]}"} "$bin/psql" -X -q -h "$workdir" -p "$port" -U postgres -d postgres \
     -v ON_ERROR_STOP=1 -f "$1"
 }
 
