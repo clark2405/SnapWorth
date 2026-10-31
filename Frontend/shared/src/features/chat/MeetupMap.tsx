@@ -247,12 +247,13 @@ const stylesFor = themedStyles((colors) => ({
     borderColor: colors.heldEdge,
     backgroundColor: colors.mapLand,
   },
+  // Clear of the frame's rounded corner, which would otherwise cut the credit's last word off.
   credit: {
     position: 'absolute',
-    right: 0,
-    bottom: 0,
+    right: tokens.spacing[3],
+    bottom: tokens.spacing[1],
     paddingHorizontal: tokens.spacing[1],
-    borderTopLeftRadius: tokens.radius.small,
+    borderRadius: tokens.radius.small,
     backgroundColor: colors.mapLand,
     opacity: 0.85,
   },

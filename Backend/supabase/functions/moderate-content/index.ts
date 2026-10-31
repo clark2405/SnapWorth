@@ -1,5 +1,5 @@
-// POST { "type": "comment", "id": "<uuid>" } — screens a pending comment and approves or holds
-// it. Called by the app right after a comment is posted; requires a signed-in caller (the
+// POST { "type": "comment" | "hanap", "id": "<uuid>" } — screens a pending comment or hanap post
+// and approves or holds it. Called by the app right after one is posted; requires a signed-in caller (the
 // function's JWT check) and runs the database update with the service role, which is the only
 // way moderation fields can change.
 import { createClient } from 'npm:@supabase/supabase-js@2';
@@ -12,6 +12,17 @@ const cors = {
   'access-control-allow-headers': 'authorization, x-client-info, apikey, content-type',
   'access-control-allow-methods': 'POST, OPTIONS',
 };
+/** What can be screened, and the table each lives in. Both share the moderation columns. */
+function tableFor(type: unknown): string | null {
+  switch (type) {
+    case 'comment':
+      return 'comments';
+    case 'hanap':
+      return 'hanap_posts';
+    default:
+      return null;
+  }
+}
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function json(status: number, body: unknown): Response {
@@ -31,8 +42,9 @@ Deno.serve(async (request) => {
   } catch {
     return json(400, { error: 'Expected a JSON body.' });
   }
-  if (target.type !== 'comment' || typeof target.id !== 'string' || !uuid.test(target.id)) {
-    return json(400, { error: 'Expected { "type": "comment", "id": "<uuid>" }.' });
+  const table = tableFor(target.type);
+  if (!table || typeof target.id !== 'string' || !uuid.test(target.id)) {
+    return json(400, { error: 'Expected { "type": "comment" | "hanap", "id": "<uuid>" }.' });
   }
 
   const db = createClient(
@@ -43,7 +55,7 @@ Deno.serve(async (request) => {
   const store: CommentStore = {
     async get(id) {
       const { data, error } = await db
-        .from('comments')
+        .from(table)
         .select('body, moderation_status')
         .eq('id', id)
         .maybeSingle();
@@ -52,7 +64,7 @@ Deno.serve(async (request) => {
     },
     async settle(id, status, ref) {
       const { error } = await db
-        .from('comments')
+        .from(table)
         .update({ moderation_status: status, moderation_ref: ref, moderated_at: new Date().toISOString() })
         .eq('id', id)
         .eq('moderation_status', 'pending');
@@ -66,7 +78,7 @@ Deno.serve(async (request) => {
     target.id,
     request.signal,
   );
-  if (outcome.kind === 'not_found') return json(404, { error: 'No such comment.' });
+  if (outcome.kind === 'not_found') return json(404, { error: 'Nothing to screen with that id.' });
   if (outcome.kind === 'retry_later') {
     return json(503, { status: 'pending', retryable: true });
   }

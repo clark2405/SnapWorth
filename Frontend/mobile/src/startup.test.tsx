@@ -37,6 +37,8 @@ jest.mock('@snapworth/shared/design', () => ({
   useTheme: () => ({ colors: { accent: '#000' } }),
 }));
 
+jest.mock('@snapworth/shared/features/chat', () => ({ useUnreadChatCount: () => 0 }));
+
 jest.mock('./SnapAccessory', () => ({ SnapAccessory: () => null, SnapBar: () => null }));
 
 jest.mock('expo-router', () => ({

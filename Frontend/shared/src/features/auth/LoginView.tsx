@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { View, Alert } from 'react-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import {
+  paperLayout,
   Button,
   ChoiceChips,
-  PasswordField,
   Field,
+  PasswordField,
   PlaceHero,
   PressableScale,
   Reveal,
@@ -151,7 +152,7 @@ export function LoginView({
               key={mode}
               entering={FadeIn.duration(240)}
               exiting={FadeOut.duration(160)}
-              layout={LinearTransition.springify().damping(20)}
+              layout={paperLayout}
               style={styles.introText}
             >
               <SWText variant="displayHero" color={brand.ink} accessibilityRole="header">

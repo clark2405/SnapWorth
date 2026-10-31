@@ -24,6 +24,7 @@ import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { IconButton, PressableScale, SWText } from '../../components';
 import { haptic, tokens } from '../../design';
 import { previewItem } from '../preview/sample-data';
+import { generalPhotoTips } from './photo-coach';
 
 export interface CaptureViewProps {
   /**
@@ -50,11 +51,8 @@ export interface CaptureViewProps {
   readonly afterCapture?: 'fly' | 'freeze';
 }
 
-const tips = [
-  'Fit the whole item in the frame',
-  'A shot of the brand tag tightens the range',
-  'Show any wear — honest photos sell faster',
-];
+/** Rotated over the viewfinder before the snap: the photo coach's general tips. */
+const tips = generalPhotoTips.shots;
 
 /**
  * The camera. It is always dark, whatever the app theme, so the scene is the brightest thing on

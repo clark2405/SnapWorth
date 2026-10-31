@@ -84,7 +84,7 @@ function ToastPill({ message }: { readonly message: ToastMessage }) {
 
   return (
     <Animated.View
-      entering={SlideInUp.springify().damping(18).stiffness(220)}
+      entering={SlideInUp.duration(380)}
       exiting={FadeOutUp.duration(220)}
       style={[themed.wrap, { top: insets.top + tokens.spacing[2] }]}
       accessibilityLiveRegion="polite"

@@ -1,22 +1,23 @@
 import { ShieldX } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { TextInput, View } from 'react-native';
-import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeOut } from 'react-native-reanimated';
 
 import {
+  paperIn,
   BottomBar,
   Button,
   EstimateBadge,
   Field,
+  hideWebFocusOutline,
   NavHeader,
   Photo,
   PriceTagIcon,
   Reveal,
   Screen,
+  typeStyle,
   SWText,
   Tag,
-  hideWebFocusOutline,
-  typeStyle,
   useToast,
 } from '../../components';
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
@@ -129,7 +130,7 @@ export function CreatePostView({
 
       {blocked ? (
         <Animated.View
-          entering={FadeInDown.springify().damping(18)}
+          entering={paperIn()}
           exiting={FadeOut.duration(tokens.motion.duration.fast)}
           style={styles.blocked}
           accessibilityRole="alert"

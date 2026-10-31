@@ -1,9 +1,10 @@
 import { ChevronDown, MapPin, Wallet, X, type LucideIcon } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import {
+  paperLayout,
   Button,
   ChoiceChips,
   PressableScale,
@@ -100,7 +101,7 @@ export function FilterPill({
   const ink = active ? colors.onInverse : colors.textPrimary;
 
   return (
-    <Animated.View layout={LinearTransition.springify().damping(20)} style={styles.pillSlot}>
+    <Animated.View layout={paperLayout} style={styles.pillSlot}>
       <PressableScale
         accessibilityRole="button"
         accessibilityLabel={
@@ -138,6 +139,34 @@ export function FilterPill({
   );
 }
 
+/**
+ * A filter pill's face alone, for a control that does its own pressing (iOS's menus): the same
+ * paper, outline and type as `FilterPill`, filled in ink once a filter is set.
+ */
+export function FilterPillFace({
+  icon: Icon,
+  placeholder,
+  value,
+}: {
+  readonly icon: LucideIcon;
+  readonly placeholder: string;
+  readonly value: string | null;
+}) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(stylesFor);
+  const active = value !== null;
+  const ink = active ? colors.onInverse : colors.textPrimary;
+  return (
+    <View style={[styles.pill, styles.pillFace, active ? styles.pillFaceActive : null]}>
+      <Icon size={15} strokeWidth={2} color={ink} />
+      <SWText variant="labelSmall" tone={active ? 'onInverse' : 'textPrimary'} numberOfLines={1}>
+        {value ?? placeholder}
+      </SWText>
+      <ChevronDown size={15} strokeWidth={2} color={ink} />
+    </View>
+  );
+}
+
 function parseAmount(text: string): number | null {
   const value = Number(text.replace(/[,\s]/g, ''));
   return text.trim() === '' || !Number.isFinite(value) || value < 0 ? null : Math.round(value);
@@ -150,8 +179,14 @@ export function PriceFilterSheet({
   countFor,
   onClose,
   onApply,
+  brackets = true,
 }: {
   readonly visible: boolean;
+  /**
+   * Shows the quick brackets above the range. Off when they're already chosen elsewhere (iOS's
+   * Price menu), so the sheet is only the custom range.
+   */
+  readonly brackets?: boolean;
   readonly filters: MarketFilters;
   readonly countFor: (min: number | null, max: number | null) => number;
   readonly onClose: () => void;
@@ -175,16 +210,22 @@ export function PriceFilterSheet({
   const count = countFor(min, max);
 
   return (
-    <Sheet visible={visible} onClose={onClose} title="Price range">
-      <ChoiceChips
-        options={previewPriceBrackets}
-        value={bracket}
-        onChange={(key) => {
-          const picked = previewPriceBrackets.find((entry) => entry.key === key);
-          setMinText(picked?.min === null || !picked ? '' : String(picked.min));
-          setMaxText(picked?.max === null || !picked ? '' : String(picked.max));
-        }}
-      />
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title={brackets ? 'Price range' : 'Custom price range'}
+    >
+      {brackets ? (
+        <ChoiceChips
+          options={previewPriceBrackets}
+          value={bracket}
+          onChange={(key) => {
+            const picked = previewPriceBrackets.find((entry) => entry.key === key);
+            setMinText(picked?.min === null || !picked ? '' : String(picked.min));
+            setMaxText(picked?.max === null || !picked ? '' : String(picked.max));
+          }}
+        />
+      ) : null}
       <View style={styles.rangeRow}>
         <View style={styles.rangeField}>
           <TextField
@@ -235,8 +276,14 @@ export function LocationFilterSheet({
   countFor,
   onClose,
   onApply,
+  nearMeOnly = false,
 }: {
   readonly visible: boolean;
+  /**
+   * Only the distance from the buyer. The named areas are chosen elsewhere (iOS's Location
+   * menu), so the sheet is only "Near me".
+   */
+  readonly nearMeOnly?: boolean;
   readonly filters: MarketFilters;
   readonly countFor: (area: string, radiusKm: RadiusKey) => number;
   readonly onClose: () => void;
@@ -248,13 +295,15 @@ export function LocationFilterSheet({
 
   useEffect(() => {
     if (!visible) return;
-    setArea(filters.area);
+    setArea(nearMeOnly ? 'near-me' : filters.area);
     setRadius(filters.radiusKm);
-  }, [filters.area, filters.radiusKm, visible]);
+  }, [filters.area, filters.radiusKm, nearMeOnly, visible]);
 
   return (
-    <Sheet visible={visible} onClose={onClose} title="Location">
-      <ChoiceChips options={previewMarketAreas} value={area} onChange={setArea} />
+    <Sheet visible={visible} onClose={onClose} title={nearMeOnly ? 'Near me' : 'Location'}>
+      {nearMeOnly ? null : (
+        <ChoiceChips options={previewMarketAreas} value={area} onChange={setArea} />
+      )}
       {area === 'near-me' ? (
         <Animated.View
           entering={FadeIn.duration(tokens.motion.duration.base)}
@@ -269,7 +318,7 @@ export function LocationFilterSheet({
       ) : null}
       <SheetActions
         count={countFor(area, radius)}
-        onClear={() => setArea('anywhere')}
+        onClear={() => (nearMeOnly ? onApply('anywhere', radius) : setArea('anywhere'))}
         onApply={() => onApply(area, radius)}
       />
     </Sheet>
@@ -321,6 +370,14 @@ const stylesFor = themedStyles((colors) => ({
   // Set filters close up against their clear button, so the pair reads as one control.
   pillActive: {
     paddingRight: tokens.spacing[8],
+    borderColor: colors.inverse,
+    backgroundColor: colors.inverse,
+  },
+  // A little narrower than the pressable pill, so three fit a phone's row.
+  pillFace: {
+    paddingHorizontal: tokens.spacing[2] + 2,
+  },
+  pillFaceActive: {
     borderColor: colors.inverse,
     backgroundColor: colors.inverse,
   },

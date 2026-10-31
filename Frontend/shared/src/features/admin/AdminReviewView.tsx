@@ -1,9 +1,10 @@
 import { Check, ShieldCheck, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { View } from 'react-native';
-import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeOut } from 'react-native-reanimated';
 
 import {
+  paperLayout,
   Avatar,
   Button,
   EmptyState,
@@ -63,11 +64,7 @@ export function AdminReviewView({ onBack, onDecide }: AdminReviewViewProps) {
         />
       ) : (
         queue.map((content, index) => (
-          <Animated.View
-            key={content.id}
-            exiting={FadeOut.duration(220)}
-            layout={LinearTransition.springify().damping(20)}
-          >
+          <Animated.View key={content.id} exiting={FadeOut.duration(220)} layout={paperLayout}>
             <Reveal index={index + 1}>
               <HeldCard content={content} onDecide={(decision) => decide(content, decision)} />
             </Reveal>

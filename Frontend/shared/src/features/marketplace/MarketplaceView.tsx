@@ -1,9 +1,12 @@
-import { BadgePercent, PackageSearch } from 'lucide-react-native';
+import { BadgePercent, LayoutGrid, PackageSearch } from 'lucide-react-native';
 import { useState } from 'react';
-import { View } from 'react-native';
-import Animated, { FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
+import { Platform, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import {
+  paperIn,
+  paperLayout,
+  paperOut,
   AskingPriceBadge,
   Button,
   ChoiceChips,
@@ -17,23 +20,26 @@ import {
   SnapIcon,
   Sticker,
   SWText,
-  ZoomLink,
   useGridColumns,
+  ZoomLink,
 } from '../../components';
 import { held, themedStyles, tokens, useThemedStyles, useWideLayout } from '../../design';
 import {
   formatPeso,
   previewListings,
+  previewMarketAreas,
   previewMarketCategories,
+  previewPriceBrackets,
   type PreviewListing,
 } from '../preview/sample-data';
+import { HanapEntry } from '../hanap/HanapEntry';
 import { ProfileButton } from '../profile/ProfileButton';
 import { Tip } from '../tips';
+import { FilterMenu } from './FilterMenu';
 import { ListingCard } from './ListingCard';
 import {
   areaLabel,
   defaultMarketFilters,
-  FilterPill,
   filterIcons,
   LocationFilterSheet,
   matchesPriceAndPlace,
@@ -48,6 +54,8 @@ export interface MarketplaceViewProps {
   /** Every change to category, price range or location, for the listing query to follow. */
   readonly onFiltersChange?: (filters: MarketFilters) => void;
   readonly onOpenProfile?: () => void;
+  /** Opens Hanap, where buyers post what they're looking for. */
+  readonly onOpenHanap?: () => void;
 }
 
 // Preview-only: listings don't carry a category field yet, so map them locally against
@@ -74,10 +82,12 @@ export function MarketplaceView({
   onSell,
   onFiltersChange,
   onOpenProfile,
+  onOpenHanap,
 }: MarketplaceViewProps) {
   const styles = useThemedStyles(stylesFor);
   const [filters, setFilters] = useState<MarketFilters>(defaultMarketFilters);
   const [openSheet, setOpenSheet] = useState<'price' | 'location' | null>(null);
+  const ios = Platform.OS === 'ios';
 
   const update = (change: Partial<MarketFilters>) => {
     const next = { ...filters, ...change };
@@ -138,28 +148,81 @@ export function MarketplaceView({
       <Tip id="save" style={styles.tip} />
 
       <Reveal index={0} style={styles.filters}>
-        <ChoiceChips
-          options={previewMarketCategories}
-          value={filters.category}
-          scroll
-          onChange={(key) => update({ category: key })}
-        />
+        {/* iOS shows every filter as one of its own menus, Category too; elsewhere the
+            categories are chips and price and place open sheets. */}
+        {ios ? null : (
+          <ChoiceChips
+            options={previewMarketCategories}
+            value={filters.category}
+            scroll
+            onChange={(key) => update({ category: key })}
+          />
+        )}
         <View style={styles.pills}>
-          <FilterPill
+          {ios ? (
+            <FilterMenu
+              icon={LayoutGrid}
+              systemImage="square.grid.2x2"
+              placeholder="Category"
+              value={
+                filters.category === 'all'
+                  ? null
+                  : (previewMarketCategories.find((entry) => entry.key === filters.category)
+                      ?.label ?? null)
+              }
+              choices={previewMarketCategories}
+              chosenKey={filters.category}
+              onChoose={(key) => update({ category: key })}
+              onOpenSheet={() => undefined}
+              onClear={() => update({ category: 'all' })}
+            />
+          ) : null}
+          <FilterMenu
             icon={filterIcons.price}
+            systemImage="creditcard"
             placeholder="Price"
             value={priceLabel(filters.minPrice, filters.maxPrice)}
-            onOpen={() => setOpenSheet('price')}
+            choices={priceChoices}
+            chosenKey={
+              filters.minPrice === null && filters.maxPrice === null
+                ? 'any'
+                : (previewPriceBrackets.find(
+                    (entry) => entry.min === filters.minPrice && entry.max === filters.maxPrice,
+                  )?.key ?? null)
+            }
+            onChoose={(key) => {
+              const bracket = previewPriceBrackets.find((entry) => entry.key === key);
+              update({ minPrice: bracket?.min ?? null, maxPrice: bracket?.max ?? null });
+            }}
+            more={{
+              label: 'Custom range…',
+              systemImage: 'slider.horizontal.3',
+              onOpen: () => setOpenSheet('price'),
+            }}
+            onOpenSheet={() => setOpenSheet('price')}
             onClear={() => update({ minPrice: null, maxPrice: null })}
           />
-          <FilterPill
+          <FilterMenu
             icon={filterIcons.location}
+            systemImage="mappin.and.ellipse"
             placeholder="Location"
             value={areaLabel(filters.area, filters.radiusKm)}
-            onOpen={() => setOpenSheet('location')}
+            choices={areaChoices}
+            chosenKey={filters.area === 'near-me' ? null : filters.area}
+            onChoose={(key) => update({ area: key })}
+            more={{
+              label: 'Near me…',
+              systemImage: 'location',
+              onOpen: () => setOpenSheet('location'),
+            }}
+            onOpenSheet={() => setOpenSheet('location')}
             onClear={() => update({ area: 'anywhere' })}
           />
         </View>
+      </Reveal>
+
+      <Reveal index={1} style={styles.hanap}>
+        <HanapEntry onOpen={onOpenHanap} />
       </Reveal>
 
       {underEstimate.length > 0 ? (
@@ -199,11 +262,9 @@ export function MarketplaceView({
           {filtered.map((listing, index) => (
             <Animated.View
               key={listing.id}
-              entering={FadeInDown.springify()
-                .damping(18)
-                .delay(Math.min(index, 4) * 50)}
-              exiting={FadeOut.duration(160)}
-              layout={LinearTransition.springify().damping(20)}
+              entering={paperIn(Math.min(index, 4) * 50)}
+              exiting={paperOut}
+              layout={paperLayout}
               style={wide ? { width: grid.cellWidth } : styles.cell}
             >
               <ListingCard listing={listing} onOpen={() => onOpenListing?.(listing.id)} />
@@ -216,6 +277,7 @@ export function MarketplaceView({
 
       <PriceFilterSheet
         visible={openSheet === 'price'}
+        brackets={!ios}
         filters={filters}
         countFor={(minPrice, maxPrice) => matching({ ...filters, minPrice, maxPrice }).length}
         onClose={() => setOpenSheet(null)}
@@ -226,6 +288,7 @@ export function MarketplaceView({
       />
       <LocationFilterSheet
         visible={openSheet === 'location'}
+        nearMeOnly={ios}
         filters={filters}
         countFor={(area, radiusKm) => matching({ ...filters, area, radiusKm }).length}
         onClose={() => setOpenSheet(null)}
@@ -237,6 +300,15 @@ export function MarketplaceView({
     </Screen>
   );
 }
+
+/** Price's quick choices: none, then the brackets. */
+const priceChoices = [
+  { key: 'any', label: 'Any price' },
+  ...previewPriceBrackets.map(({ key, label }) => ({ key, label })),
+];
+
+/** Location's quick choices: the named areas. "Near me" needs a distance, so it opens a sheet. */
+const areaChoices = previewMarketAreas.filter((entry) => entry.key !== 'near-me');
 
 /** The narrowest a listing card can be and still fit its title, price and estimate. */
 const listingMinWidth = 220;
@@ -305,12 +377,16 @@ const stylesFor = themedStyles((colors) => ({
   },
   filters: {
     gap: tokens.spacing[3],
+    marginBottom: tokens.spacing[6],
+  },
+  hanap: {
     marginBottom: tokens.spacing[8],
   },
+  // Tight enough that iOS's three filters (Category, Price, Location) share one row.
   pills: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: tokens.spacing[3],
+    gap: tokens.spacing[2],
   },
   highlightSection: {
     gap: tokens.spacing[4],

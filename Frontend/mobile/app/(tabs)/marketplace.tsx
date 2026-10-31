@@ -9,6 +9,7 @@ export default function MarketplaceRoute() {
     <MarketplaceView
       onOpenListing={(listingId) => router.push(`/listing/${listingId}`)}
       onOpenProfile={() => router.push('/profile')}
+      onOpenHanap={() => router.push('/hanap')}
     />
   );
 }

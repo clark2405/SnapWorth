@@ -14,8 +14,8 @@ values
    'authenticated', 'authenticated', 'mariacruz@seed.snapworth.test', '', now(),
    '{"provider":"email","providers":["email"]}', '{"handle":"mariacruz"}', now(), now()),
   ('00000000-0000-0000-0000-000000000000', '00000000-0000-4000-8000-000000000003',
-   'authenticated', 'authenticated', 'manila_hype@seed.snapworth.test', '', now(),
-   '{"provider":"email","providers":["email"]}', '{"handle":"manila_hype"}', now(), now()),
+   'authenticated', 'authenticated', 'sugbo_hype@seed.snapworth.test', '', now(),
+   '{"provider":"email","providers":["email"]}', '{"handle":"sugbo_hype"}', now(), now()),
   ('00000000-0000-0000-0000-000000000000', '00000000-0000-4000-8000-000000000004',
    'authenticated', 'authenticated', 'justin_v@seed.snapworth.test', '', now(),
    '{"provider":"email","providers":["email"]}', '{"handle":"justin_v"}', now(), now())

@@ -124,6 +124,19 @@ export function useConversationList(): ConversationListState {
 }
 
 /**
+ * How many messages are waiting unread across the viewer's chats, for the Chats tab's badge.
+ * Pass `false` for a guest: nothing loads, and the count is 0.
+ */
+export function useUnreadChatCount(signedIn: boolean): number {
+  const { list, want } = useChatContext();
+  useEffect(() => {
+    if (signedIn) want();
+  }, [signedIn, want]);
+  if (!signedIn) return 0;
+  return list.conversations.reduce((total, conversation) => total + conversation.unread, 0);
+}
+
+/**
  * Opens (or reopens) the viewer's conversation about a listing. Resolves to its id, or null
  * after telling the viewer why it couldn't.
  */
@@ -139,6 +152,36 @@ export function useMessageSeller(): (listingKey: string) => Promise<Conversation
       }
       toast.show(chatErrorCopy(result.error));
       return null;
+    },
+    [refresh, service, toast],
+  );
+}
+
+/**
+ * Makes an offer on a listing: opens (or reopens) the viewer's chat with its seller and sends the
+ * offer there, where the seller can accept, decline or counter it. Resolves to the chat's id, or
+ * null after telling the viewer why it couldn't.
+ */
+export function useOfferToSeller(): (
+  listingKey: string,
+  amountPhp: number,
+) => Promise<ConversationId | null> {
+  const { service, refresh } = useChatContext();
+  const toast = useToast();
+  return useCallback(
+    async (listingKey, amountPhp) => {
+      const started = await service.start(listingKey);
+      if (!started.ok) {
+        toast.show(chatErrorCopy(started.error));
+        return null;
+      }
+      const sent = await service.sendOffer(service.nextMessageId(), started.value, amountPhp);
+      void refresh();
+      if (!sent.ok) {
+        toast.show(chatErrorCopy(sent.error));
+        return null;
+      }
+      return started.value;
     },
     [refresh, service, toast],
   );

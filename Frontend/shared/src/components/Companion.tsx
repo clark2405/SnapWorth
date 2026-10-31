@@ -12,9 +12,9 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
   FadeIn,
-  FadeInDown,
   FadeOut,
   runOnJS,
+  useAnimatedReaction,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -28,9 +28,10 @@ import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../desi
 import { Worthy, type CompanionMood } from './Worthy';
 import { GlassSurface } from './GlassSurface';
 import { PressableScale } from './PressableScale';
-import { contentScrolling } from './scroll-signal';
+import { contentScrolling, tabBarFolded } from './scroll-signal';
 import { SWText, typeStyle } from './SWText';
 import { hideWebFocusOutline } from './TextField';
+import { paperIn } from './paper-motion';
 
 export interface CompanionAction {
   readonly key: string;
@@ -57,6 +58,8 @@ export interface CompanionProps {
   readonly onRequestOpen?: (open: () => void) => void;
   /** Distance from the bottom edge to rest above, e.g. the tab bar. */
   readonly bottomOffset?: number;
+  /** The same while the tab bar is folded (scrolled down a tab), when it's shorter. */
+  readonly foldedBottomOffset?: number;
   readonly hidden?: boolean;
 }
 
@@ -70,6 +73,8 @@ const tuckedScale = 0.78;
 const tuckShift = 0.5 + 0.05 * tuckedScale;
 const edgeGap = 16;
 const holdMs = 520;
+/** How long Worthy waits untouched before tucking itself half away at its edge. */
+const idleTuckMs = 5000;
 // Worthy introduces itself once per session; after that the orb stays quiet until asked.
 let hintShownThisSession = false;
 
@@ -87,6 +92,7 @@ export function Companion({
   onHoldSnap,
   onRequestOpen,
   bottomOffset = 0,
+  foldedBottomOffset,
   hidden = false,
 }: CompanionProps) {
   const { width, height } = useWindowDimensions();
@@ -99,20 +105,62 @@ export function Companion({
   const [showHint, setShowHint] = useState(false);
   const cameraOpening = useRef(false);
 
-  const restX = side === 'right' ? width - orbSize - edgeGap : edgeGap;
-  const restY = height - insets.bottom - bottomOffset - orbSize - tokens.spacing[3];
-  const x = useSharedValue(restX);
+  const edgeX = (to: 'left' | 'right') => (to === 'right' ? width - orbSize - edgeGap : edgeGap);
+  // The lowest it can sit: above the tab bar, or above the folded bar while it's folded.
+  const lowest = (offset: number) => height - insets.bottom - offset - orbSize - tokens.spacing[3];
+  const restY = lowest(bottomOffset);
+  const foldedRestY = lowest(foldedBottomOffset ?? bottomOffset);
+  const highest = insets.top + 80;
+  // Position lives on the UI thread. React state only mirrors it for what's drawn beside Worthy
+  // (its panel and hint), and never drives it, so a throw settles in one unbroken motion.
+  const sideRef = useRef(side);
+  const x = useSharedValue(edgeX(side));
+  /** How far above its lowest spot the person left it. */
+  const raised = useSharedValue(0);
   const y = useSharedValue(restY);
   const lift = useSharedValue(hidden ? 0 : 1);
   const charge = useSharedValue(0);
+  /** 1 while Worthy is tucked into its edge after a few untouched seconds. */
+  const idle = useSharedValue(0);
   const [dragY, setDragY] = useState(0);
 
+  // Only a new window size moves it sideways; a drag already put it where it belongs.
   useEffect(() => {
-    x.value = withSpring(restX, tokens.motion.spring.smooth);
-  }, [restX, x]);
+    x.value = withSpring(edgeX(sideRef.current), tokens.motion.spring.gentle);
+  }, [width]);
+  // A new floor (another screen, the tab bar folding or opening) carries it along, keeping the
+  // height the person chose but never sinking behind a bar.
+  useAnimatedReaction(
+    () => (tabBarFolded.value > 0.5 ? foldedRestY : restY),
+    (floor, previous) => {
+      if (floor === previous) return;
+      y.value = withSpring(Math.max(highest, floor - raised.value), tokens.motion.spring.gentle);
+    },
+    [foldedRestY, restY, highest],
+  );
+
+  // After a few seconds untouched, Worthy slips half out of sight at its edge; any touch, or
+  // opening it, brings it back.
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wake = useCallback(() => {
+    idle.value = withTiming(0, { duration: 240, easing: Easing.bezier(0.16, 1, 0.3, 1) });
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    idleTimer.current = setTimeout(() => {
+      idle.value = withTiming(1, { duration: 520, easing: Easing.bezier(0.16, 1, 0.3, 1) });
+    }, idleTuckMs);
+  }, [idle]);
   useEffect(() => {
-    y.value = withSpring(restY + dragY, tokens.motion.spring.smooth);
-  }, [dragY, restY, y]);
+    if (open || showHint || hidden) {
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+      idle.value = withTiming(0, { duration: 240 });
+      return;
+    }
+    wake();
+    return () => {
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+    };
+  }, [hidden, idle, open, showHint, wake]);
+
   useEffect(() => {
     cameraOpening.current = false;
     lift.value = reduceMotion
@@ -178,13 +226,17 @@ export function Companion({
   }, [hidden, onHoldSnap]);
 
   const settleSide = useCallback((next: 'left' | 'right') => {
-    haptic('select');
+    if (next !== sideRef.current) haptic('select');
+    sideRef.current = next;
     setSide(next);
   }, []);
 
   const tap = Gesture.Tap()
     .enabled(!hidden)
     .maxDuration(holdMs - 20)
+    .onBegin(() => {
+      runOnJS(wake)();
+    })
     .onEnd((_event, success) => {
       if (success) runOnJS(requestOpen)();
     });
@@ -209,6 +261,9 @@ export function Companion({
     .enabled(!hidden)
     .activeOffsetX([-12, 12])
     .activeOffsetY([-12, 12])
+    .onBegin(() => {
+      runOnJS(wake)();
+    })
     .onChange((event) => {
       x.value += event.changeX;
       y.value += event.changeY;
@@ -217,12 +272,13 @@ export function Companion({
       const projected = x.value + event.velocityX * 0.15;
       const nextSide = projected + orbSize / 2 > width / 2 ? 'right' : 'left';
       const targetX = nextSide === 'right' ? width - orbSize - edgeGap : edgeGap;
-      const minY = insets.top + 80;
-      const maxY = height - insets.bottom - bottomOffset - orbSize - tokens.spacing[3];
-      const targetY = Math.min(maxY, Math.max(minY, y.value + event.velocityY * 0.1));
-      runOnJS(setDragY)(targetY - maxY);
-      x.value = withSpring(targetX, { ...tokens.motion.spring.smooth, velocity: event.velocityX });
-      y.value = withSpring(targetY, { ...tokens.motion.spring.smooth, velocity: event.velocityY });
+      const floor = tabBarFolded.value > 0.5 ? foldedRestY : restY;
+      const targetY = Math.min(floor, Math.max(highest, y.value + event.velocityY * 0.1));
+      raised.value = floor - targetY;
+      // One spring each way, carrying the throw's speed: nothing restarts it afterwards.
+      x.value = withSpring(targetX, { ...tokens.motion.spring.gentle, velocity: event.velocityX });
+      y.value = withSpring(targetY, { ...tokens.motion.spring.gentle, velocity: event.velocityY });
+      runOnJS(setDragY)(targetY - restY);
       runOnJS(settleSide)(nextSide);
     });
 
@@ -233,7 +289,7 @@ export function Companion({
   // are reading without disappearing. It slides back out once the content settles.
   const tuckDirection = side === 'right' ? 1 : -1;
   const orbStyle = useAnimatedStyle(() => {
-    const tuck = contentScrolling.value;
+    const tuck = Math.max(contentScrolling.value, idle.value);
     return {
       opacity: lift.value,
       transform: [
@@ -423,13 +479,7 @@ function CompanionPanel({
               return (
                 <Animated.View
                   key={action.key}
-                  entering={
-                    reduceMotion
-                      ? FadeIn
-                      : FadeInDown.delay(120 + index * 55)
-                          .springify()
-                          .damping(18)
-                  }
+                  entering={reduceMotion ? FadeIn : paperIn(120 + index * 55)}
                 >
                   <PressableScale
                     accessibilityLabel={action.label}

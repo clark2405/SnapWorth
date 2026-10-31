@@ -2,6 +2,7 @@ import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { Platform, View } from 'react-native';
 
 import { fontFaces, useTheme } from '@snapworth/shared/design';
+import { useUnreadChatCount } from '@snapworth/shared/features/chat';
 import { useSession } from '@snapworth/shared/features/session';
 
 import { SnapAccessory, SnapBar } from '../../src/SnapAccessory';
@@ -15,6 +16,8 @@ import { SnapAccessory, SnapBar } from '../../src/SnapAccessory';
 export default function TabsLayout() {
   const { colors } = useTheme();
   const { isGuest } = useSession();
+  // A guest has no conversations, so nothing loads and nothing is unread.
+  const unread = useUnreadChatCount(!isGuest);
 
   // Anyone can look around: a guest browses the feed and the market, and is asked for an
   // account only on acting (voting, saving, messaging, snapping), with the reason why.
@@ -50,8 +53,11 @@ export default function TabsLayout() {
           md="forum"
         />
         <NativeTabs.Trigger.Label>Chats</NativeTabs.Trigger.Label>
-        {/* A guest has no conversations, so nothing is unread. */}
-        {isGuest ? null : <NativeTabs.Trigger.Badge>2</NativeTabs.Trigger.Badge>}
+        {unread > 0 ? (
+          <NativeTabs.Trigger.Badge>
+            {unread > 99 ? '99+' : String(unread)}
+          </NativeTabs.Trigger.Badge>
+        ) : null}
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="history">
         <NativeTabs.Trigger.Icon

@@ -14,11 +14,10 @@ import {
   WifiOff,
 } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollView, Share, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
-  FadeInDown,
   FadeOut,
   cancelAnimation,
   useAnimatedStyle,
@@ -31,35 +30,32 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import {
+  paperIn,
   BottomBar,
   Button,
   ChoiceChips,
-  PriceTagIcon,
-  Stamp,
-  TagShape,
-  Worthy,
   CountUp,
+  DetailHero,
+  DetailLayout,
+  DetailSheet,
   Field,
   IconButton,
   NavHeader,
   Photo,
   PriceRangeBar,
+  PriceTagIcon,
   Reveal,
   Screen,
   SelectField,
-  Sheet,
-  Sparkline,
-  SWText,
   shareIcon,
-  Wordmark,
-  LogoMark,
+  Sparkline,
+  Stamp,
   Surface,
+  SWText,
   Tag,
+  TagShape,
   TextField,
-  useToast,
-  DetailHero,
-  DetailLayout,
-  DetailSheet,
+  Worthy,
   WorthySays,
 } from '../../components';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
@@ -73,6 +69,8 @@ import {
   type PreviewCondition,
   type PreviewSharing,
 } from '../preview/sample-data';
+import { PaidPriceSection } from '../history/PaidPriceSection';
+import { ShareTagSheet } from '../history/ShareTagSheet';
 import { Tip, useTip } from '../tips';
 
 /**
@@ -299,6 +297,10 @@ export function EstimateResultView({
                 />
               </Reveal>
 
+              <Reveal index={2} style={styles.section}>
+                <PaidPriceSection itemId={itemId ?? item.id} worth={value} />
+              </Reveal>
+
               <Tip id="list" />
 
               <Reveal index={2} style={styles.insights}>
@@ -365,9 +367,7 @@ export function EstimateResultView({
                   {previewValuation.comparables.map((comparable, index) => (
                     <Animated.View
                       key={comparable.id}
-                      entering={FadeInDown.delay(360 + index * 70)
-                        .springify()
-                        .damping(18)}
+                      entering={paperIn(360 + index * 70)}
                       style={styles.comparable}
                     >
                       <Photo
@@ -411,13 +411,19 @@ export function EstimateResultView({
         </DetailSheet>
       </DetailLayout>
 
-      <ShareCardSheet
-        visible={sharing}
+      <ShareTagSheet
+        item={
+          sharing
+            ? {
+                id: itemId ?? item.id,
+                title,
+                photo: item.photo,
+                photoLabel: item.photoLabel,
+                worth: value,
+              }
+            : null
+        }
         onClose={() => setSharing(false)}
-        title={title}
-        value={value}
-        low={low}
-        high={high}
       />
     </Screen>
   );
@@ -585,11 +591,7 @@ function ScanOverlay() {
       )}
       <View style={styles.detections}>
         {detections.slice(0, found).map((label) => (
-          <Animated.View
-            key={label}
-            entering={FadeInDown.springify().damping(16)}
-            style={styles.detection}
-          >
+          <Animated.View key={label} entering={paperIn()} style={styles.detection}>
             <SWText variant="labelSmall" color={tokens.overlay.text}>
               {label}
             </SWText>
@@ -646,7 +648,7 @@ function Problem({
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   return (
-    <Animated.View entering={FadeInDown.springify().damping(18)}>
+    <Animated.View entering={paperIn()}>
       <Surface padding={tokens.spacing[5]} contentStyle={styles.problem}>
         <View style={styles.problemHeader} accessibilityLiveRegion="assertive">
           <Icon size={20} strokeWidth={2} color={colors.danger} />
@@ -740,75 +742,10 @@ function Destinations({
   );
 }
 
-/** The shareable valuation card (research: Vivino/StockX-style share cards). */
-function ShareCardSheet({
-  visible,
-  onClose,
-  title,
-  value,
-  low,
-  high,
-}: {
-  readonly visible: boolean;
-  readonly onClose: () => void;
-  readonly title: string;
-  readonly value: number;
-  readonly low: number;
-  readonly high: number;
-}) {
-  const styles = useThemedStyles(stylesFor);
-  const { colors } = useTheme();
-  const toast = useToast();
-
-  return (
-    <Sheet visible={visible} onClose={onClose} title="Share valuation">
-      <View style={styles.shareCard}>
-        <Photo
-          source={previewItem.photo}
-          label={previewItem.photoLabel}
-          aspectRatio={4 / 3}
-          radius={tokens.radius.large}
-        />
-        <View style={styles.shareBody}>
-          <SWText variant="headingMedium">{title}</SWText>
-          {/* The card people post carries the same tag as the app, so it is recognisably ours. */}
-          <TagShape tilt={tokens.tilt.start} style={styles.shareTag}>
-            <SWText variant="stamp" color={colors.kraftInk}>
-              Worth about
-            </SWText>
-            <SWText variant="priceLarge" color={colors.kraftInk}>
-              {formatPeso(value)}
-            </SWText>
-          </TagShape>
-          <SWText variant="caption" tone="textMuted">
-            Range {formatPeso(low)} – {formatPeso(high)} · valued with SnapWorth
-          </SWText>
-        </View>
-        <View style={styles.shareMark}>
-          <LogoMark size={24} />
-          <Wordmark height={18} />
-        </View>
-      </View>
-      <Button
-        label="Share card"
-        icon={shareIcon}
-        onPress={() => {
-          void Share.share({ message: `${title} — worth about ${formatPeso(value)} on SnapWorth.` })
-            .then((result) => {
-              if (result.action === Share.sharedAction) toast.show({ title: 'Valuation shared' });
-            })
-            .catch(() => undefined);
-          onClose();
-        }}
-      />
-    </Sheet>
-  );
-}
-
 const gutter = tokens.layout.pageGutterCompact;
 const cornerSize = 26;
 
-const stylesFor = themedStyles((colors, name) => ({
+const stylesFor = themedStyles((colors) => ({
   content: {
     paddingTop: 0,
     paddingHorizontal: 0,
@@ -1009,34 +946,5 @@ const stylesFor = themedStyles((colors, name) => ({
     backgroundColor: tokens.overlay.chrome,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: tokens.overlay.border,
-  },
-  shareCard: {
-    borderRadius: tokens.radius.xlarge,
-    padding: tokens.spacing[3],
-    gap: tokens.spacing[3],
-    backgroundColor: colors.canvas,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderSubtle,
-    shadowColor: tokens.shadow[name],
-    shadowOpacity: 1,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-  },
-  shareTag: {
-    alignSelf: 'flex-start',
-    paddingRight: tokens.spacing[5],
-    paddingVertical: tokens.spacing[3],
-    marginVertical: tokens.spacing[2],
-  },
-  shareBody: {
-    gap: 2,
-    paddingHorizontal: tokens.spacing[1],
-  },
-  shareMark: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.spacing[2],
-    paddingHorizontal: tokens.spacing[1],
-    paddingBottom: tokens.spacing[1],
   },
 }));

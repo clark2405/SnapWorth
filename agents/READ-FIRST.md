@@ -18,6 +18,92 @@ Route files in `web/app` and `mobile/app` are thin wrappers. A screen's behaviou
 `shared/src/features/`, and its building blocks in `shared/src/components/`. Every route exists in
 both apps.
 
+## What's built and what isn't
+
+Keep this list current: when you finish or start something, move it here in the same change.
+Last updated 2026-10-31.
+
+### Working for real
+
+- **Accounts:** sign-up and sign-in with email against Supabase, on the phone and the web. Google
+  sign-in on the phone now finishes too (PR #20), but hasn't been checked on a device yet. Guests can
+  look around, and an account is asked for, with the reason, only when they act.
+- **One sign-in:** chats, comments, Hanap and suki use the same Supabase client as sign-in, so what
+  someone does belongs to the account they signed in with (PR #20).
+- **Your own profile:** name, handle, photo, location and bio come from the account, and the listed,
+  sold and chat counts from Supabase (PR #20). A new handle is saved to `public.profiles` too, so
+  comments and chats show it; a taken one is turned away (needs the `profile_handles` migration
+  deployed). The photo stays on the account, on that phone only, until photos are uploaded to
+  Storage.
+- **Snap → AI estimate:** the phone's camera checks the photo and sends it to the
+  `estimate-price` Edge Function (Gemini) for a real estimate.
+- **On-device AI:** the photo check and label reading on every iPhone. With Apple Intelligence,
+  also a first look at the item and Worthy's answers to light questions.
+- **Feed comments:** stored in Supabase, moderated, threaded.
+- **Chats:** real messages over Supabase Realtime, offers, and agreeing a meetup on a map. Deployed
+  to Supabase on 2026-10-30. The phone's Chats tab counts unread messages.
+- **Sharing a tag:** an item's share button makes a picture of its tag and opens the share sheet.
+  Needs an app build made after 2026-10-30; older builds share text.
+- **Native pickers on iOS:** choices use the system's segmented controls and menus on iOS; Android
+  and the web keep the app's own chips. Tap-to-act chips (quick replies, suggestions) stay chips.
+- **Hanap:** buyers post what they're looking for, and see the Market listings that match
+  (Market shows the count). Moderated like comments. The database table and the
+  `moderate-content` change need deploying.
+- **Suki prices:** a seller gives a regular buyer a standing discount from the chat. Both see it,
+  and the buyer's offers start from it. The database table needs deploying.
+- **Photo coach:** tips before a snap, and after it, the shots that matter for that kind of item.
+  **Not complete:** only iPhones with Apple Intelligence know the kind of item; every other device
+  gets general tips until the cloud AI exists.
+
+### Kept on the device only, until History is stored in Supabase
+
+- **Flip tracker:** what an owner paid for an item, and the gain, in History and on the item.
+- **Collections:** sets of History items, with their total and flip, shareable as a picture.
+
+### Screens built, but showing sample data
+
+These look finished but read from `shared/src/features/preview/sample-data.ts`, and what people do
+on them isn't saved.
+
+- **Feed:** posts and votes. Posting to the feed only opens the feed.
+- **Market:** listings, filters, listing pages, saved listings and price alerts. Listing an item
+  for sale isn't saved.
+- **History and the item screen:** History's items, and the item screen, which always shows the
+  same sample item.
+- **Profile:** seller profiles, your votes, settings, trends, search and the admin review queue.
+  Your own profile is real (see above), but its "checked" count is still sample data.
+- **Worthy's cards:** price, trend and collection answers.
+
+### Not done yet
+
+- **Sign-in:**
+  - Google sign-in on the web.
+  - Apple sign-in isn't set up.
+  - Password reset sends nothing.
+  - Deleting an account only signs out.
+- **Saving snaps:** each snap and its estimate saved to History (database tables and photo storage).
+- **The rest of the data on Supabase:** votes, posts, listings, price alerts and the admin queue.
+- **Cloud AI** (a teammate owns this; see "Handoff" below):
+  - Worthy's chat in the cloud.
+  - Real data behind Worthy's cards.
+  - Deploying the `estimate-price` update.
+- **Notifications:**
+  - Push needs the paid Apple Developer account.
+  - Meetup reminders and in-app banners aren't built yet.
+- **Map tiles and place search for launch:** a provider and plan for each. The defaults
+  (OpenStreetMap's own tiles, and its Nominatim search behind the meetup map's search box) are
+  for development only. Set `EXPO_PUBLIC_MAP_TILES_URL` and `EXPO_PUBLIC_PLACE_SEARCH_URL`.
+- **Android:** not yet checked on a phone. The Snap bar may be hidden behind the tab bar.
+- **Deploy the backend changes:** `npx supabase db push` (hanap and suki tables, and changing your
+  own handle) and
+  `npx supabase functions deploy moderate-content` (it now screens hanap posts too). Without a
+  moderation provider configured, every hanap post is held, so only its author sees it.
+- **Profile photos:** uploading them to Supabase Storage, so other people can see them.
+- **Deployment:** EAS builds for the phones, and Vercel for the web.
+
+The detailed task lists are in `agents/specs/`. Git keeps that folder local, so ask whoever has it,
+or update this list instead.
+
 ## Product rules
 
 ### Anyone can look around; an account is asked for only when they act
@@ -61,6 +147,16 @@ Give this reason, in these words or close to them, wherever someone is asked: ev
 comes from a real person, so the community's verdicts stay fair. The last onboarding step says it:
 "Looking around is free. Snapping, voting and selling need a free account, so every price here
 comes from a real person."
+
+### What people paid, and sharing a tag
+
+- **Flip tracker:** an owner can note what they paid for an item ("What you paid" on the item
+  screen). History shows the gain on each row and in total. Only the owner ever sees it.
+  History is still sample data, so the prices are kept on the device (`paid-prices.tsx`). When
+  History moves to Supabase, they move with it, private to the owner.
+- **Shared tags:** an item's share button makes a picture of its tag (`ShareTagCard.tsx`) and
+  shares it. The picture is always in the light palette (`PrintedTheme`). What was paid is only on
+  it if the owner switches it on.
 
 ### Launching the app
 
@@ -217,7 +313,14 @@ any new artwork:
   native tab draws its own backdrop. On web, one shared backdrop sits behind all the tabs
   (`BackdropHostContext`).
 - **Metro:** restart with `--clear` after adding a `.web.tsx` file, or it keeps serving the old one.
+- **Platform files import themselves:** inside `Thing.ios.tsx`, `import … from './Thing'` resolves
+  back to `Thing.ios.tsx` on iOS. Put what both versions share in a third file (see `ChipRow.tsx`
+  and `checklist.ts`).
 - **Gestures:** a draggable thing inside a swipeable scene uses `Gesture.Pan().blocksExternalGesture(pager)`.
+- **Pictures of views on the web:** html2canvas, which draws the shared tag, loses anything React
+  Native Web puts in its style sheet. So a view that must appear in the picture gets its colours
+  and edges as plain inline styles (see `paintFor` in `ShareTagCard.tsx`). Tilts come out flat on
+  the web; the phones keep them.
 
 ## Secrets and setup
 

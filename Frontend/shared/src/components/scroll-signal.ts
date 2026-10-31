@@ -7,6 +7,13 @@ import { makeMutable } from 'react-native-reanimated';
  */
 export const contentScrolling = makeMutable(0);
 
+/**
+ * 1 while the web's tab bar is folded down, 0 while it's open. Like iOS's tab bar, it folds as
+ * the reader scrolls on down a tab's page and opens again as soon as they scroll back up, reach
+ * the top, or tap it. Written by `Screen` (tab pages only) and the tab bar itself.
+ */
+export const tabBarFolded = makeMutable(0);
+
 const scrollToTopListeners = new Set<() => void>();
 
 /**

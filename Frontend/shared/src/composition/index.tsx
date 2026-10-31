@@ -4,8 +4,12 @@ import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import {
   createLocalChatRepository,
   createLocalCommentRepository,
+  createLocalHanapRepository,
+  createLocalSukiRepository,
   createSupabaseChatRepository,
   createSupabaseCommentRepository,
+  createSupabaseHanapRepository,
+  createSupabaseSukiRepository,
   createPhotoPricingService,
   screenWithRules,
   type LocalSeedComment,
@@ -13,12 +17,19 @@ import {
 } from '../adapters';
 import { getSupabase } from '../adapters/supabaseClient';
 import { ChatServiceProvider } from '../features/chat/chat-state';
+import { SukiProvider } from '../features/chat/suki';
 import { CommentServiceProvider } from '../features/feed';
+import { HanapProvider } from '../features/hanap/hanap-state';
+import { CollectionsProvider } from '../features/history/collections';
+import { PaidPricesProvider } from '../features/history/paid-prices';
 import {
   previewChatListingKey,
   previewConversation,
   previewConversations,
+  previewCollections,
+  previewHanap,
   previewListings,
+  previewPaidPrices,
   previewPostDetail,
   previewPosts,
   previewProfile,
@@ -26,7 +37,9 @@ import {
   type PreviewMessage,
   type PreviewUser,
 } from '../features/preview/sample-data';
+import type { HanapRepository } from '../ports/hanap';
 import type { ChatService, CommentService } from '../ports/services';
+import type { SukiRepository } from '../ports/suki';
 import { createChatService, createCommentService } from '../services';
 import type { UtcDateTime } from '../types/date-time';
 import type { ChatListing, PublicProfile } from '../types/entities';
@@ -44,6 +57,8 @@ export interface AppServices {
   readonly backend: 'supabase' | 'device';
   readonly comments: CommentService;
   readonly chats: ChatService;
+  readonly hanap: HanapRepository;
+  readonly suki: SukiRepository;
   readonly pricing: PhotoPricingService;
 }
 
@@ -79,10 +94,10 @@ function previewSeed(): LocalSeedComment[] {
 const previewSellerByListing: Readonly<Record<string, PreviewUser>> = {
   'polaroid-sun-600': previewUsers.mariaCruz,
   'air-jordan-1-bred': previewUsers.justinV,
-  'retro-walkman': previewUsers.manilaHype,
+  'retro-walkman': previewUsers.sugboHype,
   'keychron-keyboard': previewUsers.mariaCruz,
   'nike-teal-windbreaker': previewUsers.retroCurator,
-  'colour-block-windbreaker': previewUsers.manilaHype,
+  'colour-block-windbreaker': previewUsers.sugboHype,
   'black-puffer-jacket': previewUsers.justinV,
   'polaroid-film-bundle': previewUsers.mariaCruz,
 };
@@ -188,6 +203,8 @@ export function createAppServices(config: BackendConfig): AppServices {
       backend: 'supabase',
       comments: createCommentService(createSupabaseCommentRepository(client)),
       chats: createChatService(createSupabaseChatRepository(client)),
+      hanap: createSupabaseHanapRepository(client),
+      suki: createSupabaseSukiRepository(client),
       pricing: createPhotoPricingService(client),
     };
   }
@@ -217,6 +234,20 @@ export function createAppServices(config: BackendConfig): AppServices {
         simulateReplies: { delayMs: 1200, replies: demoReplies },
       }),
     ),
+    hanap: createLocalHanapRepository({
+      store: AsyncStorage,
+      viewer: profileOf(previewProfile.user),
+      seed: previewHanap.map(({ minutesAgo, ...entry }) => ({
+        ...entry,
+        createdAt: new Date(Date.now() - minutesAgo * 60_000).toISOString() as UtcDateTime,
+      })),
+      screen: screenWithRules,
+    }),
+    // The windbreaker's buyer is already the preview owner's suki.
+    suki: createLocalSukiRepository({
+      store: AsyncStorage,
+      seed: { [`seller:${profileOf(previewUsers.sugboHype).userId}`]: 10 },
+    }),
   };
 }
 
@@ -242,7 +273,19 @@ export function AppServicesProvider({
   return (
     <PhotoPricingContext.Provider value={services.pricing}>
       <CommentServiceProvider service={services.comments}>
-        <ChatServiceProvider service={services.chats}>{children}</ChatServiceProvider>
+        <ChatServiceProvider service={services.chats}>
+          <HanapProvider repository={services.hanap}>
+            <SukiProvider repository={services.suki}>
+              {/* History is still sample data, so what people paid, and their collections, stay on the
+              device for now. */}
+              <PaidPricesProvider store={AsyncStorage} seed={previewPaidPrices}>
+                <CollectionsProvider store={AsyncStorage} seed={previewCollections}>
+                  {children}
+                </CollectionsProvider>
+              </PaidPricesProvider>
+            </SukiProvider>
+          </HanapProvider>
+        </ChatServiceProvider>
       </CommentServiceProvider>
     </PhotoPricingContext.Provider>
   );

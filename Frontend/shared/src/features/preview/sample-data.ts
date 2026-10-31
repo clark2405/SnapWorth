@@ -17,7 +17,7 @@ import walkman from './images/walkman.jpg';
 import keyboard from './images/keyboard.jpg';
 import avatarRetroCurator from './images/avatar-retro-curator.jpg';
 import avatarMariaCruz from './images/avatar-mariacruz.jpg';
-import avatarManilaHype from './images/avatar-manila-hype.jpg';
+import avatarSugboHype from './images/avatar-sugbo-hype.jpg';
 import avatarJustinV from './images/avatar-justin-v.jpg';
 
 const image = {
@@ -31,7 +31,7 @@ const image = {
   keyboard,
   avatarRetroCurator,
   avatarMariaCruz,
-  avatarManilaHype,
+  avatarSugboHype,
   avatarJustinV,
 };
 
@@ -45,7 +45,7 @@ export interface PreviewUser {
 export const previewUsers = {
   retroCurator: { handle: 'retro_curator', avatar: image.avatarRetroCurator },
   mariaCruz: { handle: 'mariacruz', avatar: image.avatarMariaCruz },
-  manilaHype: { handle: 'manila_hype', avatar: image.avatarManilaHype },
+  sugboHype: { handle: 'sugbo_hype', avatar: image.avatarSugboHype },
   justinV: { handle: 'justin_v', avatar: image.avatarJustinV },
 } satisfies Record<string, PreviewUser>;
 
@@ -104,7 +104,7 @@ export const previewPosts: readonly PreviewPost[] = [
     comments: [
       {
         id: 'windbreaker-c1',
-        author: previewUsers.manilaHype,
+        author: previewUsers.sugboHype,
         body: 'Teal colourways go fast. ₱2,450 is fair, maybe even a little low.',
         postedAgo: '1m ago',
       },
@@ -142,7 +142,7 @@ export const previewPosts: readonly PreviewPost[] = [
       },
       {
         id: 'polaroid-c2',
-        author: previewUsers.manilaHype,
+        author: previewUsers.sugboHype,
         body: 'Test the flash first. A working one is worth the extra.',
         postedAgo: '30m ago',
       },
@@ -171,7 +171,7 @@ export const previewOlderPosts: readonly PreviewPost[] = [
   },
   {
     id: 'keychron-post',
-    author: previewUsers.manilaHype,
+    author: previewUsers.sugboHype,
     postedAgo: '5d ago',
     body: 'Listing my Keychron at ₱4,500. Too much for a used board?',
     photo: image.keyboard,
@@ -212,7 +212,7 @@ export const previewPostDetail: PreviewPost = {
     },
     {
       id: 'c1',
-      author: previewUsers.manilaHype,
+      author: previewUsers.sugboHype,
       body: '₱2,450 is actually extremely fair. Authentic 90s Nike sells for easily ₱3k in high-end thrift shops. Buy!',
       postedAgo: '1h ago',
     },
@@ -327,7 +327,7 @@ export const previewItem = {
   estimate: 2450,
   photo: image.windbreakerRetro,
   photoLabel: 'Teal and purple vintage Nike windbreaker',
-  location: 'Metro Manila, PH',
+  location: 'Cebu City, PH',
 } as const;
 
 /** A structured price offer inside a chat. `countered` means a newer offer replaced it. */
@@ -384,7 +384,7 @@ export const previewConversation = {
     },
     {
       id: 'm4',
-      body: 'Meet in the middle? Makati works for me for the pickup.',
+      body: 'Meet in the middle? IT Park works for me for the pickup.',
       sentAt: '10:30 AM',
       mine: false,
       offer: { amount: 2050, status: 'pending' },
@@ -556,6 +556,75 @@ export const previewHistory: readonly PreviewHistoryItem[] = [
 ];
 
 /**
+ * What the preview's owner paid for some of their things, for the flip tracker: ukay-ukay finds,
+ * a surplus-shop Walkman, and sneakers bought to resell. Seeds a fresh install.
+ */
+export const previewPaidPrices: Readonly<Record<string, number>> = {
+  'nike-neon-windbreaker': 180,
+  'black-puffer-jacket': 350,
+  'sony-walkman-wm': 650,
+  'air-jordan-1-retro': 6200,
+};
+
+/** Hanap posts a fresh install starts with: what people around Cebu are looking for. */
+export const previewHanap: readonly {
+  readonly id: string;
+  readonly authorHandle: string;
+  readonly body: string;
+  readonly maxPhp: number | null;
+  readonly minutesAgo: number;
+  readonly mine?: boolean;
+}[] = [
+  {
+    id: 'hanap-mine-windbreaker',
+    authorHandle: 'you',
+    body: 'Nike windbreaker, size M',
+    maxPhp: 3000,
+    minutesAgo: 90,
+    mine: true,
+  },
+  {
+    id: 'hanap-film-camera',
+    authorHandle: 'juan_thrifts',
+    body: 'Film camera that still works, Pentax or Canon',
+    maxPhp: 4000,
+    minutesAgo: 25,
+  },
+  {
+    id: 'hanap-jordans',
+    authorHandle: 'justin_v',
+    body: 'Jordan 1 size 10',
+    maxPhp: null,
+    minutesAgo: 180,
+  },
+  {
+    id: 'hanap-cassette',
+    authorHandle: 'maria_cruz',
+    body: 'Cassette player for my tita, any brand',
+    maxPhp: 1500,
+    minutesAgo: 420,
+  },
+];
+
+/** The preview owner's collections, seeding a fresh install. */
+export const previewCollections: readonly {
+  readonly id: string;
+  readonly name: string;
+  readonly itemIds: readonly string[];
+}[] = [
+  {
+    id: 'ukay-jackets',
+    name: 'Ukay jackets',
+    itemIds: ['nike-neon-windbreaker', 'black-puffer-jacket', 'teal-half-zip'],
+  },
+  {
+    id: 'retro-tech',
+    name: 'Retro tech',
+    itemIds: ['polaroid-sun-600', 'sony-walkman-wm', 'keychron-k2'],
+  },
+];
+
+/**
  * Where each of the viewer's items is shared. An item can sit on the feed, the market, both,
  * or neither (private, the default for a fresh capture).
  */
@@ -582,8 +651,8 @@ export const previewProfile = {
   user: previewUsers.retroCurator,
   displayName: 'Rico Santos',
   joined: 'Joined March 2026',
-  location: 'Makati, Metro Manila',
-  bio: 'Thrifting 90s sportswear and film cameras around Manila. Everything I sell is tested.',
+  location: 'Lahug, Cebu City',
+  bio: 'Thrifting 90s sportswear and film cameras around Cebu. Everything I sell is tested.',
   rating: '4.8',
   stats: { checked: previewHistory.length, listed: 1, sold: 12 },
   isAdmin: true,
@@ -619,10 +688,10 @@ export interface PreviewConversationSummary {
 export const previewConversations: readonly PreviewConversationSummary[] = [
   {
     id: 'windbreaker-chat',
-    with: previewUsers.manilaHype,
+    with: previewUsers.sugboHype,
     itemTitle: 'Vintage Nike Neon Windbreaker',
     itemPhoto: image.windbreakerRetro,
-    lastMessage: 'Offered ₱2,050 · Makati works for me for the pickup.',
+    lastMessage: 'Offered ₱2,050 · IT Park works for me for the pickup.',
     lastFromMe: false,
     sentAt: '10:30 AM',
     unread: 2,
@@ -664,14 +733,14 @@ export const previewConversations: readonly PreviewConversationSummary[] = [
     with: previewUsers.justinV,
     itemTitle: 'Black Quilted Puffer Jacket',
     itemPhoto: image.pufferBlack,
-    lastMessage: 'Is it a size M? I can meet at Glorietta on Saturday.',
+    lastMessage: 'Is it a size M? I can meet at Ayala Center Cebu on Saturday.',
     lastFromMe: false,
     sentAt: '9:12 AM',
     unread: 0,
   },
   {
     id: 'walkman-chat',
-    with: previewUsers.manilaHype,
+    with: previewUsers.sugboHype,
     itemTitle: 'Retro Walkman Player',
     itemPhoto: image.walkman,
     lastMessage: 'Does it still play both sides of the tape?',
@@ -701,7 +770,7 @@ export const previewConversations: readonly PreviewConversationSummary[] = [
   },
   {
     id: 'colour-block-chat',
-    with: previewUsers.manilaHype,
+    with: previewUsers.sugboHype,
     itemTitle: '90s Colour-Block Windbreaker',
     itemPhoto: image.windbreakerRetro,
     lastMessage: 'Sent you the measurements. Pit to pit is 24 inches.',
@@ -731,7 +800,7 @@ export const previewConversations: readonly PreviewConversationSummary[] = [
   },
   {
     id: 'keychron-hype-chat',
-    with: previewUsers.manilaHype,
+    with: previewUsers.sugboHype,
     itemTitle: 'Mechanical Keychron Keyboard',
     itemPhoto: image.keyboard,
     lastMessage: 'Which switches are on it, brown or red?',
@@ -741,7 +810,7 @@ export const previewConversations: readonly PreviewConversationSummary[] = [
   },
   {
     id: 'jordan-bred-chat',
-    with: previewUsers.manilaHype,
+    with: previewUsers.sugboHype,
     itemTitle: 'Air Jordan 1 High Bred',
     itemPhoto: image.jordanBred,
     lastMessage: 'Box and extra laces included. ₱8,500 is firm, sorry.',
@@ -771,7 +840,7 @@ export const previewConversations: readonly PreviewConversationSummary[] = [
   },
   {
     id: 'film-bundle-hype-chat',
-    with: previewUsers.manilaHype,
+    with: previewUsers.sugboHype,
     itemTitle: 'Polaroid Camera and Film Bundle',
     itemPhoto: image.polaroidScene,
     lastMessage: 'I can do ₱3,500 if you pick up this week.',
@@ -801,7 +870,7 @@ export const previewConversations: readonly PreviewConversationSummary[] = [
   },
   {
     id: 'polaroid-hype-chat',
-    with: previewUsers.manilaHype,
+    with: previewUsers.sugboHype,
     itemTitle: 'Vintage Polaroid Sun 600',
     itemPhoto: image.polaroidCamera,
     lastMessage: 'Let me know if the price drops. Still interested!',
@@ -814,7 +883,7 @@ export const previewConversations: readonly PreviewConversationSummary[] = [
     with: previewUsers.mariaCruz,
     itemTitle: 'Mechanical Keychron Keyboard',
     itemPhoto: image.keyboard,
-    lastMessage: 'I can meet at SM Megamall after work on Friday.',
+    lastMessage: 'I can meet at SM City Cebu after work on Friday.',
     lastFromMe: true,
     sentAt: 'Aug 25',
     unread: 0,
@@ -893,7 +962,7 @@ export const previewHeldContent: readonly PreviewHeldContent[] = [
   {
     id: 'held-2',
     kind: 'post',
-    author: previewUsers.manilaHype,
+    author: previewUsers.sugboHype,
     body: 'DM me for cheaper prices, selling outside the app.',
     reason: 'Flagged by moderation: off-platform sale',
     heldAgo: '1h ago',
@@ -1128,23 +1197,23 @@ export const previewMarketCategories: readonly { readonly key: string; readonly 
 /** Where each preview listing is, for the location filter, until listings carry a place. */
 export const previewListingPlaces: Readonly<Record<string, { area: string; distanceKm: number }>> =
   {
-    'polaroid-sun-600': { area: 'makati', distanceKm: 2 },
-    'air-jordan-1-bred': { area: 'quezon-city', distanceKm: 11 },
-    'retro-walkman': { area: 'pasig', distanceKm: 6 },
-    'keychron-keyboard': { area: 'cebu', distanceKm: 570 },
-    'nike-teal-windbreaker': { area: 'quezon-city', distanceKm: 9 },
-    'colour-block-windbreaker': { area: 'pasig', distanceKm: 5 },
-    'black-puffer-jacket': { area: 'makati', distanceKm: 3 },
-    'polaroid-film-bundle': { area: 'makati', distanceKm: 4 },
+    'polaroid-sun-600': { area: 'cebu-city', distanceKm: 2 },
+    'air-jordan-1-bred': { area: 'lapu-lapu', distanceKm: 11 },
+    'retro-walkman': { area: 'mandaue', distanceKm: 6 },
+    'keychron-keyboard': { area: 'metro-manila', distanceKm: 570 },
+    'nike-teal-windbreaker': { area: 'lapu-lapu', distanceKm: 9 },
+    'colour-block-windbreaker': { area: 'mandaue', distanceKm: 5 },
+    'black-puffer-jacket': { area: 'cebu-city', distanceKm: 3 },
+    'polaroid-film-bundle': { area: 'cebu-city', distanceKm: 4 },
   };
 
 export const previewMarketAreas: readonly { readonly key: string; readonly label: string }[] = [
   { key: 'anywhere', label: 'Anywhere' },
   { key: 'near-me', label: 'Near me' },
-  { key: 'makati', label: 'Makati' },
-  { key: 'quezon-city', label: 'Quezon City' },
-  { key: 'pasig', label: 'Pasig' },
-  { key: 'cebu', label: 'Cebu' },
+  { key: 'cebu-city', label: 'Cebu City' },
+  { key: 'mandaue', label: 'Mandaue' },
+  { key: 'lapu-lapu', label: 'Lapu-Lapu' },
+  { key: 'metro-manila', label: 'Metro Manila' },
 ];
 
 export const previewPriceBrackets: readonly {

@@ -53,7 +53,7 @@ import { AmbientBackdrop, useBackdropClaim, type AmbientBackdropProps } from './
 import { BackdropHostContext, ScreenPresenceContext } from './backdrop-host';
 import { useScreenVisibility } from './screen-visibility';
 import { ScrollEdge } from './ScrollEdge';
-import { contentScrolling, onScrollToTopRequest } from './scroll-signal';
+import { contentScrolling, onScrollToTopRequest, tabBarFolded } from './scroll-signal';
 import { SWText } from './SWText';
 
 /** The shortest a pull-to-refresh shows itself reloading: one pass of the wordmark's wave. */
@@ -189,9 +189,15 @@ export function Screen({
   const bare = Platform.OS === 'ios' && scroll && !transparent && clearTabBar && !footer;
   const offsetBase = bare ? insets.top : 0;
   const base = useSharedValue(offsetBase);
+  // The scroll view's own last offset. The top inset can settle after the first scroll event on a
+  // tab's first open, so when it changes the position is worked out again from the offset;
+  // otherwise the page reads as pulled down by the inset until the next scroll, and the wordmark,
+  // which follows a pull, sits up under the status bar.
+  const rawOffset = useSharedValue<number | null>(null);
   useEffect(() => {
     base.value = offsetBase;
-  }, [base, offsetBase]);
+    if (rawOffset.value !== null) scrollY.value = rawOffset.value + offsetBase;
+  }, [base, offsetBase, rawOffset, scrollY]);
 
   // Tapping the tab you are already on brings its page back to the top, as in every system app.
   // Native tabs announce the repeat tap through the navigator; the web's tab bar asks directly.
@@ -220,6 +226,7 @@ export function Screen({
 
   const onScroll = useAnimatedScrollHandler({
     onScroll: (event, context: { lastY?: number }) => {
+      rawOffset.value = event.contentOffset.y;
       const y = event.contentOffset.y + base.value;
       const delta = y - (context.lastY ?? y);
       context.lastY = y;
@@ -233,6 +240,11 @@ export function Screen({
         );
       } else if (y <= 40) {
         contentScrolling.value = withTiming(0, { duration: tokens.motion.duration.stepTransition });
+      }
+      // A tab's page folds the tab bar on the way down and opens it on any way back up.
+      if (clearTabBar) {
+        if (y <= 40 || delta < -6) tabBarFolded.value = 0;
+        else if (delta > 6 && y > 80) tabBarFolded.value = 1;
       }
     },
   });

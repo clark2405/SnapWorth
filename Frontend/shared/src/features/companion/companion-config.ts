@@ -16,8 +16,11 @@ import { formatPeso, previewListingDetail, previewPortfolio } from '../preview/s
 
 export interface CompanionConfig {
   readonly hidden: boolean;
-  /** Where Worthy rests: above the tab bar on tab roots, above the action bar on details. */
-  readonly lift: 'tabBar' | 'actionBar';
+  /**
+   * What Worthy rests above: the tab bar on the four tabs, a bottom bar (a page's actions, a
+   * chat's message box), or nothing, when it can go right down to the bottom.
+   */
+  readonly lift: 'tabBar' | 'actionBar' | 'none';
   readonly greeting: string;
   readonly hint?: string;
   readonly actions: readonly CompanionAction[];
@@ -49,7 +52,11 @@ const hiddenOn = [
 export function companionConfigFor(pathname: string, host: CompanionHost): CompanionConfig {
   const { go, ask, notify } = host;
   const hidden = hiddenOn.some((pattern) => pattern.test(pathname));
-  const lift = /^\/(item|listing|post|seller)\//.test(pathname) ? 'actionBar' : 'tabBar';
+  const lift = /^\/(feed|marketplace|chat|history)\/?$/.test(pathname)
+    ? 'tabBar'
+    : /^\/(item|listing|post|seller|chat)\//.test(pathname)
+      ? 'actionBar'
+      : 'none';
   const snap: CompanionAction = {
     key: 'snap',
     label: 'Snap something to value',

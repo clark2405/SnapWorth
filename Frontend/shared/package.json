@@ -19,6 +19,7 @@
     "./features/chat": "./src/features/chat/index.ts",
     "./features/companion": "./src/features/companion/index.ts",
     "./features/feed": "./src/features/feed/index.ts",
+    "./features/hanap": "./src/features/hanap/index.ts",
     "./features/history": "./src/features/history/index.ts",
     "./features/item": "./src/features/item/index.ts",
     "./features/launch": "./src/features/launch/index.ts",
@@ -37,6 +38,7 @@
     "@expo-google-fonts/bricolage-grotesque": "0.4.1",
     "@expo-google-fonts/dm-mono": "0.4.2",
     "@expo-google-fonts/plus-jakarta-sans": "0.4.2",
+    "@expo/ui": "58.0.23",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-masked-view/masked-view": "0.3.2",
     "@supabase/supabase-js": "2.117.2",
@@ -44,12 +46,14 @@
     "expo-font": "58.0.10",
     "expo-glass-effect": "58.0.5",
     "expo-haptics": "58.0.7",
+    "expo-sharing": "58.0.20",
     "lucide-react-native": "1.47.0",
     "react": "19.3.0",
     "react-native": "0.88.0",
     "react-native-gesture-handler": "3.3.0",
     "react-native-reanimated": "4.7.1",
     "react-native-safe-area-context": "5.10.1",
-    "react-native-svg": "15.16.0"
+    "react-native-svg": "15.16.0",
+    "react-native-view-shot": "6.1.1"
   }
 }

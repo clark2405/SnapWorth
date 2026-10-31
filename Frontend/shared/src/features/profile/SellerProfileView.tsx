@@ -1,11 +1,13 @@
 import { Flag, UserX } from 'lucide-react-native';
 import { View } from 'react-native';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 
 import {
+  paperIn,
+  paperLayout,
   Avatar,
-  IconButton,
   EmptyState,
+  IconButton,
   NavHeader,
   Rating,
   Reveal,
@@ -108,10 +110,8 @@ export function SellerProfileView({
             {listings.map((listing, index) => (
               <Animated.View
                 key={listing.id}
-                entering={FadeInDown.springify()
-                  .damping(18)
-                  .delay(Math.min(index, 4) * 50)}
-                layout={LinearTransition.springify().damping(20)}
+                entering={paperIn(Math.min(index, 4) * 50)}
+                layout={paperLayout}
                 style={styles.cell}
               >
                 <ListingCard listing={listing} onOpen={() => onOpenListing?.(listing.id)} />

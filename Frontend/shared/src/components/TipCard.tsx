@@ -1,11 +1,12 @@
 import type { LucideIcon } from 'lucide-react-native';
 import { X } from 'lucide-react-native';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
-import Animated, { FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { held, themedStyles, tokens, useTheme, useThemedStyles } from '../design';
 import { PressableScale } from './PressableScale';
 import { SWText } from './SWText';
+import { paperIn, paperLayout } from './paper-motion';
 
 export interface TipCardProps {
   readonly icon: LucideIcon;
@@ -24,9 +25,9 @@ export function TipCard({ icon: Icon, title, message, onClose, style }: TipCardP
   const styles = useThemedStyles(stylesFor);
   return (
     <Animated.View
-      entering={FadeInDown.springify().damping(18)}
+      entering={paperIn()}
       exiting={FadeOut.duration(tokens.motion.duration.fast)}
-      layout={LinearTransition}
+      layout={paperLayout}
       style={[styles.card, style]}
       accessibilityRole="summary"
     >

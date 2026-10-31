@@ -22,16 +22,20 @@ comment on table public.meetup_spots is
 
 -- Busy public places in Cebu City, where SnapWorth starts. Coordinates are from each place's
 -- Wikipedia entry (Fuente Osmeña Circle, which has none, from Waze), cross-checked with
--- latlong.net, Sygic, Travelprofy and findlatitudeandlongitude.com where they list it
--- (October 2026).
+-- latlong.net, Sygic, Travelprofy and findlatitudeandlongitude.com where they list it. SM
+-- Seaside's, JY Square's and Il Corso's are OpenStreetMap's own point for the mall (relation
+-- 7722019, nodes 1508435161 and 11468705743). Every pin was checked against OpenStreetMap's
+-- outline of its place (October 2026).
 insert into public.meetup_spots (key, name, city, area, lat, lng) values
   ('sm-city-cebu', 'SM City Cebu', 'Cebu City', 'reclamation', 10.311111, 123.918056),
   ('robinsons-galleria-cebu', 'Robinsons Galleria Cebu', 'Cebu City', 'reclamation', 10.304167, 123.911111),
   ('ayala-center-cebu', 'Ayala Center Cebu', 'Cebu City', 'business-park', 10.317778, 123.905),
   ('ayala-central-bloc', 'Ayala Malls Central Bloc, IT Park', 'Cebu City', 'it-park', 10.330556, 123.907222),
   ('fuente-osmena', 'Fuente Osmeña Circle', 'Cebu City', 'uptown', 10.309848, 123.893135),
+  ('jy-square', 'JY Square Mall', 'Cebu City', 'uptown', 10.330283, 123.898601),
   ('plaza-independencia', 'Plaza Independencia', 'Cebu City', 'downtown', 10.292917, 123.905556),
-  ('sm-seaside-cebu', 'SM Seaside City Cebu', 'Cebu City', 'srp', 10.280389, 123.881833);
+  ('sm-seaside-cebu', 'SM Seaside City Cebu', 'Cebu City', 'srp', 10.281823, 123.88241),
+  ('il-corso', 'Il Corso', 'Cebu City', 'srp', 10.26643, 123.877805);
 
 alter table public.meetup_spots enable row level security;
 create policy "Active meetup spots are public"
