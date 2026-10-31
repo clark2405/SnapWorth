@@ -69,7 +69,12 @@ jest.mock('expo-camera', () => {
 jest.mock('@snapworth/shared/features/capture', () => {
   const React = jest.requireActual<typeof ReactApi>('react');
   const { View, Button } = jest.requireActual<typeof ReactNativeApi>('react-native');
+  // The photo coach is plain data, so the real one is used.
+  const { coachFor } = jest.requireActual<{ coachFor: unknown }>(
+    '@snapworth/shared/features/capture/photo-coach',
+  );
   return {
+    coachFor,
     CaptureView: (props: {
       viewfinder: React.ReactNode;
       captureDisabled: boolean;
@@ -104,8 +109,9 @@ jest.mock('@snapworth/shared/components', () => {
 jest.mock('@snapworth/shared/design', () => ({
   tokens: {
     color: { dark: { sunken: '#000' } },
-    overlay: { text: '#fff' },
-    spacing: { 4: 16, 6: 24 },
+    overlay: { text: '#fff', chrome: '#0008' },
+    radius: { medium: 16 },
+    spacing: { 1: 4, 3: 12, 4: 16, 6: 24 },
   },
 }));
 
@@ -415,6 +421,9 @@ it('sends what the phone read along with a good photo', async () => {
   });
   // The brand is printed in the photo, so it's shown; the estimate replaces the first look.
   expect(screen.getByText('Looks like: high top sneakers · Nike')).toBeTruthy();
+  // The phone knows it's shoes, so the coach asks for the shots that matter for shoes.
+  expect(screen.getByText('For shoes, also snap')).toBeTruthy();
+  expect(screen.getByText('•  The size tag inside the tongue')).toBeTruthy();
   await act(async () => finish(sampleEstimate));
   expect(screen.queryByText(/Looks like/)).toBeNull();
   expect(screen.getByText('Camera-tested jacket')).toBeTruthy();

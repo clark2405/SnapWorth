@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, SWText } from '@snapworth/shared/components';
 import { tokens } from '@snapworth/shared/design';
-import { CaptureView } from '@snapworth/shared/features/capture';
+import { CaptureView, coachFor, type PhotoCoach } from '@snapworth/shared/features/capture';
 import type {
   CapturedItemImage,
   PhotoClues,
@@ -56,6 +56,9 @@ export function CameraCapture({
   const [checking, setChecking] = useState(false);
   const [problem, setProblem] = useState<PhotoProblem>();
   const [looksLike, setLooksLike] = useState<string>();
+  // The kind of item, from the on-device reader, for the photo coach. Unknown without Apple
+  // Intelligence: the coach then gives general tips (the cloud AI will fill this in later).
+  const [itemKind, setItemKind] = useState<string | null>(null);
   const [clues, setClues] = useState<PhotoClues>();
   const lookGeneration = useRef(0);
   const estimateGeneration = useRef(0);
@@ -145,6 +148,7 @@ export function CameraCapture({
     const impression = await readItem(uri);
     if (look !== lookGeneration.current) return;
     setChecking(false);
+    setItemKind(impression?.category ?? null);
     if (impression?.item.trim()) {
       const brand = confirmedBrand(impression, measurement?.text ?? []);
       setLooksLike(brand ? `${impression.item} · ${brand}` : impression.item);
@@ -159,6 +163,7 @@ export function CameraCapture({
     setChecking(false);
     setProblem(undefined);
     setLooksLike(undefined);
+    setItemKind(null);
     setClues(undefined);
   };
 
@@ -338,6 +343,7 @@ export function CameraCapture({
             Read on the item: {clues.text.slice(0, 3).join(' · ')}
           </SWText>
         ) : null}
+        {!checking && !problem ? <CoachList coach={coachFor(itemKind)} /> : null}
         {estimating ? (
           <SWText
             variant="headingLarge"
@@ -460,7 +466,33 @@ export function CameraCapture({
   );
 }
 
+/** The photo coach after a snap: the shots that would help buyers and the AI judge it. */
+function CoachList({ coach }: { readonly coach: PhotoCoach }) {
+  return (
+    <View
+      style={styles.coach}
+      accessible
+      accessibilityLabel={`${coach.title}: ${coach.shots.join(', ')}`}
+    >
+      <SWText variant="label" color={tokens.overlay.text}>
+        {coach.title}
+      </SWText>
+      {coach.shots.map((shot) => (
+        <SWText key={shot} variant="caption" color={tokens.overlay.text}>
+          {`•  ${shot}`}
+        </SWText>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  coach: {
+    gap: tokens.spacing[1],
+    padding: tokens.spacing[3],
+    borderRadius: tokens.radius.medium,
+    backgroundColor: tokens.overlay.chrome,
+  },
   root: { flex: 1, backgroundColor: tokens.color.dark.sunken },
   panel: {
     flex: 1,
