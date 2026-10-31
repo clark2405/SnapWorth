@@ -14,7 +14,13 @@ const liftRoom = {
   // iOS: tab bar plus its accessory. Android: Material navigation bar plus the floating Snap bar.
   tabBar: Platform.OS === 'android' ? 152 : 126,
   actionBar: 92,
+  none: 0,
 } as const;
+/**
+ * iOS folds its tab bar into one short row as you scroll down a tab; Worthy can then come down
+ * to just above it. Android's bars don't fold.
+ */
+const foldedTabBarRoom = Platform.OS === 'android' ? liftRoom.tabBar : 62;
 
 /** Mounts Worthy over every screen and feeds it the actions for the current route. */
 export function CompanionHost({ ready }: { readonly ready: boolean }) {
@@ -40,6 +46,7 @@ export function CompanionHost({ ready }: { readonly ready: boolean }) {
       hint={config.hint}
       hidden={!ready || config.hidden}
       bottomOffset={liftRoom[config.lift]}
+      foldedBottomOffset={config.lift === 'tabBar' ? foldedTabBarRoom : undefined}
       onAsk={(question) => router.push({ pathname: '/worthy', params: { q: question } })}
       onHoldSnap={() => router.push('/capture')}
       // Worthy works with your own snaps, listings and chats: a guest is asked for an account.

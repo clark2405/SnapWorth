@@ -140,7 +140,17 @@ function WebCompanion({ ready }: { readonly ready: boolean }) {
       hidden={!ready || config.hidden || (wide && pathname === '/chat')}
       // On a wide window there's no floating tab bar to ride above, only the page's edge; a
       // screen's own bottom bar is still there to clear.
-      bottomOffset={config.lift === 'tabBar' ? (wide ? tokens.spacing[6] : 90) : 92}
+      bottomOffset={
+        config.lift === 'tabBar'
+          ? wide
+            ? tokens.spacing[6]
+            : 142
+          : config.lift === 'actionBar'
+            ? 92
+            : 0
+      }
+      // The folded tab bar is one short row; Worthy can come down to just above it.
+      foldedBottomOffset={config.lift === 'tabBar' && !wide ? 66 : undefined}
       onAsk={(question) => router.push({ pathname: '/worthy', params: { q: question } })}
       onHoldSnap={() => router.push('/capture')}
       // Worthy works with your own snaps, listings and chats: a guest is asked for an account.
