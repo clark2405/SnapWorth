@@ -22,6 +22,11 @@ const common = {
 const pureUnitProject = {
   ...common,
   displayName: 'unit-node',
+  // Sample data bundles photos; plain Node cannot load them, and these tests never show them.
+  moduleNameMapper: {
+    ...common.moduleNameMapper,
+    '\\.(jpe?g|png|webp)$': '<rootDir>/test/image-stub.cjs',
+  },
   testMatch: ['**/?(*.)+(test).[jt]s?(x)'],
   testPathIgnorePatterns: [
     ...common.testPathIgnorePatterns,

@@ -7,7 +7,6 @@ import {
   createLocalHanapRepository,
   createLocalSukiRepository,
   createSupabaseChatRepository,
-  createSupabaseClient,
   createSupabaseCommentRepository,
   createSupabaseHanapRepository,
   createSupabaseSukiRepository,
@@ -16,6 +15,7 @@ import {
   type LocalSeedComment,
   type LocalSeedConversation,
 } from '../adapters';
+import { getSupabase } from '../adapters/supabaseClient';
 import { ChatServiceProvider } from '../features/chat/chat-state';
 import { SukiProvider } from '../features/chat/suki';
 import { CommentServiceProvider } from '../features/feed';
@@ -198,10 +198,7 @@ const demoReplies = [
  */
 export function createAppServices(config: BackendConfig): AppServices {
   if (config.supabaseUrl && config.supabaseAnonKey) {
-    const client = createSupabaseClient(
-      { url: config.supabaseUrl, anonKey: config.supabaseAnonKey },
-      AsyncStorage,
-    );
+    const client = getSupabase({ url: config.supabaseUrl, anonKey: config.supabaseAnonKey });
     return {
       backend: 'supabase',
       comments: createCommentService(createSupabaseCommentRepository(client)),
