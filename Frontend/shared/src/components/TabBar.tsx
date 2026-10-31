@@ -1,7 +1,11 @@
-import type { LucideIcon } from 'lucide-react-native';
+import { Search, type LucideIcon } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View, type LayoutRectangle } from 'react-native';
 import Animated, {
+  FadeIn,
+  FadeOut,
+  runOnJS,
+  useAnimatedReaction,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -13,8 +17,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../design';
 import { GlassSurface } from './GlassSurface';
 import { PressableScale } from './PressableScale';
+import { SnapRow } from './SnapRow';
 import { SWText } from './SWText';
+import { tabBarFolded } from './scroll-signal';
 import { usePop } from './usePop';
+import { paperLayout } from './paper-motion';
 
 export interface TabItem<Key extends string> {
   readonly key: Key;
@@ -26,14 +33,26 @@ export interface TabBarProps<Key extends string> {
   readonly tabs: readonly TabItem<Key>[];
   readonly activeKey?: Key;
   readonly onSelect: (key: Key) => void;
+  /** Opens the camera. Snap rides above the tabs, as it does on iOS. */
+  readonly onSnap?: () => void;
+  /** Opens search, in its own circle beside the tabs, as on iOS. */
+  readonly onSearch?: () => void;
 }
 
 /**
- * A floating glass capsule for platforms without the native tab bar (the web): tabs with thin
- * line icons, the active one in ink with a bold label on a soft gliding pill. Tabs are places
- * only; actions such as Snap live on the screens they belong to.
+ * The tab bar for platforms without the native one (the web), laid out like iOS's: Snap, the
+ * core action, rides above in its own bar; below, the places in a floating glass capsule, with
+ * search in a circle of its own beside them. Tabs have thin line icons, the active one in ink
+ * with a bold label on a soft gliding pill.
  */
-export function TabBar<Key extends string>({ tabs, activeKey, onSelect }: TabBarProps<Key>) {
+export function TabBar<Key extends string>({
+  tabs,
+  activeKey,
+  onSelect,
+  onSnap,
+  onSearch,
+}: TabBarProps<Key>) {
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useThemedStyles(stylesFor);
   const reduceMotion = useReducedMotion();
@@ -44,6 +63,24 @@ export function TabBar<Key extends string>({ tabs, activeKey, onSelect }: TabBar
   const placed = useSharedValue(false);
 
   const target = activeKey === undefined ? undefined : slots[activeKey];
+
+  // Folded, as iOS's bar folds while you scroll down a page: the open tab, a compact Snap and
+  // search on one row. Scrolling back up, reaching the top, switching tabs or tapping the tab
+  // opens it again.
+  const [folded, setFolded] = useState(false);
+  useAnimatedReaction(
+    () => tabBarFolded.value > 0.5,
+    (now, before) => {
+      if (now !== before) runOnJS(setFolded)(now);
+    },
+  );
+  useEffect(() => {
+    tabBarFolded.value = 0;
+  }, [activeKey]);
+  const unfold = () => {
+    tabBarFolded.value = 0;
+  };
+  const activeTab = tabs.find((item) => item.key === activeKey);
 
   // One pill for the whole bar: it slides to the chosen tab and stretches to fit, so switching
   // tabs reads as the selection travelling rather than one tab dimming as another lights.
@@ -96,15 +133,87 @@ export function TabBar<Key extends string>({ tabs, activeKey, onSelect }: TabBar
     </View>
   );
 
-  return (
-    <View style={[styles.dock, { paddingBottom: Math.max(insets.bottom, tokens.spacing[3]) }]}>
-      <View style={styles.capsuleShadow}>
-        <GlassSurface style={styles.capsule}>
-          <View accessibilityRole="tablist" style={styles.row}>
-            <Animated.View pointerEvents="none" style={[styles.pill, pillStyle]} />
-            {tabs.map(renderTab)}
-          </View>
+  const search = (size: 'regular' | 'folded') =>
+    onSearch ? (
+      <View style={styles.shadow}>
+        <GlassSurface style={size === 'folded' ? styles.foldedCircle : styles.searchCircle}>
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel="Search"
+            onPress={onSearch}
+            style={size === 'folded' ? styles.foldedCircle : styles.searchButton}
+          >
+            <Search
+              size={size === 'folded' ? 22 : 24}
+              strokeWidth={1.75}
+              color={colors.textPrimary}
+            />
+          </PressableScale>
         </GlassSurface>
+      </View>
+    ) : null;
+
+  const dockStyle = [styles.dock, { paddingBottom: Math.max(insets.bottom, tokens.spacing[3]) }];
+
+  if (folded && activeTab) {
+    const Icon = activeTab.icon;
+    return (
+      <View style={dockStyle}>
+        <Animated.View
+          entering={FadeIn.duration(tokens.motion.duration.base)}
+          exiting={FadeOut.duration(tokens.motion.duration.base)}
+          layout={paperLayout}
+          style={styles.bottomRow}
+        >
+          <View style={styles.shadow}>
+            <GlassSurface style={styles.foldedTab}>
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityLabel={`${activeTab.label}. Show all tabs`}
+                onPress={unfold}
+                style={styles.foldedTabFace}
+              >
+                <Icon size={20} strokeWidth={2} color={colors.textPrimary} />
+                <SWText variant="tabLabelActive" tone="textPrimary">
+                  {activeTab.label}
+                </SWText>
+              </PressableScale>
+            </GlassSurface>
+          </View>
+          {onSnap ? (
+            <View style={[styles.shadow, styles.capsuleSlot]}>
+              <GlassSurface style={styles.foldedSnap}>
+                <SnapRow compact onPress={onSnap} />
+              </GlassSurface>
+            </View>
+          ) : (
+            <View style={styles.capsuleSlot} />
+          )}
+          {search('folded')}
+        </Animated.View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={dockStyle}>
+      {onSnap ? (
+        <View style={[styles.shadow, styles.snapSlot]}>
+          <GlassSurface style={styles.snapBar}>
+            <SnapRow compact={false} onPress={onSnap} />
+          </GlassSurface>
+        </View>
+      ) : null}
+      <View style={styles.bottomRow}>
+        <View style={[styles.shadow, styles.capsuleSlot]}>
+          <GlassSurface style={styles.capsule}>
+            <View accessibilityRole="tablist" style={styles.row}>
+              <Animated.View pointerEvents="none" style={[styles.pill, pillStyle]} />
+              {tabs.map(renderTab)}
+            </View>
+          </GlassSurface>
+        </View>
+        {search('regular')}
       </View>
     </View>
   );
@@ -161,6 +270,9 @@ function Tab<Key extends string>({
   );
 }
 
+/** The folded bar's height: one row of the open tab, a compact Snap and search. */
+const foldedHeight = 52;
+
 const stylesFor = themedStyles((colors, name) => ({
   dock: {
     position: 'absolute',
@@ -172,14 +284,42 @@ const stylesFor = themedStyles((colors, name) => ({
     paddingHorizontal: tokens.spacing[4],
     pointerEvents: 'box-none',
   },
-  capsuleShadow: {
-    width: '100%',
-    maxWidth: tokens.layout.phoneColumn - tokens.spacing[8],
+  shadow: {
     borderRadius: tokens.radius.full,
     shadowColor: tokens.lifted[name],
     shadowOpacity: 1,
     shadowRadius: 26,
     shadowOffset: { width: 0, height: 14 },
+  },
+  // The Snap bar and the row below it share one width, like iOS's accessory and tab bar.
+  snapSlot: {
+    width: '100%',
+    maxWidth: tokens.layout.phoneColumn - tokens.spacing[8],
+  },
+  snapBar: {
+    borderRadius: tokens.radius.full,
+    paddingVertical: tokens.spacing[1],
+  },
+  bottomRow: {
+    width: '100%',
+    maxWidth: tokens.layout.phoneColumn - tokens.spacing[8],
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing[3],
+  },
+  capsuleSlot: {
+    flex: 1,
+  },
+  searchCircle: {
+    width: tokens.layout.floatingTabBar,
+    height: tokens.layout.floatingTabBar,
+    borderRadius: tokens.radius.full,
+  },
+  searchButton: {
+    width: tokens.layout.floatingTabBar,
+    height: tokens.layout.floatingTabBar,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   capsule: {
     width: '100%',
@@ -209,6 +349,29 @@ const stylesFor = themedStyles((colors, name) => ({
   },
   tabFaceActive: {
     ...StyleSheet.absoluteFill,
+    justifyContent: 'center',
+  },
+  foldedTab: {
+    height: foldedHeight,
+    borderRadius: tokens.radius.full,
+  },
+  foldedTabFace: {
+    height: foldedHeight,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing[2],
+    paddingHorizontal: tokens.spacing[4],
+  },
+  foldedSnap: {
+    height: foldedHeight,
+    borderRadius: tokens.radius.full,
+    justifyContent: 'center',
+  },
+  foldedCircle: {
+    width: foldedHeight,
+    height: foldedHeight,
+    borderRadius: tokens.radius.full,
+    alignItems: 'center',
     justifyContent: 'center',
   },
   pill: {

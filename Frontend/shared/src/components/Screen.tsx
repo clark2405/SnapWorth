@@ -53,7 +53,7 @@ import { AmbientBackdrop, useBackdropClaim, type AmbientBackdropProps } from './
 import { BackdropHostContext, ScreenPresenceContext } from './backdrop-host';
 import { useScreenVisibility } from './screen-visibility';
 import { ScrollEdge } from './ScrollEdge';
-import { contentScrolling, onScrollToTopRequest } from './scroll-signal';
+import { contentScrolling, onScrollToTopRequest, tabBarFolded } from './scroll-signal';
 import { SWText } from './SWText';
 
 /** The shortest a pull-to-refresh shows itself reloading: one pass of the wordmark's wave. */
@@ -240,6 +240,11 @@ export function Screen({
         );
       } else if (y <= 40) {
         contentScrolling.value = withTiming(0, { duration: tokens.motion.duration.stepTransition });
+      }
+      // A tab's page folds the tab bar on the way down and opens it on any way back up.
+      if (clearTabBar) {
+        if (y <= 40 || delta < -6) tabBarFolded.value = 0;
+        else if (delta > 6 && y > 80) tabBarFolded.value = 1;
       }
     },
   });

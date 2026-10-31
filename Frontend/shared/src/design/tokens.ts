@@ -637,9 +637,12 @@ export const tokens = deepFreeze({
     nativeTabBarClearance: 140,
     /** Android: Material's navigation bar plus the Snap bar floating above it, over the inset. */
     androidTabBarClearance: 152,
-    /** Room above the web's floating tab bar, so content and the companion clear it. */
-    floatingTabBarClearance: 112,
-    floatingTabBar: 74,
+    /**
+     * Room above the web's floating tab bar and the Snap bar riding on it, so content clears
+     * both. The bar matches iOS's: 62pt tabs, a 12pt gap, the 56pt Snap bar.
+     */
+    floatingTabBarClearance: 146,
+    floatingTabBar: 62,
     /** The tall primary pill: the one accent action on a screen. */
     primaryButton: 56,
     headerCompact: 52,
