@@ -31,9 +31,10 @@ Last updated 2026-10-31.
 - **One sign-in:** chats, comments, Hanap and suki use the same Supabase client as sign-in, so what
   someone does belongs to the account they signed in with (PR #20).
 - **Your own profile:** name, handle, photo, location and bio come from the account, and the listed,
-  sold and chat counts from Supabase (PR #20). **Catch:** edits are saved to the account, but
-  `public.profiles` only allows reads, so a new handle or photo never reaches it. Comments and
-  chats keep showing the old handle until a migration lets people update their own row.
+  sold and chat counts from Supabase (PR #20). A new handle is saved to `public.profiles` too, so
+  comments and chats show it; a taken one is turned away (needs the `profile_handles` migration
+  deployed). The photo stays on the account, on that phone only, until photos are uploaded to
+  Storage.
 - **Snap → AI estimate:** the phone's camera checks the photo and sends it to the
   `estimate-price` Edge Function (Gemini) for a real estimate.
 - **On-device AI:** the photo check and label reading on every iPhone. With Apple Intelligence,
@@ -93,9 +94,11 @@ on them isn't saved.
   (OpenStreetMap's own tiles, and its Nominatim search behind the meetup map's search box) are
   for development only. Set `EXPO_PUBLIC_MAP_TILES_URL` and `EXPO_PUBLIC_PLACE_SEARCH_URL`.
 - **Android:** not yet checked on a phone. The Snap bar may be hidden behind the tab bar.
-- **Deploy the hanap and suki backend changes:** `npx supabase db push` (hanap and suki tables) and
+- **Deploy the backend changes:** `npx supabase db push` (hanap and suki tables, and changing your
+  own handle) and
   `npx supabase functions deploy moderate-content` (it now screens hanap posts too). Without a
   moderation provider configured, every hanap post is held, so only its author sees it.
+- **Profile photos:** uploading them to Supabase Storage, so other people can see them.
 - **Deployment:** EAS builds for the phones, and Vercel for the web.
 
 The detailed task lists are in `agents/specs/`. Git keeps that folder local, so ask whoever has it,
