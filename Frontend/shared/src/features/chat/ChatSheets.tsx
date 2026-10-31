@@ -25,6 +25,9 @@ import type { MeetupPurpose } from '../../types/entities';
 import { findMeetupSpot, homeCity, meetupSpots } from '../../types/meetup-spots';
 import { distanceMeters, project, unproject, type Camera } from './meetup-map-geo';
 import { MeetupPicker, placingZoom } from './MeetupPicker';
+import type { FoundPlace } from './place-search';
+import { PlaceSearch } from './PlaceSearch';
+import { FullMeetupMap } from './FullMeetupMap';
 import { sukiDiscounts } from '../../ports/suki';
 import { sukiPrice } from './suki';
 
@@ -247,6 +250,8 @@ export function MeetupSheet({
   const [name, setName] = useState('');
   const [day, setDay] = useState<string | null>(null);
   const [time, setTime] = useState<string | null>(null);
+  // The map, full screen, for when the sheet's is too small to find the spot.
+  const [fullMap, setFullMap] = useState(false);
   // A shorter map on a short phone, so the whole sheet still fits.
   const aspect = screenHeight < 760 ? 2.1 : 1.55;
 
@@ -258,6 +263,7 @@ export function MeetupSheet({
     setName('');
     setDay(null);
     setTime(null);
+    setFullMap(false);
   }, [initialPurpose, visible]);
 
   const moveTo = (next: Camera) => {
@@ -276,6 +282,17 @@ export function MeetupSheet({
     setSpotKey(spot.key);
     setName(spot.name);
     setCamera({ center: project(spot.lat, spot.lng), zoom: spotZoom });
+  };
+
+  // A searched place: a suggested spot keeps its key, anywhere else is the person's own spot.
+  const goTo = (place: FoundPlace) => {
+    if (place.spotKey) {
+      suggest(place.spotKey);
+      return;
+    }
+    setSpotKey(null);
+    setName(place.name);
+    setCamera({ center: project(place.lat, place.lng), zoom: spotZoom });
   };
 
   const label = (options: typeof previewMeetupDays, key: string | null) =>
@@ -301,12 +318,23 @@ export function MeetupSheet({
         <SWText variant="overline" tone="textMuted">
           Where
         </SWText>
+        <PlaceSearch onPick={goTo} />
         <MeetupPicker
           camera={camera}
           onCameraChange={moveTo}
           label={name.trim() || undefined}
           aspect={aspect}
           accessibilityLabel="Map for choosing where to meet"
+          onToggleSize={() => setFullMap(true)}
+        />
+        <FullMeetupMap
+          visible={fullMap}
+          camera={camera}
+          name={name}
+          onCameraChange={moveTo}
+          onNameChange={setName}
+          onPick={goTo}
+          onClose={() => setFullMap(false)}
         />
         <ChoiceChips
           options={meetupSpots.map((spot) => ({ key: spot.key, label: spot.name }))}

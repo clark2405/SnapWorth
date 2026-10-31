@@ -1,4 +1,4 @@
-import { LocateFixed, Minus, Plus } from 'lucide-react-native';
+import { LocateFixed, Maximize2, Minimize2, Minus, Plus } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -31,9 +31,12 @@ export interface MeetupPickerProps {
   readonly onCameraChange: (camera: Camera) => void;
   /** The name of the place under the pin, worn on a sticker above it. */
   readonly label?: string;
-  /** Width over height. */
-  readonly aspect: number;
+  /** Width over height. Leave it out to fill the space given, as the full-screen map does. */
+  readonly aspect?: number;
   readonly accessibilityLabel: string;
+  /** Shows a button to open the map bigger, or, when `expanded`, to close it back down. */
+  readonly onToggleSize?: () => void;
+  readonly expanded?: boolean;
 }
 
 /** Runs inside the pinch gesture, on the UI thread, so it must be a worklet. */
@@ -54,6 +57,8 @@ export function MeetupPicker({
   label,
   aspect,
   accessibilityLabel,
+  onToggleSize,
+  expanded = false,
 }: MeetupPickerProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
@@ -145,9 +150,9 @@ export function MeetupPicker({
   const middle = { left: size.width / 2, top: size.height / 2 };
 
   return (
-    <View style={[styles.frame, held(colors, 3)]}>
+    <View style={[styles.frame, aspect === undefined ? styles.fill : null, held(colors, 3)]}>
       <View
-        style={[styles.clip, { aspectRatio: aspect }]}
+        style={[styles.clip, aspect === undefined ? styles.fill : { aspectRatio: aspect }]}
         onLayout={onLayout}
         accessibilityLabel={accessibilityLabel}
         accessibilityHint="Drag the map to move the pin. Pinch, double-tap or use the buttons to zoom."
@@ -211,6 +216,18 @@ export function MeetupPicker({
             N
           </SWText>
         </View>
+        {/* In the corner the credit leaves free, clear of the zoom buttons on a short map. */}
+        {onToggleSize ? (
+          <View style={styles.size}>
+            <IconButton
+              icon={expanded ? Minimize2 : Maximize2}
+              label={expanded ? 'Smaller map' : 'Bigger map'}
+              appearance="tinted"
+              size={18}
+              onPress={onToggleSize}
+            />
+          </View>
+        ) : null}
         <View style={styles.zoom}>
           <IconButton
             icon={Plus}
@@ -246,6 +263,9 @@ const stylesFor = themedStyles((colors) => ({
   frame: {
     borderRadius: tokens.radius.large,
     backgroundColor: colors.mapLand,
+  },
+  fill: {
+    flex: 1,
   },
   clip: {
     width: '100%',
@@ -315,5 +335,10 @@ const stylesFor = themedStyles((colors) => ({
     right: tokens.spacing[2],
     bottom: tokens.spacing[5],
     gap: tokens.spacing[1],
+  },
+  size: {
+    position: 'absolute',
+    left: tokens.spacing[2],
+    bottom: tokens.spacing[5],
   },
 }));
