@@ -21,7 +21,7 @@ both apps.
 ## What's built and what isn't
 
 Keep this list current: when you finish or start something, move it here in the same change.
-Last updated 2026-10-31.
+Last updated 2026-11-04.
 
 ### Working for real
 
@@ -59,6 +59,11 @@ Last updated 2026-10-31.
 
 - **Flip tracker:** what an owner paid for an item, and the gain, in History and on the item.
 - **Collections:** sets of History items, with their total and flip, shareable as a picture.
+- **Guess the worth:** a daily game on the Feed. It's five of the Market's listings, the same five
+  for everyone that day. You guess each one's worth, then see the AI's estimate and what voters
+  think of the asking price. Your scores, streak and Sharp eye badges stay on the device; no
+  account needed. It draws from the Market's sample listings and their sample AI estimates
+  (`previewListingWorth`) until listings are stored in Supabase.
 
 ### Screens built, but showing sample data
 
@@ -94,10 +99,11 @@ on them isn't saved.
   (OpenStreetMap's own tiles, and its Nominatim search behind the meetup map's search box) are
   for development only. Set `EXPO_PUBLIC_MAP_TILES_URL` and `EXPO_PUBLIC_PLACE_SEARCH_URL`.
 - **Android:** not yet checked on a phone. The Snap bar may be hidden behind the tab bar.
-- **Deploy the backend changes:** `npx supabase db push` (hanap and suki tables, and changing your
-  own handle) and
-  `npx supabase functions deploy moderate-content` (it now screens hanap posts too). Without a
-  moderation provider configured, every hanap post is held, so only its author sees it.
+- **A moderation provider:** Supabase has no `MODERATION_PROVIDER` secret set, so
+  `moderate-content` holds every feed comment and hanap post: only its author sees it. Set
+  `MODERATION_PROVIDER=rules` for the built-in word rules (fine while testing), or `openai` with an
+  `OPENAI_API_KEY` (OpenAI's moderation is free) before launch. Set it in the dashboard under Edge
+  Functions → Secrets, or with `npx supabase secrets set`.
 - **Profile photos:** uploading them to Supabase Storage, so other people can see them.
 - **Deployment:** EAS builds for the phones, and Vercel for the web.
 
