@@ -63,6 +63,8 @@ export function ChatServiceProvider({
   });
   const loading = useRef<Promise<void> | null>(null);
   const again = useRef(false);
+  /** Moves on whenever the account changes, so a list loaded for the old one is thrown away. */
+  const account = useRef(0);
 
   // One load at a time; a change while one is running asks for one more after it.
   const refresh = useCallback((): Promise<void> => {
@@ -73,7 +75,9 @@ export function ChatServiceProvider({
     const run = (async () => {
       do {
         again.current = false;
+        const loadingFor = account.current;
         const result = await service.list();
+        if (loadingFor !== account.current) continue;
         setList((current) =>
           result.ok
             ? { status: 'ready', conversations: result.value, error: null }
@@ -95,6 +99,12 @@ export function ChatServiceProvider({
     void refresh();
     return service.subscribe((event) => {
       if (event.type === 'message') void refresh();
+      if (event.type === 'account') {
+        // Off the screen at once, so nobody sees the last account's chats, even briefly.
+        account.current += 1;
+        setList({ status: 'loading', conversations: [], error: null });
+        if (event.signedIn) void refresh();
+      }
     });
   }, [refresh, service, wanted]);
 
@@ -278,6 +288,14 @@ export function useConversation(conversationId: string | undefined): Conversatio
     });
     const unsubscribe = service.subscribe((event) => {
       if (!active) return;
+      // A chat open when the account changes is asked for again, as the new account.
+      if (event.type === 'account') {
+        setStatus('loading');
+        setConversation(null);
+        setMessages([]);
+        setAttempt((count) => count + 1);
+        return;
+      }
       if (event.type === 'typing') {
         if (event.conversationId === id) setTyping(event.typing);
         return;
