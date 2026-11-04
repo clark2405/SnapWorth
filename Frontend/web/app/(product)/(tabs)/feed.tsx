@@ -16,6 +16,7 @@ export default function FeedRoute() {
       onSharePost={(postId) => share(`/post/${postId}`, 'Is this priced right? Vote on SnapWorth.')}
       onOpenProfile={() => router.push('/profile')}
       onOpenTrend={(trend) => router.push(`/trend/${trend}`)}
+      onOpenGuess={() => router.push('/guess')}
     />
   );
 }

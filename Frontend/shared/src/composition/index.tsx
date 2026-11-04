@@ -20,6 +20,7 @@ import { ChatServiceProvider } from '../features/chat/chat-state';
 import { SukiProvider } from '../features/chat/suki';
 import { CommentServiceProvider } from '../features/feed';
 import { HanapProvider } from '../features/hanap/hanap-state';
+import { GuessProvider } from '../features/guess/guess-state';
 import { CollectionsProvider } from '../features/history/collections';
 import { PaidPricesProvider } from '../features/history/paid-prices';
 import {
@@ -280,7 +281,8 @@ export function AppServicesProvider({
               device for now. */}
               <PaidPricesProvider store={AsyncStorage} seed={previewPaidPrices}>
                 <CollectionsProvider store={AsyncStorage} seed={previewCollections}>
-                  {children}
+                  {/* Guess the worth needs no account, so its days stay on the device. */}
+                  <GuessProvider store={AsyncStorage}>{children}</GuessProvider>
                 </CollectionsProvider>
               </PaidPricesProvider>
             </SukiProvider>

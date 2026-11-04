@@ -20,6 +20,7 @@ import {
 } from '../../components';
 import { held, themedStyles, tokens, useThemedStyles, useWideLayout } from '../../design';
 import type { VoteChoice } from '../../types';
+import { GuessEntry } from '../guess/GuessEntry';
 import { previewOlderPosts, previewPosts, previewTrending } from '../preview/sample-data';
 import { ProfileButton } from '../profile/ProfileButton';
 import { useAccountGate } from '../session';
@@ -39,6 +40,8 @@ export interface FeedViewProps {
   readonly onOpenTrend?: (trendKey: string) => void;
   /** Shares a link to a post, from its press-and-hold menu. */
   readonly onSharePost?: (postId: string) => void;
+  /** Opens today's Guess the worth. Without it, the Feed doesn't offer the game. */
+  readonly onOpenGuess?: () => void;
 }
 
 type PreviewTrend = (typeof previewTrending)[number];
@@ -57,6 +60,7 @@ export function FeedView({
   onSnap,
   onOpenTrend,
   onSharePost,
+  onOpenGuess,
 }: FeedViewProps) {
   const styles = useThemedStyles(stylesFor);
   // Local until VoteService exists: tapping the same vote again withdraws it.
@@ -119,6 +123,12 @@ export function FeedView({
           ))}
         </ScrollView>
       </Reveal>
+
+      {onOpenGuess ? (
+        <Reveal index={0} style={styles.guess}>
+          <GuessEntry onOpen={onOpenGuess} />
+        </Reveal>
+      ) : null}
 
       <View style={gridded ? styles.grid : styles.list} onLayout={grid.onLayout}>
         {feedPosts.map((post, index) => (
@@ -246,5 +256,9 @@ const stylesFor = themedStyles((colors) => ({
   },
   tip: {
     marginBottom: tokens.spacing[6],
+  },
+  guess: {
+    marginTop: -tokens.spacing[4],
+    marginBottom: tokens.spacing[10],
   },
 }));
