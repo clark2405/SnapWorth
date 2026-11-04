@@ -304,6 +304,24 @@ export const previewListings: readonly PreviewListing[] = [
   },
 ];
 
+/**
+ * What SnapWorth's AI puts each Market listing at, and its range: the answers in Guess the
+ * worth. They agree with the community's verdicts above (the Jordans' price is called too low,
+ * so the AI puts them higher).
+ */
+export const previewListingWorth: Readonly<
+  Record<string, { readonly estimate: number; readonly low: number; readonly high: number }>
+> = {
+  'polaroid-sun-600': { estimate: 2750, low: 2300, high: 3100 },
+  'air-jordan-1-bred': { estimate: 9400, low: 8400, high: 10400 },
+  'retro-walkman': { estimate: 1900, low: 1600, high: 2200 },
+  'keychron-keyboard': { estimate: 3900, low: 3400, high: 4300 },
+  'nike-teal-windbreaker': { estimate: 2450, low: 2100, high: 2800 },
+  'colour-block-windbreaker': { estimate: 2400, low: 2100, high: 2700 },
+  'black-puffer-jacket': { estimate: 2800, low: 2400, high: 3200 },
+  'polaroid-film-bundle': { estimate: 3600, low: 3100, high: 4100 },
+};
+
 export const previewListingDetail = {
   id: 'polaroid-sun-600',
   title: 'Vintage Polaroid Sun 600',
