@@ -178,6 +178,23 @@ export function createSupabaseChatRepository(client: SupabaseClient): ChatReposi
     channel = undefined;
   }
 
+  // When the account changes (signing in, out, or as someone else), the old account's chats
+  // must leave the screen and the live channel must listen as the new one. The first answer
+  // is the session the app started with, which isn't a change.
+  let account: string | null | undefined;
+  client.auth.onAuthStateChange((_event, session) => {
+    const next = session?.user.id ?? null;
+    const known = account;
+    account = next;
+    if (known === undefined || known === next) return;
+    if (listeners.size > 0) {
+      closeChannel();
+      if (next) openChannel();
+    }
+    const event = { type: 'account' as const, signedIn: next !== null };
+    listeners.forEach((each) => each(event));
+  });
+
   return {
     async start(listingKey) {
       const viewer = await viewerId();

@@ -22,7 +22,12 @@ export type ChatEvent =
       readonly type: 'typing';
       readonly conversationId: ConversationId;
       readonly typing: boolean;
-    };
+    }
+  /**
+   * Someone else is signed in now, or nobody is: every chat on screen belonged to the old
+   * account and has to go. `signedIn` says whether there's a new account to load chats for.
+   */
+  | { readonly type: 'account'; readonly signedIn: boolean };
 
 export type ChatListener = (event: ChatEvent) => void;
 
