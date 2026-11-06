@@ -91,7 +91,11 @@ export function CameraCapture({
     [],
   );
 
-  const estimatePhoto = async (image: CapturedItemImage, hints?: PhotoClues, uriForSave?: string) => {
+  const estimatePhoto = async (
+    image: CapturedItemImage,
+    hints?: PhotoClues,
+    uriForSave?: string,
+  ) => {
     if (estimateRequest.current) return;
     const generation = ++estimateGeneration.current;
     const controller = new AbortController();
@@ -410,7 +414,10 @@ export function CameraCapture({
           </SWText>
         ) : null}
         {(estimateError || estimate?.status === 'unable_to_estimate') && photoData ? (
-          <Button label="Retry estimate" onPress={() => void estimatePhoto(photoData, clues, photoUri)} />
+          <Button
+            label="Retry estimate"
+            onPress={() => void estimatePhoto(photoData, clues, photoUri)}
+          />
         ) : null}
         {problem && photoData ? (
           <Button
