@@ -123,7 +123,7 @@ export function CameraCapture({
             highPhp: result.highPhp,
             explanation: result.explanation,
             assumptions: result.assumptions,
-            resolvedUri,
+            photoUri: resolvedUri,
             capturedOn: new Date().toLocaleDateString('en-US', {
               month: 'short',
               day: 'numeric',
