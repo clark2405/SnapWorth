@@ -51,11 +51,7 @@ import { ProfileButton } from '../profile/ProfileButton';
 import { CollectionsStrip } from './CollectionsStrip';
 import { flipOf, flipTotals, gainLabel, type FlipTotals } from './flips';
 import { usePaidPrices } from './paid-prices';
-import {
-  deleteScan,
-  loadScans,
-  scanToPreviewItem,
-} from './scan-history';
+import { deleteScan, loadScans, scanToPreviewItem } from './scan-history';
 import { ShareTagSheet, type ShareableItem } from './ShareTagSheet';
 
 export interface HistoryViewProps {
@@ -179,12 +175,7 @@ export function HistoryView({
   const wide = useWideLayout();
 
   return (
-    <Screen
-      clearTabBar
-      place="history"
-      ambient="history"
-      onRefresh={reloadScans}
-    >
+    <Screen clearTabBar place="history" ambient="history" onRefresh={reloadScans}>
       <LargeTitle
         brand
         title="History"

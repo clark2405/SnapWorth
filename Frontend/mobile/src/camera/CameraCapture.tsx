@@ -138,7 +138,6 @@ export function CameraCapture({
           onSaveScan?.(scan);
         }
       }
-
     } catch (cause) {
       if (generation === estimateGeneration.current && !controller.signal.aborted) {
         setEstimateError(
@@ -434,10 +433,7 @@ export function CameraCapture({
             <SWText color={tokens.overlay.text} align="center">
               Saved to your History.
             </SWText>
-            <Button
-              label="View in History"
-              onPress={onOpenHistory}
-            />
+            <Button label="View in History" onPress={onOpenHistory} />
           </>
         ) : estimate !== undefined ? (
           <SWText color={tokens.overlay.text} align="center">

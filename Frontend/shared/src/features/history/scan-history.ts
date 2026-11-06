@@ -1,10 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import type {
-  PreviewHistoryItem,
-  PreviewItemStatus,
-} from '../preview/sample-data';
+import type { PreviewHistoryItem, PreviewItemStatus } from '../preview/sample-data';
 
 export const SCAN_HISTORY_STORAGE_KEY = '@snapworth/scan_history';
 
@@ -128,15 +125,10 @@ export async function loadScans(
 
       // Merge: remote take precedence for matching IDs, but keep unique local ones
       const remoteIds = new Set(remoteScans.map((r) => r.id));
-      const combined = [
-        ...remoteScans,
-        ...localScans.filter((l) => !remoteIds.has(l.id)),
-      ];
+      const combined = [...remoteScans, ...localScans.filter((l) => !remoteIds.has(l.id))];
 
       // Cache updated list back to local storage
-      void store.setItem(SCAN_HISTORY_STORAGE_KEY, JSON.stringify(combined)).catch(
-        () => undefined,
-      );
+      void store.setItem(SCAN_HISTORY_STORAGE_KEY, JSON.stringify(combined)).catch(() => undefined);
 
       return combined;
     }
