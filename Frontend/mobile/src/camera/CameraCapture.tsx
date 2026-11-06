@@ -436,22 +436,6 @@ export function CameraCapture({
             This photo and estimate have not been added to History.
           </SWText>
         ) : null}
-        ) : null}
-        {estimate?.status === 'estimated' ? (
-          <>
-            <SWText color={tokens.overlay.text} align="center">
-              Saved to your History.
-            </SWText>
-            <Button
-              label="View in History"
-              onPress={onOpenHistory}
-            />
-          </>
-        ) : (
-          <SWText color={tokens.overlay.text} align="center">
-            This photo and estimate have not been added to History.
-          </SWText>
-        )}
         <Button
           label="Retake photo"
           onPress={() => {
