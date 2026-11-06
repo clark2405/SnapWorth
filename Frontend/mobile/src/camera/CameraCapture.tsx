@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, SWText } from '@snapworth/shared/components';
 import { tokens } from '@snapworth/shared/design';
 import { CaptureView, coachFor, type PhotoCoach } from '@snapworth/shared/features/capture';
+import type { SavedScan } from '@snapworth/shared/features/history/scan-history';
 import type {
   CapturedItemImage,
   PhotoClues,
@@ -28,6 +29,7 @@ export interface CameraCaptureProps {
   readonly onOpenHistory: () => void;
   readonly onPhotoCaptured?: () => void;
   readonly onEstimate: PhotoPricingService['estimate'];
+  readonly onSaveScan?: (scan: SavedScan) => Promise<void> | void;
 }
 
 export function CameraCapture({
@@ -36,6 +38,7 @@ export function CameraCapture({
   onOpenHistory,
   onPhotoCaptured,
   onEstimate,
+  onSaveScan,
 }: CameraCaptureProps) {
   const [permission, requestPermission, refreshPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
@@ -108,8 +111,29 @@ export function CameraCapture({
       const result = await (hints
         ? onEstimate(image, controller.signal, hints)
         : onEstimate(image, controller.signal));
-      if (generation === estimateGeneration.current && !controller.signal.aborted)
+      if (generation === estimateGeneration.current && !controller.signal.aborted) {
         setEstimate(result);
+        if (result.status === 'estimated' && photoUri) {
+          const scan: SavedScan = {
+            id: `scan-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            title: result.itemName,
+            estimate: result.amountPhp,
+            lowPhp: result.lowPhp,
+            highPhp: result.highPhp,
+            explanation: result.explanation,
+            assumptions: result.assumptions,
+            photoUri,
+            capturedOn: new Date().toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            }),
+            status: 'private',
+          };
+          onSaveScan?.(scan);
+        }
+      }
+
     } catch (cause) {
       if (generation === estimateGeneration.current && !controller.signal.aborted) {
         setEstimateError(
@@ -397,9 +421,37 @@ export function CameraCapture({
             }}
           />
         ) : null}
-        <SWText color={tokens.overlay.text} align="center">
-          This photo and estimate have not been added to History.
-        </SWText>
+        {estimate?.status === 'estimated' ? (
+          <>
+            <SWText color={tokens.overlay.text} align="center">
+              Saved to your History.
+            </SWText>
+            <Button
+              label="View in History"
+              onPress={onOpenHistory}
+            />
+          </>
+        ) : estimate !== undefined ? (
+          <SWText color={tokens.overlay.text} align="center">
+            This photo and estimate have not been added to History.
+          </SWText>
+        ) : null}
+        ) : null}
+        {estimate?.status === 'estimated' ? (
+          <>
+            <SWText color={tokens.overlay.text} align="center">
+              Saved to your History.
+            </SWText>
+            <Button
+              label="View in History"
+              onPress={onOpenHistory}
+            />
+          </>
+        ) : (
+          <SWText color={tokens.overlay.text} align="center">
+            This photo and estimate have not been added to History.
+          </SWText>
+        )}
         <Button
           label="Retake photo"
           onPress={() => {

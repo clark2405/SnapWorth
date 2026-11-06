@@ -420,16 +420,16 @@ it('sends what the phone read along with a good photo', async () => {
     looksLike: { item: 'high top sneakers', category: 'shoes', colours: ['red', 'black'] },
   });
   // The brand is printed in the photo, so it's shown; the estimate replaces the first look.
-  expect(screen.getByText('Looks like: high top sneakers · Nike')).toBeTruthy();
+  expect(screen.getByText('Looks like: high top sneakers ┬╖ Nike')).toBeTruthy();
   // The phone knows it's shoes, so the coach asks for the shots that matter for shoes.
   expect(screen.getByText('For shoes, also snap')).toBeTruthy();
-  expect(screen.getByText('•  The size tag inside the tongue')).toBeTruthy();
+  expect(screen.getByText('ΓÇó  The size tag inside the tongue')).toBeTruthy();
   await act(async () => finish(sampleEstimate));
   expect(screen.queryByText(/Looks like/)).toBeNull();
   expect(screen.getByText('Camera-tested jacket')).toBeTruthy();
 });
 
-it('forgets the last photo’s check on retake', async () => {
+it('forgets the last photoΓÇÖs check on retake', async () => {
   mockMeasurePhoto.mockResolvedValueOnce({ ...goodPhoto, sharpness: 5 });
   openCamera();
   await readyCamera();
@@ -444,4 +444,52 @@ it('forgets the last photo’s check on retake', async () => {
   });
   expect(screen.queryByText('A little blurry')).toBeNull();
   await waitFor(() => expect(mockEstimate).toHaveBeenCalledTimes(1));
+});
+
+it('saves a successful estimate and provides a View in History button', async () => {
+  const onSaveScan = jest.fn();
+  const onOpenHistory = jest.fn();
+  render(
+    <CameraCapture
+      active={true}
+      onClose={jest.fn()}
+      onOpenHistory={onOpenHistory}
+      onEstimate={mockEstimate}
+      onSaveScan={onSaveScan}
+    />,
+  );
+  await readyCamera();
+  fireEvent.press(screen.getByText('Take photo'));
+  await screen.findByText('Saved to your History.');
+  expect(onSaveScan).toHaveBeenCalledWith(
+    expect.objectContaining({
+      title: 'Camera-tested jacket',
+      estimate: 1500,
+      photoUri: 'file:///photo.jpg',
+      status: 'private',
+    }),
+  );
+
+  fireEvent.press(screen.getByText('View in History'));
+  expect(onOpenHistory).toHaveBeenCalledTimes(1);
+});
+
+it('does not save to history if the estimate fails', async () => {
+  const onSaveScan = jest.fn();
+  mockEstimate.mockRejectedValueOnce(new Error('AI failed'));
+  render(
+    <CameraCapture
+      active={true}
+      onClose={jest.fn()}
+      onOpenHistory={jest.fn()}
+      onEstimate={mockEstimate}
+      onSaveScan={onSaveScan}
+    />,
+  );
+  await readyCamera();
+  fireEvent.press(screen.getByText('Take photo'));
+  await screen.findByText('AI failed');
+  expect(onSaveScan).not.toHaveBeenCalled();
+  expect(screen.queryByText('Saved to your History.')).toBeNull();
+  expect(screen.queryByText('View in History')).toBeNull();
 });

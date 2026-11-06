@@ -51,9 +51,11 @@ import { ProfileButton } from '../profile/ProfileButton';
 import { CollectionsStrip } from './CollectionsStrip';
 import { flipOf, flipTotals, gainLabel, type FlipTotals } from './flips';
 import { usePaidPrices } from './paid-prices';
+import { deleteScan, loadScans, scanToPreviewItem } from './scan-history';
 import { ShareTagSheet, type ShareableItem } from './ShareTagSheet';
 
 export interface HistoryViewProps {
+  readonly items?: readonly PreviewHistoryItem[];
   readonly onOpenItem?: (itemId: string) => void;
   /** Opens a collection's page, e.g. `/collection/:id`. */
   readonly onOpenCollection?: (collectionId: string) => void;
@@ -88,6 +90,7 @@ const filters: readonly { key: FilterKey; label: string }[] = [
 ];
 
 export function HistoryView({
+  items: propItems,
   onOpenItem,
   onOpenCollection,
   onDeleteItem,
@@ -100,7 +103,8 @@ export function HistoryView({
   const styles = useThemedStyles(stylesFor);
   const { colors } = useTheme();
   const toast = useToast();
-  const [items, setItems] = useState<readonly PreviewHistoryItem[]>(previewHistory);
+  const [internalItems, setInternalItems] = useState<readonly PreviewHistoryItem[]>(previewHistory);
+  const items = propItems ?? internalItems;
   const [filter, setFilter] = useState<FilterKey>('all');
   const { paid } = usePaidPrices();
   const flips = useMemo(
@@ -111,6 +115,28 @@ export function HistoryView({
       ),
     [items, paid],
   );
+
+  const reloadScans = async () => {
+    try {
+      const scans = await loadScans();
+      if (scans.length > 0) {
+        const customItems = scans.map(scanToPreviewItem);
+        const customIds = new Set(customItems.map((c) => c.id));
+        const filteredPreview = previewHistory.filter((p) => !customIds.has(p.id));
+        setInternalItems([...customItems, ...filteredPreview]);
+      } else {
+        setInternalItems(previewHistory);
+      }
+    } catch {
+      // Keep existing items if load fails
+    }
+  };
+
+  useEffect(() => {
+    if (!propItems) {
+      void reloadScans();
+    }
+  }, [propItems]);
 
   // The tab stays mounted, so follow a new deep link's filter as well as the first one.
   useEffect(() => {
@@ -123,8 +149,14 @@ export function HistoryView({
     [filter, items],
   );
 
+  const portfolioTotal = useMemo(
+    () => items.reduce((sum, item) => sum + (item.estimate || 0), 0),
+    [items],
+  );
+
   const deleteItem = (item: PreviewHistoryItem) => {
-    setItems((current) => current.filter((entry) => entry.id !== item.id));
+    setInternalItems((current) => current.filter((entry) => entry.id !== item.id));
+    void deleteScan(item.id);
     onDeleteItem?.(item.id);
     toast.show({ title: 'Removed from history', body: item.title });
   };
@@ -147,13 +179,13 @@ export function HistoryView({
       clearTabBar
       place="history"
       ambient="history"
-      onRefresh={() => new Promise((resolve) => setTimeout(resolve, 900))}
+      onRefresh={reloadScans}
     >
       <LargeTitle
         brand
         title="History"
         overlineIcon={Archive}
-        overline={`${previewHistory.length} items`}
+        overline={`${items.length} items`}
         trailing={
           <View style={styles.actions}>
             {onSnap ? (
@@ -179,7 +211,7 @@ export function HistoryView({
             <Surface tone="feature" padding={tokens.spacing[5]} contentStyle={styles.heroContent}>
               <Overline icon={Wallet} label="What it's all worth" tone="onFeatureDim" />
               <CountUp
-                value={previewPortfolio.total}
+                value={portfolioTotal}
                 format={formatPeso}
                 variant="priceHero"
                 tone="onFeature"

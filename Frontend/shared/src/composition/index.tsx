@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 
 import {
@@ -61,6 +62,7 @@ export interface AppServices {
   readonly hanap: HanapRepository;
   readonly suki: SukiRepository;
   readonly pricing: PhotoPricingService;
+  readonly supabaseClient?: SupabaseClient;
 }
 
 const profileOf = (user: PreviewUser): PublicProfile => ({
@@ -207,6 +209,7 @@ export function createAppServices(config: BackendConfig): AppServices {
       hanap: createSupabaseHanapRepository(client),
       suki: createSupabaseSukiRepository(client),
       pricing: createPhotoPricingService(client),
+      supabaseClient: client,
     };
   }
   return {
@@ -253,11 +256,16 @@ export function createAppServices(config: BackendConfig): AppServices {
 }
 
 const PhotoPricingContext = createContext<PhotoPricingService | null>(null);
+const SupabaseContext = createContext<SupabaseClient | null>(null);
 
 export function usePhotoPricing(): PhotoPricingService {
   const pricing = useContext(PhotoPricingContext);
   if (!pricing) throw new Error('Photo pricing requires AppServicesProvider.');
   return pricing;
+}
+
+export function useSupabaseClient(): SupabaseClient | null {
+  return useContext(SupabaseContext);
 }
 
 export function AppServicesProvider({
@@ -272,23 +280,25 @@ export function AppServicesProvider({
     [config.supabaseUrl, config.supabaseAnonKey],
   );
   return (
-    <PhotoPricingContext.Provider value={services.pricing}>
-      <CommentServiceProvider service={services.comments}>
-        <ChatServiceProvider service={services.chats}>
-          <HanapProvider repository={services.hanap}>
-            <SukiProvider repository={services.suki}>
-              {/* History is still sample data, so what people paid, and their collections, stay on the
-              device for now. */}
-              <PaidPricesProvider store={AsyncStorage} seed={previewPaidPrices}>
-                <CollectionsProvider store={AsyncStorage} seed={previewCollections}>
-                  {/* Guess the worth needs no account, so its days stay on the device. */}
-                  <GuessProvider store={AsyncStorage}>{children}</GuessProvider>
-                </CollectionsProvider>
-              </PaidPricesProvider>
-            </SukiProvider>
-          </HanapProvider>
-        </ChatServiceProvider>
-      </CommentServiceProvider>
-    </PhotoPricingContext.Provider>
+    <SupabaseContext.Provider value={services.supabaseClient ?? null}>
+      <PhotoPricingContext.Provider value={services.pricing}>
+        <CommentServiceProvider service={services.comments}>
+          <ChatServiceProvider service={services.chats}>
+            <HanapProvider repository={services.hanap}>
+              <SukiProvider repository={services.suki}>
+                {/* History is still sample data, so what people paid, and their collections, stay on the
+                device for now. */}
+                <PaidPricesProvider store={AsyncStorage} seed={previewPaidPrices}>
+                  <CollectionsProvider store={AsyncStorage} seed={previewCollections}>
+                    {/* Guess the worth needs no account, so its days stay on the device. */}
+                    <GuessProvider store={AsyncStorage}>{children}</GuessProvider>
+                  </CollectionsProvider>
+                </PaidPricesProvider>
+              </SukiProvider>
+            </HanapProvider>
+          </ChatServiceProvider>
+        </CommentServiceProvider>
+      </PhotoPricingContext.Provider>
+    </SupabaseContext.Provider>
   );
 }

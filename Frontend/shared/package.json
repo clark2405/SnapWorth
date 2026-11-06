@@ -33,7 +33,8 @@
     "./features/tips": "./src/features/tips/index.ts",
     "./features/trends": "./src/features/trends/index.ts",
     "./ports": "./src/ports/index.ts",
-    "./types": "./src/types/index.ts"
+    "./types": "./src/types/index.ts",
+    "./features/history/scan-history": "./src/features/history/scan-history.ts"
   },
   "peerDependencies": {
     "@expo-google-fonts/bricolage-grotesque": "0.4.1",
