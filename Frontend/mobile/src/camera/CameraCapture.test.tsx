@@ -420,10 +420,10 @@ it('sends what the phone read along with a good photo', async () => {
     looksLike: { item: 'high top sneakers', category: 'shoes', colours: ['red', 'black'] },
   });
   // The brand is printed in the photo, so it's shown; the estimate replaces the first look.
-  expect(screen.getByText('Looks like: high top sneakers ┬╖ Nike')).toBeTruthy();
+  expect(screen.getByText('Looks like: high top sneakers Â· Nike')).toBeTruthy();
   // The phone knows it's shoes, so the coach asks for the shots that matter for shoes.
   expect(screen.getByText('For shoes, also snap')).toBeTruthy();
-  expect(screen.getByText('ΓÇó  The size tag inside the tongue')).toBeTruthy();
+  expect(screen.getByText('•  The size tag inside the tongue')).toBeTruthy();
   await act(async () => finish(sampleEstimate));
   expect(screen.queryByText(/Looks like/)).toBeNull();
   expect(screen.getByText('Camera-tested jacket')).toBeTruthy();

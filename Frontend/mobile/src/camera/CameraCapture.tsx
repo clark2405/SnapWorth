@@ -91,7 +91,7 @@ export function CameraCapture({
     [],
   );
 
-  const estimatePhoto = async (image: CapturedItemImage, hints?: PhotoClues) => {
+  const estimatePhoto = async (image: CapturedItemImage, hints?: PhotoClues, uriForSave?: string) => {
     if (estimateRequest.current) return;
     const generation = ++estimateGeneration.current;
     const controller = new AbortController();
@@ -113,7 +113,8 @@ export function CameraCapture({
         : onEstimate(image, controller.signal));
       if (generation === estimateGeneration.current && !controller.signal.aborted) {
         setEstimate(result);
-        if (result.status === 'estimated' && photoUri) {
+        const resolvedUri = uriForSave || photoUri;
+        if (result.status === 'estimated' && resolvedUri) {
           const scan: SavedScan = {
             id: `scan-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
             title: result.itemName,
@@ -122,7 +123,7 @@ export function CameraCapture({
             highPhp: result.highPhp,
             explanation: result.explanation,
             assumptions: result.assumptions,
-            photoUri,
+            resolvedUri,
             capturedOn: new Date().toLocaleDateString('en-US', {
               month: 'short',
               day: 'numeric',
@@ -179,7 +180,7 @@ export function CameraCapture({
     }
     const hints = cluesFrom(measurement, impression);
     setClues(hints);
-    void estimatePhoto(image, hints);
+    void estimatePhoto(image, hints, uri);
   };
 
   const forgetLook = () => {
@@ -409,7 +410,7 @@ export function CameraCapture({
           </SWText>
         ) : null}
         {(estimateError || estimate?.status === 'unable_to_estimate') && photoData ? (
-          <Button label="Retry estimate" onPress={() => void estimatePhoto(photoData, clues)} />
+          <Button label="Retry estimate" onPress={() => void estimatePhoto(photoData, clues, photoUri)} />
         ) : null}
         {problem && photoData ? (
           <Button
@@ -417,7 +418,7 @@ export function CameraCapture({
             variant="secondary"
             onPress={() => {
               setProblem(undefined);
-              void estimatePhoto(photoData, clues);
+              void estimatePhoto(photoData, clues, photoUri);
             }}
           />
         ) : null}
