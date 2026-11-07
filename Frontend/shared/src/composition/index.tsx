@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 
 import {
@@ -22,6 +23,7 @@ import { CommentServiceProvider } from '../features/feed';
 import { HanapProvider } from '../features/hanap/hanap-state';
 import { GuessProvider } from '../features/guess/guess-state';
 import { CollectionsProvider } from '../features/history/collections';
+import { ScanHistoryProvider } from '../features/history/scan-history-state';
 import { PaidPricesProvider } from '../features/history/paid-prices';
 import {
   previewChatListingKey,
@@ -61,6 +63,8 @@ export interface AppServices {
   readonly hanap: HanapRepository;
   readonly suki: SukiRepository;
   readonly pricing: PhotoPricingService;
+  /** The Supabase connection, for the stores that take one directly (saved scans). */
+  readonly supabaseClient?: SupabaseClient;
 }
 
 const profileOf = (user: PreviewUser): PublicProfile => ({
@@ -207,6 +211,7 @@ export function createAppServices(config: BackendConfig): AppServices {
       hanap: createSupabaseHanapRepository(client),
       suki: createSupabaseSukiRepository(client),
       pricing: createPhotoPricingService(client),
+      supabaseClient: client,
     };
   }
   return {
@@ -278,11 +283,19 @@ export function AppServicesProvider({
           <HanapProvider repository={services.hanap}>
             <SukiProvider repository={services.suki}>
               {/* History is still sample data, so what people paid, and their collections, stay on the
-              device for now. */}
+                device for now. */}
               <PaidPricesProvider store={AsyncStorage} seed={previewPaidPrices}>
                 <CollectionsProvider store={AsyncStorage} seed={previewCollections}>
                   {/* Guess the worth needs no account, so its days stay on the device. */}
-                  <GuessProvider store={AsyncStorage}>{children}</GuessProvider>
+                  <GuessProvider store={AsyncStorage}>
+                    {/* Saved scans: in Supabase with a backend, on the phone without. */}
+                    <ScanHistoryProvider
+                      client={services.supabaseClient ?? null}
+                      store={AsyncStorage}
+                    >
+                      {children}
+                    </ScanHistoryProvider>
+                  </GuessProvider>
                 </CollectionsProvider>
               </PaidPricesProvider>
             </SukiProvider>

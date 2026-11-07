@@ -75,6 +75,6 @@ describe('the flip tracker', () => {
     expect(screen.getByText('Paid ₱180 for 1 of these, now worth ₱2,450')).toBeOnTheScreen();
     expect(screen.getByText('+₱2,270 flip')).toBeOnTheScreen();
     // The card's total counts up for a moment; let it land.
-    await waitFor(() => expect(screen.getByText('₱15,250')).toBeOnTheScreen(), { timeout: 2000 });
+    await waitFor(() => expect(screen.getByText('₱50,200')).toBeOnTheScreen(), { timeout: 2000 });
   });
 });

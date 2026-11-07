@@ -21,7 +21,7 @@ both apps.
 ## What's built and what isn't
 
 Keep this list current: when you finish or start something, move it here in the same change.
-Last updated 2026-11-04.
+Last updated 2026-11-07.
 
 ### Working for real
 
@@ -55,6 +55,12 @@ Last updated 2026-11-04.
   **Not complete:** only iPhones with Apple Intelligence know the kind of item; every other device
   gets general tips until the cloud AI exists.
 
+- **Saving snaps (PR #24):** each successful estimate is saved to History, in Supabase's
+  `scan_history` table (private to its owner), with a copy on the phone for offline. A scan saved
+  offline is sent when the app is back online. Each account on a shared phone sees only its own.
+  History shows your own scans once you have one; before that, the sample items as a preview.
+  Needs `npx supabase db push` to create the table.
+
 ### Kept on the device only, until History is stored in Supabase
 
 - **Flip tracker:** what an owner paid for an item, and the gain, in History and on the item.
@@ -86,7 +92,6 @@ on them isn't saved.
   - Apple sign-in isn't set up.
   - Password reset sends nothing.
   - Deleting an account only signs out.
-- **Saving snaps:** each snap and its estimate saved to History (database tables and photo storage).
 - **The rest of the data on Supabase:** votes, posts, listings, price alerts and the admin queue.
 - **Cloud AI** (a teammate owns this; see "Handoff" below):
   - Worthy's chat in the cloud.
@@ -105,6 +110,8 @@ on them isn't saved.
   `OPENAI_API_KEY` (OpenAI's moderation is free) before launch. Set it in the dashboard under Edge
   Functions → Secrets, or with `npx supabase secrets set`.
 - **Profile photos:** uploading them to Supabase Storage, so other people can see them.
+- **Scan photos:** a saved scan's photo is a path on the phone that took it, so it shows only
+  there. Uploading them to Storage would make History's photos show on every device.
 - **Deployment:** EAS builds for the phones, and Vercel for the web.
 
 The detailed task lists are in `agents/specs/`. Git keeps that folder local, so ask whoever has it,

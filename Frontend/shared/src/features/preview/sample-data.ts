@@ -1108,11 +1108,12 @@ export const previewValuation = {
 
 /** The user's collection: everything they have valued and still own. */
 export const previewPortfolio = {
-  total: 15250,
-  itemCount: 4,
-  change: 1180,
+  total: 50200,
+  itemCount: 14,
+  // Up ₱3,890 from ₱46,310 at the start of the month: +8.4%.
+  change: 3890,
   changeLabel: '+8.4% this month',
-  series: [12400, 12650, 12900, 12800, 13300, 13550, 13400, 13900, 14300, 14650, 14900, 15250],
+  series: [40800, 41650, 42450, 42150, 43800, 44600, 44100, 45750, 47050, 48250, 49050, 50200],
   topMover: { title: 'Vintage Polaroid Sun 600', change: '+₱400' },
 } as const;
 

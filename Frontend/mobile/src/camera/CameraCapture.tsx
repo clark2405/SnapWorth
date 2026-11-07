@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, SWText } from '@snapworth/shared/components';
 import { tokens } from '@snapworth/shared/design';
 import { CaptureView, coachFor, type PhotoCoach } from '@snapworth/shared/features/capture';
+import type { NewScan, SaveOutcome } from '@snapworth/shared/features/history/scan-history';
 import type {
   CapturedItemImage,
   PhotoClues,
@@ -28,6 +29,8 @@ export interface CameraCaptureProps {
   readonly onOpenHistory: () => void;
   readonly onPhotoCaptured?: () => void;
   readonly onEstimate: PhotoPricingService['estimate'];
+  /** Saves a successful estimate to History, and says how that went. */
+  readonly onSaveScan?: (scan: NewScan) => Promise<SaveOutcome>;
 }
 
 export function CameraCapture({
@@ -36,6 +39,7 @@ export function CameraCapture({
   onOpenHistory,
   onPhotoCaptured,
   onEstimate,
+  onSaveScan,
 }: CameraCaptureProps) {
   const [permission, requestPermission, refreshPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
@@ -52,6 +56,8 @@ export function CameraCapture({
   const [estimate, setEstimate] = useState<PhotoEstimate>();
   const [estimating, setEstimating] = useState(false);
   const [estimateError, setEstimateError] = useState<string>();
+  // Whether this photo's estimate made it into History.
+  const [saved, setSaved] = useState<SaveOutcome | 'saving'>();
   // The phone's own look at the photo, before it's priced: a problem stops it being sent.
   const [checking, setChecking] = useState(false);
   const [problem, setProblem] = useState<PhotoProblem>();
@@ -88,11 +94,16 @@ export function CameraCapture({
     [],
   );
 
-  const estimatePhoto = async (image: CapturedItemImage, hints?: PhotoClues) => {
+  const estimatePhoto = async (
+    image: CapturedItemImage,
+    hints?: PhotoClues,
+    uriForSave?: string,
+  ) => {
     if (estimateRequest.current) return;
     const generation = ++estimateGeneration.current;
     const controller = new AbortController();
     setEstimate(undefined);
+    setSaved(undefined);
     setEstimateError(undefined);
     setEstimating(true);
     const timer = setTimeout(() => {
@@ -104,12 +115,27 @@ export function CameraCapture({
       }
     }, 75_000);
     estimateRequest.current = { controller, timer };
+    // A successful estimate is saved to History once the estimate itself is over.
+    let toSave: NewScan | undefined;
     try {
       const result = await (hints
         ? onEstimate(image, controller.signal, hints)
         : onEstimate(image, controller.signal));
-      if (generation === estimateGeneration.current && !controller.signal.aborted)
+      if (generation === estimateGeneration.current && !controller.signal.aborted) {
         setEstimate(result);
+        const resolvedUri = uriForSave || photoUri;
+        if (result.status === 'estimated' && resolvedUri) {
+          toSave = {
+            title: result.itemName,
+            estimate: result.amountPhp,
+            lowPhp: result.lowPhp,
+            highPhp: result.highPhp,
+            explanation: result.explanation,
+            assumptions: result.assumptions,
+            photoUri: resolvedUri,
+          };
+        }
+      }
     } catch (cause) {
       if (generation === estimateGeneration.current && !controller.signal.aborted) {
         setEstimateError(
@@ -124,6 +150,11 @@ export function CameraCapture({
         estimateRequest.current = null;
         setEstimating(false);
       }
+    }
+    if (toSave && onSaveScan) {
+      setSaved('saving');
+      const outcome = await onSaveScan(toSave).catch((): SaveOutcome => 'failed');
+      if (generation === estimateGeneration.current) setSaved(outcome);
     }
   };
 
@@ -155,7 +186,7 @@ export function CameraCapture({
     }
     const hints = cluesFrom(measurement, impression);
     setClues(hints);
-    void estimatePhoto(image, hints);
+    void estimatePhoto(image, hints, uri);
   };
 
   const forgetLook = () => {
@@ -385,7 +416,10 @@ export function CameraCapture({
           </SWText>
         ) : null}
         {(estimateError || estimate?.status === 'unable_to_estimate') && photoData ? (
-          <Button label="Retry estimate" onPress={() => void estimatePhoto(photoData, clues)} />
+          <Button
+            label="Retry estimate"
+            onPress={() => void estimatePhoto(photoData, clues, photoUri)}
+          />
         ) : null}
         {problem && photoData ? (
           <Button
@@ -393,13 +427,28 @@ export function CameraCapture({
             variant="secondary"
             onPress={() => {
               setProblem(undefined);
-              void estimatePhoto(photoData, clues);
+              void estimatePhoto(photoData, clues, photoUri);
             }}
           />
         ) : null}
-        <SWText color={tokens.overlay.text} align="center">
-          This photo and estimate have not been added to History.
-        </SWText>
+        {estimate?.status === 'estimated' && (saved === 'saved' || saved === 'pending') ? (
+          <>
+            <SWText color={tokens.overlay.text} align="center">
+              {saved === 'saved'
+                ? 'Saved to your History.'
+                : 'Saved to your History on this phone. It’ll sync when you’re back online.'}
+            </SWText>
+            <Button label="View in History" onPress={onOpenHistory} />
+          </>
+        ) : estimate?.status === 'estimated' && saved === 'saving' ? (
+          <SWText color={tokens.overlay.text} align="center">
+            Saving to your History…
+          </SWText>
+        ) : estimate !== undefined ? (
+          <SWText color={tokens.overlay.text} align="center">
+            This photo and estimate have not been added to History.
+          </SWText>
+        ) : null}
         <Button
           label="Retake photo"
           onPress={() => {
@@ -407,6 +456,7 @@ export function CameraCapture({
             forgetLook();
             setEstimating(false);
             setEstimate(undefined);
+            setSaved(undefined);
             setEstimateError(undefined);
             setReady(false);
             setPhotoUri(undefined);

@@ -445,3 +445,87 @@ it('forgets the last photo’s check on retake', async () => {
   expect(screen.queryByText('A little blurry')).toBeNull();
   await waitFor(() => expect(mockEstimate).toHaveBeenCalledTimes(1));
 });
+
+it('saves a successful estimate and provides a View in History button', async () => {
+  const onSaveScan = jest.fn().mockResolvedValue('saved');
+  const onOpenHistory = jest.fn();
+  render(
+    <CameraCapture
+      active={true}
+      onClose={jest.fn()}
+      onOpenHistory={onOpenHistory}
+      onEstimate={mockEstimate}
+      onSaveScan={onSaveScan}
+    />,
+  );
+  await readyCamera();
+  fireEvent.press(screen.getByText('Take photo'));
+  await screen.findByText('Saved to your History.');
+  expect(onSaveScan).toHaveBeenCalledWith(
+    expect.objectContaining({
+      title: 'Camera-tested jacket',
+      estimate: 1500,
+      photoUri: 'file:///photo.jpg',
+    }),
+  );
+
+  fireEvent.press(screen.getByText('View in History'));
+  expect(onOpenHistory).toHaveBeenCalledTimes(1);
+});
+
+it('does not save to history if the estimate fails', async () => {
+  const onSaveScan = jest.fn();
+  mockEstimate.mockRejectedValueOnce(new Error('AI failed'));
+  render(
+    <CameraCapture
+      active={true}
+      onClose={jest.fn()}
+      onOpenHistory={jest.fn()}
+      onEstimate={mockEstimate}
+      onSaveScan={onSaveScan}
+    />,
+  );
+  await readyCamera();
+  fireEvent.press(screen.getByText('Take photo'));
+  await screen.findByText('AI failed');
+  expect(onSaveScan).not.toHaveBeenCalled();
+  expect(screen.queryByText('Saved to your History.')).toBeNull();
+  expect(screen.queryByText('View in History')).toBeNull();
+});
+
+it('says when a scan is kept on the phone to sync later', async () => {
+  const onSaveScan = jest.fn().mockResolvedValue('pending');
+  render(
+    <CameraCapture
+      active={true}
+      onClose={jest.fn()}
+      onOpenHistory={jest.fn()}
+      onEstimate={mockEstimate}
+      onSaveScan={onSaveScan}
+    />,
+  );
+  await readyCamera();
+  fireEvent.press(screen.getByText('Take photo'));
+  await screen.findByText(
+    'Saved to your History on this phone. It’ll sync when you’re back online.',
+  );
+  expect(screen.getByText('View in History')).toBeTruthy();
+});
+
+it('doesn’t claim a scan was saved when saving failed', async () => {
+  const onSaveScan = jest.fn().mockResolvedValue('failed');
+  render(
+    <CameraCapture
+      active={true}
+      onClose={jest.fn()}
+      onOpenHistory={jest.fn()}
+      onEstimate={mockEstimate}
+      onSaveScan={onSaveScan}
+    />,
+  );
+  await readyCamera();
+  fireEvent.press(screen.getByText('Take photo'));
+  await screen.findByText('This photo and estimate have not been added to History.');
+  expect(screen.queryByText('Saved to your History.')).toBeNull();
+  expect(screen.queryByText('View in History')).toBeNull();
+});
