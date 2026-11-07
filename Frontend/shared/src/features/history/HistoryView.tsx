@@ -51,7 +51,8 @@ import { ProfileButton } from '../profile/ProfileButton';
 import { CollectionsStrip } from './CollectionsStrip';
 import { flipOf, flipTotals, gainLabel, type FlipTotals } from './flips';
 import { usePaidPrices } from './paid-prices';
-import { deleteScan, loadScans, scanToPreviewItem } from './scan-history';
+import { scanToPreviewItem } from './scan-history';
+import { useScanHistory } from './scan-history-state';
 import { ShareTagSheet, type ShareableItem } from './ShareTagSheet';
 
 export interface HistoryViewProps {
@@ -103,8 +104,13 @@ export function HistoryView({
   const styles = useThemedStyles(stylesFor);
   const { colors } = useTheme();
   const toast = useToast();
-  const [internalItems, setInternalItems] = useState<readonly PreviewHistoryItem[]>(previewHistory);
-  const items = propItems ?? internalItems;
+  const { scans, remove, reload } = useScanHistory();
+  // Until the first scan, History shows the sample items as a preview; after it, only the
+  // person's own scans, so the two are never mixed.
+  const [samples, setSamples] = useState<readonly PreviewHistoryItem[]>(previewHistory);
+  const ownItems = useMemo(() => scans.map(scanToPreviewItem), [scans]);
+  const showingSamples = !propItems && ownItems.length === 0;
+  const items = propItems ?? (showingSamples ? samples : ownItems);
   const [filter, setFilter] = useState<FilterKey>('all');
   const { paid } = usePaidPrices();
   const flips = useMemo(
@@ -115,28 +121,6 @@ export function HistoryView({
       ),
     [items, paid],
   );
-
-  const reloadScans = async () => {
-    try {
-      const scans = await loadScans();
-      if (scans.length > 0) {
-        const customItems = scans.map(scanToPreviewItem);
-        const customIds = new Set(customItems.map((c) => c.id));
-        const filteredPreview = previewHistory.filter((p) => !customIds.has(p.id));
-        setInternalItems([...customItems, ...filteredPreview]);
-      } else {
-        setInternalItems(previewHistory);
-      }
-    } catch {
-      // Keep existing items if load fails
-    }
-  };
-
-  useEffect(() => {
-    if (!propItems) {
-      void reloadScans();
-    }
-  }, [propItems]);
 
   // The tab stays mounted, so follow a new deep link's filter as well as the first one.
   useEffect(() => {
@@ -155,8 +139,8 @@ export function HistoryView({
   );
 
   const deleteItem = (item: PreviewHistoryItem) => {
-    setInternalItems((current) => current.filter((entry) => entry.id !== item.id));
-    void deleteScan(item.id);
+    if (showingSamples) setSamples((current) => current.filter((entry) => entry.id !== item.id));
+    else void remove(item.id);
     onDeleteItem?.(item.id);
     toast.show({ title: 'Removed from history', body: item.title });
   };
@@ -175,12 +159,12 @@ export function HistoryView({
   const wide = useWideLayout();
 
   return (
-    <Screen clearTabBar place="history" ambient="history" onRefresh={reloadScans}>
+    <Screen clearTabBar place="history" ambient="history" onRefresh={reload}>
       <LargeTitle
         brand
         title="History"
         overlineIcon={Archive}
-        overline={`${items.length} items`}
+        overline={items.length === 1 ? '1 item' : `${items.length} items`}
         trailing={
           <View style={styles.actions}>
             {onSnap ? (
@@ -211,10 +195,19 @@ export function HistoryView({
                 variant="priceHero"
                 tone="onFeature"
               />
-              <View style={styles.heroMeta}>
-                <Tag label={previewPortfolio.changeLabel} tone="mint" />
-              </View>
-              <Sparkline values={previewPortfolio.series} height={56} color={colors.onFeature} />
+              {/* Real scans have no price history yet, so the trend is the preview's alone. */}
+              {showingSamples ? (
+                <>
+                  <View style={styles.heroMeta}>
+                    <Tag label={previewPortfolio.changeLabel} tone="mint" />
+                  </View>
+                  <Sparkline
+                    values={previewPortfolio.series}
+                    height={56}
+                    color={colors.onFeature}
+                  />
+                </>
+              ) : null}
               {flips ? <FlipSummary totals={flips} /> : null}
             </Surface>
           </Reveal>

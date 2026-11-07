@@ -22,6 +22,7 @@
     "./features/guess": "./src/features/guess/index.ts",
     "./features/hanap": "./src/features/hanap/index.ts",
     "./features/history": "./src/features/history/index.ts",
+    "./features/history/scan-history": "./src/features/history/scan-history.ts",
     "./features/item": "./src/features/item/index.ts",
     "./features/launch": "./src/features/launch/index.ts",
     "./features/marketplace": "./src/features/marketplace/index.ts",
@@ -33,8 +34,7 @@
     "./features/tips": "./src/features/tips/index.ts",
     "./features/trends": "./src/features/trends/index.ts",
     "./ports": "./src/ports/index.ts",
-    "./types": "./src/types/index.ts",
-    "./features/history/scan-history": "./src/features/history/scan-history.ts"
+    "./types": "./src/types/index.ts"
   },
   "peerDependencies": {
     "@expo-google-fonts/bricolage-grotesque": "0.4.1",

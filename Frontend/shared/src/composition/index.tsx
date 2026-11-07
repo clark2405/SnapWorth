@@ -23,6 +23,7 @@ import { CommentServiceProvider } from '../features/feed';
 import { HanapProvider } from '../features/hanap/hanap-state';
 import { GuessProvider } from '../features/guess/guess-state';
 import { CollectionsProvider } from '../features/history/collections';
+import { ScanHistoryProvider } from '../features/history/scan-history-state';
 import { PaidPricesProvider } from '../features/history/paid-prices';
 import {
   previewChatListingKey,
@@ -62,6 +63,7 @@ export interface AppServices {
   readonly hanap: HanapRepository;
   readonly suki: SukiRepository;
   readonly pricing: PhotoPricingService;
+  /** The Supabase connection, for the stores that take one directly (saved scans). */
   readonly supabaseClient?: SupabaseClient;
 }
 
@@ -256,16 +258,11 @@ export function createAppServices(config: BackendConfig): AppServices {
 }
 
 const PhotoPricingContext = createContext<PhotoPricingService | null>(null);
-const SupabaseContext = createContext<SupabaseClient | null>(null);
 
 export function usePhotoPricing(): PhotoPricingService {
   const pricing = useContext(PhotoPricingContext);
   if (!pricing) throw new Error('Photo pricing requires AppServicesProvider.');
   return pricing;
-}
-
-export function useSupabaseClient(): SupabaseClient | null {
-  return useContext(SupabaseContext);
 }
 
 export function AppServicesProvider({
@@ -280,25 +277,31 @@ export function AppServicesProvider({
     [config.supabaseUrl, config.supabaseAnonKey],
   );
   return (
-    <SupabaseContext.Provider value={services.supabaseClient ?? null}>
-      <PhotoPricingContext.Provider value={services.pricing}>
-        <CommentServiceProvider service={services.comments}>
-          <ChatServiceProvider service={services.chats}>
-            <HanapProvider repository={services.hanap}>
-              <SukiProvider repository={services.suki}>
-                {/* History is still sample data, so what people paid, and their collections, stay on the
+    <PhotoPricingContext.Provider value={services.pricing}>
+      <CommentServiceProvider service={services.comments}>
+        <ChatServiceProvider service={services.chats}>
+          <HanapProvider repository={services.hanap}>
+            <SukiProvider repository={services.suki}>
+              {/* History is still sample data, so what people paid, and their collections, stay on the
                 device for now. */}
-                <PaidPricesProvider store={AsyncStorage} seed={previewPaidPrices}>
-                  <CollectionsProvider store={AsyncStorage} seed={previewCollections}>
-                    {/* Guess the worth needs no account, so its days stay on the device. */}
-                    <GuessProvider store={AsyncStorage}>{children}</GuessProvider>
-                  </CollectionsProvider>
-                </PaidPricesProvider>
-              </SukiProvider>
-            </HanapProvider>
-          </ChatServiceProvider>
-        </CommentServiceProvider>
-      </PhotoPricingContext.Provider>
-    </SupabaseContext.Provider>
+              <PaidPricesProvider store={AsyncStorage} seed={previewPaidPrices}>
+                <CollectionsProvider store={AsyncStorage} seed={previewCollections}>
+                  {/* Guess the worth needs no account, so its days stay on the device. */}
+                  <GuessProvider store={AsyncStorage}>
+                    {/* Saved scans: in Supabase with a backend, on the phone without. */}
+                    <ScanHistoryProvider
+                      client={services.supabaseClient ?? null}
+                      store={AsyncStorage}
+                    >
+                      {children}
+                    </ScanHistoryProvider>
+                  </GuessProvider>
+                </CollectionsProvider>
+              </PaidPricesProvider>
+            </SukiProvider>
+          </HanapProvider>
+        </ChatServiceProvider>
+      </CommentServiceProvider>
+    </PhotoPricingContext.Provider>
   );
 }

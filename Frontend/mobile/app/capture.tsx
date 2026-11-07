@@ -1,7 +1,7 @@
 import { useIsFocused, useRouter } from 'expo-router';
 
-import { usePhotoPricing, useSupabaseClient } from '@snapworth/shared/composition';
-import { saveScan, type SavedScan } from '@snapworth/shared/features/history/scan-history';
+import { usePhotoPricing } from '@snapworth/shared/composition';
+import { useScanHistory } from '@snapworth/shared/features/history';
 import { AccountGateView, useSession } from '@snapworth/shared/features/session';
 import { useTip } from '@snapworth/shared/features/tips';
 
@@ -13,7 +13,7 @@ export default function CaptureRoute() {
   const router = useRouter();
   const focused = useIsFocused();
   const pricing = usePhotoPricing();
-  const supabase = useSupabaseClient();
+  const scanHistory = useScanHistory();
   const { isGuest } = useSession();
   // Taking a photo is what the Snap tip teaches, so doing it retires the tip.
   const snapTip = useTip('snap');
@@ -27,7 +27,7 @@ export default function CaptureRoute() {
       onClose={close}
       onPhotoCaptured={snapTip.done}
       onEstimate={pricing.estimate}
-      onSaveScan={(scan: SavedScan) => saveScan(scan, supabase)}
+      onSaveScan={scanHistory.save}
       onOpenHistory={() => router.dismissTo('/history')}
     />
   );
