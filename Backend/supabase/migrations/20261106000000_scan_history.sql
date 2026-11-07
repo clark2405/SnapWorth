@@ -1,39 +1,81 @@
--- Scan History: Stores successful AI price estimates and captured photos for users.
--- Visible only to the owner via row-level security.
+-- Scan History: each successful AI estimate a signed-in person saves, with the photo it came
+-- from. Private: only its owner can see, change or delete it.
+--
+-- `photo_uri` is where the photo is on the phone that took it, so it only shows there; uploading
+-- photos to Storage is a follow-up.
 
-create table if not exists public.scan_history (
+create table public.scan_history (
+  -- The app makes the id, so a scan keeps the same one on the phone and here.
   id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users (id) on delete cascade,
-  item_name text not null,
+  -- Always the person signed in: a client never chooses it.
+  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  item_name text not null check (char_length(item_name) between 1 and 200),
   amount_php integer not null check (amount_php >= 0),
   low_php integer not null check (low_php >= 0),
-  high_php integer not null check (high_php >= 0),
-  explanation text,
-  assumptions jsonb not null default '[]'::jsonb,
-  photo_uri text,
+  high_php integer not null check (high_php >= low_php),
+  explanation text check (char_length(explanation) <= 2000),
+  assumptions jsonb not null default '[]'::jsonb check (jsonb_typeof(assumptions) = 'array'),
+  photo_uri text check (char_length(photo_uri) <= 2000),
   status text not null default 'private' check (status in ('listed', 'on_feed', 'private', 'sold')),
   created_at timestamptz not null default now()
 );
 
-comment on table public.scan_history is 'Stores captured scans and their successful AI estimates.';
+comment on table public.scan_history is 'Each person''s saved scans and their AI estimates. Private to the owner.';
+
+create index scan_history_user_created_idx on public.scan_history (user_id, created_at desc);
+
+-- A flood limit: at most 60 saved scans an hour per account. Estimates are limited already; this
+-- stops rows being written straight to the table.
+create function public.enforce_scan_history_rate_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if (
+    select count(*)
+      from public.scan_history s
+     where s.user_id = new.user_id
+       and s.created_at > now() - interval '1 hour'
+  ) >= 60 then
+    raise exception 'You are saving scans too quickly. Try again in a while.' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger scan_history_enforce_rate_limit
+  before insert on public.scan_history
+  for each row execute function public.enforce_scan_history_rate_limit();
 
 alter table public.scan_history enable row level security;
 
-create policy "Users can view own scan history"
+create policy "People see their own scans"
   on public.scan_history for select
-  using (auth.uid() = user_id or user_id is null);
+  to authenticated
+  using (user_id = (select auth.uid()));
 
-create policy "Users can insert own scan history"
+create policy "People save their own scans"
   on public.scan_history for insert
-  with check (auth.uid() = user_id or user_id is null);
+  to authenticated
+  with check (user_id = (select auth.uid()));
 
-create policy "Users can update own scan history"
+create policy "People change their own scans"
   on public.scan_history for update
-  using (auth.uid() = user_id);
+  to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
 
-create policy "Users can delete own scan history"
+create policy "People delete their own scans"
   on public.scan_history for delete
-  using (auth.uid() = user_id);
+  to authenticated
+  using (user_id = (select auth.uid()));
 
-create index if not exists idx_scan_history_user_created
-  on public.scan_history (user_id, created_at desc);
+-- Column-level grants back the policies up: signed-out visitors get nothing, the owner is
+-- always the caller, and only a scan's status can change once it's saved.
+revoke all on public.scan_history from anon, authenticated;
+grant select, delete on public.scan_history to authenticated;
+grant insert (id, item_name, amount_php, low_php, high_php, explanation, assumptions, photo_uri, status)
+  on public.scan_history to authenticated;
+grant update (status) on public.scan_history to authenticated;
