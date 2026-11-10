@@ -2,11 +2,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { ScanPhotoStore } from '../../adapters/supabase/photo-storage';
 import {
+  DEVICE_PAID_PRICES_KEY,
   deleteScan,
   loadScans,
   newScanId,
   saveScan,
   scanToPreviewItem,
+  setScanPaid,
   type KeyValueStore,
   type SavedScan,
   type ScanPlace,
@@ -48,6 +50,7 @@ const remoteRow = {
   assumptions: [],
   photo_uri: 'file:///rolex.jpg',
   photo_path: null as string | null,
+  paid_php: null as number | null,
   status: 'listed',
   created_at: '2026-11-06T10:00:00.000Z',
 };
@@ -282,5 +285,117 @@ describe('scan-history', () => {
 
     expect(await deleteScan(sampleScan.id, place)).toBe(true);
     expect(photos.remove).toHaveBeenCalledWith(`user-123/${sampleScan.id}.jpg`);
+  });
+
+  describe('what was paid', () => {
+    it('is kept on the scan, sent to Supabase as the owner’s', async () => {
+      const supabase = fakeSupabase();
+      const place = {
+        store,
+        client: supabase.client,
+        owner: 'user-123',
+        photos: fakePhotos().photos,
+      };
+      await saveScan(sampleScan, place);
+
+      expect(await setScanPaid(sampleScan.id, 150, place)).toBe(true);
+      expect(supabase.update).toHaveBeenLastCalledWith({ paid_php: 150 });
+      let [loaded] = await loadScans(place);
+      expect(loaded!.paidPhp).toBe(150);
+
+      expect(await setScanPaid(sampleScan.id, null, place)).toBe(true);
+      expect(supabase.update).toHaveBeenLastCalledWith({ paid_php: null });
+      [loaded] = await loadScans(place);
+      expect(loaded!.paidPhp).toBeUndefined();
+    });
+
+    it('set offline, stays on the phone and is sent on a later load', async () => {
+      const supabase = fakeSupabase();
+      const place = {
+        store,
+        client: supabase.client,
+        owner: 'user-123',
+        photos: fakePhotos().photos,
+      };
+      await saveScan(sampleScan, place);
+      supabase.state.offline = true;
+
+      expect(await setScanPaid(sampleScan.id, 150, place)).toBe(false);
+      expect((await loadScans(place))[0]!.paidPhp).toBe(150);
+
+      supabase.state.offline = false;
+      const [loaded] = await loadScans(place);
+      expect(loaded).toEqual(expect.objectContaining({ paidPhp: 150, paidPending: false }));
+      expect(supabase.state.rows[0]!.paid_php).toBe(150);
+    });
+
+    it('goes along with a scan saved offline', async () => {
+      const supabase = fakeSupabase();
+      const place = {
+        store,
+        client: supabase.client,
+        owner: 'user-123',
+        photos: fakePhotos().photos,
+      };
+      supabase.state.offline = true;
+      await saveScan(sampleScan, place);
+      await setScanPaid(sampleScan.id, 90, place);
+
+      supabase.state.offline = false;
+      expect((await loadScans(place))[0]!.paidPhp).toBe(90);
+      expect(supabase.state.rows[0]!.paid_php).toBe(90);
+    });
+
+    it('kept on this phone before moves onto the account’s own scans, once', async () => {
+      const supabase = fakeSupabase([remoteRow]);
+      const place = {
+        store,
+        client: supabase.client,
+        owner: 'user-123',
+        photos: fakePhotos().photos,
+      };
+      const someoneElses = '11111111-2222-4333-8444-555555555555';
+      await store.setItem(
+        DEVICE_PAID_PRICES_KEY,
+        JSON.stringify({
+          [remoteRow.id]: 90000,
+          [someoneElses]: 300,
+          'nike-neon-windbreaker': 180,
+        }),
+      );
+
+      const [loaded] = await loadScans(place);
+      expect(loaded!.paidPhp).toBe(90000);
+      expect(supabase.state.rows[0]!.paid_php).toBe(90000);
+      // Another account's price, and the sample's, stay on the phone.
+      expect(JSON.parse((await store.getItem(DEVICE_PAID_PRICES_KEY))!)).toEqual({
+        [someoneElses]: 300,
+        'nike-neon-windbreaker': 180,
+      });
+    });
+
+    it('kept on this phone never overwrites one the account already has', async () => {
+      const supabase = fakeSupabase([{ ...remoteRow, paid_php: 120000 }]);
+      const place = {
+        store,
+        client: supabase.client,
+        owner: 'user-123',
+        photos: fakePhotos().photos,
+      };
+      await store.setItem(DEVICE_PAID_PRICES_KEY, JSON.stringify({ [remoteRow.id]: 1 }));
+
+      expect((await loadScans(place))[0]!.paidPhp).toBe(120000);
+      expect(supabase.update).not.toHaveBeenCalled();
+      expect(JSON.parse((await store.getItem(DEVICE_PAID_PRICES_KEY))!)).toEqual({});
+    });
+
+    it('kept on this phone moves onto its scans without a backend too', async () => {
+      await saveScan(sampleScan, onDevice());
+      await store.setItem(DEVICE_PAID_PRICES_KEY, JSON.stringify({ [sampleScan.id]: 75 }));
+
+      expect((await loadScans(onDevice()))[0]!.paidPhp).toBe(75);
+      expect((await loadScans(onDevice()))[0]!.paidPhp).toBe(75);
+      expect(JSON.parse((await store.getItem(DEVICE_PAID_PRICES_KEY))!)).toEqual({});
+    });
   });
 });

@@ -51,6 +51,8 @@ describe('userProfile', () => {
     expect(profile.location).toBe('Metropolis');
     expect(profile.bio).toBe('Reporter and collector');
     expect(profile.joined).toBe('Joined May 2026');
+    // A real account's count is its own scans, never the sample figure.
+    expect(profile.stats.checked).toBe(0);
   });
 
   it('resolves avatar source correctly for remote and fallback images', () => {

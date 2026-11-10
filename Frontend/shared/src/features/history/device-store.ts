@@ -1,5 +1,5 @@
 /**
- * Where History's own notes are kept until History is stored in Supabase: AsyncStorage on
+ * Where History's notes about the sample items are kept without a backend: AsyncStorage on
  * devices, the browser's storage on the web. The composition root supplies it.
  */
 export interface DeviceStore {

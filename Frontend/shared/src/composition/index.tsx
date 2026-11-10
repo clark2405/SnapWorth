@@ -4,14 +4,18 @@ import { createContext, useContext, useMemo, type ReactNode } from 'react';
 
 import {
   createLocalChatRepository,
+  createLocalCollectionRepository,
   createLocalCommentRepository,
   createLocalHanapRepository,
   createLocalSukiRepository,
+  createSupabaseAccountObserver,
   createSupabaseChatRepository,
+  createSupabaseCollectionRepository,
   createSupabaseCommentRepository,
   createSupabaseHanapRepository,
   createSupabaseSukiRepository,
   createPhotoPricingService,
+  deviceAccount,
   screenWithRules,
   type LocalSeedComment,
   type LocalSeedConversation,
@@ -40,6 +44,8 @@ import {
   type PreviewMessage,
   type PreviewUser,
 } from '../features/preview/sample-data';
+import type { AccountObserver } from '../ports/account';
+import type { CollectionRepository } from '../ports/collections';
 import type { HanapRepository } from '../ports/hanap';
 import type { ChatService, CommentService } from '../ports/services';
 import type { SukiRepository } from '../ports/suki';
@@ -63,6 +69,10 @@ export interface AppServices {
   readonly hanap: HanapRepository;
   readonly suki: SukiRepository;
   readonly pricing: PhotoPricingService;
+  /** Who is signed in, for what's kept per account. */
+  readonly account: AccountObserver;
+  /** Where an account's collections are kept. */
+  readonly collectionsFor: (accountId: string) => CollectionRepository;
   /** The Supabase connection, for the stores that take one directly (saved scans). */
   readonly supabaseClient?: SupabaseClient;
 }
@@ -204,6 +214,7 @@ const demoReplies = [
 export function createAppServices(config: BackendConfig): AppServices {
   if (config.supabaseUrl && config.supabaseAnonKey) {
     const client = getSupabase({ url: config.supabaseUrl, anonKey: config.supabaseAnonKey });
+    const collections = createSupabaseCollectionRepository(client, { device: AsyncStorage });
     return {
       backend: 'supabase',
       comments: createCommentService(createSupabaseCommentRepository(client)),
@@ -211,9 +222,17 @@ export function createAppServices(config: BackendConfig): AppServices {
       hanap: createSupabaseHanapRepository(client),
       suki: createSupabaseSukiRepository(client),
       pricing: createPhotoPricingService(client),
+      account: createSupabaseAccountObserver(client),
+      // Row-level security keeps each account to its own; collections this phone kept before
+      // move into the account that owns their things.
+      collectionsFor: () => collections,
       supabaseClient: client,
     };
   }
+  const deviceCollections = createLocalCollectionRepository({
+    store: AsyncStorage,
+    seed: previewCollections,
+  });
   return {
     backend: 'device',
     pricing: {
@@ -249,6 +268,8 @@ export function createAppServices(config: BackendConfig): AppServices {
       })),
       screen: screenWithRules,
     }),
+    account: deviceAccount,
+    collectionsFor: () => deviceCollections,
     // The windbreaker's buyer is already the preview owner's suki.
     suki: createLocalSukiRepository({
       store: AsyncStorage,
@@ -282,22 +303,24 @@ export function AppServicesProvider({
         <ChatServiceProvider service={services.chats}>
           <HanapProvider repository={services.hanap}>
             <SukiProvider repository={services.suki}>
-              {/* History is still sample data, so what people paid, and their collections, stay on the
-                device for now. */}
-              <PaidPricesProvider store={AsyncStorage} seed={previewPaidPrices}>
-                <CollectionsProvider store={AsyncStorage} seed={previewCollections}>
-                  {/* Guess the worth needs no account, so its days stay on the device. */}
-                  <GuessProvider store={AsyncStorage}>
-                    {/* Saved scans: in Supabase with a backend, on the phone without. */}
-                    <ScanHistoryProvider
-                      client={services.supabaseClient ?? null}
-                      store={AsyncStorage}
-                    >
-                      {children}
-                    </ScanHistoryProvider>
-                  </GuessProvider>
-                </CollectionsProvider>
-              </PaidPricesProvider>
+              {/* Saved scans, and what was paid for each: in Supabase with a backend, on the
+                phone without. */}
+              <ScanHistoryProvider client={services.supabaseClient ?? null} store={AsyncStorage}>
+                {/* The sample items' prices: kept on the device without a backend; with one
+                  they're a preview, so they aren't kept. */}
+                <PaidPricesProvider
+                  store={services.backend === 'device' ? AsyncStorage : undefined}
+                  seed={previewPaidPrices}
+                >
+                  <CollectionsProvider
+                    account={services.account}
+                    repositoryFor={services.collectionsFor}
+                  >
+                    {/* Guess the worth needs no account, so its days stay on the device. */}
+                    <GuessProvider store={AsyncStorage}>{children}</GuessProvider>
+                  </CollectionsProvider>
+                </PaidPricesProvider>
+              </ScanHistoryProvider>
             </SukiProvider>
           </HanapProvider>
         </ChatServiceProvider>

@@ -29,7 +29,9 @@ export type OperationName =
   | 'resolve_moderation_case'
   | 'load_hanap'
   | 'publish_hanap'
-  | 'update_hanap';
+  | 'update_hanap'
+  | 'load_collections'
+  | 'save_collection';
 
 export type AppError =
   | {

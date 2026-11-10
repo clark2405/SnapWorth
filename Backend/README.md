@@ -9,6 +9,7 @@
 | Feed discussion      | `supabase/migrations/20261005000000_feed_comments.sql` | Profiles, feed posts, comments with one level of replies, reports, and the RLS policies that decide who sees what. |
 | Chats                | `supabase/migrations/20261029*_chat*.sql`              | Listings (the minimum a chat needs), conversations, messages, offers, pickups, blocks, reports, and their RLS.     |
 | Photos               | `supabase/migrations/20261110000000_photo_storage.sql` | Storage buckets for scan photos (private, signed links) and profile photos (public), and who may write where.       |
+| Flips, collections   | `supabase/migrations/20261110000100_flips_and_collections.sql` | What an owner paid for each scan (`scan_history.paid_php`), and their collections of scans. Owner-only. |
 | Moderation           | `supabase/functions/moderate-content/`                 | Screens each new comment and approves or holds it. Fail-closed: nothing is public until it has been screened.      |
 | Moderation providers | `supabase/functions/_shared/providers/moderation.ts`   | `openai` (OpenAI's free moderation endpoint) for real use; `rules` (a fixed word list) for local development.      |
 | Development data     | `supabase/seed/`                                       | The demo accounts, the two feed posts the app ships with and their comments, and the market listings.              |

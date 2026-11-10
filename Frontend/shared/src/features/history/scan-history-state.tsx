@@ -10,12 +10,16 @@ import {
   type ReactNode,
 } from 'react';
 
+import { previewHistory, type PreviewHistoryItem } from '../preview/sample-data';
 import {
   deleteScan,
   formatCapturedDate,
   loadScans,
   newScanId,
   saveScan,
+  scanToPreviewItem,
+  setScanPaid,
+  withoutPrice,
   type KeyValueStore,
   type NewScan,
   type SavedScan,
@@ -30,6 +34,8 @@ export interface ScanHistory {
   /** Saves a successful estimate to History. */
   readonly save: (scan: NewScan) => Promise<SaveOutcome>;
   readonly remove: (scanId: string) => Promise<void>;
+  /** Notes what was paid for a scan, or forgets it with `null`. */
+  readonly setPaid: (scanId: string, amount: number | null) => Promise<void>;
   /** Loads again, as pull-to-refresh does. */
   readonly reload: () => Promise<void>;
 }
@@ -42,6 +48,7 @@ const none: ScanHistory = {
   scans: [],
   save: () => Promise.resolve('failed'),
   remove: () => Promise.resolve(),
+  setPaid: () => Promise.resolve(),
   reload: () => Promise.resolve(),
 };
 
@@ -137,13 +144,46 @@ export function ScanHistoryProvider({
     [place],
   );
 
+  const setPaid = useCallback(
+    async (scanId: string, amount: number | null) => {
+      setScans((current) =>
+        current.map((item) => {
+          if (item.id !== scanId) return item;
+          const unpriced = withoutPrice(item);
+          return amount === null ? unpriced : { ...unpriced, paidPhp: amount };
+        }),
+      );
+      if (place) await setScanPaid(scanId, amount, place);
+    },
+    [place],
+  );
+
   const value = useMemo<ScanHistory>(
-    () => ({ status, scans, save, remove, reload }),
-    [reload, remove, save, scans, status],
+    () => ({ status, scans, save, remove, setPaid, reload }),
+    [reload, remove, save, scans, setPaid, status],
   );
   return <ScanHistoryContext.Provider value={value}>{children}</ScanHistoryContext.Provider>;
 }
 
 export function useScanHistory(): ScanHistory {
   return useContext(ScanHistoryContext) ?? none;
+}
+
+/**
+ * The things History holds: the account's own scans, or, before the first one, the sample items
+ * as a preview, never the two mixed.
+ */
+export function useHistoryItems(): {
+  readonly items: readonly PreviewHistoryItem[];
+  /** True while the sample items stand in. */
+  readonly samples: boolean;
+} {
+  const { scans } = useScanHistory();
+  return useMemo(
+    () =>
+      scans.length > 0
+        ? { items: scans.map(scanToPreviewItem), samples: false }
+        : { items: previewHistory, samples: true },
+    [scans],
+  );
 }

@@ -3,12 +3,7 @@ import type { ImageSourcePropType } from 'react-native';
 
 import { uploadAvatar } from '../../adapters/supabase/photo-storage';
 import { getSupabase, isSupabaseConfigured } from '../../adapters/supabaseClient';
-import {
-  previewConversations,
-  previewHistory,
-  previewProfile,
-  previewVotesCast,
-} from '../preview/sample-data';
+import { previewConversations, previewProfile, previewVotesCast } from '../preview/sample-data';
 import { useSession, type SessionUser } from '../session';
 
 export interface UserProfileDetails {
@@ -64,11 +59,14 @@ function textOf(...values: unknown[]): string | undefined {
   return undefined;
 }
 
+/** The id of the preview profile shown with nobody signed in. */
+export const previewProfileId = 'demo-user';
+
 /** Returns fallback profile details when Supabase is unconfigured or user details are missing. */
 export function buildFallbackProfile(user?: SessionUser | null): UserProfileDetails {
   if (!user) {
     return {
-      id: 'demo-user',
+      id: previewProfileId,
       email: 'member@snapworth.com',
       displayName: previewProfile.displayName,
       handle: previewProfile.user.handle,
@@ -115,7 +113,8 @@ export function buildFallbackProfile(user?: SessionUser | null): UserProfileDeta
       user.email?.endsWith('@snapworth.com'),
     ),
     stats: {
-      checked: previewHistory.length,
+      // Their own scans, counted once they've loaded.
+      checked: 0,
       listed: previewProfile.stats.listed,
       sold: previewProfile.stats.sold,
     },
@@ -131,7 +130,7 @@ export function buildFallbackProfile(user?: SessionUser | null): UserProfileDeta
  * Fetches user profile from Supabase:
  * 1. Current user metadata & auth details
  * 2. `public.profiles` row (handle, avatar_url)
- * 3. Actual activity metrics (listings count, chats count)
+ * 3. Actual activity metrics (scans, listings and chats counts)
  */
 export async function fetchUserProfile(authUser?: SessionUser | null): Promise<UserProfileDetails> {
   let user = authUser;
@@ -155,6 +154,7 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
   const fallback = buildFallbackProfile(user);
   let handle = fallback.handle;
   let avatarUrl = fallback.avatarUrl;
+  let checkedCount = fallback.stats.checked;
   let listedCount = fallback.stats.listed;
   let soldCount = fallback.stats.sold;
   let chatCount = fallback.activity.conversations;
@@ -181,7 +181,11 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
 
       // Query activity stats
       try {
-        const [listedRes, soldRes, chatRes] = await Promise.allSettled([
+        const [checkedRes, listedRes, soldRes, chatRes] = await Promise.allSettled([
+          supabase
+            .from('scan_history')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id),
           supabase
             .from('listings')
             .select('id', { count: 'exact', head: true })
@@ -197,6 +201,9 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
             .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`),
         ]);
 
+        if (checkedRes.status === 'fulfilled' && typeof checkedRes.value.count === 'number') {
+          checkedCount = checkedRes.value.count;
+        }
         if (listedRes.status === 'fulfilled' && typeof listedRes.value.count === 'number') {
           listedCount = listedRes.value.count;
         }
@@ -219,7 +226,7 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
     handle,
     avatarUrl,
     stats: {
-      checked: fallback.stats.checked,
+      checked: checkedCount,
       listed: listedCount,
       sold: soldCount,
     },

@@ -4,6 +4,8 @@ import { renderScreen } from '../../testing/render-screen';
 import { HistoryView } from './HistoryView';
 import { PaidPriceSection } from './PaidPriceSection';
 import { PaidPricesProvider, type PaidPriceStore } from './paid-prices';
+import { loadScans, saveScan, type SavedScan } from './scan-history';
+import { ScanHistoryProvider } from './scan-history-state';
 
 function memoryStore(
   saved?: Record<string, number>,
@@ -76,5 +78,39 @@ describe('the flip tracker', () => {
     expect(screen.getByText('+₱2,270 flip')).toBeOnTheScreen();
     // The card's total counts up for a moment; let it land.
     await waitFor(() => expect(screen.getByText('₱50,200')).toBeOnTheScreen(), { timeout: 2000 });
+  });
+
+  it('keeps what was paid for a saved scan on the scan itself, not with the samples', async () => {
+    const store = memoryStore();
+    const lamp: SavedScan = {
+      id: '6f1c2a9e-4b7d-4c3e-9a1f-2d8e5b7c4a10',
+      title: 'Brass desk lamp',
+      estimate: 1800,
+      lowPhp: 1500,
+      highPhp: 2200,
+      explanation: '',
+      assumptions: [],
+      photoUri: 'file:///lamp.jpg',
+      capturedOn: 'Nov 7, 2026',
+      status: 'private',
+    };
+    await saveScan(lamp, { store, client: null, owner: 'device' });
+    renderScreen(
+      <ScanHistoryProvider client={null} store={store}>
+        <PaidPricesProvider store={store}>
+          <PaidPriceSection itemId={lamp.id} worth={1800} />
+        </PaidPricesProvider>
+      </ScanHistoryProvider>,
+    );
+
+    fireEvent.press(await screen.findByRole('button', { name: 'Add what you paid' }));
+    fireEvent.changeText(screen.getByLabelText('What you paid, in pesos'), '300');
+    fireEvent.press(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByText('+₱1,500 flip')).toBeOnTheScreen();
+    await waitFor(async () =>
+      expect((await loadScans({ store, client: null, owner: 'device' }))[0]!.paidPhp).toBe(300),
+    );
+    expect(store.data.get('snapworth.paid-prices.v1')).toBeUndefined();
   });
 });

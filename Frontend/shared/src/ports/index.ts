@@ -1,4 +1,6 @@
+export * from './account';
 export * from './chat';
+export * from './collections';
 export * from './comments';
 export * from './hanap';
 export * from './platform';

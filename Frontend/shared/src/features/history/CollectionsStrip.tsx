@@ -2,12 +2,17 @@ import { FolderPlus } from 'lucide-react-native';
 import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 
-import { Photo, PressableScale, Surface, SWText, Tag } from '../../components';
+import { Photo, PressableScale, Surface, SWText, Tag, useToast } from '../../components';
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import { formatPeso } from '../preview/peso';
 import type { ChecklistItem } from './checklist';
 import { CollectionNameSheet } from './CollectionSheets';
-import { collectionTotals, useCollections, type Collection } from './collections';
+import {
+  collectionNotSaved,
+  collectionTotals,
+  useCollections,
+  type Collection,
+} from './collections';
 import { gainLabel } from './flips';
 import { usePaidPrices } from './paid-prices';
 
@@ -26,6 +31,7 @@ export function CollectionsStrip({
   const styles = useThemedStyles(stylesFor);
   const { colors } = useTheme();
   const { collections, create } = useCollections();
+  const toast = useToast();
   const [making, setMaking] = useState(false);
 
   return (
@@ -66,9 +72,12 @@ export function CollectionsStrip({
         items={items}
         onClose={() => setMaking(false)}
         onSave={(name, selected) => {
-          const id = create(name, selected);
+          const { id, saved } = create(name, selected);
           setMaking(false);
           onOpenCollection?.(id);
+          void saved.then((kept) => {
+            if (!kept) toast.show(collectionNotSaved);
+          });
         }}
       />
     </View>

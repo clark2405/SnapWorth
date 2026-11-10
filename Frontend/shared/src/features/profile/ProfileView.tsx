@@ -45,7 +45,8 @@ import {
   type ThemePreference,
 } from '../../design';
 import { formatPeso, previewHeldContent, previewPortfolio } from '../preview/sample-data';
-import { avatarSourceFor, useUserProfile } from './userProfile';
+import { useScanHistory } from '../history/scan-history-state';
+import { avatarSourceFor, previewProfileId, useUserProfile } from './userProfile';
 
 export type ProfileDestination =
   | 'edit-profile'
@@ -81,10 +82,17 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
   const { colors, preference, setPreference } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const { profile } = useUserProfile();
+  const scanHistory = useScanHistory();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // What they've checked is their saved scans, including ones still on their way to Supabase;
+  // the preview profile keeps its sample count.
+  const checked =
+    profile.id !== previewProfileId && scanHistory.status === 'ready'
+      ? scanHistory.scans.length
+      : profile.stats.checked;
 
   const stats = [
-    { label: 'Checked', value: profile.stats.checked },
+    { label: 'Checked', value: checked },
     { label: 'Listed', value: profile.stats.listed },
     { label: 'Sold', value: profile.stats.sold },
   ];

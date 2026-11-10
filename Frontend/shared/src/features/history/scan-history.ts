@@ -9,6 +9,12 @@ import type { PreviewHistoryItem, PreviewItemStatus } from '../preview/sample-da
 
 export const SCAN_HISTORY_STORAGE_KEY = '@snapworth/scan_history';
 
+/**
+ * Where this phone kept what was paid for things, by item id, before prices moved onto the
+ * scans. The sample items' prices are still kept there without a backend.
+ */
+export const DEVICE_PAID_PRICES_KEY = 'snapworth.paid-prices.v1';
+
 export interface KeyValueStore {
   getItem(key: string): Promise<string | null>;
   setItem(key: string, value: string): Promise<void>;
@@ -36,12 +42,24 @@ export interface SavedScan {
   readonly status: PreviewItemStatus;
   /** False until Supabase has it, so a scan saved offline is sent again later. */
   readonly synced?: boolean;
+  /** What the owner paid for it, for the flip tracker. Only the owner sees it. */
+  readonly paidPhp?: number;
+  /** True while a change to `paidPhp` hasn't reached Supabase, so it's sent again later. */
+  readonly paidPending?: boolean;
 }
 
 /** A scan as the camera makes it: the rest is filled in on saving. */
 export type NewScan = Omit<
   SavedScan,
-  'id' | 'capturedOn' | 'status' | 'synced' | 'photoPath' | 'photoUrl' | 'photoPending'
+  | 'id'
+  | 'capturedOn'
+  | 'status'
+  | 'synced'
+  | 'photoPath'
+  | 'photoUrl'
+  | 'photoPending'
+  | 'paidPhp'
+  | 'paidPending'
 >;
 
 /**
@@ -127,6 +145,7 @@ async function insertRemote(client: SupabaseClient, scan: SavedScan): Promise<bo
       assumptions: scan.assumptions,
       photo_uri: scan.photoUri,
       status: scan.status,
+      ...(scan.paidPhp === undefined ? {} : { paid_php: scan.paidPhp }),
     });
     return !error;
   } catch {
@@ -196,6 +215,7 @@ interface ScanRow {
   readonly assumptions: unknown;
   readonly photo_uri: string | null;
   readonly photo_path?: string | null;
+  readonly paid_php?: number | null;
   readonly status: string | null;
   readonly created_at: string;
 }
@@ -210,6 +230,7 @@ const scanFromRow = (row: ScanRow): SavedScan => ({
   assumptions: Array.isArray(row.assumptions) ? (row.assumptions as string[]) : [],
   photoUri: row.photo_uri ?? '',
   ...(row.photo_path ? { photoPath: row.photo_path } : {}),
+  ...(typeof row.paid_php === 'number' ? { paidPhp: row.paid_php } : {}),
   capturedOn: formatCapturedDate(new Date(row.created_at)),
   status: (row.status as PreviewItemStatus) || 'private',
   synced: true,
@@ -223,7 +244,7 @@ const scanFromRow = (row: ScanRow): SavedScan => ({
  */
 export async function loadScans(place: ScanPlace): Promise<SavedScan[]> {
   const local = await readLocal(place);
-  if (!place.client) return local;
+  if (!place.client) return adoptDevicePaidPrices(place, local);
 
   const { data, error } = await place.client
     .from('scan_history')
@@ -239,11 +260,14 @@ export async function loadScans(place: ScanPlace): Promise<SavedScan[]> {
   const localById = new Map(local.map((scan) => [scan.id, scan]));
   // Supabase's copy, keeping what only this phone knows: that it still has a photo to send.
   const remote = (data as ScanRow[]).map((row) => {
-    const scan = scanFromRow(row);
+    let scan = scanFromRow(row);
     const here = localById.get(scan.id);
-    return here?.photoPending && !scan.photoPath
-      ? { ...scan, photoUri: here.photoUri, photoPending: true }
-      : scan;
+    if (here?.photoPending && !scan.photoPath) {
+      scan = { ...scan, photoUri: here.photoUri, photoPending: true };
+    }
+    // A price changed here and not sent yet beats Supabase's older one.
+    if (here?.paidPending) scan = { ...withoutPrice(scan), ...priceOf(here), paidPending: true };
+    return scan;
   });
   const remoteIds = new Set(remote.map((scan) => scan.id));
   // Saved here but never sent: send them now, and keep any that still can't go.
@@ -252,14 +276,102 @@ export async function loadScans(place: ScanPlace): Promise<SavedScan[]> {
     if (await insertRemote(place.client, scan)) unsent.push({ ...scan, synced: true });
     else unsent.push(scan);
   }
-  // Photos this phone still holds go up now that their scans are in Supabase.
+  // Photos and prices this phone still holds go up now that their scans are in Supabase.
   const combined: SavedScan[] = [];
-  for (const scan of [...unsent, ...remote]) {
+  for (let scan of [...unsent, ...remote]) {
     const path = scan.synced && scan.photoPending ? await sendPhoto(place, scan) : null;
-    combined.push(path ? { ...scan, photoPath: path, photoPending: false } : scan);
+    if (path) scan = { ...scan, photoPath: path, photoPending: false };
+    if (scan.synced && scan.paidPending && (await sendPaid(place.client, scan))) {
+      scan = { ...scan, paidPending: false };
+    }
+    combined.push(scan);
   }
   await writeLocal(place, combined);
-  return withPhotoLinks(place, combined);
+  return withPhotoLinks(place, await adoptDevicePaidPrices(place, combined));
+}
+
+const priceOf = (scan: SavedScan) => (scan.paidPhp === undefined ? {} : { paidPhp: scan.paidPhp });
+
+/** A scan with no price paid noted. */
+export function withoutPrice(scan: SavedScan): SavedScan {
+  const copy: { -readonly [K in keyof SavedScan]?: SavedScan[K] } = { ...scan };
+  delete copy.paidPhp;
+  delete copy.paidPending;
+  return copy as SavedScan;
+}
+
+/** Sends a scan's price paid (or that there's none) to Supabase. */
+async function sendPaid(client: SupabaseClient, scan: SavedScan): Promise<boolean> {
+  try {
+    const { error } = await client
+      .from('scan_history')
+      .update({ paid_php: scan.paidPhp ?? null })
+      .eq('id', scan.id);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Notes what the owner paid for a scan, or forgets it with `null`: on the phone at once, then in
+ * Supabase. Resolves false if Supabase couldn't take it yet; the phone's copy keeps it and sends
+ * it on the next load.
+ */
+export async function setScanPaid(
+  scanId: string,
+  amount: number | null,
+  place: ScanPlace,
+): Promise<boolean> {
+  const scans = await readLocal(place);
+  const scan = scans.find((item) => item.id === scanId);
+  if (!scan) return false;
+  const next: SavedScan = {
+    ...withoutPrice(scan),
+    ...(amount === null ? {} : { paidPhp: amount }),
+    ...(place.client ? { paidPending: true } : {}),
+  };
+  await writeLocal(
+    place,
+    scans.map((item) => (item.id === scanId ? next : item)),
+  );
+  if (!place.client) return true;
+  // A scan not in Supabase yet takes its price along when it's sent.
+  if (!next.synced || !(await sendPaid(place.client, next))) return false;
+  await updateLocal(place, scanId, { paidPending: false });
+  return true;
+}
+
+/**
+ * Moves prices this phone kept for the account's scans (before they were stored on the scan) onto
+ * those scans, once. A scan that already has a price keeps it. Prices for anything else (another
+ * account's scans, the sample items) stay on the phone.
+ */
+async function adoptDevicePaidPrices(place: ScanPlace, scans: SavedScan[]): Promise<SavedScan[]> {
+  let kept: Record<string, number>;
+  try {
+    const text = await place.store.getItem(DEVICE_PAID_PRICES_KEY);
+    kept = text ? (JSON.parse(text) as Record<string, number>) : {};
+  } catch {
+    return scans;
+  }
+  const byId = new Map(scans.map((scan) => [scan.id, scan]));
+  const ids = Object.keys(kept).filter((id) => byId.has(id));
+  if (ids.length === 0) return scans;
+  for (const id of ids) {
+    const amount = kept[id];
+    if (byId.get(id)!.paidPhp === undefined && typeof amount === 'number') {
+      await setScanPaid(id, amount, place);
+    }
+  }
+  // The scans have them now (sent, or waiting on the phone to be sent), so the old copies go.
+  const left = Object.fromEntries(Object.entries(kept).filter(([id]) => !byId.has(id)));
+  await place.store.setItem(DEVICE_PAID_PRICES_KEY, JSON.stringify(left)).catch(() => undefined);
+  const updated = new Map((await readLocal(place)).map((scan) => [scan.id, scan]));
+  return scans.map((scan) => {
+    const now = updated.get(scan.id);
+    return now ? { ...scan, ...priceOf(now), paidPending: now.paidPending } : scan;
+  });
 }
 
 /** Adds a link to each uploaded photo; a photo without one shows the phone's copy. */
