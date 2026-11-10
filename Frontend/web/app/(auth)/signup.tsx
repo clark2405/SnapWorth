@@ -11,6 +11,8 @@ import {
 } from '@snapworth/shared/features/auth';
 import { useSession, type SessionUser } from '@snapworth/shared/features/session';
 
+import { useGoogleSignIn } from '../../src/google-sign-in';
+
 export default function SignupRoute() {
   const router = useRouter();
   const { startSession } = useSession();
@@ -67,6 +69,7 @@ export default function SignupRoute() {
     else router.replace('/feed');
     openFromTag();
   };
+  const google = useGoogleSignIn(() => void done());
 
   return (
     <LoginView
@@ -74,7 +77,7 @@ export default function SignupRoute() {
       onSubmit={done}
       onForgotPassword={() => router.push('/reset-password')}
       onContinueWithApple={() => done()}
-      onContinueWithGoogle={() => done()}
+      onContinueWithGoogle={google}
       onClose={returning && router.canGoBack() ? () => router.back() : undefined}
     />
   );
