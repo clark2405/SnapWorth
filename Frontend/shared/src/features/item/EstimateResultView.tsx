@@ -7,6 +7,7 @@ import {
   Gem,
   Handshake,
   Lock,
+  PackageSearch,
   RotateCw,
   ShoppingBag,
   type LucideIcon,
@@ -38,6 +39,7 @@ import {
   DetailHero,
   DetailLayout,
   DetailSheet,
+  EmptyState,
   Field,
   IconButton,
   NavHeader,
@@ -46,6 +48,7 @@ import {
   PriceTagIcon,
   Reveal,
   Screen,
+  ScreenSkeleton,
   SelectField,
   shareIcon,
   Sparkline,
@@ -59,19 +62,17 @@ import {
   WorthySays,
 } from '../../components';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
-import {
-  formatPeso,
-  photosOf,
-  previewConditions,
-  previewItem,
-  previewSharingByItem,
-  previewValuation,
-  type PreviewCondition,
-  type PreviewSharing,
-} from '../preview/sample-data';
+import { formatPeso } from '../preview/peso';
+import type { PreviewCondition } from '../preview/sample-data';
 import { PaidPriceSection } from '../history/PaidPriceSection';
 import { ShareTagSheet } from '../history/ShareTagSheet';
 import { Tip, useTip } from '../tips';
+import {
+  useItemDetail,
+  type ItemDetail,
+  type ItemPlacement,
+  type SampleValuation,
+} from './item-source';
 
 /**
  * Where the estimate stands. The photo is already saved in every state, because the item is
@@ -101,18 +102,36 @@ export interface EstimateResultViewProps {
   readonly presentation?: 'screen' | 'sheet';
 }
 
-const conditionFactor = (key: PreviewCondition) =>
-  previewConditions.find((condition) => condition.key === key)?.factor ?? 1;
-/** The preview estimate is for a like-new item; other conditions scale from the good-condition base. */
-const baseValue = previewItem.estimate / conditionFactor(previewValuation.condition);
 const roundTo50 = (value: number) => Math.round(value / 50) * 50;
+
+const conditionFactor = (sample: SampleValuation, key: PreviewCondition) =>
+  sample.conditions.find((condition) => condition.key === key)?.factor ?? 1;
+
+/**
+ * The sample's price at a condition. Its estimate is for the condition the AI saw; other
+ * conditions scale from there.
+ */
+function sampleAt(item: ItemDetail, sample: SampleValuation, condition: PreviewCondition) {
+  const seen = conditionFactor(sample, sample.valuation.condition);
+  const factor = conditionFactor(sample, condition) / seen;
+  return {
+    value: roundTo50((item.estimate / seen) * conditionFactor(sample, condition)),
+    low: roundTo50(item.low * factor),
+    high: roundTo50(item.high * factor),
+  };
+}
 
 /**
  * Worthy's word on the condition chosen, in pesos: what it adds or costs against like new, and
  * what to do about it. `low` is the bottom of the range at that condition.
  */
-function conditionLine(condition: PreviewCondition, low: number): string {
-  const worth = (key: PreviewCondition) => roundTo50(baseValue * conditionFactor(key));
+function conditionLine(
+  item: ItemDetail,
+  sample: SampleValuation,
+  condition: PreviewCondition,
+  low: number,
+): string {
+  const worth = (key: PreviewCondition) => sampleAt(item, sample, key).value;
   const gap = formatPeso(Math.abs(worth('like_new') - worth(condition)));
   switch (condition) {
     case 'new':
@@ -126,8 +145,34 @@ function conditionLine(condition: PreviewCondition, low: number): string {
   }
 }
 
-export function EstimateResultView({
-  itemId,
+/**
+ * One thing in History: a saved scan, with the AI's estimate, range and reasoning, or the sample
+ * preview before the first scan. An id that's neither is answered with a page saying so.
+ */
+export function EstimateResultView(props: EstimateResultViewProps) {
+  const lookup = useItemDetail(props.itemId);
+  if (lookup.status === 'loading') return <ScreenSkeleton kind="detail" />;
+  if (lookup.status === 'missing') return <MissingItem onBack={props.onBack} />;
+  // A different item starts afresh: its own title, condition and reveal.
+  return <ItemResult key={lookup.item.id} {...props} item={lookup.item} />;
+}
+
+function MissingItem({ onBack }: { readonly onBack?: () => void }) {
+  return (
+    <Screen ambient="history" header={<NavHeader title="Item" onBack={onBack} banded />}>
+      <EmptyState
+        icon={PackageSearch}
+        title="This item isn’t in your History"
+        body="It may have been deleted, or saved by another account. Your other things are still in History."
+        actionLabel={onBack ? 'Back to History' : undefined}
+        onAction={onBack}
+      />
+    </Screen>
+  );
+}
+
+function ItemResult({
+  item,
   status = 'estimated',
   onBack,
   onShare,
@@ -138,18 +183,20 @@ export function EstimateResultView({
   onViewPost,
   onViewListing,
   presentation = 'screen',
-}: EstimateResultViewProps) {
+}: EstimateResultViewProps & { readonly item: ItemDetail }) {
   const asSheet = presentation === 'sheet';
   const listTip = useTip('list');
-  const item = previewItem;
+  const sample = item.sample;
   // A fresh capture (the sheet) is private until the owner shares it; History items carry their
   // own state. The preview reuses a History item for the capture, so the sheet ignores its state.
-  const placement: PreviewSharing =
-    (asSheet || !itemId ? undefined : previewSharingByItem[itemId]) ?? {};
+  const placement: ItemPlacement = asSheet ? {} : item.placement;
   const styles = useThemedStyles(stylesFor);
   const { colors } = useTheme();
+  // Only the sample's name can be edited, as a preview; a scan keeps the name the AI gave it.
   const [title, setTitle] = useState<string>(item.title);
-  const [condition, setCondition] = useState<PreviewCondition>(previewValuation.condition);
+  const [condition, setCondition] = useState<PreviewCondition>(
+    sample?.valuation.condition ?? 'like_new',
+  );
   const [sharing, setSharing] = useState(false);
   const estimated = status === 'estimated';
   // Reveal only a newly resolved estimate; one opened from History is already known.
@@ -160,10 +207,10 @@ export function EstimateResultView({
     if (estimated && resolvedHere.current) haptic('success');
   }, [estimated]);
 
-  const factor = conditionFactor(condition) / conditionFactor(previewValuation.condition);
-  const value = roundTo50(baseValue * conditionFactor(condition));
-  const low = roundTo50(previewValuation.low * factor);
-  const high = roundTo50(previewValuation.high * factor);
+  const { value, low, high } = sample
+    ? sampleAt(item, sample, condition)
+    : { value: item.estimate, low: item.low, high: item.high };
+  const cover = item.photos[0];
 
   return (
     <Screen
@@ -216,7 +263,7 @@ export function EstimateResultView({
       <DetailLayout
         hero={
           asSheet ? null : (
-            <DetailHero photos={photosOf(item)} heightRatio={estimated ? 0.5 : 0.62}>
+            <DetailHero photos={item.photos} heightRatio={estimated ? 0.5 : 0.62}>
               {status === 'estimating' ? <ScanOverlay /> : null}
             </DetailHero>
           )
@@ -250,7 +297,7 @@ export function EstimateResultView({
               {/* The appraisal hangs on its price tag, stamped with how sure the AI is. */}
               <Reveal index={0} style={styles.headline}>
                 <SWText variant="caption" tone="textMuted">
-                  {item.category}
+                  {item.category ?? (item.capturedOn ? `Snapped ${item.capturedOn}` : '')}
                 </SWText>
                 <View style={styles.tagRow}>
                   <TagShape
@@ -272,13 +319,15 @@ export function EstimateResultView({
                       accessibilityLiveRegion="polite"
                     />
                   </TagShape>
-                  <Stamp
-                    label={`${previewValuation.confidence} confidence`}
-                    side="end"
-                    // Stamped once the count has landed on the price.
-                    land={resolvedHere.current ? { delay: 1250 } : undefined}
-                    style={styles.confidence}
-                  />
+                  {item.confidence ? (
+                    <Stamp
+                      label={`${item.confidence} confidence`}
+                      side="end"
+                      // Stamped once the count has landed on the price.
+                      land={resolvedHere.current ? { delay: 1250 } : undefined}
+                      style={styles.confidence}
+                    />
+                  ) : null}
                 </View>
                 <SWText variant="bodyMedium" tone="textMuted">
                   AI estimate, not a sale price
@@ -290,120 +339,51 @@ export function EstimateResultView({
                   low={low}
                   high={high}
                   estimate={value}
-                  confidence={previewValuation.confidence}
+                  confidence={item.confidence ?? 'medium'}
                   format={formatPeso}
                   showConfidence={false}
                   animate={resolvedHere.current}
                 />
               </Reveal>
 
+              {item.explanation ? (
+                <Reveal index={2} style={styles.section}>
+                  <SectionTitle title="Why this price" />
+                  <SWText variant="bodyMedium" tone="textSecondary">
+                    {item.explanation}
+                  </SWText>
+                  {item.assumptions.length > 0 ? (
+                    <View style={styles.assumptions} accessibilityRole="list">
+                      <SWText variant="labelMedium" tone="textMuted">
+                        What the AI assumed
+                      </SWText>
+                      {item.assumptions.map((assumption) => (
+                        <SWText key={assumption} variant="bodySmall" tone="textSecondary">
+                          {`• ${assumption}`}
+                        </SWText>
+                      ))}
+                    </View>
+                  ) : null}
+                </Reveal>
+              ) : null}
+
               <Reveal index={2} style={styles.section}>
-                <PaidPriceSection itemId={itemId ?? item.id} worth={value} />
+                <PaidPriceSection itemId={item.id} worth={value} />
               </Reveal>
 
               <Tip id="list" />
 
-              <Reveal index={2} style={styles.insights}>
-                <Insight
-                  icon={Flame}
-                  label={previewValuation.demand}
-                  detail={previewValuation.demandDetail}
+              {sample ? (
+                <SampleMarket
+                  item={item}
+                  sample={sample}
+                  condition={condition}
+                  onCondition={setCondition}
+                  low={low}
+                  title={title}
+                  onTitle={setTitle}
                 />
-                <Insight icon={Clock3} label={previewValuation.sellTime} />
-                <Insight
-                  icon={Gem}
-                  label={previewValuation.rarity}
-                  detail="Fewer than 1 in 20 listings"
-                />
-              </Reveal>
-
-              <Reveal index={3} style={styles.section}>
-                <SectionTitle title="Condition" />
-                <ChoiceChips
-                  options={previewConditions.map(({ key, label }) => ({ key, label }))}
-                  value={condition}
-                  onChange={setCondition}
-                />
-                <Animated.View key={condition} entering={FadeIn.duration(220)}>
-                  <SWText variant="bodySmall" tone="textMuted">
-                    {previewConditions.find((c) => c.key === condition)?.hint}
-                  </SWText>
-                </Animated.View>
-              </Reveal>
-
-              <Reveal index={3} delay={80}>
-                <Animated.View key={condition} entering={FadeIn.duration(220)}>
-                  <WorthySays>{conditionLine(condition, low)}</WorthySays>
-                </Animated.View>
-              </Reveal>
-
-              <Reveal index={4} style={styles.section}>
-                <SectionTitle
-                  title="Price trend"
-                  detail={previewValuation.trendChange}
-                  detailTone="success"
-                />
-                <Surface padding={tokens.spacing[4]}>
-                  <Sparkline values={previewValuation.trend} height={72} />
-                  <View style={styles.trendAxis}>
-                    <SWText variant="caption" tone="textMuted">
-                      12 weeks ago
-                    </SWText>
-                    <SWText variant="caption" tone="textMuted">
-                      Today
-                    </SWText>
-                  </View>
-                </Surface>
-              </Reveal>
-
-              <Reveal index={4} delay={120} style={styles.section}>
-                <SectionTitle title="Recent sales" />
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.bleed}
-                  contentContainerStyle={styles.comparables}
-                >
-                  {previewValuation.comparables.map((comparable, index) => (
-                    <Animated.View
-                      key={comparable.id}
-                      entering={paperIn(360 + index * 70)}
-                      style={styles.comparable}
-                    >
-                      <Photo
-                        source={comparable.photo}
-                        label={comparable.photoLabel}
-                        aspectRatio={1}
-                        radius={tokens.radius.medium}
-                      />
-                      <SWText variant="priceSmall">{formatPeso(comparable.price)}</SWText>
-                      <SWText variant="caption" numberOfLines={2} style={styles.comparableTitle}>
-                        {comparable.title}
-                      </SWText>
-                      <SWText variant="caption" tone="textMuted" numberOfLines={1}>
-                        {comparable.soldAgo}
-                      </SWText>
-                      <SWText variant="caption" tone="textMuted" numberOfLines={1}>
-                        {comparable.source}
-                      </SWText>
-                    </Animated.View>
-                  ))}
-                </ScrollView>
-              </Reveal>
-
-              <Reveal index={4} delay={200} style={styles.section}>
-                <SectionTitle title="Details" />
-                <Field label="Identified item">
-                  <TextField
-                    value={title}
-                    onChangeText={setTitle}
-                    accessibilityLabel="Identified item"
-                  />
-                </Field>
-                <Field label="Category">
-                  <SelectField value={item.category} accessibilityLabel="Category" />
-                </Field>
-              </Reveal>
+              ) : null}
             </>
           ) : null}
 
@@ -413,12 +393,12 @@ export function EstimateResultView({
 
       <ShareTagSheet
         item={
-          sharing
+          sharing && cover
             ? {
-                id: itemId ?? item.id,
+                id: item.id,
                 title,
-                photo: item.photo,
-                photoLabel: item.photoLabel,
+                photo: cover.source,
+                photoLabel: cover.label,
                 worth: value,
               }
             : null
@@ -426,6 +406,120 @@ export function EstimateResultView({
         onClose={() => setSharing(false)}
       />
     </Screen>
+  );
+}
+
+/**
+ * The sample's market detail: demand, how condition moves the price, the trend and recent sales.
+ * A real scan doesn't have these yet, so it shows the AI's estimate and reasoning alone.
+ */
+function SampleMarket({
+  item,
+  sample,
+  condition,
+  onCondition,
+  low,
+  title,
+  onTitle,
+}: {
+  readonly item: ItemDetail;
+  readonly sample: SampleValuation;
+  readonly condition: PreviewCondition;
+  readonly onCondition: (condition: PreviewCondition) => void;
+  readonly low: number;
+  readonly title: string;
+  readonly onTitle: (title: string) => void;
+}) {
+  const styles = useThemedStyles(stylesFor);
+  const { valuation, conditions } = sample;
+  return (
+    <>
+      <Reveal index={2} style={styles.insights}>
+        <Insight icon={Flame} label={valuation.demand} detail={valuation.demandDetail} />
+        <Insight icon={Clock3} label={valuation.sellTime} />
+        <Insight icon={Gem} label={valuation.rarity} detail="Fewer than 1 in 20 listings" />
+      </Reveal>
+
+      <Reveal index={3} style={styles.section}>
+        <SectionTitle title="Condition" />
+        <ChoiceChips
+          options={conditions.map(({ key, label }) => ({ key, label }))}
+          value={condition}
+          onChange={onCondition}
+        />
+        <Animated.View key={condition} entering={FadeIn.duration(220)}>
+          <SWText variant="bodySmall" tone="textMuted">
+            {conditions.find((c) => c.key === condition)?.hint}
+          </SWText>
+        </Animated.View>
+      </Reveal>
+
+      <Reveal index={3} delay={80}>
+        <Animated.View key={condition} entering={FadeIn.duration(220)}>
+          <WorthySays>{conditionLine(item, sample, condition, low)}</WorthySays>
+        </Animated.View>
+      </Reveal>
+
+      <Reveal index={4} style={styles.section}>
+        <SectionTitle title="Price trend" detail={valuation.trendChange} detailTone="success" />
+        <Surface padding={tokens.spacing[4]}>
+          <Sparkline values={valuation.trend} height={72} />
+          <View style={styles.trendAxis}>
+            <SWText variant="caption" tone="textMuted">
+              12 weeks ago
+            </SWText>
+            <SWText variant="caption" tone="textMuted">
+              Today
+            </SWText>
+          </View>
+        </Surface>
+      </Reveal>
+
+      <Reveal index={4} delay={120} style={styles.section}>
+        <SectionTitle title="Recent sales" />
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.bleed}
+          contentContainerStyle={styles.comparables}
+        >
+          {valuation.comparables.map((comparable, index) => (
+            <Animated.View
+              key={comparable.id}
+              entering={paperIn(360 + index * 70)}
+              style={styles.comparable}
+            >
+              <Photo
+                source={comparable.photo}
+                label={comparable.photoLabel}
+                aspectRatio={1}
+                radius={tokens.radius.medium}
+              />
+              <SWText variant="priceSmall">{formatPeso(comparable.price)}</SWText>
+              <SWText variant="caption" numberOfLines={2} style={styles.comparableTitle}>
+                {comparable.title}
+              </SWText>
+              <SWText variant="caption" tone="textMuted" numberOfLines={1}>
+                {comparable.soldAgo}
+              </SWText>
+              <SWText variant="caption" tone="textMuted" numberOfLines={1}>
+                {comparable.source}
+              </SWText>
+            </Animated.View>
+          ))}
+        </ScrollView>
+      </Reveal>
+
+      <Reveal index={4} delay={200} style={styles.section}>
+        <SectionTitle title="Details" />
+        <Field label="Identified item">
+          <TextField value={title} onChangeText={onTitle} accessibilityLabel="Identified item" />
+        </Field>
+        <Field label="Category">
+          <SelectField value={item.category ?? ''} accessibilityLabel="Category" />
+        </Field>
+      </Reveal>
+    </>
   );
 }
 
@@ -484,10 +578,11 @@ function Insight({
 }
 
 /** Saved to history always; then wherever else the item lives. */
-function SavedNote({ sharing }: { readonly sharing: PreviewSharing }) {
+function SavedNote({ sharing }: { readonly sharing: ItemPlacement }) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
-  const shared = sharing.postId !== undefined || sharing.listingId !== undefined;
+  const onFeed = sharing.onFeed || sharing.postId !== undefined;
+  const forSale = sharing.listed || sharing.sold || sharing.listingId !== undefined;
   return (
     <View style={styles.saved}>
       <View style={styles.savedLine}>
@@ -497,9 +592,9 @@ function SavedNote({ sharing }: { readonly sharing: PreviewSharing }) {
         </SWText>
       </View>
       <View style={styles.sharedTags}>
-        {shared ? null : <Tag label="Private" tone="sand" icon={Lock} />}
-        {sharing.postId ? <Tag label="On feed" tone="sand" icon={Users} /> : null}
-        {sharing.listingId ? (
+        {onFeed || forSale ? null : <Tag label="Private" tone="sand" icon={Lock} />}
+        {onFeed ? <Tag label="On feed" tone="sand" icon={Users} /> : null}
+        {forSale ? (
           sharing.sold ? (
             <Tag label="Sold" tone="grave" icon={Handshake} />
           ) : (
@@ -676,7 +771,7 @@ function Destinations({
   onKeepPrivate,
   onViewPost,
   onViewListing,
-}: { readonly sharing: PreviewSharing } & Pick<
+}: { readonly sharing: ItemPlacement } & Pick<
   EstimateResultViewProps,
   'onListForSale' | 'onPostToFeed' | 'onKeepPrivate' | 'onViewPost' | 'onViewListing'
 >) {
@@ -811,6 +906,9 @@ const stylesFor = themedStyles((colors) => ({
   },
   section: {
     gap: tokens.spacing[3],
+  },
+  assumptions: {
+    gap: tokens.spacing[1],
   },
   sectionTitle: {
     flexDirection: 'row',
