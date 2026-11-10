@@ -1,7 +1,7 @@
-// POST { "type": "comment" | "hanap" | "post", "id": "<uuid>" } — screens a pending comment,
-// hanap post or feed post and approves or holds it. Called by the app right after one is posted;
-// requires a signed-in caller (the function's JWT check) and runs the database update with the
-// service role, which is the only way moderation fields can change.
+// POST { "type": "comment" | "hanap" | "listing" | "post", "id": "<uuid>" } — screens a pending
+// comment, hanap post, listing or feed post and approves or holds it. Called by the app right after
+// one is posted; requires a signed-in caller (the function's JWT check) and runs the database
+// update with the service role, which is the only way moderation fields can change.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 import { providerFromEnv } from '../_shared/providers/moderation.ts';
@@ -19,6 +19,8 @@ function tableFor(type: unknown): string | null {
       return 'comments';
     case 'hanap':
       return 'hanap_posts';
+    case 'listing':
+      return 'listings';
     case 'post':
       return 'feed_posts';
     default:
@@ -34,7 +36,7 @@ function json(status: number, body: unknown): Response {
   });
 }
 
-Deno.serve(async (request) => {
+Deno.serve(async (request: Request) => {
   if (request.method === 'OPTIONS') return new Response(null, { headers: cors });
   if (request.method !== 'POST') return json(405, { error: 'Use POST.' });
 
@@ -46,7 +48,9 @@ Deno.serve(async (request) => {
   }
   const table = tableFor(target.type);
   if (!table || typeof target.id !== 'string' || !uuid.test(target.id)) {
-    return json(400, { error: 'Expected { "type": "comment" | "hanap" | "post", "id": "<uuid>" }.' });
+    return json(400, {
+      error: 'Expected { "type": "comment" | "hanap" | "listing" | "post", "id": "<uuid>" }.',
+    });
   }
 
   const db = createClient(
@@ -56,6 +60,20 @@ Deno.serve(async (request) => {
   );
   const store: CommentStore = {
     async get(id) {
+      if (table === 'listings') {
+        const { data, error } = await db
+          .from(table)
+          .select('title, description, moderation_status')
+          .eq('id', id)
+          .maybeSingle();
+        if (error) throw error;
+        return data
+          ? {
+              body: [data.title, data.description ?? ''].filter(Boolean).join('\n\n'),
+              status: data.moderation_status as ModerationStatus,
+            }
+          : null;
+      }
       const { data, error } = await db
         .from(table)
         .select('body, moderation_status')
