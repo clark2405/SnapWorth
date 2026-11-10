@@ -323,3 +323,4 @@ revoke all on public.saved_listings from anon, authenticated;
 grant select, delete on public.saved_listings to authenticated;
 grant insert (listing_id, alert_below_php, alert_enabled) on public.saved_listings to authenticated;
 grant update (alert_below_php, alert_enabled) on public.saved_listings to authenticated;
+

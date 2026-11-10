@@ -6,6 +6,7 @@ import {
   createLocalChatRepository,
   createLocalCollectionRepository,
   createLocalCommentRepository,
+  createLocalFeedRepository,
   createLocalHanapRepository,
   createLocalMarketplaceRepository,
   createLocalSukiRepository,
@@ -13,6 +14,7 @@ import {
   createSupabaseChatRepository,
   createSupabaseCollectionRepository,
   createSupabaseCommentRepository,
+  createSupabaseFeedRepository,
   createSupabaseHanapRepository,
   createSupabaseMarketplaceRepository,
   createSupabaseSukiRepository,
@@ -25,7 +27,12 @@ import {
 import { getSupabase } from '../adapters/supabaseClient';
 import { ChatServiceProvider } from '../features/chat/chat-state';
 import { SukiProvider } from '../features/chat/suki';
-import { CommentServiceProvider } from '../features/feed';
+import {
+  buildPreviewFeedPosts,
+  buildPreviewFeedVotes,
+  CommentServiceProvider,
+  FeedProvider,
+} from '../features/feed';
 import { HanapProvider } from '../features/hanap/hanap-state';
 import { GuessProvider } from '../features/guess/guess-state';
 import { CollectionsProvider } from '../features/history/collections';
@@ -54,6 +61,7 @@ import {
 } from '../features/preview/sample-data';
 import type { AccountObserver } from '../ports/account';
 import type { CollectionRepository } from '../ports/collections';
+import type { FeedRepository } from '../ports/feed';
 import type { HanapRepository } from '../ports/hanap';
 import type { MarketplaceRepository } from '../ports/marketplace';
 import type { ChatService, CommentService } from '../ports/services';
@@ -75,6 +83,7 @@ export interface AppServices {
   readonly backend: 'supabase' | 'device';
   readonly comments: CommentService;
   readonly chats: ChatService;
+  readonly feed: FeedRepository;
   readonly hanap: HanapRepository;
   readonly marketplace: MarketplaceRepository;
   readonly suki: SukiRepository;
@@ -229,6 +238,7 @@ export function createAppServices(config: BackendConfig): AppServices {
       backend: 'supabase',
       comments: createCommentService(createSupabaseCommentRepository(client)),
       chats: createChatService(createSupabaseChatRepository(client)),
+      feed: createSupabaseFeedRepository(client),
       hanap: createSupabaseHanapRepository(client),
       marketplace: createSupabaseMarketplaceRepository(client),
       suki: createSupabaseSukiRepository(client),
@@ -279,6 +289,11 @@ export function createAppServices(config: BackendConfig): AppServices {
       })),
       screen: screenWithRules,
     }),
+    feed: createLocalFeedRepository({
+      seed: buildPreviewFeedPosts(),
+      seedVotes: buildPreviewFeedVotes(),
+      viewerHandle: previewProfile.user.handle,
+    }),
     marketplace: createLocalMarketplaceRepository({
       store: AsyncStorage,
       viewer: profileOf(previewProfile.user),
@@ -321,26 +336,31 @@ export function AppServicesProvider({
         <ChatServiceProvider service={services.chats}>
           <HanapProvider repository={services.hanap}>
             <MarketplaceProvider repository={services.marketplace}>
-              <SukiProvider repository={services.suki}>
-                {/* Saved scans, and what was paid for each: in Supabase with a backend, on the
-                  phone without. */}
-                <ScanHistoryProvider client={services.supabaseClient ?? null} store={AsyncStorage}>
-                  {/* The sample items' prices: kept on the device without a backend; with one
-                    they're a preview, so they aren't kept. */}
-                  <PaidPricesProvider
-                    store={services.backend === 'device' ? AsyncStorage : undefined}
-                    seed={previewPaidPrices}
+              <FeedProvider repository={services.feed}>
+                <SukiProvider repository={services.suki}>
+                  {/* Saved scans, and what was paid for each: in Supabase with a backend, on the
+                    phone without. */}
+                  <ScanHistoryProvider
+                    client={services.supabaseClient ?? null}
+                    store={AsyncStorage}
                   >
-                    <CollectionsProvider
-                      account={services.account}
-                      repositoryFor={services.collectionsFor}
+                    {/* The sample items' prices: kept on the device without a backend; with one
+                      they're a preview, so they aren't kept. */}
+                    <PaidPricesProvider
+                      store={services.backend === 'device' ? AsyncStorage : undefined}
+                      seed={previewPaidPrices}
                     >
-                      {/* Guess the worth needs no account, so its days stay on the device. */}
-                      <GuessProvider store={AsyncStorage}>{children}</GuessProvider>
-                    </CollectionsProvider>
-                  </PaidPricesProvider>
-                </ScanHistoryProvider>
-              </SukiProvider>
+                      <CollectionsProvider
+                        account={services.account}
+                        repositoryFor={services.collectionsFor}
+                      >
+                        {/* Guess the worth needs no account, so its days stay on the device. */}
+                        <GuessProvider store={AsyncStorage}>{children}</GuessProvider>
+                      </CollectionsProvider>
+                    </PaidPricesProvider>
+                  </ScanHistoryProvider>
+                </SukiProvider>
+              </FeedProvider>
             </MarketplaceProvider>
           </HanapProvider>
         </ChatServiceProvider>

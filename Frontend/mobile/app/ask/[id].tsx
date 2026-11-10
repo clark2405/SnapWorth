@@ -18,16 +18,16 @@ export default function CreatePostRoute() {
       <CreatePostView
         itemId={itemId}
         source={from === 'listing' ? 'listing' : 'item'}
-        // Preview wiring: `?outcome=held` or `?outcome=blocked` shows what moderation would do.
         outcome={
-          outcome === 'held' || outcome === 'blocked' || outcome === 'pending'
+          outcome === 'held' ||
+          outcome === 'blocked' ||
+          outcome === 'pending' ||
+          outcome === 'approved'
             ? outcome
-            : 'approved'
+            : undefined
         }
         onBack={() => router.back()}
-        // Preview wiring: there is no post service yet, so publishing just opens the feed.
-        // Dismissing back to it closes the whole snap flow (camera, estimate, this composer),
-        // where replacing would leave them stacked behind the feed.
+        // Dismissing back to the feed closes the whole snap flow (camera, estimate, this composer).
         onPublish={() => router.dismissTo('/feed')}
       />
     </ModalSafeArea>

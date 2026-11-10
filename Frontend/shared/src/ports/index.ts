@@ -2,6 +2,7 @@ export * from './account';
 export * from './chat';
 export * from './collections';
 export * from './comments';
+export * from './feed';
 export * from './hanap';
 export * from './marketplace';
 export * from './platform';

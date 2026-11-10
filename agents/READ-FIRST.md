@@ -93,9 +93,18 @@ Last updated 2026-11-10.
   Guess the worth all draw from real listings (falling back to the local sample seed when offline
   or before any listings exist). Saved listings and price-drop alerts are stored per account in
   `saved_listings`.
+- **Feed, votes and trends:** community price-check posts live in Supabase (`feed_posts`), linked
+  to a saved scan (`scan_id`) or a marketplace listing (`listing_id`), and screened through
+  `moderate-content`. A read policy on `storage.objects` lets anyone view the scan photo of an
+  approved feed post. `CreatePostView` (`/ask/<id>`) reads the real scan or listing, and
+  `ConfirmPriceView`'s "Also ask the feed" switch publishes a linked feed post alongside a new
+  listing. Votes are stored per account in `votes` (one vote per person per post), with triggers
+  keeping each post's `too_high_count`, `just_right_count` and `too_low_count` and any linked
+  listing's `verdict` / `verdict_share` in sync. Feed, post discussion pages, Your votes
+  (`VotesView`), Search and Trends (`TrendView`) all draw from real feed posts and listings.
 - **Needs deploying:** `npx supabase db push` for the `scan_history`, `photo_storage`,
-  `flips_and_collections` and `marketplace` migrations (making the Storage buckets, policies and
-  expanded `listings` / `saved_listings` tables).
+  `flips_and_collections`, `marketplace` and `feed_and_votes` migrations, and
+  `npx supabase functions deploy moderate-content` for feed post screening.
 
 ### Kept on the device only
 
@@ -110,11 +119,10 @@ Last updated 2026-11-10.
 These look finished but read from `shared/src/features/preview/sample-data.ts`, and what people do
 on them isn't saved.
 
-- **Feed:** posts and votes. Posting to the feed only opens the feed.
 - **History, before the first scan:** the sample items, and their sample market detail (demand,
   condition, trend and recent sales) on the item screen. A real scan has no market detail yet.
-- **Profile:** your votes, settings, trends and the admin review queue.
-  Your own profile, seller profiles and price alerts are real (see above).
+- **Profile:** the admin review queue. Your own profile, seller profiles, price alerts and your
+  votes are real (see above).
 - **Worthy's cards:** price, trend and collection answers.
 
 ### Not done yet
@@ -124,7 +132,7 @@ on them isn't saved.
     Supabase's Google provider set up first; see "Sign-in setup".
   - Sign in with Apple is written but hidden: it needs the paid Apple Developer account. See
     "Sign-in setup" to turn it on.
-- **The rest of the data on Supabase:** votes, posts and the admin queue.
+- **The rest of the data on Supabase:** the admin review queue.
 - **Cloud AI** (a teammate owns this; see "Handoff" below):
   - Worthy's chat in the cloud.
   - Real data behind Worthy's cards.
@@ -137,13 +145,10 @@ on them isn't saved.
   for development only. Set `EXPO_PUBLIC_MAP_TILES_URL` and `EXPO_PUBLIC_PLACE_SEARCH_URL`.
 - **Android:** not yet checked on a phone. The Snap bar may be hidden behind the tab bar.
 - **A moderation provider:** Supabase has no `MODERATION_PROVIDER` secret set, so
-  `moderate-content` holds every feed comment and hanap post: only its author sees it. Set
+  `moderate-content` holds every feed comment, feed post and hanap post: only its author sees it. Set
   `MODERATION_PROVIDER=rules` for the built-in word rules (fine while testing), or `openai` with an
   `OPENAI_API_KEY` (OpenAI's moderation is free) before launch. Set it in the dashboard under Edge
   Functions → Secrets, or with `npx supabase secrets set`.
-- **Listing or posting from History:** the listing flow (`/list/<id>`) and asking the feed
-  (`/ask/<id>`) still show the sample item; `useItemDetail` in `features/item` gives them the
-  real scan.
 - **Deployment:** EAS builds for the phones, and Vercel for the web.
 
 The detailed task lists are in `agents/specs/`. Git keeps that folder local, so ask whoever has it,

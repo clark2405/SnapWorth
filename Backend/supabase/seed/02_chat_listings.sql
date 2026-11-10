@@ -196,3 +196,7 @@ on conflict (id) do update
       verdict_share = excluded.verdict_share,
       views_count = excluded.views_count,
       saves_count = excluded.saves_count;
+
+update public.feed_posts
+   set listing_id = '00000000-0000-4000-9100-000000000001'
+ where id = '00000000-0000-4000-9000-000000000002';

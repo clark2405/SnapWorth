@@ -22,14 +22,11 @@ import {
   ZoomTarget,
 } from '../../components';
 import { held, themedStyles, tokens, useTheme, useThemedStyles, useWideLayout } from '../../design';
+import type { MarketCategory } from '../../ports/marketplace';
+import { toPreviewPost, useFeed } from '../feed/feed-state';
 import { ListingCard } from '../marketplace/ListingCard';
-import {
-  formatPeso,
-  previewListings,
-  previewPosts,
-  previewTrendDetails,
-  previewTrending,
-} from '../preview/sample-data';
+import { toPreviewListing, useMarketplace } from '../marketplace/marketplace-state';
+import { formatPeso, previewTrendDetails, previewTrending } from '../preview/sample-data';
 
 export interface TrendViewProps {
   /** A "Hot this month" key, e.g. `film-cameras`. */
@@ -40,6 +37,14 @@ export interface TrendViewProps {
   readonly onOpenPost?: (postId: string) => void;
   readonly onSnap?: () => void;
 }
+
+const trendCategoryByKey: Readonly<Record<string, MarketCategory>> = {
+  'film-cameras': 'collectibles',
+  sneakers: 'sneakers',
+  '90s-sportswear': 'fashion',
+  'retro-audio': 'electronics',
+  keyboards: 'electronics',
+};
 
 /**
  * One trending category, told as a story rather than a search: the photo runs full bleed and the
@@ -57,6 +62,8 @@ export function TrendView({
   const styles = useThemedStyles(stylesFor);
   const { colors } = useTheme();
   const { height } = useWindowDimensions();
+  const { listings: marketListings } = useMarketplace();
+  const { posts: feedPosts } = useFeed();
   const trend = previewTrending.find((entry) => entry.key === trendKey) ?? previewTrending[0];
   const detail = trend ? previewTrendDetails[trend.key] : undefined;
 
@@ -75,8 +82,32 @@ export function TrendView({
   }
 
   const rising = !trend.change.trim().startsWith('−');
-  const listings = previewListings.filter((listing) => detail.listingIds.includes(listing.id));
-  const posts = previewPosts.filter((post) => detail.postIds.includes(post.id));
+  const trendCategory = trendCategoryByKey[trend.key];
+  const listings = marketListings
+    .filter(
+      (listing) =>
+        listing.status === 'active' &&
+        (detail.listingIds.includes(listing.id) ||
+          detail.listingIds.includes(listing.slug) ||
+          (trendCategory !== undefined &&
+            listing.category === trendCategory &&
+            !Object.values(previewTrendDetails).some(
+              (other) => other !== detail && other.listingIds.includes(listing.id),
+            ))),
+    )
+    .map(toPreviewListing);
+  const posts = feedPosts
+    .filter(
+      (post) =>
+        detail.postIds.includes(post.id) ||
+        detail.postIds.includes(post.slug) ||
+        (trendCategory !== undefined &&
+          post.category === trendCategory &&
+          !Object.values(previewTrendDetails).some(
+            (other) => other !== detail && other.postIds.includes(post.slug),
+          )),
+    )
+    .map(toPreviewPost);
   const heroHeight = Math.round(height * 0.5);
   // On a wide window the photo is framed on the left and the title heads the details beside it.
   const wide = useWideLayout();

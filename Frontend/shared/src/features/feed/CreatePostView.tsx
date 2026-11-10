@@ -1,5 +1,5 @@
 import { ShieldX } from 'lucide-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { TextInput, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
@@ -21,7 +21,12 @@ import {
   useToast,
 } from '../../components';
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import type { MarketCategory } from '../../ports/marketplace';
+import { useScanHistory } from '../history/scan-history-state';
+import { useItemDetail } from '../item/item-source';
+import { listingPhotoSource, useMarketplace } from '../marketplace/marketplace-state';
 import { formatPeso, previewItem, previewMyListing } from '../preview/sample-data';
+import { useFeed } from './feed-state';
 
 /**
  * What moderation decided about a new post. `approved` goes live; `pending` is live once
@@ -33,70 +38,149 @@ export interface CreatePostViewProps {
   readonly itemId?: string;
   /** `listing` reposts a marketplace listing so the community can judge its asking price. */
   readonly source?: 'item' | 'listing';
-  /** The moderation result to show; until moderation is wired the post is approved. */
+  /** Optional moderation outcome override for preview/testing. */
   readonly outcome?: PostModerationOutcome;
   readonly onBack?: () => void;
-  readonly onPublish?: (question: string) => void;
+  readonly onPublish?: (question: string, postId?: string) => void;
 }
 
 const maxLength = 280;
-const publishDelayMs = 900;
+
+function inferCategory(title: string, fallback?: MarketCategory | null): MarketCategory {
+  if (fallback) return fallback;
+  const lower = title.toLowerCase();
+  if (/jordan|sneaker|shoe|dunk/.test(lower)) return 'sneakers';
+  if (/walkman|keyboard|keychron|sony|audio|headphone/.test(lower)) return 'electronics';
+  if (/polaroid|camera|film|vintage|card|coin/.test(lower)) return 'collectibles';
+  if (/lamp|chair|vase|table/.test(lower)) return 'home';
+  return 'fashion';
+}
 
 /**
  * Asking the community about an estimate. The estimate travels with the post exactly as it was
- * given, so voters judge the AI's number, not a number the author edited. Publishing pulses
- * briefly, then hands off with a toast so the moment reads as landed, not just dismissed.
+ * given, so voters judge the AI's number, not a number the author edited. Publishing saves the
+ * post to the feed repository and screens it, then hands off with a toast.
  */
 export function CreatePostView({
+  itemId,
   source = 'item',
-  outcome = 'approved',
+  outcome,
   onBack,
   onPublish,
 }: CreatePostViewProps) {
-  const item = previewItem;
-  const asking = source === 'listing' ? previewMyListing.askingPrice : null;
+  const lookup = useItemDetail(itemId);
+  const { scans, reload: reloadScans } = useScanHistory();
+  const { findListing } = useMarketplace();
+  const { publishPost } = useFeed();
+
+  const savedScan = itemId ? scans.find((entry) => entry.id === itemId) : undefined;
+  const foundItem = lookup.status === 'found' ? lookup.item : undefined;
+  const foundListing = source === 'listing' ? findListing(itemId) : undefined;
+
+  const title =
+    source === 'listing'
+      ? (foundListing?.title ?? previewMyListing.title)
+      : (foundItem?.title ?? previewItem.title);
+  const estimate =
+    source === 'listing'
+      ? (foundListing?.estimatePhp ?? foundItem?.estimate ?? previewItem.estimate)
+      : (foundItem?.estimate ?? previewItem.estimate);
+  const asking =
+    source === 'listing' ? (foundListing?.askingPrice ?? previewMyListing.askingPrice) : null;
+  const photo =
+    source === 'listing' && foundListing
+      ? listingPhotoSource(foundListing)
+      : (foundItem?.photos[0]?.source ?? previewItem.photo);
+  const photoLabel =
+    source === 'listing' && foundListing
+      ? foundListing.photoLabel
+      : (foundItem?.photos[0]?.label ?? previewItem.photoLabel);
+
+  const defaultQuestion =
+    asking === null
+      ? `Is ${formatPeso(estimate)} right for this ${title.toLowerCase()}?`
+      : `I'm asking ${formatPeso(asking)} for this ${title.toLowerCase()}. Fair price?`;
+
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
-  const [question, setQuestion] = useState(
-    asking === null
-      ? `Is ${formatPeso(item.estimate)} right for this ${item.title.toLowerCase()}?`
-      : `I'm asking ${formatPeso(asking)} for this ${item.title.toLowerCase()}. Fair price?`,
-  );
+  const [question, setQuestion] = useState(defaultQuestion);
+  const [editedQuestion, setEditedQuestion] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [blocked, setBlocked] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!editedQuestion) {
+      setQuestion(defaultQuestion);
+    }
+  }, [defaultQuestion, editedQuestion]);
+
   const trimmed = question.trim();
   const canPost = trimmed.length > 0 && trimmed.length <= maxLength;
 
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
-
-  const publish = () => {
+  const publish = async () => {
     if (!canPost || publishing) return;
     setPublishing(true);
-    timer.current = setTimeout(() => {
+
+    if (outcome === 'blocked') {
       setPublishing(false);
-      if (outcome === 'blocked') {
+      setBlocked(true);
+      return;
+    }
+
+    const result = await publishPost({
+      title,
+      body: trimmed,
+      estimate,
+      category: inferCategory(title, foundListing?.category ?? null),
+      scanId: savedScan?.id ?? foundListing?.scanId ?? null,
+      listingId: source === 'listing' ? (foundListing?.rowId ?? foundListing?.id ?? itemId) : null,
+      listingAskingPrice: asking,
+      photoPath: savedScan?.photoPath ?? foundListing?.photoPath ?? null,
+      photoUrl: savedScan
+        ? (savedScan.photoUrl ?? savedScan.photoUri)
+        : (foundListing?.photoUrl ?? null),
+    });
+    setPublishing(false);
+
+    if (!result.ok) {
+      if (result.error.kind === 'validation' && result.error.code === 'blocked') {
         setBlocked(true);
         return;
       }
-      if (outcome === 'held') {
-        toast.show({
-          title: 'Held for review',
-          body: 'A moderator will check it before it appears on the feed.',
-        });
-      } else if (outcome === 'pending') {
-        toast.show({ title: 'Posted', body: 'Others will see it once it has been checked.' });
-      } else {
-        toast.show({ title: 'Posted to the feed', celebrate: true });
-      }
-      onPublish?.(trimmed);
-    }, publishDelayMs);
+      toast.show({
+        title: 'Couldn’t post to the feed',
+        body:
+          result.error.kind === 'rate_limited'
+            ? 'You are posting too quickly. Try again in a while.'
+            : 'Please check your connection and try again.',
+      });
+      return;
+    }
+
+    if (savedScan) {
+      void reloadScans();
+    }
+
+    const effectiveOutcome: PostModerationOutcome =
+      outcome ??
+      (result.value.moderationStatus === 'removed' ? 'blocked' : result.value.moderationStatus);
+
+    if (effectiveOutcome === 'blocked') {
+      setBlocked(true);
+      return;
+    }
+    if (effectiveOutcome === 'held') {
+      toast.show({
+        title: 'Held for review',
+        body: 'A moderator will check it before it appears on the feed.',
+      });
+    } else if (effectiveOutcome === 'pending') {
+      toast.show({ title: 'Posted', body: 'Others will see it once it has been checked.' });
+    } else {
+      toast.show({ title: 'Posted to the feed', celebrate: true });
+    }
+    onPublish?.(trimmed, result.value.slug || result.value.id);
   };
 
   return (
@@ -105,7 +189,12 @@ export function CreatePostView({
       header={<NavHeader title="Ask the community" onBack={onBack} banded />}
       footer={
         <BottomBar>
-          <Button label="Post to feed" disabled={!canPost} loading={publishing} onPress={publish} />
+          <Button
+            label="Post to feed"
+            disabled={!canPost}
+            loading={publishing}
+            onPress={() => void publish()}
+          />
           <SWText variant="caption" tone="textMuted" align="center">
             Posts are public.
           </SWText>
@@ -114,14 +203,9 @@ export function CreatePostView({
       contentStyle={styles.content}
     >
       <Reveal index={0} style={styles.lockup}>
-        <Photo
-          source={item.photo}
-          label={item.photoLabel}
-          aspectRatio={4 / 3}
-          radius={tokens.radius.large}
-        />
+        <Photo source={photo} label={photoLabel} aspectRatio={4 / 3} radius={tokens.radius.large} />
         <View style={styles.badges}>
-          <EstimateBadge value={formatPeso(item.estimate)} />
+          <EstimateBadge value={formatPeso(estimate)} />
           {asking === null ? null : (
             <Tag label={`For sale · ${formatPeso(asking)}`} tone="mint" icon={PriceTagIcon} />
           )}
@@ -151,6 +235,7 @@ export function CreatePostView({
           <TextInput
             value={question}
             onChangeText={(text) => {
+              setEditedQuestion(true);
               setQuestion(text);
               setBlocked(false);
             }}

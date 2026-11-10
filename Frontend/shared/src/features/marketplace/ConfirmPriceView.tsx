@@ -24,6 +24,7 @@ import {
 } from '../../components';
 import { haptic, themedStyles, tokens, useThemedStyles } from '../../design';
 import type { MarketArea, MarketCategory } from '../../ports/marketplace';
+import { useFeed } from '../feed/feed-state';
 import { useScanHistory } from '../history/scan-history-state';
 import { useItemDetail } from '../item/item-source';
 import {
@@ -92,6 +93,7 @@ export function ConfirmPriceView({ itemId, onBack, onPublish }: ConfirmPriceView
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
   const { listings, publishListing, updateListing } = useMarketplace();
+  const { publishPost } = useFeed();
   const { scans, reload: reloadScans } = useScanHistory();
   const lookup = useItemDetail(itemId);
 
@@ -227,6 +229,20 @@ export function ConfirmPriceView({ itemId, onBack, onPublish }: ConfirmPriceView
 
     if (savedScan) {
       void reloadScans();
+    }
+
+    if (alsoAskFeed) {
+      await publishPost({
+        title,
+        body: `I'm asking ${formatPeso(enteredPrice)} for this ${title.toLowerCase()}. Fair price?`,
+        estimate: baseValuation,
+        category,
+        scanId: savedScan?.id ?? null,
+        listingId: published.value.rowId ?? published.value.id,
+        listingAskingPrice: enteredPrice,
+        photoPath: savedScan?.photoPath ?? null,
+        photoUrl: savedScan ? (savedScan.photoUrl ?? savedScan.photoUri) : null,
+      });
     }
 
     toast.show({

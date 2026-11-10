@@ -51,6 +51,7 @@ import {
   type DeleteAccountOutcome,
 } from '../auth/account-deletion';
 import { formatPeso, previewHeldContent, previewPortfolio } from '../preview/sample-data';
+import { useFeed } from '../feed/feed-state';
 import { useScanHistory } from '../history/scan-history-state';
 import { avatarSourceFor, previewProfileId, useUserProfile } from './userProfile';
 
@@ -90,6 +91,7 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
   const styles = useThemedStyles(stylesFor);
   const { profile } = useUserProfile();
   const scanHistory = useScanHistory();
+  const feed = useFeed();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [typed, setTyped] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -100,6 +102,10 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
     profile.id !== previewProfileId && scanHistory.status === 'ready'
       ? scanHistory.scans.length
       : profile.stats.checked;
+  const votesCount =
+    profile.id !== previewProfileId && !feed.loading
+      ? feed.userVotes.length
+      : profile.activity.votes;
 
   const closeDelete = () => {
     if (deleting) return;
@@ -228,7 +234,7 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
           <ListRow
             label="Votes cast"
             icon={Vote}
-            value={String(profile.activity.votes)}
+            value={String(votesCount)}
             onPress={() => onOpen?.('votes')}
           />
           <ListRow

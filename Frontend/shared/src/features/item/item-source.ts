@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import type { EstimateConfidence, ItemPhoto } from '../../components';
+import { useFeed } from '../feed/feed-state';
 import { useScanHistory } from '../history/scan-history-state';
 import type { SavedScan } from '../history/scan-history';
 import { useMarketplace } from '../marketplace/marketplace-state';
@@ -57,7 +58,7 @@ export type ItemLookup =
   | { readonly status: 'found'; readonly item: ItemDetail };
 
 /** A saved scan as the item screen shows it. */
-export function scanDetail(scan: SavedScan, listingId?: string): ItemDetail {
+export function scanDetail(scan: SavedScan, listingId?: string, postId?: string): ItemDetail {
   return {
     id: scan.id,
     title: scan.title,
@@ -71,7 +72,8 @@ export function scanDetail(scan: SavedScan, listingId?: string): ItemDetail {
     capturedOn: scan.capturedOn,
     placement: {
       ...(listingId ? { listingId } : {}),
-      onFeed: scan.status === 'on_feed',
+      ...(postId ? { postId } : {}),
+      onFeed: scan.status === 'on_feed' || Boolean(postId),
       listed: scan.status === 'listed' || Boolean(listingId),
       sold: scan.status === 'sold',
     },
@@ -106,13 +108,18 @@ const sampleIds = new Set(previewHistory.map((item) => item.id));
 export function useItemDetail(itemId: string | undefined): ItemLookup {
   const { scans, status } = useScanHistory();
   const { listings } = useMarketplace();
+  const { findPostForScan } = useFeed();
   return useMemo<ItemLookup>(() => {
     const scan = itemId ? scans.find((entry) => entry.id === itemId) : undefined;
     if (scan) {
       const linkedListing = listings.find((entry) => entry.scanId === scan.id);
-      return { status: 'found', item: scanDetail(scan, linkedListing?.id) };
+      const linkedPost = findPostForScan(scan.id);
+      return {
+        status: 'found',
+        item: scanDetail(scan, linkedListing?.id, linkedPost?.slug || linkedPost?.id),
+      };
     }
     if (!itemId || sampleIds.has(itemId)) return { status: 'found', item: sampleDetail(itemId) };
     return status === 'loading' ? { status: 'loading' } : { status: 'missing' };
-  }, [itemId, listings, scans, status]);
+  }, [findPostForScan, itemId, listings, scans, status]);
 }

@@ -1,7 +1,7 @@
-// POST { "type": "comment" | "hanap", "id": "<uuid>" } — screens a pending comment or hanap post
-// and approves or holds it. Called by the app right after one is posted; requires a signed-in caller (the
-// function's JWT check) and runs the database update with the service role, which is the only
-// way moderation fields can change.
+// POST { "type": "comment" | "hanap" | "post", "id": "<uuid>" } — screens a pending comment,
+// hanap post or feed post and approves or holds it. Called by the app right after one is posted;
+// requires a signed-in caller (the function's JWT check) and runs the database update with the
+// service role, which is the only way moderation fields can change.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 import { providerFromEnv } from '../_shared/providers/moderation.ts';
@@ -12,13 +12,15 @@ const cors = {
   'access-control-allow-headers': 'authorization, x-client-info, apikey, content-type',
   'access-control-allow-methods': 'POST, OPTIONS',
 };
-/** What can be screened, and the table each lives in. Both share the moderation columns. */
+/** What can be screened, and the table each lives in. All share the moderation columns. */
 function tableFor(type: unknown): string | null {
   switch (type) {
     case 'comment':
       return 'comments';
     case 'hanap':
       return 'hanap_posts';
+    case 'post':
+      return 'feed_posts';
     default:
       return null;
   }
@@ -44,7 +46,7 @@ Deno.serve(async (request) => {
   }
   const table = tableFor(target.type);
   if (!table || typeof target.id !== 'string' || !uuid.test(target.id)) {
-    return json(400, { error: 'Expected { "type": "comment" | "hanap", "id": "<uuid>" }.' });
+    return json(400, { error: 'Expected { "type": "comment" | "hanap" | "post", "id": "<uuid>" }.' });
   }
 
   const db = createClient(

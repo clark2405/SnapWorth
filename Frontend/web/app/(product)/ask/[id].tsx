@@ -15,12 +15,15 @@ export default function CreatePostRoute() {
     <CreatePostView
       itemId={itemId}
       source={from === 'listing' ? 'listing' : 'item'}
-      // Preview wiring: `?outcome=held` or `?outcome=blocked` shows what moderation would do.
       outcome={
-        outcome === 'held' || outcome === 'blocked' || outcome === 'pending' ? outcome : 'approved'
+        outcome === 'held' ||
+        outcome === 'blocked' ||
+        outcome === 'pending' ||
+        outcome === 'approved'
+          ? outcome
+          : undefined
       }
       onBack={() => router.back()}
-      // Preview wiring: there is no post service yet, so publishing just opens the feed.
       onPublish={() => router.replace('/feed')}
     />
   );

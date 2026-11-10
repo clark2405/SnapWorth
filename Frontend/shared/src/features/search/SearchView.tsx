@@ -39,11 +39,11 @@ import {
   ZoomLink,
 } from '../../components';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import { useFeed } from '../feed/feed-state';
 import { useHistoryItems } from '../history/scan-history-state';
 import { useMarketplace } from '../marketplace/marketplace-state';
 import {
   formatPeso,
-  previewPosts,
   previewRecentSearches,
   previewTrending,
   type PreviewSearchResult,
@@ -165,6 +165,7 @@ export function SearchView({
       : null);
 
   const { previewListings: marketListings } = useMarketplace();
+  const { previewPosts: feedPosts } = useFeed();
   const { items: historyItems } = useHistoryItems();
 
   const searchIndex = useMemo<readonly PreviewSearchResult[]>(
@@ -177,7 +178,7 @@ export function SearchView({
         photoLabel: listing.photoLabel,
         amount: listing.askingPrice,
       })),
-      ...previewPosts.map((post) => ({
+      ...feedPosts.map((post) => ({
         id: post.id,
         kind: 'post' as const,
         title: post.body,
@@ -194,7 +195,7 @@ export function SearchView({
         amount: item.estimate,
       })),
     ],
-    [historyItems, marketListings],
+    [feedPosts, historyItems, marketListings],
   );
 
   const results = useMemo(

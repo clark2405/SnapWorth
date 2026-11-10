@@ -1,5 +1,4 @@
 import { Flame } from 'lucide-react-native';
-import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import {
@@ -19,12 +18,12 @@ import {
   type SearchOrigin,
 } from '../../components';
 import { held, themedStyles, tokens, useThemedStyles, useWideLayout } from '../../design';
-import type { VoteChoice } from '../../types';
 import { GuessEntry } from '../guess/GuessEntry';
-import { previewOlderPosts, previewPosts, previewTrending } from '../preview/sample-data';
+import { previewTrending } from '../preview/sample-data';
 import { ProfileButton } from '../profile/ProfileButton';
 import { useAccountGate } from '../session';
 import { Tip, useTip } from '../tips';
+import { useFeed } from './feed-state';
 import { PostCard } from './PostCard';
 
 export interface FeedViewProps {
@@ -46,9 +45,6 @@ export interface FeedViewProps {
 
 type PreviewTrend = (typeof previewTrending)[number];
 
-/** Newest first, the older ones further down, as the feed reads once it has history. */
-const feedPosts = [...previewPosts, ...previewOlderPosts];
-
 /**
  * The community's front page: what is trending this month, then every open question, newest
  * first. Nothing here is a hard card; posts are set apart by air, not rules.
@@ -63,8 +59,7 @@ export function FeedView({
   onOpenGuess,
 }: FeedViewProps) {
   const styles = useThemedStyles(stylesFor);
-  // Local until VoteService exists: tapping the same vote again withdraws it.
-  const [votes, setVotes] = useState<Record<string, VoteChoice | null>>({});
+  const { previewPosts: feedPosts, voteFor, toggleVote, refresh } = useFeed();
   const requireAccount = useAccountGate();
   const voteTip = useTip('vote');
   // One column of posts on a phone; on a wide window as many as fit, up to three.
@@ -77,12 +72,7 @@ export function FeedView({
   const wide = useWideLayout();
 
   return (
-    <Screen
-      clearTabBar
-      place="feed"
-      ambient="feed"
-      onRefresh={() => new Promise<void>((resolve) => setTimeout(resolve, 900))}
-    >
+    <Screen clearTabBar place="feed" ambient="feed" onRefresh={refresh}>
       <LargeTitle
         brand
         title="Feed"
@@ -139,14 +129,11 @@ export function FeedView({
           >
             <PostCard
               post={post}
-              vote={votes[post.id] ?? null}
+              vote={voteFor(post.id)}
               onVote={(choice) =>
                 requireAccount('vote', () => {
                   voteTip.done();
-                  setVotes((current) => ({
-                    ...current,
-                    [post.id]: current[post.id] === choice ? null : choice,
-                  }));
+                  void toggleVote(post.id, choice);
                 })
               }
               onOpen={() => onOpenPost?.(post.id)}

@@ -45,17 +45,83 @@ update public.profiles
        location = 'Lapu-Lapu'
  where id = '00000000-0000-4000-8000-000000000004';
 
-insert into public.feed_posts (id, slug, owner_id, body, estimate_php, moderation_status, created_at)
+insert into public.feed_posts (
+  id,
+  slug,
+  owner_id,
+  title,
+  category,
+  body,
+  estimate_php,
+  too_high_count,
+  just_right_count,
+  too_low_count,
+  moderation_status,
+  created_at
+)
 values
-  ('00000000-0000-4000-9000-000000000001', 'retro-windbreaker',
-   '00000000-0000-4000-8000-000000000001',
-   'Just picked up this retro 90s Nike teal windbreaker. AI valued it at ₱2,450. Is this fair? Community let me know!',
-   2450, 'approved', now() - interval '2 minutes'),
-  ('00000000-0000-4000-9000-000000000002', 'polaroid-sun-600',
-   '00000000-0000-4000-8000-000000000002',
-   'Is a vintage polaroid camera worth ₱3,500? Help me out please!',
-   3500, 'approved', now() - interval '1 hour')
-on conflict (id) do nothing;
+  (
+    '00000000-0000-4000-9000-000000000001',
+    'retro-windbreaker',
+    '00000000-0000-4000-8000-000000000001',
+    'Retro 90s Nike Teal Windbreaker',
+    'fashion',
+    'Just picked up this retro 90s Nike teal windbreaker. AI valued it at ₱2,450. Is this fair? Community let me know!',
+    2450,
+    12,
+    38,
+    4,
+    'approved',
+    now() - interval '2 minutes'
+  ),
+  (
+    '00000000-0000-4000-9000-000000000002',
+    'polaroid-sun-600',
+    '00000000-0000-4000-8000-000000000002',
+    'Vintage Polaroid Sun 600',
+    'collectibles',
+    'Is a vintage polaroid camera worth ₱3,500? Help me out please!',
+    3500,
+    35,
+    12,
+    2,
+    'approved',
+    now() - interval '1 hour'
+  ),
+  (
+    '00000000-0000-4000-9000-000000000003',
+    'retro-walkman-post',
+    '00000000-0000-4000-8000-000000000004',
+    'Silver Cassette Walkman Player',
+    'electronics',
+    'Found my dad’s old Walkman. AI says ₱1,900. Would you pay that?',
+    1900,
+    6,
+    41,
+    9,
+    'approved',
+    now() - interval '3 days'
+  ),
+  (
+    '00000000-0000-4000-9000-000000000004',
+    'keychron-post',
+    '00000000-0000-4000-8000-000000000003',
+    'Mechanical Keychron Keyboard',
+    'electronics',
+    'Listing my Keychron at ₱4,500. Too much for a used board?',
+    3900,
+    28,
+    14,
+    3,
+    'approved',
+    now() - interval '5 days'
+  )
+on conflict (id) do update
+  set title = excluded.title,
+      category = excluded.category,
+      too_high_count = excluded.too_high_count,
+      just_right_count = excluded.just_right_count,
+      too_low_count = excluded.too_low_count;
 
 insert into public.comments (id, post_id, parent_id, author_id, body, moderation_status, created_at)
 values

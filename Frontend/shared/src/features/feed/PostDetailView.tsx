@@ -1,5 +1,5 @@
 import { ArrowUp, ChevronRight, ShieldX, ShoppingBag, X } from 'lucide-react-native';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
@@ -31,21 +31,18 @@ import {
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import { commentBodyMaxLength, type ThreadComment } from '../../types/entities';
 import type { AppError } from '../../types/errors';
-import type { VoteChoice } from '../../types';
 import {
   formatPeso,
   photosOf,
-  previewOlderPosts,
   previewPostDetail,
-  previewPosts,
   previewProfile,
-  previewVotesCast,
   type PreviewPost,
 } from '../preview/sample-data';
 import { useAccountGate, useSession } from '../session';
 import { Tip, useTip } from '../tips';
 import { CommentList } from './CommentList';
 import { useCommentThread } from './comment-thread';
+import { useFeed } from './feed-state';
 import { verdictLine } from './verdict';
 
 export interface PostDetailViewProps {
@@ -93,10 +90,16 @@ export function PostDetailView({
   onOpenListing,
   onListForSale,
 }: PostDetailViewProps) {
+  const { findPost, findPreviewPost, loadPost, voteFor, toggleVote } = useFeed();
+  const rawPost = findPost(postId);
   // The post the user tapped; a link to a post outside the preview feed falls back to a sample.
-  const post =
-    [...previewPosts, ...previewOlderPosts].find((entry) => entry.id === postId) ??
-    previewPostDetail;
+  const post = findPreviewPost(postId) ?? previewPostDetail;
+
+  useEffect(() => {
+    if (!postId || rawPost) return;
+    void loadPost(postId);
+  }, [loadPost, postId, rawPost]);
+
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
@@ -104,9 +107,7 @@ export function PostDetailView({
   const { isGuest } = useSession();
   const requireAccount = useAccountGate();
   const voteTip = useTip('vote');
-  const [vote, setVote] = useState<VoteChoice | null>(() =>
-    isGuest ? null : (previewVotesCast.find((entry) => entry.postId === post.id)?.vote ?? null),
-  );
+  const vote = voteFor(post.id);
   const [draft, setDraft] = useState('');
   const [replyingTo, setReplyingTo] = useState<ThreadComment | null>(null);
   const [sending, setSending] = useState(false);
@@ -328,7 +329,13 @@ export function PostDetailView({
           <Reveal index={1} style={styles.question}>
             <EstimateBadge value={formatPeso(post.estimate)} size="hero" />
             <SWText variant="bodyLarge">{post.body}</SWText>
-            <CrossPost post={post} onOpenListing={onOpenListing} onListForSale={onListForSale} />
+            <CrossPost
+              post={post}
+              isMine={rawPost?.isMine}
+              listTargetId={rawPost?.scanId ?? post.id}
+              onOpenListing={onOpenListing}
+              onListForSale={onListForSale}
+            />
           </Reveal>
 
           <Reveal index={2} style={styles.verdict}>
@@ -336,12 +343,14 @@ export function PostDetailView({
             <VerdictBar tally={post.votes} />
             <Tip id="vote" />
             <VoteChips
-              tally={post.votes}
+              tally={
+                vote ? { ...post.votes, [vote]: Math.max(0, post.votes[vote] - 1) } : post.votes
+              }
               selected={vote}
               onVote={(choice) =>
                 requireAccount('vote', () => {
                   voteTip.done();
-                  setVote((current) => (current === choice ? null : choice));
+                  void toggleVote(post.id, choice);
                 })
               }
             />
@@ -400,15 +409,19 @@ export function PostDetailView({
  */
 function CrossPost({
   post,
+  isMine,
+  listTargetId,
   onOpenListing,
   onListForSale,
 }: {
   readonly post: PreviewPost;
+  readonly isMine?: boolean;
+  readonly listTargetId?: string;
 } & Pick<PostDetailViewProps, 'onOpenListing' | 'onListForSale'>) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const { isGuest } = useSession();
-  const mine = !isGuest && post.author.handle === previewProfile.user.handle;
+  const mine = !isGuest && (isMine ?? post.author.handle === previewProfile.user.handle);
   const { listing } = post;
 
   if (listing) {
@@ -450,7 +463,7 @@ function CrossPost({
         variant="secondary"
         icon={ShoppingBag}
         accessibilityHint="Opens price confirmation. You set the asking price yourself."
-        onPress={() => onListForSale?.(post.id)}
+        onPress={() => onListForSale?.(listTargetId ?? post.id)}
       />
     </Surface>
   );
