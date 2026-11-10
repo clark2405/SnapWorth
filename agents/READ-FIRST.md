@@ -21,7 +21,7 @@ both apps.
 ## What's built and what isn't
 
 Keep this list current: when you finish or start something, move it here in the same change.
-Last updated 2026-11-07.
+Last updated 2026-11-10.
 
 ### Working for real
 
@@ -33,8 +33,10 @@ Last updated 2026-11-07.
 - **Your own profile:** name, handle, photo, location and bio come from the account, and the listed,
   sold and chat counts from Supabase (PR #20). A new handle is saved to `public.profiles` too, so
   comments and chats show it; a taken one is turned away (needs the `profile_handles` migration
-  deployed). The photo stays on the account, on that phone only, until photos are uploaded to
-  Storage.
+  deployed). A new photo is uploaded to Storage's public `avatars` bucket and set on
+  `public.profiles`, so comments and chats show it too. The database only takes a photo the person
+  uploaded to their own folder on this project's address, so locally the app must use the address
+  the Supabase CLI prints. The "checked" count is the account's own saved scans.
 - **Snap → AI estimate:** the phone's camera checks the photo and sends it to the
   `estimate-price` Edge Function (Gemini) for a real estimate.
 - **On-device AI:** the photo check and label reading on every iPhone. With Apple Intelligence,
@@ -59,12 +61,26 @@ Last updated 2026-11-07.
   `scan_history` table (private to its owner), with a copy on the phone for offline. A scan saved
   offline is sent when the app is back online. Each account on a shared phone sees only its own.
   History shows your own scans once you have one; before that, the sample items as a preview.
-  Needs `npx supabase db push` to create the table.
-
-### Kept on the device only, until History is stored in Supabase
-
-- **Flip tracker:** what an owner paid for an item, and the gain, in History and on the item.
+- **Scan photos:** after a scan is saved, its photo is uploaded to Storage's private
+  `scan-photos` bucket, so History shows it on every device, through links that last 12 hours.
+  The phone's own copy shows until the upload has gone; a failed upload is tried again on the
+  next load. Listing or posting a scan will need a read policy for its photo (see the
+  `photo_storage` migration's comment).
+- **The item screen:** `/item/<scan id>` shows that scan: its estimate and range, why the AI
+  priced it so and what it assumed, its photo, date and where it lives. An id that isn't one of
+  the account's scans gets a page saying so. The sample items still open the sample preview.
+- **Flip tracker:** what an owner paid for an item, and the gain, in History and on the item. It's
+  stored on the scan (`scan_history.paid_php`), private to the owner, and set offline it's sent
+  later. The sample items' prices are a preview.
 - **Collections:** sets of History items, with their total and flip, shareable as a picture.
+  Stored in the account (`collections`, `collection_items`), private to the owner; without a
+  backend they stay on the phone. Collections and prices a phone kept before move into the
+  account that owns their things, once.
+- **Needs deploying:** `npx supabase db push` for the `scan_history`, `photo_storage` and
+  `flips_and_collections` migrations (the last two make the Storage buckets and their policies).
+
+### Kept on the device only
+
 - **Guess the worth:** a daily game on the Feed. It's five of the Market's listings, the same five
   for everyone that day. You guess each one's worth, then see the AI's estimate and what voters
   think of the asking price. Your scores, streak and Sharp eye badges stay on the device; no
@@ -79,10 +95,10 @@ on them isn't saved.
 - **Feed:** posts and votes. Posting to the feed only opens the feed.
 - **Market:** listings, filters, listing pages, saved listings and price alerts. Listing an item
   for sale isn't saved.
-- **History and the item screen:** History's items, and the item screen, which always shows the
-  same sample item.
+- **History, before the first scan:** the sample items, and their sample market detail (demand,
+  condition, trend and recent sales) on the item screen. A real scan has no market detail yet.
 - **Profile:** seller profiles, your votes, settings, trends, search and the admin review queue.
-  Your own profile is real (see above), but its "checked" count is still sample data.
+  Your own profile is real (see above).
 - **Worthy's cards:** price, trend and collection answers.
 
 ### Not done yet
@@ -109,9 +125,9 @@ on them isn't saved.
   `MODERATION_PROVIDER=rules` for the built-in word rules (fine while testing), or `openai` with an
   `OPENAI_API_KEY` (OpenAI's moderation is free) before launch. Set it in the dashboard under Edge
   Functions → Secrets, or with `npx supabase secrets set`.
-- **Profile photos:** uploading them to Supabase Storage, so other people can see them.
-- **Scan photos:** a saved scan's photo is a path on the phone that took it, so it shows only
-  there. Uploading them to Storage would make History's photos show on every device.
+- **Listing or posting from History:** the listing flow (`/list/<id>`) and asking the feed
+  (`/ask/<id>`) still show the sample item; `useItemDetail` in `features/item` gives them the
+  real scan.
 - **Deployment:** EAS builds for the phones, and Vercel for the web.
 
 The detailed task lists are in `agents/specs/`. Git keeps that folder local, so ask whoever has it,
@@ -164,9 +180,9 @@ comes from a real person."
 ### What people paid, and sharing a tag
 
 - **Flip tracker:** an owner can note what they paid for an item ("What you paid" on the item
-  screen). History shows the gain on each row and in total. Only the owner ever sees it.
-  History is still sample data, so the prices are kept on the device (`paid-prices.tsx`). When
-  History moves to Supabase, they move with it, private to the owner.
+  screen). History shows the gain on each row and in total. Only the owner ever sees it: it's
+  stored on the scan (`scan_history.paid_php`), private to the owner. Never copy it into a
+  listing, a post or anything else others can read.
 - **Shared tags:** an item's share button makes a picture of its tag (`ShareTagCard.tsx`) and
   shares it. The picture is always in the light palette (`PrintedTheme`). What was paid is only on
   it if the owner switches it on.
