@@ -68,7 +68,6 @@ export default function LoginRoute() {
     <LoginView
       onSubmit={done}
       onForgotPassword={() => router.push('/reset-password')}
-      onContinueWithApple={() => done()}
       onContinueWithGoogle={google}
       onClose={returning && router.canGoBack() ? () => router.back() : undefined}
     />

@@ -28,6 +28,28 @@ export async function performGoogleAuth(redirectUrl: string) {
 }
 
 /**
+ * Signs in with the identity token from Sign in with Apple on an iPhone. `rawNonce` is the
+ * nonce before hashing; Apple saw its SHA-256, and Supabase checks the token against it.
+ * A first sign-in's name, which Apple sends only once, is kept on the account.
+ */
+export async function performAppleAuth(credential: {
+  readonly idToken: string;
+  readonly rawNonce: string;
+  readonly fullName?: string;
+}) {
+  const result = await getSupabase().auth.signInWithIdToken({
+    provider: 'apple',
+    token: credential.idToken,
+    nonce: credential.rawNonce,
+  });
+  if (!result.error && credential.fullName && !result.data.user?.user_metadata?.full_name) {
+    const named = await getSupabase().auth.updateUser({ data: { full_name: credential.fullName } });
+    if (named.data.user) return { ...result, data: { ...result.data, user: named.data.user } };
+  }
+  return result;
+}
+
+/**
  * Where Google sends people back to on the web (`/auth/callback`). It must be on Supabase's
  * Redirect URLs list; see READ-FIRST "Sign-in setup".
  */

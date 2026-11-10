@@ -76,7 +76,6 @@ export default function SignupRoute() {
       initialMode="signup"
       onSubmit={done}
       onForgotPassword={() => router.push('/reset-password')}
-      onContinueWithApple={() => done()}
       onContinueWithGoogle={google}
       onClose={returning && router.canGoBack() ? () => router.back() : undefined}
     />

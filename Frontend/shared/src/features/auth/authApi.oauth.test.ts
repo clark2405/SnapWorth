@@ -1,10 +1,12 @@
-import { finishOAuthRedirect, startWebGoogleSignIn } from './authApi';
+import { finishOAuthRedirect, performAppleAuth, startWebGoogleSignIn } from './authApi';
 
 // A stand-in for the Supabase auth client: each test says what it answers.
 const mockAuth = {
   signInWithOAuth: jest.fn(),
   setSession: jest.fn(),
   exchangeCodeForSession: jest.fn(),
+  signInWithIdToken: jest.fn(),
+  updateUser: jest.fn(),
 };
 
 jest.mock('../../adapters/supabaseClient', () => ({
@@ -111,5 +113,51 @@ describe('finishOAuthRedirect', () => {
       { kind: 'failed' },
     );
     expect(mockAuth.exchangeCodeForSession).not.toHaveBeenCalled();
+  });
+});
+
+describe('performAppleAuth', () => {
+  const credential = { idToken: 'apple-id-token', rawNonce: 'raw-nonce' };
+
+  it('signs in with Apple’s identity token and the nonce before hashing', async () => {
+    mockAuth.signInWithIdToken.mockResolvedValue({ data: { session: {}, user }, error: null });
+
+    const result = await performAppleAuth(credential);
+
+    expect(mockAuth.signInWithIdToken).toHaveBeenCalledWith({
+      provider: 'apple',
+      token: 'apple-id-token',
+      nonce: 'raw-nonce',
+    });
+    expect(result.data.user).toBe(user);
+    expect(mockAuth.updateUser).not.toHaveBeenCalled();
+  });
+
+  it('keeps the name Apple sends only on a first sign-in', async () => {
+    const unnamed = { id: 'u2', user_metadata: {} };
+    const named = { ...unnamed, user_metadata: { full_name: 'Ana Cruz' } };
+    mockAuth.signInWithIdToken.mockResolvedValue({
+      data: { session: {}, user: unnamed },
+      error: null,
+    });
+    mockAuth.updateUser.mockResolvedValue({ data: { user: named }, error: null });
+
+    const result = await performAppleAuth({ ...credential, fullName: 'Ana Cruz' });
+
+    expect(mockAuth.updateUser).toHaveBeenCalledWith({ data: { full_name: 'Ana Cruz' } });
+    expect(result.data.user).toBe(named);
+  });
+
+  it('passes a refused token on as it is', async () => {
+    const refusal = { message: 'Nonces mismatch', status: 400 };
+    mockAuth.signInWithIdToken.mockResolvedValue({
+      data: { session: null, user: null },
+      error: refusal,
+    });
+
+    const result = await performAppleAuth({ ...credential, fullName: 'Ana Cruz' });
+
+    expect(result.error).toBe(refusal);
+    expect(mockAuth.updateUser).not.toHaveBeenCalled();
   });
 });
