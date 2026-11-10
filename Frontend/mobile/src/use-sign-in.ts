@@ -13,11 +13,14 @@ import {
 import {
   completeAuthFromUrl,
   isSupabaseConfigured,
+  performAppleAuth,
   performAuth,
   performGoogleAuth,
   type AuthInput,
 } from '@snapworth/shared/features/auth';
 import { useSession, type SessionUser } from '@snapworth/shared/features/session';
+
+import { appleCancelled, appleSignInAvailable, requestAppleCredential } from './apple-sign-in';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -146,12 +149,34 @@ export function useSignIn() {
     }
   };
 
+  // Only offered once Sign in with Apple is set up (see apple-sign-in.ts), and with Supabase.
+  const apple = async () => {
+    if (!requestAppleCredential || !configured) return;
+    try {
+      const credential = await requestAppleCredential();
+      const closing = closeIntoTag({ stamp: 'WELCOME', name: firstNameOf(credential.fullName) });
+      const { data, error } = await performAppleAuth(credential);
+      if (error || !data.user) {
+        cancelHandoff();
+        Alert.alert('Apple sign-in failed', error?.message ?? 'Apple didn’t return an account.');
+        return;
+      }
+      setHandoffName(firstNameOf(data.user.user_metadata?.full_name ?? credential.fullName));
+      await closing;
+      enter(data.user);
+    } catch (failure) {
+      cancelHandoff();
+      if (appleCancelled(failure)) return;
+      Alert.alert('Apple sign-in failed', messageOf(failure));
+    }
+  };
+
   const close = returning && router.canGoBack() ? () => router.back() : undefined;
 
   return {
     submit,
     google,
-    apple: () => Alert.alert('Unavailable', 'Apple login not configured.'),
+    apple: appleSignInAvailable && configured ? apple : undefined,
     forgotPassword: () => router.push('/reset-password'),
     close,
   };

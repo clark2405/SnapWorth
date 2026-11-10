@@ -28,6 +28,14 @@ Last updated 2026-11-10.
 - **Accounts:** sign-up and sign-in with email against Supabase, on the phone and the web. Google
   sign-in on the phone now finishes too (PR #20), but hasn't been checked on a device yet. Guests can
   look around, and an account is asked for, with the reason, only when they act.
+- **Password reset:** "Forgot password?" emails a link that opens `/new-password` (web) or
+  `snapworth://new-password` (phone) to choose a new one. The answer never says whether an email
+  has an account; expired or used links say so. Needs the Redirect URLs in "Sign-in setup".
+- **Deleting an account:** Profile → Delete account asks for the typed word DELETE (not a
+  password: Google and Apple accounts have none), then the `delete-account` Edge Function removes
+  the person's files in the `avatars` and `scan-photos` buckets and their Auth user, which every
+  table cascades from (`account_deletion_test.sql` checks each one). This device's copies go too.
+  Needs `npx supabase functions deploy delete-account`.
 - **One sign-in:** chats, comments, Hanap and suki use the same Supabase client as sign-in, so what
   someone does belongs to the account they signed in with (PR #20).
 - **Your own profile:** name, handle, photo, location and bio come from the account, and the listed,
@@ -104,10 +112,10 @@ on them isn't saved.
 ### Not done yet
 
 - **Sign-in:**
-  - Google sign-in on the web.
-  - Apple sign-in isn't set up.
-  - Password reset sends nothing.
-  - Deleting an account only signs out.
+  - Google sign-in on the web is built (`/auth/callback`), but needs a Google OAuth client and
+    Supabase's Google provider set up first; see "Sign-in setup".
+  - Sign in with Apple is written but hidden: it needs the paid Apple Developer account. See
+    "Sign-in setup" to turn it on.
 - **The rest of the data on Supabase:** votes, posts, listings, price alerts and the admin queue.
 - **Cloud AI** (a teammate owns this; see "Handoff" below):
   - Worthy's chat in the cloud.
@@ -359,6 +367,41 @@ any new artwork:
   `sb_secret_…` or service-role key in the app or in `.env.local`. If one is ever shared, roll it in
   the Supabase dashboard.
 - Without Supabase configured, sign-in starts a local session on the device. The app still runs.
+
+### Sign-in setup
+
+Dashboard settings the code can't make. `<web>` is the web app's address (for example
+`https://snapworth.app`); `<ref>` is the Supabase project ref.
+
+1. **Redirect URLs** (Supabase → Authentication → URL Configuration). Site URL: `<web>`. Redirect
+   URLs: `<web>/new-password`, `<web>/auth/callback`, `http://localhost:8081/**` (the web dev
+   server), `snapworth://**` (phone builds) and `exp://**` (Expo Go). Supabase sends a link
+   anywhere else to the Site URL instead, so a missing entry looks like a link that does nothing.
+2. **Email:** Supabase's built-in mailer sends only a few emails an hour. Set up custom SMTP
+   (Authentication → Emails → SMTP Settings) before people rely on password reset.
+3. **Google** (web and phone both go through Supabase's Google provider):
+   - Google Cloud Console → APIs & Services → OAuth consent screen: app name, support email,
+     authorized domains `<ref>.supabase.co` and `<web>`'s domain, scopes `openid`, `email`,
+     `profile`. Publish it, or add testers while it's in testing.
+   - Credentials → Create credentials → OAuth client ID → Web application. Authorized JavaScript
+     origins: `<web>` and `http://localhost:8081`. Authorized redirect URI:
+     `https://<ref>.supabase.co/auth/v1/callback`.
+   - Supabase → Authentication → Sign In / Providers → Google: turn it on and paste the client
+     ID and secret.
+4. **Sign in with Apple** (iPhone only; needs the paid Apple Developer account, so it's off):
+   - Apple Developer → Certificates, Identifiers & Profiles → Identifiers → `com.snapworth.app`:
+     turn on Sign In with Apple.
+   - Supabase → Sign In / Providers → Apple: turn it on and add `com.snapworth.app` to Client
+     IDs. The secret key is only for Apple on the web, which isn't built.
+   - In `Frontend/mobile`: `npx expo install expo-apple-authentication expo-crypto`, then pin both
+     to exact versions in `package.json` (`npm run check:dependency-pins` must stay green).
+   - `app.config.ts`: add `usesAppleSignIn: true` under `ios`, and `'expo-apple-authentication'`
+     to `plugins`. This adds the entitlement that a free Personal Team can't sign.
+   - `mobile/src/apple-sign-in.ts`: import both modules and replace `requestAppleCredential`'s
+     `null` with the function in its comment.
+   - Set `EXPO_PUBLIC_APPLE_SIGN_IN=1` in `.env.local`, run `npx expo prebuild --clean` and build
+     with the paid team. The button then shows on iOS. App Review expects it whenever Google
+     sign-in is offered, so do this before submitting to the App Store.
 
 ## Before you call a change done
 

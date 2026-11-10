@@ -12,6 +12,7 @@
 | Flips, collections   | `supabase/migrations/20261110000100_flips_and_collections.sql` | What an owner paid for each scan (`scan_history.paid_php`), and their collections of scans. Owner-only. |
 | Moderation           | `supabase/functions/moderate-content/`                 | Screens each new comment and approves or holds it. Fail-closed: nothing is public until it has been screened.      |
 | Moderation providers | `supabase/functions/_shared/providers/moderation.ts`   | `openai` (OpenAI's free moderation endpoint) for real use; `rules` (a fixed word list) for local development.      |
+| Deleting accounts    | `supabase/functions/delete-account/`                   | Deletes the caller's account for good: their Storage files, then their Auth user, which every table cascades from. |
 | Development data     | `supabase/seed/`                                       | The demo accounts, the two feed posts the app ships with and their comments, and the market listings.              |
 | Tests                | `supabase/tests/`, `scripts/`                          | Database behaviour tests and Edge Function tests, run in CI on every push.                                         |
 
@@ -127,6 +128,22 @@ node --experimental-strip-types Backend/scripts/check-pricing.mjs
 This smoke test exercises pricing logic and the Gemini API; it does not test deployed
 Supabase authentication. Actual private photos should not be used in development because
 Google's unpaid API terms permit product-improvement use of inputs and outputs.
+
+## Deleting an account
+
+`supabase/functions/delete-account/` is what Profile → Delete account calls. It checks the
+caller's session with Supabase Auth (gateway JWT verification is off, as for `estimate-price`),
+requires `{ "confirm": "DELETE" }`, removes everything under the caller's folder (`<user id>/…`)
+in the `avatars` and `scan-photos` buckets (a bucket that doesn't exist yet is skipped), then
+deletes the Auth user with the service role. Every table that refers to a person cascades from
+that; `supabase/tests/account_deletion_test.sql` fails if a table is added that doesn't, or that
+would block the delete. A bucket that keeps people's files under another name must be added to
+`accountBuckets` in `account.ts`. Deploy it from `Backend/`:
+
+```sh
+npx supabase functions deploy delete-account
+node --test supabase/functions/delete-account/account_test.mjs   # the handler's tests, without Deno
+```
 
 ## Running the tests
 

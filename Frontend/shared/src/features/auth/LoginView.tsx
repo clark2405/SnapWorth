@@ -42,6 +42,7 @@ export interface LoginViewProps {
   readonly initialMode?: AuthMode;
   readonly onSubmit?: (input: AuthInput) => void;
   readonly onForgotPassword?: () => void;
+  /** Sign in with Apple; the button shows only when this is given. */
   readonly onContinueWithApple?: () => void;
   readonly onContinueWithGoogle?: () => void;
   readonly onClose?: () => void;
@@ -114,8 +115,6 @@ export function LoginView({
     }, 900);
   };
 
-  const continueWithApple = () =>
-    onContinueWithApple ? onContinueWithApple() : onSubmit?.({ mode, email, password });
   const continueWithGoogle = () =>
     onContinueWithGoogle ? onContinueWithGoogle() : onSubmit?.({ mode, email, password });
 
@@ -172,11 +171,14 @@ export function LoginView({
           <Surface padding={tokens.spacing[5]} contentStyle={styles.card}>
             <View style={styles.quick}>
               <View style={wide ? styles.pair : styles.quick}>
-                <Button
-                  label="Continue with Apple"
-                  onPress={continueWithApple}
-                  containerStyle={half}
-                />
+                {/* Apple only where it's set up (an iPhone build that turned it on). */}
+                {onContinueWithApple ? (
+                  <Button
+                    label="Continue with Apple"
+                    onPress={onContinueWithApple}
+                    containerStyle={half}
+                  />
+                ) : null}
                 <Button
                   label="Continue with Google"
                   variant="secondary"

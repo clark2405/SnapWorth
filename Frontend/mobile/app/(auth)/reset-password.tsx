@@ -1,11 +1,24 @@
+import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 
-import { ResetPasswordView } from '@snapworth/shared/features/auth';
+import {
+  ResetPasswordView,
+  isSupabaseConfigured,
+  newPasswordPath,
+  requestPasswordReset,
+} from '@snapworth/shared/features/auth';
 
 export default function ResetPasswordRoute() {
   const router = useRouter();
   const toLogin = () => (router.canGoBack() ? router.back() : router.replace('/login'));
 
-  // Preview wiring: there is no auth service yet, so sending always succeeds.
-  return <ResetPasswordView onBack={toLogin} onBackToLogin={toLogin} />;
+  // The email's link opens the app at /new-password (snapworth://new-password).
+  return (
+    <ResetPasswordView
+      onBack={toLogin}
+      onBackToLogin={toLogin}
+      unavailable={!isSupabaseConfigured()}
+      onSendLink={(email) => requestPasswordReset(email, Linking.createURL(newPasswordPath))}
+    />
+  );
 }

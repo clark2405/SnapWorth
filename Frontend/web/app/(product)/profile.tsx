@@ -1,12 +1,13 @@
 import { useRouter } from 'expo-router';
 
 import { useToast } from '@snapworth/shared/components';
+import { deleteAccount } from '@snapworth/shared/features/auth';
 import { ProfileView } from '@snapworth/shared/features/profile';
 import { AccountGateView, useSession } from '@snapworth/shared/features/session';
 
 export default function ProfileRoute() {
   const router = useRouter();
-  const { isGuest, endSession } = useSession();
+  const { isGuest, user, endSession } = useSession();
   const toast = useToast();
   const back = () => (router.canGoBack() ? router.back() : router.replace('/feed'));
 
@@ -31,12 +32,16 @@ export default function ProfileRoute() {
         endSession();
         router.replace('/feed');
       }}
-      // Preview wiring: there is no account service yet, so deleting ends the session and leaves
-      // a guest. Once it exists, this must also erase the account and its data on the server.
-      onDeleteAccount={() => {
-        endSession();
-        toast.show({ title: 'Account deleted', body: 'You can keep looking around.' });
-        router.replace('/feed');
+      // Deletes the account and everything in it on the server, then this device's copy, and
+      // leaves a guest who can keep looking around. A failure stays in the sheet with the reason.
+      onDeleteAccount={async (typed) => {
+        const outcome = await deleteAccount(typed, user?.id);
+        if (outcome.kind === 'deleted') {
+          endSession();
+          toast.show({ title: 'Account deleted', body: 'You can keep looking around.' });
+          router.replace('/feed');
+        }
+        return outcome;
       }}
     />
   );
