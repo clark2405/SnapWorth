@@ -13,30 +13,39 @@ import {
   TextField,
 } from '../../components';
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import type { ResetLinkOutcome } from './password-reset';
 
 export interface ResetPasswordViewProps {
   readonly onBack?: () => void;
-  /** Sends the reset link. Resolve `false` to show the failure state. */
-  readonly onSendLink?: (email: string) => Promise<boolean> | boolean;
+  /** Sends the reset link (see `requestPasswordReset`). */
+  readonly onSendLink?: (email: string) => Promise<ResetLinkOutcome> | ResetLinkOutcome;
   readonly onBackToLogin?: () => void;
+  /** No server to send from (a build without Supabase): says so instead of offering to send. */
+  readonly unavailable?: boolean;
 }
 
-type Status = 'idle' | 'sending' | 'sent' | 'error';
+type Status = 'idle' | 'sending' | 'sent' | 'error' | 'unavailable';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function ResetPasswordView({ onBack, onSendLink, onBackToLogin }: ResetPasswordViewProps) {
+export function ResetPasswordView({
+  onBack,
+  onSendLink,
+  onBackToLogin,
+  unavailable = false,
+}: ResetPasswordViewProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const [email, setEmail] = useState('');
-  const [status, setStatus] = useState<Status>('idle');
+  const [sendStatus, setStatus] = useState<Status>('idle');
+  const status: Status = unavailable ? 'unavailable' : sendStatus;
   const valid = emailPattern.test(email.trim());
 
   const send = async () => {
-    if (!valid || status === 'sending') return;
+    if (!valid || status === 'sending' || status === 'unavailable') return;
     setStatus('sending');
-    const ok = onSendLink ? await onSendLink(email.trim()) : true;
-    setStatus(ok ? 'sent' : 'error');
+    const outcome = onSendLink ? await onSendLink(email.trim()) : 'sent';
+    setStatus(outcome === 'sent' ? 'sent' : outcome === 'unavailable' ? 'unavailable' : 'error');
   };
 
   if (status === 'sent') {
@@ -82,7 +91,9 @@ export function ResetPasswordView({ onBack, onSendLink, onBackToLogin }: ResetPa
           Reset your password.
         </SWText>
         <SWText variant="bodyLarge" tone="textSecondary">
-          Enter the email you signed up with and we will send you a link to choose a new one.
+          {status === 'unavailable'
+            ? 'Password reset isn’t available in this build: it isn’t connected to the SnapWorth server, so there’s no email to send.'
+            : 'Enter the email you signed up with and we will send you a link to choose a new one.'}
         </SWText>
       </Reveal>
 
@@ -118,7 +129,7 @@ export function ResetPasswordView({ onBack, onSendLink, onBackToLogin }: ResetPa
         <Button
           label={status === 'sending' ? 'Sending…' : 'Send reset link'}
           loading={status === 'sending'}
-          disabled={!valid}
+          disabled={!valid || status === 'unavailable'}
           onPress={send}
         />
       </Reveal>
