@@ -36,6 +36,7 @@ import {
   Surface,
   SWText,
   Tag,
+  TextField,
 } from '../../components';
 import {
   themedStyles,
@@ -44,6 +45,11 @@ import {
   useThemedStyles,
   type ThemePreference,
 } from '../../design';
+import {
+  confirmsDeletion,
+  deleteConfirmationWord,
+  type DeleteAccountOutcome,
+} from '../auth/account-deletion';
 import { formatPeso, previewHeldContent, previewPortfolio } from '../preview/sample-data';
 import { avatarSourceFor, useUserProfile } from './userProfile';
 
@@ -65,10 +71,11 @@ export interface ProfileViewProps {
   readonly onOpen?: (destination: ProfileDestination) => void;
   readonly onLogOut?: () => void;
   /**
-   * Permanently deletes the account and its data. Apple requires apps that create accounts to
-   * offer deletion in the app, not just deactivation.
+   * Permanently deletes the account and its data, once the person has typed the confirmation
+   * word (see `deleteAccount`). Apple requires apps that create accounts to offer deletion in
+   * the app, not just deactivation.
    */
-  readonly onDeleteAccount?: () => void;
+  readonly onDeleteAccount?: (typed: string) => Promise<DeleteAccountOutcome> | void;
 }
 
 const appearanceOptions: readonly { readonly key: ThemePreference; readonly label: string }[] = [
@@ -82,6 +89,29 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
   const styles = useThemedStyles(stylesFor);
   const { profile } = useUserProfile();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [typed, setTyped] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteProblem, setDeleteProblem] = useState<string | null>(null);
+
+  const closeDelete = () => {
+    if (deleting) return;
+    setConfirmingDelete(false);
+    setTyped('');
+    setDeleteProblem(null);
+  };
+  const deleteAccount = async () => {
+    if (deleting || !confirmsDeletion(typed)) return;
+    setDeleting(true);
+    setDeleteProblem(null);
+    const outcome = await onDeleteAccount?.(typed);
+    setDeleting(false);
+    if (outcome?.kind === 'failed') {
+      setDeleteProblem(outcome.message);
+      return;
+    }
+    setConfirmingDelete(false);
+    setTyped('');
+  };
 
   const stats = [
     { label: 'Checked', value: profile.stats.checked },
@@ -245,31 +275,48 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
         </ListGroup>
       </Reveal>
 
-      {/* Deleting can't be undone, so this is the one place the app stops to confirm. */}
-      <Sheet
-        visible={confirmingDelete}
-        onClose={() => setConfirmingDelete(false)}
-        title="Delete your account?"
-      >
+      {/* Deleting can't be undone, so this is the one place the app stops to confirm, and asks
+          for a typed word: everyone has one, even accounts with no password (Google, Apple). */}
+      <Sheet visible={confirmingDelete} onClose={closeDelete} title="Delete your account?">
         <View style={styles.deleteSheet}>
           <SWText variant="bodyMedium" tone="textSecondary">
             This permanently removes your profile, items, listings, votes, comments and chats. It
             can&apos;t be undone. You can still look around SnapWorth without an account.
           </SWText>
+          <View style={styles.deleteConfirm}>
+            <SWText variant="labelSmall" tone="textSecondary">
+              {`Type ${deleteConfirmationWord} to confirm`}
+            </SWText>
+            <TextField
+              value={typed}
+              onChangeText={(value) => {
+                setTyped(value);
+                setDeleteProblem(null);
+              }}
+              onSubmitEditing={deleteAccount}
+              placeholder={deleteConfirmationWord}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              autoComplete="off"
+              returnKeyType="done"
+              editable={!deleting}
+              accessibilityLabel={`Type ${deleteConfirmationWord} to confirm`}
+            />
+            {deleteProblem ? (
+              <SWText variant="bodySmall" tone="danger" accessibilityLiveRegion="assertive">
+                {deleteProblem}
+              </SWText>
+            ) : null}
+          </View>
           <View style={styles.deleteActions}>
             <Button
-              label="Delete account"
+              label={deleting ? 'Deleting…' : 'Delete account'}
               variant="danger"
-              onPress={() => {
-                setConfirmingDelete(false);
-                onDeleteAccount?.();
-              }}
+              loading={deleting}
+              disabled={!confirmsDeletion(typed)}
+              onPress={deleteAccount}
             />
-            <Button
-              label="Keep my account"
-              variant="secondary"
-              onPress={() => setConfirmingDelete(false)}
-            />
+            <Button label="Keep my account" variant="secondary" onPress={closeDelete} />
           </View>
         </View>
       </Sheet>
@@ -324,6 +371,9 @@ const stylesFor = themedStyles(() => ({
   },
   deleteSheet: {
     gap: tokens.spacing[5],
+  },
+  deleteConfirm: {
+    gap: tokens.spacing[2],
   },
   deleteActions: {
     gap: tokens.spacing[2],

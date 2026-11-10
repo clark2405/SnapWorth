@@ -18,3 +18,7 @@ verify_jwt = true
 # The handler validates the bearer session with Supabase Auth itself. This also
 # supports clients using the newer publishable project keys.
 verify_jwt = false
+
+[functions.delete-account]
+# As for estimate-price: the handler checks the caller's session with Supabase Auth itself.
+verify_jwt = false
