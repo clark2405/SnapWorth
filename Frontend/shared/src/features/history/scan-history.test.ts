@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import type { ScanPhotoStore } from '../../adapters/supabase/photo-storage';
 import {
   deleteScan,
   loadScans,
@@ -46,6 +47,7 @@ const remoteRow = {
   explanation: 'Submariner model in good state.',
   assumptions: [],
   photo_uri: 'file:///rolex.jpg',
+  photo_path: null as string | null,
   status: 'listed',
   created_at: '2026-11-06T10:00:00.000Z',
 };
@@ -63,6 +65,13 @@ function fakeSupabase(rows: (typeof remoteRow)[] = []) {
     state.rows = state.rows.filter((row) => row.id !== id);
     return { error: null };
   });
+  const update = jest.fn((values: Record<string, unknown>) => ({
+    eq: async (_column: string, id: string) => {
+      if (state.offline) return { error: { message: 'offline' } };
+      state.rows = state.rows.map((row) => (row.id === id ? { ...row, ...values } : row));
+      return { error: null };
+    },
+  }));
   const client = {
     from: jest.fn(() => ({
       insert,
@@ -77,10 +86,26 @@ function fakeSupabase(rows: (typeof remoteRow)[] = []) {
           };
         },
       }),
+      update,
       delete: () => ({ eq: deleteEq }),
     })),
   } as unknown as SupabaseClient;
-  return { client, state, insert, ownerFilter, deleteEq };
+  return { client, state, insert, update, ownerFilter, deleteEq };
+}
+
+/** A stand-in Storage: uploads fail while `offline`, and each path's link names it. */
+function fakePhotos() {
+  const state = { offline: false };
+  const photos = {
+    upload: jest.fn(async (owner: string, scanId: string, _uri: string) =>
+      state.offline ? null : `${owner}/${scanId}.jpg`,
+    ),
+    links: jest.fn(async (paths: readonly string[]) =>
+      Object.fromEntries(paths.map((path) => [path, `https://signed.test/${path}?token=t`])),
+    ),
+    remove: jest.fn(async (_path: string) => true),
+  } satisfies ScanPhotoStore;
+  return { photos, state };
 }
 
 describe('scan-history', () => {
@@ -180,5 +205,82 @@ describe('scan-history', () => {
     expect(await deleteScan(sampleScan.id, place)).toBe(true);
     expect(supabase.deleteEq).toHaveBeenCalledWith('id', sampleScan.id);
     expect(await loadScans(place)).toEqual([]);
+  });
+
+  it('uploads the photo once the scan is saved, so every device can show it', async () => {
+    const supabase = fakeSupabase();
+    const { photos } = fakePhotos();
+    const place = { store, client: supabase.client, owner: 'user-123', photos };
+
+    expect(await saveScan(sampleScan, place)).toBe('saved');
+    expect(photos.upload).toHaveBeenCalledWith('user-123', sampleScan.id, 'file:///photo1.jpg');
+    expect(supabase.update).toHaveBeenCalledWith({
+      photo_path: `user-123/${sampleScan.id}.jpg`,
+    });
+
+    const [loaded] = await loadScans(place);
+    expect(loaded!.photoPath).toBe(`user-123/${sampleScan.id}.jpg`);
+    expect(scanToPreviewItem(loaded!).photo).toEqual({
+      uri: `https://signed.test/user-123/${sampleScan.id}.jpg?token=t`,
+    });
+  });
+
+  it('shows the phone’s photo until the upload goes, then sends it on a later load', async () => {
+    const supabase = fakeSupabase();
+    const { photos, state } = fakePhotos();
+    const place = { store, client: supabase.client, owner: 'user-123', photos };
+    state.offline = true;
+
+    // The scan is saved even though its photo has to wait.
+    expect(await saveScan(sampleScan, place)).toBe('saved');
+    let [loaded] = await loadScans(place);
+    expect(loaded!.photoPending).toBe(true);
+    expect(scanToPreviewItem(loaded!).photo).toEqual({ uri: 'file:///photo1.jpg' });
+
+    state.offline = false;
+    [loaded] = await loadScans(place);
+    expect(loaded!.photoPending).toBe(false);
+    expect(supabase.state.rows[0]!.photo_path).toBe(`user-123/${sampleScan.id}.jpg`);
+    expect(scanToPreviewItem(loaded!).photo).toEqual({
+      uri: `https://signed.test/user-123/${sampleScan.id}.jpg?token=t`,
+    });
+  });
+
+  it('sends a photo saved offline once its scan reaches Supabase', async () => {
+    const supabase = fakeSupabase();
+    const { photos } = fakePhotos();
+    const place = { store, client: supabase.client, owner: 'user-123', photos };
+    supabase.state.offline = true;
+    expect(await saveScan(sampleScan, place)).toBe('pending');
+    expect(photos.upload).not.toHaveBeenCalled();
+
+    supabase.state.offline = false;
+    const [loaded] = await loadScans(place);
+    expect(photos.upload).toHaveBeenCalledTimes(1);
+    expect(loaded!.photoPath).toBe(`user-123/${sampleScan.id}.jpg`);
+  });
+
+  it('shows another device’s scan by its uploaded photo, and never uploads a path from there', async () => {
+    const supabase = fakeSupabase([{ ...remoteRow, photo_path: `user-123/${remoteRow.id}.jpg` }]);
+    const { photos } = fakePhotos();
+    const place = { store, client: supabase.client, owner: 'user-123', photos };
+
+    const [loaded] = await loadScans(place);
+    expect(photos.upload).not.toHaveBeenCalled();
+    expect(scanToPreviewItem(loaded!).photo).toEqual({
+      uri: `https://signed.test/user-123/${remoteRow.id}.jpg?token=t`,
+    });
+    // Links run out, so the phone's copy never keeps them.
+    expect(await store.getItem(`@snapworth/scan_history:user-123`)).not.toContain('signed.test');
+  });
+
+  it('deletes the photo along with the scan', async () => {
+    const supabase = fakeSupabase();
+    const { photos } = fakePhotos();
+    const place = { store, client: supabase.client, owner: 'user-123', photos };
+    await saveScan(sampleScan, place);
+
+    expect(await deleteScan(sampleScan.id, place)).toBe(true);
+    expect(photos.remove).toHaveBeenCalledWith(`user-123/${sampleScan.id}.jpg`);
   });
 });

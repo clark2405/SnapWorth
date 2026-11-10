@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ImageSourcePropType } from 'react-native';
 
+import { uploadAvatar } from '../../adapters/supabase/photo-storage';
 import { getSupabase, isSupabaseConfigured } from '../../adapters/supabaseClient';
 import {
   previewConversations,
@@ -237,10 +238,17 @@ function handleRefusal(code?: string): string {
   return 'Your handle couldn’t be saved. Try again.';
 }
 
+/** A photo on this device (picked or taken), rather than one already online. */
+function isDevicePhoto(uri: string): boolean {
+  return !/^https?:\/\//i.test(uri);
+}
+
 /**
  * Updates user profile in Supabase. The handle goes to the `public.profiles` row first, since
  * that's the one comments and chats show, and a handle someone else has is refused there before
- * anything else is saved. The rest (name, place, bio, photo) is kept on the account.
+ * anything else is saved. A new photo picked on the device is uploaded to the person's avatar
+ * folder in Storage and set on `public.profiles` too, so others see it. The rest (name, place,
+ * bio, and the photo's URL) is kept on the account.
  */
 export async function updateUserProfile(
   updates: ProfileUpdateInput,
@@ -251,19 +259,44 @@ export async function updateUserProfile(
 
   try {
     const supabase = getSupabase();
+    const newPhoto =
+      typeof updates.avatarUrl === 'string' && isDevicePhoto(updates.avatarUrl)
+        ? updates.avatarUrl
+        : undefined;
+    let avatarUrl = updates.avatarUrl;
 
-    if (updates.handle !== undefined) {
+    let userId: string | undefined;
+    if (updates.handle !== undefined || newPhoto !== undefined) {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return { success: false, error: 'Sign in again to save your profile.' };
+      userId = user.id;
+    }
+
+    if (updates.handle !== undefined && userId) {
       const { data, error } = await supabase
         .from('profiles')
         .update({ handle: updates.handle })
-        .eq('id', user.id)
+        .eq('id', userId)
         .select('id');
       // No row back means the database let nothing change.
       if (error || !data?.length) return { success: false, error: handleRefusal(error?.code) };
+    }
+
+    if (newPhoto !== undefined && userId) {
+      const photoRefused = { success: false, error: 'Your photo couldn’t be saved. Try again.' };
+      try {
+        avatarUrl = await uploadAvatar(supabase, userId, newPhoto);
+      } catch {
+        return photoRefused;
+      }
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ avatar_url: avatarUrl })
+        .eq('id', userId)
+        .select('id');
+      if (error || !data?.length) return photoRefused;
     }
 
     const userMetaUpdates: Record<string, string | null> = {};
@@ -271,7 +304,7 @@ export async function updateUserProfile(
     if (updates.handle !== undefined) userMetaUpdates.handle = updates.handle;
     if (updates.location !== undefined) userMetaUpdates.location = updates.location;
     if (updates.bio !== undefined) userMetaUpdates.bio = updates.bio;
-    if (updates.avatarUrl !== undefined) userMetaUpdates.avatar_url = updates.avatarUrl;
+    if (avatarUrl !== undefined) userMetaUpdates.avatar_url = avatarUrl;
 
     const { error: userError } = await supabase.auth.updateUser({
       data: userMetaUpdates,

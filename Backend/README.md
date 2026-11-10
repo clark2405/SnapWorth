@@ -8,6 +8,7 @@
 | -------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
 | Feed discussion      | `supabase/migrations/20261005000000_feed_comments.sql` | Profiles, feed posts, comments with one level of replies, reports, and the RLS policies that decide who sees what. |
 | Chats                | `supabase/migrations/20261029*_chat*.sql`              | Listings (the minimum a chat needs), conversations, messages, offers, pickups, blocks, reports, and their RLS.     |
+| Photos               | `supabase/migrations/20261110000000_photo_storage.sql` | Storage buckets for scan photos (private, signed links) and profile photos (public), and who may write where.       |
 | Moderation           | `supabase/functions/moderate-content/`                 | Screens each new comment and approves or holds it. Fail-closed: nothing is public until it has been screened.      |
 | Moderation providers | `supabase/functions/_shared/providers/moderation.ts`   | `openai` (OpenAI's free moderation endpoint) for real use; `rules` (a fixed word list) for local development.      |
 | Development data     | `supabase/seed/`                                       | The demo accounts, the two feed posts the app ships with and their comments, and the market listings.              |
@@ -36,6 +37,12 @@
 - **Limits:** at most 30 messages a minute per account.
 
 The client's errors map from the database's codes: `SWCLO` (closed), `SWBLK` (blocked) and `SWOLD` (offer no longer open).
+
+### How photos work
+
+- **Scan photos** (`scan-photos`, private): after a scan is saved, the app uploads its photo to `<user id>/<scan id>.jpg` and records it in `scan_history.photo_path`. Only the owner can read it, through signed links that last 12 hours. A photo can only be uploaded for a scan its owner has saved, so the scan limit (60 an hour) limits photos too. Listing or posting a scan will add a read policy for its photo (see the migration's comment).
+- **Profile photos** (`avatars`, public): one per person, `<user id>/avatar.<jpg|png|webp>`. The owner sets `profiles.avatar_url` to its public URL; the database refuses any other URL, including the same path on another host (it compares with the sign-in token's issuer, so locally the app must use the address the CLI prints).
+- **Writing:** each person adds, replaces and deletes only in their own folder.
 
 ## Setting up a Supabase project
 
@@ -68,7 +75,8 @@ Without step 4 the apps still work: comments are kept on the device, under the s
 `supabase/functions/estimate-price/` implements the camera-only Gemini prototype. It validates
 the caller's Supabase session, accepts a JPEG/PNG/WebP up to 4 MiB, sends image bytes to Gemini,
 and validates a PHP estimate/range/explanation or an explicit unable-to-estimate result. The
-key is never sent to the app. There is no upload to permanent Storage or saved scan History yet.
+key is never sent to the app. The function keeps nothing: the app saves a successful estimate to
+`scan_history` and uploads its photo to Storage afterwards (see "How photos work").
 
 The function uses the existing `AI_PROVIDER=gemini` and `AI_API_KEY` Edge Function secrets.
 `AI_MODEL` optionally overrides the default `gemini-3.6-flash`; use a model available on your

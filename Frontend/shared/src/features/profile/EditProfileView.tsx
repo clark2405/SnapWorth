@@ -50,6 +50,9 @@ export function EditProfileView({ onBack, onSaved, onPickPhoto }: EditProfileVie
   const [bio, setBio] = useState<string>(profile.bio);
   const [saving, setSaving] = useState(false);
   const [touched, setTouched] = useState(false);
+  // Whether a new photo was picked: the current one's source is rebuilt each render, so it can't
+  // be compared.
+  const [photoPicked, setPhotoPicked] = useState(false);
 
   useEffect(() => {
     if (!touched && profile) {
@@ -62,9 +65,8 @@ export function EditProfileView({ onBack, onSaved, onPickPhoto }: EditProfileVie
   }, [profile, touched]);
 
   const handleOk = handlePattern.test(handle);
-  const initialAvatar = avatarSourceFor(profile.avatarUrl);
   const changed =
-    avatar !== initialAvatar ||
+    photoPicked ||
     name.trim() !== profile.displayName ||
     handle !== profile.handle ||
     location.trim() !== profile.location ||
@@ -77,6 +79,7 @@ export function EditProfileView({ onBack, onSaved, onPickPhoto }: EditProfileVie
       const picked = await onPickPhoto();
       if (picked) {
         setAvatar(picked);
+        setPhotoPicked(true);
         setTouched(true);
       }
     } catch {
@@ -88,8 +91,9 @@ export function EditProfileView({ onBack, onSaved, onPickPhoto }: EditProfileVie
     if (!canSave) return;
     setSaving(true);
     try {
+      // Only a newly picked photo is sent, to be uploaded; an unchanged one stays as it is.
       const avatarUrl =
-        typeof avatar === 'object' && avatar !== null && 'uri' in avatar
+        photoPicked && typeof avatar === 'object' && avatar !== null && 'uri' in avatar
           ? (avatar as { uri: string }).uri
           : undefined;
 

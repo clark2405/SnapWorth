@@ -7,5 +7,6 @@ export * from './supabase/chat-repository';
 export * from './supabase/client';
 export * from './supabase/comment-repository';
 export * from './supabase/hanap-repository';
+export * from './supabase/photo-storage';
 export * from './supabase/pricing';
 export * from './supabase/suki-repository';

@@ -16,6 +16,22 @@ describe('EditProfileView', () => {
     expect(save()).toBeEnabled();
   });
 
+  it('offers Save once a new photo is picked, and not for backing out of the picker', async () => {
+    const onPickPhoto = jest
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ uri: 'file:///me.jpg' });
+    renderScreen(<EditProfileView onPickPhoto={onPickPhoto} />);
+    const save = () => screen.getByRole('button', { name: 'Save' });
+
+    fireEvent.press(screen.getByRole('button', { name: 'Change profile photo' }));
+    await waitFor(() => expect(onPickPhoto).toHaveBeenCalledTimes(1));
+    expect(save()).toBeDisabled();
+
+    fireEvent.press(screen.getByRole('button', { name: 'Change profile photo' }));
+    await waitFor(() => expect(save()).toBeEnabled());
+  });
+
   it('explains a username it cannot take and holds Save back', () => {
     renderScreen(<EditProfileView />);
 
