@@ -21,6 +21,30 @@ values
    '{"provider":"email","providers":["email"]}', '{"handle":"justin_v"}', now(), now())
 on conflict (id) do nothing;
 
+update public.profiles
+   set display_name = 'Rico Santos',
+       bio = 'Thrifting 90s sportswear and film cameras around Cebu. Everything I sell is tested.',
+       location = 'Lahug, Cebu City'
+ where id = '00000000-0000-4000-8000-000000000001';
+
+update public.profiles
+   set display_name = 'Maria Cruz',
+       bio = 'Film cameras and 90s electronics. Everything is tested before it is listed.',
+       location = 'Cebu City'
+ where id = '00000000-0000-4000-8000-000000000002';
+
+update public.profiles
+   set display_name = 'Sugbo Hype',
+       bio = 'Vintage streetwear, cassette audio and rare finds around Mandaue.',
+       location = 'Mandaue'
+ where id = '00000000-0000-4000-8000-000000000003';
+
+update public.profiles
+   set display_name = 'Justin V.',
+       bio = 'Sneaker collector and outerwear enthusiast. Original boxes included.',
+       location = 'Lapu-Lapu'
+ where id = '00000000-0000-4000-8000-000000000004';
+
 insert into public.feed_posts (id, slug, owner_id, body, estimate_php, moderation_status, created_at)
 values
   ('00000000-0000-4000-9000-000000000001', 'retro-windbreaker',

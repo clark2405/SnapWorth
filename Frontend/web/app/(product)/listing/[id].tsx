@@ -27,13 +27,13 @@ export default function ListingDetailRoute() {
         if (conversationId) router.push(`/chat/${conversationId}`);
         return conversationId !== null;
       }}
-      // Preview wiring: every sample listing detail belongs to the one sample seller.
-      onOpenSeller={() => router.push('/seller/mariacruz')}
+      onOpenSeller={(sellerHandle) => router.push(`/seller/${sellerHandle ?? 'mariacruz'}`)}
       // Owner actions on the seller's own listing.
       onAskFeed={() => router.push(`/ask/${listingId ?? ''}?from=listing`)}
       onEditPrice={() => router.push(`/list/${listingId ?? ''}`)}
       onShare={() => share(`/listing/${listingId ?? ''}`, 'For sale on SnapWorth.')}
       onMarkSold={() => router.replace('/history')}
+      onDeleteListing={() => router.replace('/marketplace')}
     />
   );
 }

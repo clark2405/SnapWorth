@@ -1,5 +1,4 @@
 import { CircleCheck, TrendingDown, TrendingUp, type LucideIcon } from 'lucide-react-native';
-import { useState } from 'react';
 import { View } from 'react-native';
 
 import {
@@ -18,6 +17,7 @@ import type { VoteChoice } from '../../types';
 import { formatPeso, type PreviewListing } from '../preview/sample-data';
 import { useAccountGate } from '../session';
 import { useTip } from '../tips';
+import { useMarketplace } from './marketplace-state';
 
 const verdictLabel: Record<VoteChoice, string> = {
   too_high: 'Too High',
@@ -42,7 +42,8 @@ export interface ListingCardProps {
 export function ListingCard({ listing, onOpen, onMessageSeller }: ListingCardProps) {
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
-  const [saved, setSaved] = useState(false);
+  const { isSaved, toggleSaved } = useMarketplace();
+  const saved = isSaved(listing.id);
   const requireAccount = useAccountGate();
   const saveTip = useTip('save');
   const verdict = `${listing.verdictShare}% ${verdictLabel[listing.verdict]}`;
@@ -54,7 +55,7 @@ export function ListingCard({ listing, onOpen, onMessageSeller }: ListingCardPro
       onPress: () =>
         requireAccount('save', () => {
           saveTip.done();
-          setSaved((value) => !value);
+          void toggleSaved(listing.id);
           toast.show({ title: saved ? 'Removed from saved' : 'Saved' });
         }),
     },
@@ -99,7 +100,7 @@ export function ListingCard({ listing, onOpen, onMessageSeller }: ListingCardPro
             onToggle={() =>
               requireAccount('save', () => {
                 saveTip.done();
-                setSaved((value) => !value);
+                void toggleSaved(listing.id);
               })
             }
             likeLabel="Save listing"

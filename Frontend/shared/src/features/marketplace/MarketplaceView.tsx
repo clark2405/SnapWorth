@@ -26,7 +26,6 @@ import {
 import { held, themedStyles, tokens, useThemedStyles, useWideLayout } from '../../design';
 import {
   formatPeso,
-  previewListings,
   previewMarketAreas,
   previewMarketCategories,
   previewPriceBrackets,
@@ -47,6 +46,7 @@ import {
   priceLabel,
   type MarketFilters,
 } from './MarketFilters';
+import { toPreviewListing, useMarketplace } from './marketplace-state';
 
 export interface MarketplaceViewProps {
   readonly onOpenListing?: (listingId: string) => void;
@@ -85,6 +85,7 @@ export function MarketplaceView({
   onOpenHanap,
 }: MarketplaceViewProps) {
   const styles = useThemedStyles(stylesFor);
+  const { listings, refresh } = useMarketplace();
   const [filters, setFilters] = useState<MarketFilters>(defaultMarketFilters);
   const [openSheet, setOpenSheet] = useState<'price' | 'location' | null>(null);
   const ios = Platform.OS === 'ios';
@@ -96,11 +97,17 @@ export function MarketplaceView({
   };
 
   const matching = (candidate: MarketFilters) =>
-    previewListings.filter(
-      (listing) =>
-        (candidate.category === 'all' || categoryByListing[listing.id] === candidate.category) &&
-        matchesPriceAndPlace(listing, candidate),
-    );
+    listings.filter((listing) => {
+      const category = listing.category ?? categoryByListing[listing.id];
+      const preview = toPreviewListing(listing);
+      return (
+        (candidate.category === 'all' || category === candidate.category) &&
+        matchesPriceAndPlace(
+          { ...preview, area: listing.area, distanceKm: listing.distanceKm },
+          candidate,
+        )
+      );
+    });
 
   const filtered = matching(filters);
   // Two listings a row on a phone; on a wide window as many as fit, up to four.
@@ -116,15 +123,13 @@ export function MarketplaceView({
   // Steals sit above the grid only while browsing everything; once narrowed, the grid is the answer.
   const underEstimate = narrowed
     ? []
-    : previewListings.filter((listing) => listing.verdict === 'too_low').slice(0, 2);
+    : listings
+        .filter((listing) => listing.verdict === 'too_low')
+        .slice(0, 2)
+        .map(toPreviewListing);
 
   return (
-    <Screen
-      clearTabBar
-      place="market"
-      ambient="market"
-      onRefresh={() => new Promise<void>((resolve) => setTimeout(resolve, 900))}
-    >
+    <Screen clearTabBar place="market" ambient="market" onRefresh={() => refresh()}>
       <LargeTitle
         brand
         title="Market"
@@ -267,7 +272,10 @@ export function MarketplaceView({
               layout={paperLayout}
               style={wide ? { width: grid.cellWidth } : styles.cell}
             >
-              <ListingCard listing={listing} onOpen={() => onOpenListing?.(listing.id)} />
+              <ListingCard
+                listing={toPreviewListing(listing)}
+                onOpen={() => onOpenListing?.(listing.id)}
+              />
             </Animated.View>
           ))}
           {/* An odd count keeps its last card at half width instead of stretching. */}

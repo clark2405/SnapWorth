@@ -18,13 +18,8 @@ import {
   Toggle,
 } from '../../components';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
-import {
-  formatPeso,
-  previewListings,
-  previewPriceAlerts,
-  type PreviewListing,
-  type PreviewPriceAlert,
-} from '../preview/sample-data';
+import { useMarketplace } from '../marketplace/marketplace-state';
+import { formatPeso, type PreviewListing, type PreviewPriceAlert } from '../preview/sample-data';
 
 export interface PriceAlertsViewProps {
   readonly onBack?: () => void;
@@ -51,20 +46,20 @@ export function PriceAlertsView({ onBack, onOpenListing, onBrowseMarket }: Price
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
-  const [alerts, setAlerts] = useState<readonly PreviewPriceAlert[]>(previewPriceAlerts);
+  const {
+    previewListings: marketListings,
+    savedAlerts: alerts,
+    saveAlert,
+    removeAlert,
+  } = useMarketplace();
   const [editing, setEditing] = useState<string | null>(null);
   const [cut, setCut] = useState<Cut>('10');
 
   const rows = alerts.flatMap((alert) => {
-    const listing = previewListings.find((entry) => entry.id === alert.listingId);
+    const listing = marketListings.find((entry) => entry.id === alert.listingId);
     return listing ? [{ alert, listing }] : [];
   });
   const editingRow = rows.find((row) => row.alert.listingId === editing);
-
-  const update = (listingId: string, change: Partial<PreviewPriceAlert>) =>
-    setAlerts((current) =>
-      current.map((alert) => (alert.listingId === listingId ? { ...alert, ...change } : alert)),
-    );
 
   const openEditor = (row: { alert: PreviewPriceAlert; listing: PreviewListing }) => {
     const off = 1 - row.alert.alertBelow / row.listing.askingPrice;
@@ -103,7 +98,7 @@ export function PriceAlertsView({ onBack, onOpenListing, onBrowseMarket }: Price
                   onEdit={() => openEditor({ alert, listing })}
                   onToggle={(on) => {
                     haptic('select');
-                    update(alert.listingId, { on });
+                    void saveAlert(alert.listingId, alert.alertBelow, on);
                   }}
                 />
               ))}
@@ -139,10 +134,11 @@ export function PriceAlertsView({ onBack, onOpenListing, onBrowseMarket }: Price
             <Button
               label="Save alert"
               onPress={() => {
-                update(editingRow.alert.listingId, {
-                  alertBelow: roundTo50(editingRow.listing.askingPrice * (1 - Number(cut) / 100)),
-                  on: true,
-                });
+                void saveAlert(
+                  editingRow.alert.listingId,
+                  roundTo50(editingRow.listing.askingPrice * (1 - Number(cut) / 100)),
+                  true,
+                );
                 haptic('success');
                 setEditing(null);
               }}
@@ -151,9 +147,7 @@ export function PriceAlertsView({ onBack, onOpenListing, onBrowseMarket }: Price
               label="Stop watching"
               variant="tertiary"
               onPress={() => {
-                setAlerts((current) =>
-                  current.filter((alert) => alert.listingId !== editingRow.alert.listingId),
-                );
+                void removeAlert(editingRow.alert.listingId);
                 setEditing(null);
                 toast.show({ title: 'Alert removed' });
               }}

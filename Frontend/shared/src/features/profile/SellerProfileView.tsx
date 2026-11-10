@@ -1,4 +1,5 @@
 import { Flag, UserX } from 'lucide-react-native';
+import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -15,8 +16,14 @@ import {
   SWText,
 } from '../../components';
 import { themedStyles, tokens, useThemedStyles } from '../../design';
+import type { SellerProfile } from '../../ports/marketplace';
 import { ListingCard } from '../marketplace/ListingCard';
-import { previewListings, previewSellers } from '../preview/sample-data';
+import {
+  sellerAvatarSource,
+  toPreviewListing,
+  useMarketplace,
+} from '../marketplace/marketplace-state';
+import { previewSellers } from '../preview/sample-data';
 import { useAccountGate } from '../session';
 
 export interface SellerProfileViewProps {
@@ -35,7 +42,64 @@ export function SellerProfileView({
 }: SellerProfileViewProps) {
   const styles = useThemedStyles(stylesFor);
   const requireAccount = useAccountGate();
-  const seller = handle ? previewSellers[handle] : undefined;
+  const { listings: marketListings, loadSeller } = useMarketplace();
+  const normalized = handle?.trim().toLowerCase().replace(/^@/, '');
+
+  const immediateSeller = useMemo<SellerProfile | null>(() => {
+    if (!normalized) return null;
+    const preview = previewSellers[normalized];
+    const matchingListings = marketListings.filter((entry) =>
+      preview
+        ? preview.listingIds.includes(entry.id) || entry.seller.handle.toLowerCase() === normalized
+        : entry.seller.handle.toLowerCase() === normalized,
+    );
+    if (preview) {
+      return {
+        id: `preview:${preview.user.handle}`,
+        handle: preview.user.handle,
+        displayName: preview.displayName,
+        avatarUrl: null,
+        rating: preview.rating,
+        sales: preview.sales,
+        joined: preview.joined,
+        bio: preview.bio,
+        location: 'Cebu City',
+        listings: matchingListings,
+      };
+    }
+    const first = matchingListings[0]?.seller;
+    if (!first) return null;
+    return {
+      id: first.id,
+      handle: first.handle,
+      displayName: first.displayName,
+      avatarUrl: first.avatarUrl,
+      rating: first.rating,
+      sales: first.sales,
+      joined: 'Joined 2026',
+      bio: '',
+      location: 'Cebu City',
+      listings: matchingListings,
+    };
+  }, [marketListings, normalized]);
+
+  const [remoteSeller, setRemoteSeller] = useState<SellerProfile | null>(null);
+
+  useEffect(() => {
+    if (!normalized || immediateSeller) {
+      setRemoteSeller(null);
+      return;
+    }
+    let active = true;
+    void loadSeller(normalized).then((loaded) => {
+      if (active && loaded) setRemoteSeller(loaded);
+    });
+    return () => {
+      active = false;
+    };
+  }, [immediateSeller, loadSeller, normalized]);
+
+  const seller = remoteSeller ?? immediateSeller;
 
   if (!seller) {
     return (
@@ -51,14 +115,15 @@ export function SellerProfileView({
     );
   }
 
-  const listings = previewListings.filter((listing) => seller.listingIds.includes(listing.id));
+  const listings = seller.listings.map(toPreviewListing);
+  const avatar = sellerAvatarSource(seller);
 
   return (
     <Screen
       ambient="market"
       header={
         <NavHeader
-          title={`@${seller.user.handle}`}
+          title={`@${seller.handle}`}
           onBack={onBack}
           trailing={
             <IconButton
@@ -72,7 +137,7 @@ export function SellerProfileView({
       contentStyle={styles.content}
     >
       <Reveal index={0} style={styles.identity}>
-        <Avatar source={seller.user.avatar} name={seller.user.handle} size={72} ring />
+        <Avatar source={avatar} name={seller.handle} size={72} ring />
         <View style={styles.identityText}>
           <SWText variant="displayMedium" accessibilityRole="header">
             {seller.displayName}
@@ -89,11 +154,13 @@ export function SellerProfileView({
         </View>
       </Reveal>
 
-      <Reveal index={1}>
-        <SWText variant="bodyMedium" tone="textSecondary">
-          {seller.bio}
-        </SWText>
-      </Reveal>
+      {seller.bio.length > 0 ? (
+        <Reveal index={1}>
+          <SWText variant="bodyMedium" tone="textSecondary">
+            {seller.bio}
+          </SWText>
+        </Reveal>
+      ) : null}
 
       <Reveal index={2} style={styles.section}>
         <SWText variant="overline" tone="textMuted" accessibilityRole="header">

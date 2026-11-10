@@ -54,12 +54,15 @@ const radiusOptions: readonly { readonly key: RadiusKey; readonly label: string 
  * service; this keeps the screen honest about what each filter would show.
  */
 export function matchesPriceAndPlace(
-  listing: PreviewListing,
+  listing: PreviewListing & { readonly area?: string; readonly distanceKm?: number },
   filters: Pick<MarketFilters, 'minPrice' | 'maxPrice' | 'area' | 'radiusKm'>,
 ): boolean {
   if (filters.minPrice !== null && listing.askingPrice < filters.minPrice) return false;
   if (filters.maxPrice !== null && listing.askingPrice > filters.maxPrice) return false;
-  const place = previewListingPlaces[listing.id];
+  const place =
+    listing.area !== undefined && listing.distanceKm !== undefined
+      ? { area: listing.area, distanceKm: listing.distanceKm }
+      : previewListingPlaces[listing.id];
   if (filters.area === 'anywhere' || !place) return true;
   if (filters.area === 'near-me') return place.distanceKm <= Number(filters.radiusKm);
   return place.area === filters.area;

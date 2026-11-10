@@ -39,10 +39,12 @@ import {
   ZoomLink,
 } from '../../components';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import { useHistoryItems } from '../history/scan-history-state';
+import { useMarketplace } from '../marketplace/marketplace-state';
 import {
   formatPeso,
+  previewPosts,
   previewRecentSearches,
-  previewSearchIndex,
   previewTrending,
   type PreviewSearchResult,
 } from '../preview/sample-data';
@@ -162,16 +164,49 @@ export function SearchView({
         }
       : null);
 
+  const { previewListings: marketListings } = useMarketplace();
+  const { items: historyItems } = useHistoryItems();
+
+  const searchIndex = useMemo<readonly PreviewSearchResult[]>(
+    () => [
+      ...marketListings.map((listing) => ({
+        id: listing.id,
+        kind: 'listing' as const,
+        title: listing.title,
+        photo: listing.photo,
+        photoLabel: listing.photoLabel,
+        amount: listing.askingPrice,
+      })),
+      ...previewPosts.map((post) => ({
+        id: post.id,
+        kind: 'post' as const,
+        title: post.body,
+        photo: post.photo,
+        photoLabel: post.photoLabel,
+        amount: post.estimate,
+      })),
+      ...historyItems.map((item) => ({
+        id: item.id,
+        kind: 'item' as const,
+        title: item.title,
+        photo: item.photo,
+        photoLabel: item.photoLabel,
+        amount: item.estimate,
+      })),
+    ],
+    [historyItems, marketListings],
+  );
+
   const results = useMemo(
     () =>
       trimmed.length === 0
         ? []
-        : previewSearchIndex.filter(
+        : searchIndex.filter(
             (result) =>
               scopeKinds[scope].includes(result.kind) &&
               result.title.toLowerCase().includes(trimmed),
           ),
-    [scope, trimmed],
+    [scope, searchIndex, trimmed],
   );
 
   const scopeLabel = scopes.find((option) => option.key === scope)?.label.toLowerCase();

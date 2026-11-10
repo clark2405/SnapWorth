@@ -3,6 +3,7 @@ export * from './chat';
 export * from './collections';
 export * from './comments';
 export * from './hanap';
+export * from './marketplace';
 export * from './platform';
 export * from './services';
 export * from './suki';

@@ -84,16 +84,26 @@ Last updated 2026-11-10.
   Stored in the account (`collections`, `collection_items`), private to the owner; without a
   backend they stay on the phone. Collections and prices a phone kept before move into the
   account that owns their things, once.
-- **Needs deploying:** `npx supabase db push` for the `scan_history`, `photo_storage` and
-  `flips_and_collections` migrations (the last two make the Storage buckets and their policies).
+- **Market and listings:** listings live in Supabase (`listings`), with photo, category, condition,
+  area, coordinates, description and AI worth range. Owners can list a scan from History (`ConfirmPriceView`
+  reads the real scan through `useItemDetail` and never copies `paid_php` or pre-fills the AI
+  estimate as the asking price), edit their listing, mark it sold, or delete it. A read policy on
+  `storage.objects` lets anyone view the scan photo of a public listing. Market, filters, listing
+  pages, seller profiles (`profiles.display_name`, `bio`, `location`), Search, Hanap matches and
+  Guess the worth all draw from real listings (falling back to the local sample seed when offline
+  or before any listings exist). Saved listings and price-drop alerts are stored per account in
+  `saved_listings`.
+- **Needs deploying:** `npx supabase db push` for the `scan_history`, `photo_storage`,
+  `flips_and_collections` and `marketplace` migrations (making the Storage buckets, policies and
+  expanded `listings` / `saved_listings` tables).
 
 ### Kept on the device only
 
 - **Guess the worth:** a daily game on the Feed. It's five of the Market's listings, the same five
   for everyone that day. You guess each one's worth, then see the AI's estimate and what voters
   think of the asking price. Your scores, streak and Sharp eye badges stay on the device; no
-  account needed. It draws from the Market's sample listings and their sample AI estimates
-  (`previewListingWorth`) until listings are stored in Supabase.
+  account needed. It draws from the Market's real listings (or the sample listings when no backend
+  is connected).
 
 ### Screens built, but showing sample data
 
@@ -101,12 +111,10 @@ These look finished but read from `shared/src/features/preview/sample-data.ts`, 
 on them isn't saved.
 
 - **Feed:** posts and votes. Posting to the feed only opens the feed.
-- **Market:** listings, filters, listing pages, saved listings and price alerts. Listing an item
-  for sale isn't saved.
 - **History, before the first scan:** the sample items, and their sample market detail (demand,
   condition, trend and recent sales) on the item screen. A real scan has no market detail yet.
-- **Profile:** seller profiles, your votes, settings, trends, search and the admin review queue.
-  Your own profile is real (see above).
+- **Profile:** your votes, settings, trends and the admin review queue.
+  Your own profile, seller profiles and price alerts are real (see above).
 - **Worthy's cards:** price, trend and collection answers.
 
 ### Not done yet
@@ -116,7 +124,7 @@ on them isn't saved.
     Supabase's Google provider set up first; see "Sign-in setup".
   - Sign in with Apple is written but hidden: it needs the paid Apple Developer account. See
     "Sign-in setup" to turn it on.
-- **The rest of the data on Supabase:** votes, posts, listings, price alerts and the admin queue.
+- **The rest of the data on Supabase:** votes, posts and the admin queue.
 - **Cloud AI** (a teammate owns this; see "Handoff" below):
   - Worthy's chat in the cloud.
   - Real data behind Worthy's cards.

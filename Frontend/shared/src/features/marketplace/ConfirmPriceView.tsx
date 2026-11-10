@@ -23,6 +23,9 @@ import {
   Toggle,
 } from '../../components';
 import { haptic, themedStyles, tokens, useThemedStyles } from '../../design';
+import type { MarketArea, MarketCategory } from '../../ports/marketplace';
+import { useScanHistory } from '../history/scan-history-state';
+import { useItemDetail } from '../item/item-source';
 import {
   formatPeso,
   previewConditions,
@@ -30,6 +33,7 @@ import {
   previewValuation,
   type PreviewCondition,
 } from '../preview/sample-data';
+import { listingPhotoSource, useMarketplace } from './marketplace-state';
 
 export interface ConfirmPriceViewProps {
   readonly itemId?: string;
@@ -38,10 +42,35 @@ export interface ConfirmPriceViewProps {
    * Receives the price the seller confirmed (the AI estimate is shown for reference only), and
    * whether to also post the listing to the feed so the community can vote on that price.
    */
-  readonly onPublish?: (enteredPrice: number, alsoAskFeed: boolean) => void;
+  readonly onPublish?: (enteredPrice: number, alsoAskFeed: boolean, listingId?: string) => void;
 }
 
 const priceInput = /^\d{1,9}(?:\.\d{1,2})?$/;
+
+const areaCycle: readonly { readonly key: MarketArea; readonly label: string }[] = [
+  { key: 'cebu-city', label: 'Cebu City, PH' },
+  { key: 'mandaue', label: 'Mandaue, PH' },
+  { key: 'lapu-lapu', label: 'Lapu-Lapu, PH' },
+  { key: 'metro-manila', label: 'Metro Manila, PH' },
+];
+
+const categoryCycle: readonly { readonly key: MarketCategory; readonly label: string }[] = [
+  { key: 'fashion', label: 'Apparel & Fashion' },
+  { key: 'collectibles', label: 'Collectibles' },
+  { key: 'sneakers', label: 'Sneakers' },
+  { key: 'electronics', label: 'Electronics' },
+  { key: 'home', label: 'Home' },
+];
+
+function inferCategory(title: string, fallback?: MarketCategory): MarketCategory {
+  if (fallback) return fallback;
+  const lower = title.toLowerCase();
+  if (/jordan|sneaker|shoe|dunk/.test(lower)) return 'sneakers';
+  if (/walkman|keyboard|keychron|sony|audio|headphone/.test(lower)) return 'electronics';
+  if (/polaroid|camera|film|vintage|card|coin/.test(lower)) return 'collectibles';
+  if (/lamp|chair|vase|table/.test(lower)) return 'home';
+  return 'fashion';
+}
 
 /** A positive amount with at most two decimals, or null if the text is not a valid price. */
 export function parseEnteredPrice(text: string): number | null {
@@ -51,47 +80,163 @@ export function parseEnteredPrice(text: string): number | null {
   return value > 0 ? value : null;
 }
 
-function suggestedPrice(condition: PreviewCondition): number {
+function suggestedPrice(
+  condition: PreviewCondition,
+  baseAmount: number = previewItem.estimate,
+): number {
   const factor = previewConditions.find((entry) => entry.key === condition)?.factor ?? 1;
-  return Math.round((previewItem.estimate * factor) / 10) * 10;
+  return Math.round((baseAmount * factor) / 10) * 10;
 }
 
-export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
+export function ConfirmPriceView({ itemId, onBack, onPublish }: ConfirmPriceViewProps) {
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
-  const item = previewItem;
+  const { listings, publishListing, updateListing } = useMarketplace();
+  const { scans, reload: reloadScans } = useScanHistory();
+  const lookup = useItemDetail(itemId);
+
+  const existingListing = itemId
+    ? listings.find(
+        (entry) =>
+          entry.id === itemId ||
+          entry.slug === itemId ||
+          entry.rowId === itemId ||
+          (entry.scanId !== null && entry.scanId === itemId),
+      )
+    : undefined;
+
+  const savedScan = itemId ? scans.find((entry) => entry.id === itemId) : undefined;
+  const foundItem = lookup.status === 'found' ? lookup.item : undefined;
+
+  const title = existingListing?.title ?? foundItem?.title ?? previewItem.title;
+  const subtitle = foundItem?.explanation ? foundItem.explanation : previewItem.subtitle;
+  const baseValuation = existingListing?.estimatePhp ?? foundItem?.estimate ?? previewItem.estimate;
+  const valuationLow = existingListing?.estimateLowPhp ?? foundItem?.low ?? previewValuation.low;
+  const valuationHigh =
+    existingListing?.estimateHighPhp ?? foundItem?.high ?? previewValuation.high;
+  const photoSource = existingListing
+    ? listingPhotoSource(existingListing)
+    : (foundItem?.photos[0]?.source ?? previewItem.photo);
+  const photoLabel =
+    existingListing?.photoLabel ?? foundItem?.photos[0]?.label ?? previewItem.photoLabel;
+
   const [alsoAskFeed, setAlsoAskFeed] = useState(false);
-  const [condition, setCondition] = useState<PreviewCondition>('good');
-  // Prefilled with the live suggestion so the seller always sees a number, but once they type
-  // their own it stops following the condition — the price they publish is always theirs, seen
-  // and editable, never silently swapped in behind the scenes.
-  const [priceText, setPriceText] = useState(() => String(suggestedPrice('good')));
-  const [edited, setEdited] = useState(false);
+  const [condition, setCondition] = useState<PreviewCondition>(
+    existingListing?.condition ?? 'good',
+  );
+  const [area, setArea] = useState<MarketArea>(existingListing?.area ?? 'cebu-city');
+  const [category, setCategory] = useState<MarketCategory>(() =>
+    inferCategory(title, existingListing?.category),
+  );
+  const [description, setDescription] = useState(
+    existingListing?.description ?? foundItem?.explanation ?? '',
+  );
+  // Starts with the live suggestion so the seller always sees a number, and once they type
+  // their own it stops following the condition.
+  const [priceText, setPriceText] = useState(() =>
+    existingListing
+      ? String(existingListing.askingPrice)
+      : String(suggestedPrice('good', baseValuation)),
+  );
+  const [edited, setEdited] = useState(Boolean(existingListing));
   const [publishing, setPublishing] = useState(false);
 
   const enteredPrice = parseEnteredPrice(priceText);
-  const suggestion = suggestedPrice(condition);
+  const suggestion = suggestedPrice(condition, baseValuation);
   const hint = previewConditions.find((entry) => entry.key === condition)?.hint ?? '';
+  const areaLabel = areaCycle.find((entry) => entry.key === area)?.label ?? previewItem.location;
+  const categoryLabel =
+    categoryCycle.find((entry) => entry.key === category)?.label ?? previewItem.category;
 
   const handleCondition = (key: PreviewCondition) => {
     setCondition(key);
-    if (!edited) setPriceText(String(suggestedPrice(key)));
+    if (!edited) setPriceText(String(suggestedPrice(key, baseValuation)));
   };
 
-  const handlePublish = () => {
-    if (enteredPrice === null) return;
+  const cycleArea = () => {
+    const idx = areaCycle.findIndex((entry) => entry.key === area);
+    const next = areaCycle[(idx + 1) % areaCycle.length];
+    if (next) setArea(next.key);
+  };
+
+  const cycleCategory = () => {
+    const idx = categoryCycle.findIndex((entry) => entry.key === category);
+    const next = categoryCycle[(idx + 1) % categoryCycle.length];
+    if (next) setCategory(next.key);
+  };
+
+  const handlePublish = async () => {
+    if (enteredPrice === null || publishing) return;
     setPublishing(true);
-    setTimeout(() => {
+
+    if (existingListing && existingListing.mine) {
+      const updated = await updateListing(existingListing.id, {
+        title,
+        askingPrice: enteredPrice,
+        condition,
+        category,
+        area,
+        description,
+      });
       setPublishing(false);
+      if (!updated.ok) {
+        toast.show({
+          title: 'Couldn’t update listing',
+          body: 'Please check your connection and try again.',
+        });
+        return;
+      }
       toast.show({
-        title: 'Listing published',
-        body: alsoAskFeed
-          ? `Live at ${formatPeso(enteredPrice)}, and on the feed for a price check.`
-          : `Live at ${formatPeso(enteredPrice)}.`,
+        title: 'Listing updated',
+        body: `Live at ${formatPeso(enteredPrice)}.`,
         celebrate: true,
       });
-      onPublish?.(enteredPrice, alsoAskFeed);
-    }, 700);
+      onPublish?.(enteredPrice, alsoAskFeed, updated.value.id);
+      return;
+    }
+
+    const published = await publishListing({
+      scanId: savedScan?.id ?? null,
+      title,
+      askingPrice: enteredPrice,
+      photoUrl: savedScan ? (savedScan.photoUrl ?? savedScan.photoUri) : null,
+      photoPath: savedScan?.photoPath ?? null,
+      category,
+      condition,
+      area,
+      description:
+        description.trim().length > 0
+          ? description.trim()
+          : `${title} in ${condition.replace('_', ' ')} condition.`,
+      estimatePhp: baseValuation,
+      estimateLowPhp: valuationLow,
+      estimateHighPhp: valuationHigh,
+    });
+    setPublishing(false);
+
+    if (!published.ok) {
+      toast.show({
+        title: 'Couldn’t publish listing',
+        body:
+          published.error.kind === 'rate_limited'
+            ? 'You are listing items too quickly. Try again in a while.'
+            : 'Please check your connection and try again.',
+      });
+      return;
+    }
+
+    if (savedScan) {
+      void reloadScans();
+    }
+
+    toast.show({
+      title: 'Listing published',
+      body: alsoAskFeed
+        ? `Live at ${formatPeso(enteredPrice)}, and on the feed for a price check.`
+        : `Live at ${formatPeso(enteredPrice)}.`,
+      celebrate: true,
+    });
+    onPublish?.(enteredPrice, alsoAskFeed, published.value.id);
   };
 
   return (
@@ -104,7 +249,7 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
             label="Publish listing"
             disabled={enteredPrice === null}
             loading={publishing}
-            onPress={handlePublish}
+            onPress={() => void handlePublish()}
           />
           {enteredPrice === null ? (
             <SWText
@@ -122,15 +267,15 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
     >
       <Reveal index={0} style={styles.item}>
         <Photo
-          source={item.photo}
-          label={item.photoLabel}
+          source={photoSource}
+          label={photoLabel}
           radius={tokens.radius.medium}
           style={styles.thumb}
         />
         <View style={styles.itemText}>
-          <SWText variant="headingSmall">{item.title}</SWText>
-          <SWText variant="bodyCompact" tone="textMuted">
-            {item.subtitle}
+          <SWText variant="headingSmall">{title}</SWText>
+          <SWText variant="bodyCompact" tone="textMuted" numberOfLines={2}>
+            {subtitle}
           </SWText>
         </View>
       </Reveal>
@@ -159,10 +304,10 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
 
       <Reveal index={2} style={styles.range}>
         <PriceRangeBar
-          low={previewValuation.low}
-          high={previewValuation.high}
-          estimate={item.estimate}
-          confidence={previewValuation.confidence}
+          low={valuationLow}
+          high={valuationHigh}
+          estimate={baseValuation}
+          confidence={foundItem?.confidence ?? previewValuation.confidence}
           asking={enteredPrice ?? suggestion}
           format={formatPeso}
         />
@@ -184,11 +329,24 @@ export function ConfirmPriceView({ onBack, onPublish }: ConfirmPriceViewProps) {
             accessibilityLabel="Your asking price in pesos"
           />
         </Field>
+        <Field label="About this item (optional)">
+          <TextField
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Condition, size, or what’s included"
+            maxLength={1000}
+            accessibilityLabel="About this item"
+          />
+        </Field>
         <Field label="Location (optional)">
-          <SelectField value={item.location} accessibilityLabel="Location" />
+          <SelectField value={areaLabel} onPress={cycleArea} accessibilityLabel="Location" />
         </Field>
         <Field label="Category (optional)">
-          <SelectField value={item.category} accessibilityLabel="Category" />
+          <SelectField
+            value={categoryLabel}
+            onPress={cycleCategory}
+            accessibilityLabel="Category"
+          />
         </Field>
       </Reveal>
 

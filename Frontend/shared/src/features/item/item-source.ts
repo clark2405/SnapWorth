@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import type { EstimateConfidence, ItemPhoto } from '../../components';
 import { useScanHistory } from '../history/scan-history-state';
 import type { SavedScan } from '../history/scan-history';
+import { useMarketplace } from '../marketplace/marketplace-state';
 import {
   photosOf,
   previewConditions,
@@ -56,7 +57,7 @@ export type ItemLookup =
   | { readonly status: 'found'; readonly item: ItemDetail };
 
 /** A saved scan as the item screen shows it. */
-export function scanDetail(scan: SavedScan): ItemDetail {
+export function scanDetail(scan: SavedScan, listingId?: string): ItemDetail {
   return {
     id: scan.id,
     title: scan.title,
@@ -69,8 +70,9 @@ export function scanDetail(scan: SavedScan): ItemDetail {
     photos: [{ source: { uri: scan.photoUrl ?? scan.photoUri }, label: scan.title }],
     capturedOn: scan.capturedOn,
     placement: {
+      ...(listingId ? { listingId } : {}),
       onFeed: scan.status === 'on_feed',
-      listed: scan.status === 'listed',
+      listed: scan.status === 'listed' || Boolean(listingId),
       sold: scan.status === 'sold',
     },
   };
@@ -103,10 +105,14 @@ const sampleIds = new Set(previewHistory.map((item) => item.id));
  */
 export function useItemDetail(itemId: string | undefined): ItemLookup {
   const { scans, status } = useScanHistory();
+  const { listings } = useMarketplace();
   return useMemo<ItemLookup>(() => {
     const scan = itemId ? scans.find((entry) => entry.id === itemId) : undefined;
-    if (scan) return { status: 'found', item: scanDetail(scan) };
+    if (scan) {
+      const linkedListing = listings.find((entry) => entry.scanId === scan.id);
+      return { status: 'found', item: scanDetail(scan, linkedListing?.id) };
+    }
     if (!itemId || sampleIds.has(itemId)) return { status: 'found', item: sampleDetail(itemId) };
     return status === 'loading' ? { status: 'loading' } : { status: 'missing' };
-  }, [itemId, scans, status]);
+  }, [itemId, listings, scans, status]);
 }

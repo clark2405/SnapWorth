@@ -10,10 +10,13 @@ import {
 } from 'react';
 
 import type { DeviceStore } from '../history/device-store';
+import { toPreviewListing, useMarketplace } from '../marketplace/marketplace-state';
+import { previewListingWorth } from '../preview/sample-data';
 import {
   dailyItems,
   dayKey,
   guessPoints,
+  guessPool,
   roundsPerDay,
   sharpEyes,
   streak,
@@ -107,8 +110,31 @@ export function useGuessGame(now: () => Date = () => new Date()): GuessGame {
   const context = useContext(GuessContext);
   const fallback = useGuessStore(null);
   const { status, games, setGames } = context ?? fallback;
+  const { listings } = useMarketplace();
   const today = dayKey(now());
-  const items = useMemo(() => dailyItems(today), [today]);
+  const items = useMemo(() => {
+    const worths: Record<
+      string,
+      { readonly estimate: number; readonly low: number; readonly high: number }
+    > = {
+      ...previewListingWorth,
+    };
+    for (const listing of listings) {
+      if (
+        typeof listing.estimatePhp === 'number' &&
+        typeof listing.estimateLowPhp === 'number' &&
+        typeof listing.estimateHighPhp === 'number'
+      ) {
+        worths[listing.id] = {
+          estimate: listing.estimatePhp,
+          low: listing.estimateLowPhp,
+          high: listing.estimateHighPhp,
+        };
+      }
+    }
+    const pool = guessPool(listings.map(toPreviewListing), worths);
+    return dailyItems(today, pool.length >= roundsPerDay ? pool : guessPool());
+  }, [listings, today]);
   const game = games.find((entry) => entry.day === today) ?? { day: today, guesses: [] };
 
   const guess = useCallback(

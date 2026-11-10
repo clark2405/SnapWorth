@@ -22,6 +22,7 @@ import {
 import { themedStyles, tokens, useThemedStyles } from '../../design';
 import type { HanapPost } from '../../ports/hanap';
 import { relativeTime } from '../feed/comment-thread-model';
+import { useMarketplace } from '../marketplace/marketplace-state';
 import { formatPeso } from '../preview/peso';
 import { previewListings, type PreviewListing } from '../preview/sample-data';
 import { useAccountGate } from '../session';
@@ -186,7 +187,8 @@ function OwnHanap({
   readonly onRemove: () => void;
 }) {
   const styles = useThemedStyles(stylesFor);
-  const matches = post.status === 'open' ? hanapMatches(post) : [];
+  const { previewListings: marketListings } = useMarketplace();
+  const matches = post.status === 'open' ? hanapMatches(post, marketListings) : [];
   const moderation = moderationTag[post.moderation];
 
   return (
