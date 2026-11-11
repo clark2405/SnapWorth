@@ -1,7 +1,9 @@
+import type { UtcDateTime } from '../types/date-time';
 import type {
   ChatReportReason,
   ConversationDetail,
   ConversationSummary,
+  MeetupPurpose,
   Message,
   OfferStatus,
   OutgoingMessage,
@@ -32,6 +34,19 @@ export type ChatEvent =
 export type ChatListener = (event: ChatEvent) => void;
 
 /**
+ * A meetup both people agreed to. `when` is as the proposer's picker wrote it ("Today, 2:00 PM"),
+ * so a day is relative to `proposedAt`, the moment it was proposed.
+ */
+export interface ConfirmedMeetup {
+  readonly messageId: MessageId;
+  readonly conversationId: ConversationId;
+  readonly place: string;
+  readonly when: string;
+  readonly purpose: MeetupPurpose;
+  readonly proposedAt: UtcDateTime;
+}
+
+/**
  * Storage for the viewer's chats. Implementations decide who the viewer is and enforce what
  * they may see and do; the Supabase one leaves that to row-level security and the database's
  * own functions.
@@ -49,6 +64,8 @@ export interface ChatRepository {
   ): Promise<Result<Message, AppError>>;
   respondToOffer(messageId: MessageId, accept: boolean): Promise<Result<OfferStatus, AppError>>;
   confirmMeetup(messageId: MessageId): Promise<Result<void, AppError>>;
+  /** Meetups the viewer's conversations agreed to, proposed at or after `since`. */
+  confirmedMeetups(since: UtcDateTime): Promise<Result<readonly ConfirmedMeetup[], AppError>>;
   markRead(id: ConversationId): Promise<Result<void, AppError>>;
   report(id: ConversationId, reason: ChatReportReason): Promise<Result<void, AppError>>;
   setBlocked(userId: UserId, blocked: boolean): Promise<Result<void, AppError>>;

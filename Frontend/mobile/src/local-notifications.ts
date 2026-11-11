@@ -9,6 +9,7 @@ export {
 } from 'expo-notifications/build/NotificationPermissions';
 export { IosAuthorizationStatus } from 'expo-notifications/build/NotificationPermissions.types';
 export { SchedulableTriggerInputTypes } from 'expo-notifications/build/Notifications.types';
+export { getAllScheduledNotificationsAsync } from 'expo-notifications/build/getAllScheduledNotificationsAsync';
 export { scheduleNotificationAsync } from 'expo-notifications/build/scheduleNotificationAsync';
 export { cancelScheduledNotificationAsync } from 'expo-notifications/build/cancelScheduledNotificationAsync';
 export { useLastNotificationResponse } from 'expo-notifications/build/useLastNotificationResponse';

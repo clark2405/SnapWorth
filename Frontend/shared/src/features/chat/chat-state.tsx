@@ -129,7 +129,14 @@ function useChatContext(): ChatContextValue {
 /** What the banners need: the service's live changes, and which chat is on screen. */
 export function useChatLive() {
   const { service, list, want, refresh, viewing } = useChatContext();
-  return { service, conversations: list.conversations, want, refresh, viewing };
+  return {
+    service,
+    status: list.status,
+    conversations: list.conversations,
+    want,
+    refresh,
+    viewing,
+  };
 }
 
 /** Screens outside a navigator (tests, web previews) are always focused. */

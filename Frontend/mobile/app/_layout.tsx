@@ -18,13 +18,14 @@ import {
 import { ThemeProvider, useTheme } from '@snapworth/shared/design';
 import { AppServicesProvider, type BackendConfig } from '@snapworth/shared/composition';
 import { useSnapWorthFonts } from '@snapworth/shared/design/font-assets';
-import { ChatBannerHost } from '@snapworth/shared/features/chat';
+import { ChatBannerHost, MeetupRemindersHost } from '@snapworth/shared/features/chat';
 import { SplashView } from '@snapworth/shared/features/launch';
-import { wantsNotification } from '@snapworth/shared/features/profile';
+import { wantsNotification, type NotificationKey } from '@snapworth/shared/features/profile';
 import { SessionProvider } from '@snapworth/shared/features/session';
 import { TipsProvider } from '@snapworth/shared/features/tips';
 
 import { CompanionHost } from '../src/CompanionHost';
+import { meetupReminderScheduler } from '../src/meetup-reminders';
 import { renderNavLink, renderZoomSource, renderZoomTarget } from '../src/nav-bridge';
 import { loadNotificationPreferences, useOpenTappedNotifications } from '../src/notifications';
 import { deviceThemeStore } from '../src/theme-store';
@@ -35,6 +36,10 @@ import { deviceTipStore } from '../src/tip-store';
 // A known, harmless warning from React Native's animated module when a native-driven value
 // updates after its last listener has gone; it carries no action, so it stays out of the way.
 LogBox.ignoreLogs(['Sending `onAnimatedValueUpdate` with no listeners registered.']);
+
+/** Whether the person wants to hear about this kind of thing, as they last chose. */
+const wantsToHear = async (kind: NotificationKey) =>
+  wantsNotification(await loadNotificationPreferences(), kind);
 
 const backend: BackendConfig = {
   supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
@@ -82,6 +87,7 @@ function Shell() {
     [router],
   );
   useOpenTappedNotifications(launched, openPath);
+  const openChat = useCallback((id: string) => openPath(`/chat/${id}`), [openPath]);
 
   // Hold on the bare canvas for the moment the bundled faces take to load, so no text ever
   // renders in a fallback face and then jumps.
@@ -137,9 +143,12 @@ function Shell() {
           </Stack>
           <CompanionHost ready={launched} />
           {/* A new message, offer or meetup in a chat that isn't open: a banner that opens it. */}
-          <ChatBannerHost
-            onOpenConversation={(id) => openPath(`/chat/${id}`)}
-            wants={async (kind) => wantsNotification(await loadNotificationPreferences(), kind)}
+          <ChatBannerHost onOpenConversation={openChat} wants={wantsToHear} />
+          {/* Agreed meetups: a banner here, and a local notification for when the app is closed. */}
+          <MeetupRemindersHost
+            onOpenConversation={openChat}
+            wants={wantsToHear}
+            scheduler={meetupReminderScheduler}
           />
           {/* Signing in closes the screen into Worthy's tag and opens it onto the app. */}
           <SignInHandoff />

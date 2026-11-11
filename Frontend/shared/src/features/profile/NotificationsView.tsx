@@ -5,6 +5,7 @@ import {
   Flame,
   Handshake,
   Lightbulb,
+  MapPin,
   MessageCircle,
   MessagesSquare,
   TrendingDown,
@@ -27,7 +28,15 @@ import { haptic, themedStyles, tokens, useThemedStyles } from '../../design';
 
 /** What a notification is about, which is what each switch on the screen turns on or off. */
 export type NotificationKey =
-  'estimates' | 'votes' | 'comments' | 'messages' | 'offers' | 'price-drops' | 'trends' | 'tips';
+  | 'estimates'
+  | 'votes'
+  | 'comments'
+  | 'messages'
+  | 'offers'
+  | 'meetups'
+  | 'price-drops'
+  | 'trends'
+  | 'tips';
 
 export interface NotificationPreferences {
   /** Silences everything without losing the choices underneath. */
@@ -101,6 +110,12 @@ const groups: readonly {
       },
       { key: 'offers', label: 'Offers', detail: 'New offers and counter-offers', icon: Handshake },
       {
+        key: 'meetups',
+        label: 'Meetup reminders',
+        detail: 'An hour before, and the morning of',
+        icon: MapPin,
+      },
+      {
         key: 'price-drops',
         label: 'Price drops',
         detail: 'On listings you saved',
@@ -138,6 +153,7 @@ export const defaultNotificationPreferences: NotificationPreferences = {
     comments: true,
     messages: true,
     offers: true,
+    meetups: true,
     'price-drops': true,
     trends: true,
     tips: false,
