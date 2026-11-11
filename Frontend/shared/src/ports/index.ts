@@ -1,4 +1,5 @@
 export * from './account';
+export * from './admin';
 export * from './chat';
 export * from './collections';
 export * from './comments';

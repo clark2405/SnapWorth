@@ -952,18 +952,22 @@ export const previewSellers: Readonly<Record<string, PreviewSeller>> = {
   },
 };
 
-export type PreviewHeldKind = 'post' | 'comment';
+export type PreviewHeldKind = 'post' | 'comment' | 'hanap' | 'conversation';
 
+/** Content the review queue shows on a device with no backend. */
 export interface PreviewHeldContent {
   readonly id: string;
   readonly kind: PreviewHeldKind;
   readonly author: PreviewUser;
   readonly body: string;
-  readonly reason: string;
+  /** How moderation held it, as `moderate-content` records it; none if it was only reported. */
+  readonly flagRef?: string;
+  /** What the people who reported it gave as the reason. */
+  readonly reportReasons?: readonly string[];
+  /** A line on what a case is about, when the text alone doesn't say. */
+  readonly context?: string;
   readonly heldAgo: string;
   readonly reports: number;
-  readonly photo?: ImageSourcePropType;
-  readonly photoLabel?: string;
 }
 
 // Ordered most urgent first: most reports, then oldest.
@@ -973,20 +977,38 @@ export const previewHeldContent: readonly PreviewHeldContent[] = [
     kind: 'comment',
     author: previewUsers.justinV,
     body: 'This is obviously fake, the seller is scamming everyone here.',
-    reason: 'Reported for harassment',
+    flagRef: 'community-reports',
+    reportReasons: ['harassment'],
     heldAgo: '3h ago',
     reports: 4,
   },
   {
     id: 'held-2',
+    kind: 'conversation',
+    author: previewUsers.justinV,
+    body: '',
+    reportReasons: ['scam'],
+    context: 'About "Retro Nike Teal Windbreaker", reported by @mariacruz',
+    heldAgo: '2h ago',
+    reports: 1,
+  },
+  {
+    id: 'held-3',
     kind: 'post',
     author: previewUsers.sugboHype,
     body: 'DM me for cheaper prices, selling outside the app.',
-    reason: 'Flagged by moderation: off-platform sale',
+    flagRef: 'rules (off-platform contact)',
     heldAgo: '1h ago',
-    reports: 2,
-    photo: image.keyboard,
-    photoLabel: 'Mechanical keyboard with RGB lighting on a desk',
+    reports: 0,
+  },
+  {
+    id: 'held-4',
+    kind: 'hanap',
+    author: previewUsers.mariaCruz,
+    body: 'Looking for a PS5, text me on Viber',
+    flagRef: 'rules (off-platform contact)',
+    heldAgo: '25m ago',
+    reports: 0,
   },
 ];
 

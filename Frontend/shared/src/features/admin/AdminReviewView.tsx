@@ -1,4 +1,4 @@
-import { Check, ShieldCheck, Trash2 } from 'lucide-react-native';
+import { Check, EyeOff, ShieldCheck, ShieldOff, Trash2, WifiOff, X } from 'lucide-react-native';
 import { useState } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
@@ -9,37 +9,56 @@ import {
   Button,
   EmptyState,
   NavHeader,
-  Photo,
   Reveal,
   Screen,
   Surface,
   SWText,
   useToast,
+  type ButtonVariant,
 } from '../../components';
 import { themedStyles, tokens, useThemedStyles } from '../../design';
-import { previewHeldContent, type PreviewHeldContent } from '../preview/sample-data';
-
-export type ModerationDecision = 'approve' | 'remove';
+import type { ReviewCase, ReviewDecision } from '../../ports/admin';
+import { useAdminReview } from './admin-state';
+import {
+  ageLabel,
+  decisionLabels,
+  decisionToast,
+  flagReason,
+  kindLabel,
+  reviewActions,
+  reviewErrorCopy,
+} from './review-model';
 
 export interface AdminReviewViewProps {
   readonly onBack?: () => void;
-  readonly onDecide?: (contentId: string, decision: ModerationDecision) => void;
 }
 
-export function AdminReviewView({ onBack, onDecide }: AdminReviewViewProps) {
+const decisionButtons = {
+  approve: { variant: 'secondary', icon: Check },
+  hold: { variant: 'tertiary', icon: EyeOff },
+  remove: { variant: 'danger', icon: Trash2 },
+  dismiss: { variant: 'secondary', icon: X },
+} as const satisfies Record<
+  ReviewDecision,
+  { readonly variant: ButtonVariant; readonly icon: typeof Check }
+>;
+
+/**
+ * What moderation has held and what people have reported, for an admin to decide. The list and
+ * every decision come from the database, which checks the caller is an admin: this screen only
+ * shows what it's given, and says so plainly when the answer is no.
+ */
+export function AdminReviewView({ onBack }: AdminReviewViewProps) {
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
-  const [queue, setQueue] = useState<readonly PreviewHeldContent[]>(previewHeldContent);
+  const { status, cases, refresh, decide } = useAdminReview();
+  const [deciding, setDeciding] = useState<string | null>(null);
 
-  const decide = (content: PreviewHeldContent, decision: ModerationDecision) => {
-    onDecide?.(content.id, decision);
-    setQueue((current) => current.filter((entry) => entry.id !== content.id));
-    toast.show({
-      title: decision === 'approve' ? 'Approved' : 'Removed',
-      body: `${content.kind === 'post' ? 'Post' : 'Comment'} by @${content.author.handle} ${
-        decision === 'approve' ? 'is now public.' : 'was removed.'
-      }`,
-    });
+  const act = async (item: ReviewCase, decision: ReviewDecision) => {
+    setDeciding(item.id);
+    const result = await decide(item, decision);
+    setDeciding(null);
+    toast.show(result.ok ? decisionToast(item, decision) : reviewErrorCopy(result.error));
   };
 
   return (
@@ -47,88 +66,118 @@ export function AdminReviewView({ onBack, onDecide }: AdminReviewViewProps) {
       header={<NavHeader title="Review queue" onBack={onBack} />}
       contentStyle={styles.content}
     >
-      <Reveal index={0} style={styles.summary}>
-        <SWText variant="displayMedium" accessibilityRole="header">
-          {queue.length === 0 ? 'All clear.' : `${queue.length} held`}
-        </SWText>
-        <SWText variant="bodySmall" tone="textMuted">
-          Most reported first. Nothing here is public until you approve it.
-        </SWText>
-      </Reveal>
-
-      {queue.length === 0 ? (
+      {status === 'denied' ? (
         <EmptyState
-          icon={ShieldCheck}
-          title="The queue is empty"
-          body="New reports and flagged posts will appear here."
+          icon={ShieldOff}
+          title="This is for admins"
+          body="Your account can’t review content. If that’s wrong, ask whoever runs SnapWorth."
         />
-      ) : (
-        queue.map((content, index) => (
-          <Animated.View key={content.id} exiting={FadeOut.duration(220)} layout={paperLayout}>
-            <Reveal index={index + 1}>
-              <HeldCard content={content} onDecide={(decision) => decide(content, decision)} />
-            </Reveal>
-          </Animated.View>
-        ))
+      ) : status === 'failed' ? (
+        <EmptyState
+          icon={WifiOff}
+          tone="error"
+          title="Couldn’t load the queue"
+          body="Check your connection and try again."
+          actionLabel="Retry"
+          onAction={() => void refresh()}
+        />
+      ) : status === 'loading' ? null : (
+        <>
+          <Reveal index={0} style={styles.summary}>
+            <SWText variant="displayMedium" accessibilityRole="header">
+              {cases.length === 0 ? 'All clear.' : `${cases.length} to review`}
+            </SWText>
+            <SWText variant="bodySmall" tone="textMuted">
+              Most reported first. Held content isn’t public until you approve it.
+            </SWText>
+          </Reveal>
+
+          {cases.length === 0 ? (
+            <EmptyState
+              icon={ShieldCheck}
+              title="The queue is empty"
+              body="New reports and flagged posts will appear here."
+            />
+          ) : (
+            cases.map((item, index) => (
+              <Animated.View key={item.id} exiting={FadeOut.duration(220)} layout={paperLayout}>
+                <Reveal index={index + 1}>
+                  <CaseCard
+                    item={item}
+                    busy={deciding === item.id}
+                    onDecide={(decision) => void act(item, decision)}
+                  />
+                </Reveal>
+              </Animated.View>
+            ))
+          )}
+        </>
       )}
     </Screen>
   );
 }
 
-function HeldCard({
-  content,
+function CaseCard({
+  item,
+  busy,
   onDecide,
 }: {
-  content: PreviewHeldContent;
-  onDecide: (decision: ModerationDecision) => void;
+  item: ReviewCase;
+  busy: boolean;
+  onDecide: (decision: ReviewDecision) => void;
 }) {
   const styles = useThemedStyles(stylesFor);
   return (
     <Surface padding={tokens.spacing[4]} contentStyle={styles.card}>
       <View style={styles.meta}>
         <SWText variant="overline" tone="warning">
-          {`${content.kind} · ${content.reports} ${content.reports === 1 ? 'report' : 'reports'}`}
+          {item.reportCount > 0
+            ? `${kindLabel(item.kind)} · ${item.reportCount} ${item.reportCount === 1 ? 'report' : 'reports'}`
+            : kindLabel(item.kind)}
         </SWText>
         <SWText variant="caption" tone="textMuted">
-          {`Held ${content.heldAgo}`}
+          {`Flagged ${ageLabel(item.flaggedAt)}`}
         </SWText>
       </View>
       <SWText variant="labelMedium" tone="textSecondary">
-        {content.reason}
+        {flagReason(item)}
       </SWText>
       <View style={styles.author}>
-        <Avatar source={content.author.avatar} name={content.author.handle} size={28} />
-        <SWText variant="labelSmall">@{content.author.handle}</SWText>
+        {item.authorAvatarUrl ? (
+          <Avatar source={{ uri: item.authorAvatarUrl }} name={item.authorHandle} size={28} />
+        ) : (
+          <View accessibilityElementsHidden importantForAccessibility="no" style={styles.initial}>
+            <SWText variant="labelSmall" tone="textSecondary">
+              {item.authorHandle.charAt(0).toUpperCase()}
+            </SWText>
+          </View>
+        )}
+        <SWText variant="labelSmall">@{item.authorHandle}</SWText>
       </View>
-      <SWText variant="bodyMedium">{content.body}</SWText>
-      {content.photo ? (
-        <Photo
-          source={content.photo}
-          label={content.photoLabel ?? 'Photo attached to the held post'}
-          aspectRatio={16 / 9}
-        />
+      {item.body ? <SWText variant="bodyMedium">{item.body}</SWText> : null}
+      {item.context ? (
+        <SWText variant="bodySmall" tone="textSecondary">
+          {item.context}
+        </SWText>
       ) : null}
       <View style={styles.actions}>
-        <Button
-          label="Remove"
-          variant="danger"
-          icon={Trash2}
-          onPress={() => onDecide('remove')}
-          containerStyle={styles.action}
-        />
-        <Button
-          label="Approve"
-          variant="secondary"
-          icon={Check}
-          onPress={() => onDecide('approve')}
-          containerStyle={styles.action}
-        />
+        {reviewActions(item).map((decision) => (
+          <Button
+            key={decision}
+            label={decisionLabels[decision]}
+            variant={decisionButtons[decision].variant}
+            icon={decisionButtons[decision].icon}
+            disabled={busy}
+            onPress={() => onDecide(decision)}
+            containerStyle={styles.action}
+          />
+        ))}
       </View>
     </Surface>
   );
 }
 
-const stylesFor = themedStyles(() => ({
+const stylesFor = themedStyles((colors) => ({
   content: {
     paddingTop: tokens.spacing[4],
     gap: tokens.spacing[4],
@@ -150,12 +199,22 @@ const stylesFor = themedStyles(() => ({
     alignItems: 'center',
     gap: tokens.spacing[2],
   },
+  initial: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.sunken,
+  },
   actions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: tokens.spacing[3],
     marginTop: tokens.spacing[1],
   },
   action: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: 120,
   },
 }));
