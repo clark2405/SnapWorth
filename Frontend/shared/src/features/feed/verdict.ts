@@ -26,16 +26,17 @@ export function verdictFor(votes: VoteCounts): Verdict | null {
 
 /**
  * Worthy's word on how the crowd has voted on an AI estimate of `estimate`: the verdict in
- * plain numbers, or how many votes it still needs. `format` writes a price.
+ * plain numbers, or how many votes it still needs. `format` writes a price; a post with no AI
+ * estimate has no price to name, so the line says "this price".
  */
 export function verdictLine(
   votes: VoteCounts,
-  estimate: number,
+  estimate: number | null,
   format: (amount: number) => string,
 ): string {
   const total = votes.too_high + votes.just_right + votes.too_low;
   const share = (count: number) => Math.round((count / Math.max(total, 1)) * 100);
-  const price = format(estimate);
+  const price = estimate === null ? 'this price' : format(estimate);
   switch (verdictFor(votes)?.label) {
     case 'Priced right':
       return `${share(votes.just_right)}% say ${price} is right. The crowd and I agree.`;

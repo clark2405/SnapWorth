@@ -83,8 +83,8 @@ export interface PreviewPost {
   readonly body: string;
   readonly photo: ImageSourcePropType;
   readonly photoLabel: string;
-  /** The AI estimate the author is asking the community to judge. */
-  readonly estimate: number;
+  /** The AI estimate the author is asking the community to judge; none when the post has no scan. */
+  readonly estimate: number | null;
   readonly votes: VoteCounts;
   readonly comments: readonly PreviewComment[];
   /** Set when the post is a marketplace listing reposted to ask whether its price is fair. */
@@ -998,8 +998,8 @@ export interface PreviewSearchResult {
   readonly title: string;
   readonly photo: ImageSourcePropType;
   readonly photoLabel: string;
-  /** Asking price for listings; AI estimate for posts and history items. */
-  readonly amount: number;
+  /** Asking price for listings; AI estimate for posts and history items, when there is one. */
+  readonly amount: number | null;
 }
 
 export const previewSearchIndex: readonly PreviewSearchResult[] = [

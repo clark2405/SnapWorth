@@ -22,7 +22,8 @@ export interface FeedPost {
   readonly title: string;
   readonly category?: MarketCategory | null;
   readonly body: string;
-  readonly estimate: number;
+  /** The AI estimate the post asks the community to judge. Null when the post has no scan. */
+  readonly estimate: number | null;
   readonly photoUrl?: string | null;
   readonly photoLabel: string;
   readonly votes: VoteCounts;
@@ -44,7 +45,11 @@ export interface UserVoteRecord {
 export interface PublishFeedPostInput {
   readonly title: string;
   readonly body: string;
-  readonly estimate: number;
+  /**
+   * Only the on-device adapter uses this. Supabase ignores it: the database copies the estimate
+   * from the linked scan or listing, so a client can't claim an AI value it didn't get.
+   */
+  readonly estimate?: number | null;
   readonly category?: MarketCategory | null;
   readonly scanId?: string | null;
   readonly listingId?: string | null;

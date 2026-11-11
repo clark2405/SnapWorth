@@ -94,7 +94,10 @@ export function createLocalFeedRepository(
         title: title || 'Community price check',
         category: input.category ?? null,
         body,
-        estimate: Math.max(0, Math.round(input.estimate)),
+        estimate:
+          input.estimate === null || input.estimate === undefined
+            ? null
+            : Math.max(0, Math.round(input.estimate)),
         photoUrl: input.photoUrl ?? null,
         photoLabel: title || body,
         votes: { too_high: 0, just_right: 0, too_low: 0 },

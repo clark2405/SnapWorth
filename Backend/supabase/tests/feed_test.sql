@@ -94,13 +94,12 @@ insert into storage.objects (bucket_id, name) values (
 );
 
 insert into public.feed_posts (
-  id, title, category, body, estimate_php, scan_id, photo_path
+  id, title, category, body, scan_id, photo_path
 ) values (
   '00000000-0000-4000-ff00-000000000001',
   '  Vintage Seiko 5 Automatic  ',
   'collectibles',
   '  Picked up this Seiko 5 for a steal. Is ₱3,200 fair?  ',
-  3200,
   '00000000-0000-4000-fe00-000000000001',
   '00000000-0000-4000-fd00-00000000000a/00000000-0000-4000-fe00-000000000001.jpg'
 );
@@ -114,6 +113,32 @@ select feed_tests.check(
     where id = '00000000-0000-4000-ff00-000000000001'),
   'publishing a feed post trims title/body, auto-generates a slug, and starts pending moderation'
 );
+
+select feed_tests.check(
+  (select estimate_php from public.feed_posts
+    where id = '00000000-0000-4000-ff00-000000000001') = 3200,
+  'a post about a scan takes its estimate from the scan'
+);
+select feed_tests.check_raises(
+  $$insert into public.feed_posts (title, body, estimate_php)
+    values ('Forged estimate', 'Is this fair?', 99999)$$,
+  '42501',
+  'a client cannot write the estimate on a feed post'
+);
+select feed_tests.check_raises(
+  $$update public.feed_posts set estimate_php = 1
+     where id = '00000000-0000-4000-ff00-000000000001'$$,
+  '42501',
+  'a client cannot change the estimate on a feed post'
+);
+insert into public.feed_posts (id, title, body)
+values ('00000000-0000-4000-ff00-000000000003', 'Mystery box', 'What would this be worth?');
+select feed_tests.check(
+  (select estimate_php is null from public.feed_posts
+    where id = '00000000-0000-4000-ff00-000000000003'),
+  'a post with no scan or listing has no estimate'
+);
+delete from public.feed_posts where id = '00000000-0000-4000-ff00-000000000003';
 
 -- While pending, Voter B and anon cannot see the post or its scan photo
 select feed_tests.sign_in('00000000-0000-4000-fd00-00000000000b');
@@ -135,16 +160,16 @@ select feed_tests.check(
 
 -- Voter B cannot link Author A's scan or spoof photo_path
 select feed_tests.check_raises(
-  $$insert into public.feed_posts (title, body, estimate_php, scan_id)
-    values ('Stolen Scan', 'Is this fair?', 1000, '00000000-0000-4000-fe00-000000000001')$$,
+  $$insert into public.feed_posts (title, body, scan_id)
+    values ('Stolen Scan', 'Is this fair?', '00000000-0000-4000-fe00-000000000001')$$,
   '23514',
   'a user cannot attach someone else''s scan to their feed post'
 );
 
 -- Client cannot bypass moderation on insert
 select feed_tests.check_raises(
-  $$insert into public.feed_posts (title, body, estimate_php, moderation_status)
-    values ('Bypass', 'Is this fair?', 1000, 'approved')$$,
+  $$insert into public.feed_posts (title, body, moderation_status)
+    values ('Bypass', 'Is this fair?', 'approved')$$,
   '42501',
   'clients cannot set moderation_status on feed_posts insert'
 );
@@ -180,28 +205,31 @@ set role authenticated;
 select feed_tests.sign_in('00000000-0000-4000-fd00-00000000000a');
 
 insert into public.listings (
-  id, title, asking_php, category, condition, area, estimate_php, estimate_low_php, estimate_high_php
+  id, scan_id, title, asking_php, category, condition, area
 ) values (
   '00000000-0000-4000-fe00-000000000002',
+  '00000000-0000-4000-fe00-000000000001',
   'Vintage Seiko 5 Automatic',
   3500,
   'collectibles',
   'good',
-  'cebu-city',
-  3200,
-  2800,
-  3600
+  'cebu-city'
 );
 
 insert into public.feed_posts (
-  id, title, category, body, estimate_php, listing_id
+  id, title, category, body, listing_id
 ) values (
   '00000000-0000-4000-ff00-000000000002',
   'Vintage Seiko 5 Automatic',
   'collectibles',
   'I''m asking ₱3,500 for this Seiko 5. Fair price?',
-  3200,
   '00000000-0000-4000-fe00-000000000002'
+);
+
+select feed_tests.check(
+  (select estimate_php = 3200 from public.feed_posts
+    where id = '00000000-0000-4000-ff00-000000000002'),
+  'a post that reposts a listing takes the listing''s estimate'
 );
 
 reset role;
@@ -280,15 +308,15 @@ do $$
 begin
   -- Author A already has 2 posts in the last hour; insert 8 more to reach 10.
   for i in 3..10 loop
-    insert into public.feed_posts (title, body, estimate_php)
-    values ('Item ' || i, 'Is item ' || i || ' priced fairly?', 1000 + i);
+    insert into public.feed_posts (title, body)
+    values ('Item ' || i, 'Is item ' || i || ' priced fairly?');
   end loop;
 end;
 $$;
 
 select feed_tests.check_raises(
-  $$insert into public.feed_posts (title, body, estimate_php)
-    values ('Item 11', 'Too many posts in an hour', 2000)$$,
+  $$insert into public.feed_posts (title, body)
+    values ('Item 11', 'Too many posts in an hour')$$,
   'P0001',
   'flood limit stops a user from publishing more than 10 feed posts in an hour'
 );

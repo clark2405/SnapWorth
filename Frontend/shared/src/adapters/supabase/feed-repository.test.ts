@@ -94,7 +94,8 @@ describe('createSupabaseFeedRepository', () => {
                       title: payload.title,
                       category: payload.category,
                       body: payload.body,
-                      estimate_php: payload.estimate_php,
+                      // The database copies this from the scan; the client never sends one.
+                      estimate_php: 3200,
                       scan_id: payload.scan_id,
                       listing_id: payload.listing_id,
                       photo_path: payload.photo_path,
@@ -138,10 +139,11 @@ describe('createSupabaseFeedRepository', () => {
     expect(insertedPayloads[0]).toMatchObject({
       title: 'Seiko 5 Automatic',
       body: 'Is ₱3,200 right for this Seiko 5?',
-      estimate_php: 3200,
       scan_id: scanId,
       photo_path: `${userId}/${scanId}.jpg`,
     });
+    expect(insertedPayloads[0]).not.toHaveProperty('estimate_php');
+    expect(result.value.estimate).toBe(3200);
     expect(invokeCalls).toEqual([{ fn: 'moderate-content', body: { type: 'post', id: postId } }]);
     expect(result.value.moderationStatus).toBe('approved');
     expect(result.value.photoUrl).toBe(`https://signed.example/${userId}/${scanId}.jpg`);

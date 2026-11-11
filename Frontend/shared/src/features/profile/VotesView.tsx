@@ -145,7 +145,7 @@ function VoteRow({
   return (
     <ZoomLink
       href={`/post/${post.id}`}
-      label={`You voted ${look.label} on ${formatPeso(post.estimate)}, ${castAgo}. ${post.body}`}
+      label={`You voted ${look.label}${post.estimate === null ? '' : ` on ${formatPeso(post.estimate)}`}, ${castAgo}. ${post.body}`}
       onPress={onOpen}
       style={styles.row}
     >
@@ -157,7 +157,9 @@ function VoteRow({
       />
       <View style={styles.rowText}>
         <View style={styles.topLine}>
-          <SWText variant="priceSmall">{formatPeso(post.estimate)}</SWText>
+          {post.estimate === null ? null : (
+            <SWText variant="priceSmall">{formatPeso(post.estimate)}</SWText>
+          )}
           <SWText variant="caption" tone="textMuted">
             {castAgo}
           </SWText>

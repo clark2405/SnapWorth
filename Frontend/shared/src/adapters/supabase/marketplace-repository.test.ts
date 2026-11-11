@@ -69,6 +69,7 @@ describe('createLocalMarketplaceRepository', () => {
 describe('createSupabaseMarketplaceRepository', () => {
   it('maps rows, signs scan photo paths, and updates scan_history status on publish and mark sold', async () => {
     const scanUpdates: { id: string; status: string }[] = [];
+    const insertedListings: Record<string, unknown>[] = [];
     const sampleRow = {
       id: '00000000-0000-4000-fc00-000000000001',
       slug: 'pentax-k1000-00000000',
@@ -129,11 +130,14 @@ describe('createSupabaseMarketplaceRepository', () => {
                 }),
               }),
             }),
-            insert: () => ({
-              select: () => ({
-                single: async () => ({ data: sampleRow, error: null }),
-              }),
-            }),
+            insert: (payload: Record<string, unknown>) => {
+              insertedListings.push(payload);
+              return {
+                select: () => ({
+                  single: async () => ({ data: sampleRow, error: null }),
+                }),
+              };
+            },
             update: (patch: Record<string, unknown>) => ({
               eq: () => ({
                 select: () => ({
@@ -175,8 +179,16 @@ describe('createSupabaseMarketplaceRepository', () => {
       condition: 'good',
       area: 'cebu-city',
       description: 'Clean viewfinder.',
+      estimatePhp: 99999,
+      estimateLowPhp: 90000,
+      estimateHighPhp: 100000,
     });
     expect(published.ok).toBe(true);
+    // The AI estimate is the database's to copy from the scan, so it is never sent.
+    expect(insertedListings[0]).not.toHaveProperty('estimate_php');
+    expect(insertedListings[0]).not.toHaveProperty('estimate_low_php');
+    expect(insertedListings[0]).not.toHaveProperty('estimate_high_php');
+    if (published.ok) expect(published.value.estimatePhp).toBe(4200);
     expect(scanUpdates).toContainEqual({ id: 'scan_1', status: 'listed' });
 
     const sold = await repo.update('pentax-k1000-00000000', { status: 'sold' });

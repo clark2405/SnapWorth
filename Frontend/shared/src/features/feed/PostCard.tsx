@@ -140,7 +140,7 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
           ) : null}
           <GestureDetector gesture={doubleTap}>
             <Animated.View style={styles.badgeOverlay}>
-              <EstimateBadge value={formatPeso(post.estimate)} />
+              {post.estimate === null ? null : <EstimateBadge value={formatPeso(post.estimate)} />}
             </Animated.View>
           </GestureDetector>
         </View>

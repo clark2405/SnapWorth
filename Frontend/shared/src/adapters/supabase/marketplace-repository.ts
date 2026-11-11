@@ -289,9 +289,6 @@ export function createSupabaseMarketplaceRepository(
           area: input.area,
           distance_km: input.distanceKm ?? 3,
           description: input.description,
-          estimate_php: input.estimatePhp ?? null,
-          estimate_low_php: input.estimateLowPhp ?? null,
-          estimate_high_php: input.estimateHighPhp ?? null,
         })
         .select(listingColumns)
         .single();

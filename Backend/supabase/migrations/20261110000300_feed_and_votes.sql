@@ -4,6 +4,10 @@
 -- verdicts in sync).
 --
 -- * Never copy `scan_history.paid_php` onto a feed post: what the owner paid is private to them.
+-- * A post's `estimate_php` is the AI estimate the community judges, so the author can't write it:
+--   `prepare_feed_post` copies it from the reposted listing, or else the linked scan, and leaves it
+--   null when the post has neither. Only a caller with no signed-in user (service role, seeds) can
+--   set it.
 -- * Public posts are fail-closed: a new post starts `pending` and is visible only to its author
 --   until `moderate-content` marks it `approved`.
 
@@ -13,6 +17,7 @@
 
 alter table public.feed_posts
   alter column owner_id set default auth.uid(),
+  alter column estimate_php drop not null,
   add column title text not null default '' check (char_length(title) <= 200),
   add column category text
     check (category is null or category in ('collectibles', 'fashion', 'sneakers', 'electronics', 'home')),
@@ -37,8 +42,8 @@ create index feed_posts_owner_created_idx on public.feed_posts (owner_id, create
 create index feed_posts_listing_idx on public.feed_posts (listing_id) where listing_id is not null;
 create index feed_posts_scan_idx on public.feed_posts (scan_id) where scan_id is not null;
 
--- Tidies the question and title, generates a stable slug when omitted, and checks that any linked
--- scan or listing belongs to the post's author.
+-- Tidies the question and title, generates a stable slug when omitted, checks that any linked scan
+-- or listing belongs to the post's author, and takes the estimate from that scan or listing.
 create function public.prepare_feed_post()
 returns trigger
 language plpgsql
@@ -47,6 +52,8 @@ as $$
 declare
   base_slug text;
   short_id text;
+  scan_amount integer;
+  listing_estimate integer;
 begin
   if new.id is null then
     new.id := gen_random_uuid();
@@ -68,27 +75,39 @@ begin
     new.slug := base_slug || '-' || short_id;
   end if;
 
-  if new.scan_id is not null and (select auth.uid()) is not null then
-    if not exists (
-      select 1
+  if (select auth.uid()) is not null then
+    if new.scan_id is not null then
+      select s.amount_php
+        into scan_amount
         from public.scan_history s
        where s.id = new.scan_id
-         and s.user_id = new.owner_id
-    ) then
-      raise exception 'A feed post can only point at one of your own saved scans.'
-        using errcode = '23514';
+         and s.user_id = new.owner_id;
+      if not found then
+        raise exception 'A feed post can only point at one of your own saved scans.'
+          using errcode = '23514';
+      end if;
     end if;
-  end if;
 
-  if new.listing_id is not null and (select auth.uid()) is not null then
-    if not exists (
-      select 1
+    if new.listing_id is not null then
+      select l.estimate_php
+        into listing_estimate
         from public.listings l
        where l.id = new.listing_id
-         and l.seller_id = new.owner_id
-    ) then
-      raise exception 'A feed post can only repost one of your own listings.'
-        using errcode = '23514';
+         and l.seller_id = new.owner_id;
+      if not found then
+        raise exception 'A feed post can only repost one of your own listings.'
+          using errcode = '23514';
+      end if;
+    end if;
+
+    if tg_op = 'INSERT' then
+      -- A repost shows the listing's estimate; a post about a scan shows the scan's.
+      new.estimate_php := case
+        when new.listing_id is not null then listing_estimate
+        else scan_amount
+      end;
+    else
+      new.estimate_php := old.estimate_php;
     end if;
   end if;
 
@@ -146,7 +165,6 @@ grant insert (
   title,
   body,
   category,
-  estimate_php,
   scan_id,
   listing_id,
   photo_path

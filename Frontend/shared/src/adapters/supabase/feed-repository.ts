@@ -29,7 +29,7 @@ interface FeedPostRow {
   readonly title?: string | null;
   readonly category?: MarketCategory | null;
   readonly body: string;
-  readonly estimate_php: number;
+  readonly estimate_php: number | null;
   readonly scan_id?: string | null;
   readonly listing_id?: string | null;
   readonly photo_path?: string | null;
@@ -207,7 +207,6 @@ export function createSupabaseFeedRepository(
           title: input.title.trim(),
           body,
           category: input.category ?? null,
-          estimate_php: Math.max(0, Math.round(input.estimate)),
           scan_id: scanId,
           listing_id: listingUuid,
           photo_path: photoPath,

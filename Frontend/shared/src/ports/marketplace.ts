@@ -81,6 +81,10 @@ export interface NewListingInput {
   readonly area: MarketArea;
   readonly distanceKm?: number;
   readonly description: string;
+  /**
+   * Only the on-device adapter uses the three estimate fields. Supabase ignores them: the database
+   * copies the estimate and range from the linked scan, so a seller can't claim an AI value.
+   */
   readonly estimatePhp?: number | null;
   readonly estimateLowPhp?: number | null;
   readonly estimateHighPhp?: number | null;

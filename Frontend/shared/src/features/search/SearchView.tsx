@@ -525,7 +525,9 @@ export function SearchView({
                       </SWText>
                     </View>
                     <View style={styles.amount}>
-                      <SWText variant="priceSmall">{formatPeso(result.amount)}</SWText>
+                      {result.amount === null ? null : (
+                        <SWText variant="priceSmall">{formatPeso(result.amount)}</SWText>
+                      )}
                       <SWText
                         variant="caption"
                         tone={result.kind === 'listing' ? 'textMuted' : 'accent'}

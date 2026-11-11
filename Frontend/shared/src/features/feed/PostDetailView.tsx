@@ -327,7 +327,9 @@ export function PostDetailView({
           </Reveal>
 
           <Reveal index={1} style={styles.question}>
-            <EstimateBadge value={formatPeso(post.estimate)} size="hero" />
+            {post.estimate === null ? null : (
+              <EstimateBadge value={formatPeso(post.estimate)} size="hero" />
+            )}
             <SWText variant="bodyLarge">{post.body}</SWText>
             <CrossPost
               post={post}

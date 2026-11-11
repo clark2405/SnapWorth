@@ -249,7 +249,9 @@ export function TrendView({
                         {post.body}
                       </SWText>
                       <SWText variant="caption" tone="textMuted">
-                        AI est. {formatPeso(post.estimate)} · {post.postedAgo}
+                        {post.estimate === null
+                          ? post.postedAgo
+                          : `AI est. ${formatPeso(post.estimate)} · ${post.postedAgo}`}
                       </SWText>
                     </View>
                     <ChevronRight size={18} strokeWidth={2} color={colors.textMuted} />

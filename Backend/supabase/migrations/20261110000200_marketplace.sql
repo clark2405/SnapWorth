@@ -2,8 +2,11 @@
 -- public read access to a scan's photo while a public listing points at it.
 --
 -- * Never copy `scan_history.paid_php` onto a listing: what the seller paid is private to them.
--- * A listing's `asking_php` is always entered by the seller; `estimate_php`, `estimate_low_php`
---   and `estimate_high_php` are the AI valuation range shown alongside it for buyers.
+-- * A listing's `asking_php` is always entered by the seller. `estimate_php`, `estimate_low_php`
+--   and `estimate_high_php` are the AI valuation shown beside it, so a seller must not be able to
+--   write them: `prepare_listing` copies them from the linked `scan_history` row (the app's own
+--   estimate for that photo) and leaves them null when the listing has no scan. They are not in
+--   any column grant. Only a caller with no signed-in user (the service role, a seed) can set them.
 -- * `slug` stays the stable public key so `start_conversation(listing_slug)` and `/listing/[id]`
 --   links work for both seeded slugs and newly published listings.
 
@@ -62,7 +65,8 @@ create index listings_status_created_idx on public.listings (status, created_at 
 create index listings_scan_idx on public.listings (scan_id) where scan_id is not null;
 
 -- Tidies the title and description, builds a URL-friendly slug when the client didn't supply one,
--- and checks that any linked scan belongs to the seller.
+-- checks that any linked scan belongs to the seller, and owns the AI estimate: for a signed-in
+-- seller it is the scan's amount and range (null with no scan) and can't change afterwards.
 create function public.prepare_listing()
 returns trigger
 language plpgsql
@@ -71,6 +75,7 @@ as $$
 declare
   base_slug text;
   short_id text;
+  scan record;
 begin
   if new.id is null then
     new.id := gen_random_uuid();
@@ -89,15 +94,30 @@ begin
     new.slug := base_slug || '-' || short_id;
   end if;
 
-  if new.scan_id is not null and (select auth.uid()) is not null then
-    if not exists (
-      select 1
-        from public.scan_history s
-       where s.id = new.scan_id
-         and s.user_id = new.seller_id
-    ) then
-      raise exception 'A listing can only point at one of your own saved scans.'
-        using errcode = '23514';
+  if (select auth.uid()) is not null then
+    if tg_op = 'INSERT' then
+      if new.scan_id is not null then
+        select s.amount_php, s.low_php, s.high_php
+          into scan
+          from public.scan_history s
+         where s.id = new.scan_id
+           and s.user_id = new.seller_id;
+        if not found then
+          raise exception 'A listing can only point at one of your own saved scans.'
+            using errcode = '23514';
+        end if;
+        new.estimate_php := scan.amount_php;
+        new.estimate_low_php := scan.low_php;
+        new.estimate_high_php := scan.high_php;
+      else
+        new.estimate_php := null;
+        new.estimate_low_php := null;
+        new.estimate_high_php := null;
+      end if;
+    else
+      new.estimate_php := old.estimate_php;
+      new.estimate_low_php := old.estimate_low_php;
+      new.estimate_high_php := old.estimate_high_php;
     end if;
   end if;
 
@@ -175,10 +195,7 @@ grant insert (
   lat,
   lng,
   distance_km,
-  description,
-  estimate_php,
-  estimate_low_php,
-  estimate_high_php
+  description
 ) on public.listings to authenticated;
 
 grant update (

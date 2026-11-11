@@ -108,10 +108,7 @@ insert into public.listings (
   condition,
   area,
   distance_km,
-  description,
-  estimate_php,
-  estimate_low_php,
-  estimate_high_php
+  description
 )
 values (
   '00000000-0000-4000-fc00-000000000001',
@@ -123,11 +120,35 @@ values (
   'good',
   'cebu-city',
   3,
-  '  Clean viewfinder, working light meter, 50mm f/2 lens included.  ',
-  4200,
-  3600,
-  4800
+  '  Clean viewfinder, working light meter, 50mm f/2 lens included.  '
 );
+
+-- The AI estimate is copied from the scan by the database; a seller can't write or change it.
+select market_tests.check(
+  (select estimate_php = 4200 and estimate_low_php = 3600 and estimate_high_php = 4800
+     from public.listings where id = '00000000-0000-4000-fc00-000000000001'),
+  'a listing takes its AI estimate and range from its scan'
+);
+select market_tests.check_rejected(
+  $$insert into public.listings (title, asking_php, estimate_php)
+    values ('Forged estimate', 1000, 99999)$$,
+  array['42501'],
+  'a seller cannot write the AI estimate when listing'
+);
+select market_tests.check_rejected(
+  $$update public.listings set estimate_php = 99999, estimate_low_php = 90000, estimate_high_php = 100000
+     where id = '00000000-0000-4000-fc00-000000000001'$$,
+  array['42501'],
+  'a seller cannot change the AI estimate afterwards'
+);
+insert into public.listings (id, title, asking_php)
+values ('00000000-0000-4000-fc00-000000000009', 'Loose find', 800);
+select market_tests.check(
+  (select estimate_php is null and estimate_low_php is null and estimate_high_php is null
+     from public.listings where id = '00000000-0000-4000-fc00-000000000009'),
+  'a listing with no scan has no AI estimate'
+);
+delete from public.listings where id = '00000000-0000-4000-fc00-000000000009';
 
 select market_tests.check(
   (select title from public.listings where id = '00000000-0000-4000-fc00-000000000001')

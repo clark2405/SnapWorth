@@ -37,4 +37,10 @@ describe('verdictLine', () => {
   it('calls a split a split', () => {
     expect(verdictLine({ too_high: 15, just_right: 15, too_low: 10 }, 2450, peso)).toMatch(/split/);
   });
+
+  it('names no price for a post with no AI estimate', () => {
+    expect(verdictLine({ too_high: 4, just_right: 30, too_low: 2 }, null, peso)).toBe(
+      '83% say this price is right. The crowd and I agree.',
+    );
+  });
 });
