@@ -22,11 +22,11 @@ import {
   ZoomTarget,
 } from '../../components';
 import { held, themedStyles, tokens, useTheme, useThemedStyles, useWideLayout } from '../../design';
-import type { MarketCategory } from '../../ports/marketplace';
-import { toPreviewPost, useFeed } from '../feed/feed-state';
+import { toPreviewPost } from '../feed/feed-state';
 import { ListingCard } from '../marketplace/ListingCard';
-import { toPreviewListing, useMarketplace } from '../marketplace/marketplace-state';
-import { formatPeso, previewTrendDetails, previewTrending } from '../preview/sample-data';
+import { toPreviewListing } from '../marketplace/marketplace-state';
+import { formatPeso } from '../preview/sample-data';
+import { useTrends } from './use-trends';
 
 export interface TrendViewProps {
   /** A "Hot this month" key, e.g. `film-cameras`. */
@@ -37,14 +37,6 @@ export interface TrendViewProps {
   readonly onOpenPost?: (postId: string) => void;
   readonly onSnap?: () => void;
 }
-
-const trendCategoryByKey: Readonly<Record<string, MarketCategory>> = {
-  'film-cameras': 'collectibles',
-  sneakers: 'sneakers',
-  '90s-sportswear': 'fashion',
-  'retro-audio': 'electronics',
-  keyboards: 'electronics',
-};
 
 /**
  * One trending category, told as a story rather than a search: the photo runs full bleed and the
@@ -62,10 +54,9 @@ export function TrendView({
   const styles = useThemedStyles(stylesFor);
   const { colors } = useTheme();
   const { height } = useWindowDimensions();
-  const { listings: marketListings } = useMarketplace();
-  const { posts: feedPosts } = useFeed();
-  const trend = previewTrending.find((entry) => entry.key === trendKey) ?? previewTrending[0];
-  const detail = trend ? previewTrendDetails[trend.key] : undefined;
+  const { trends, detailFor, listingsFor, postsFor } = useTrends();
+  const trend = trends.find((entry) => entry.key === trendKey) ?? trends[0];
+  const detail = trend ? detailFor(trend.key) : undefined;
 
   if (!trend || !detail) {
     return (
@@ -81,47 +72,25 @@ export function TrendView({
     );
   }
 
-  const rising = !trend.change.trim().startsWith('−');
-  const trendCategory = trendCategoryByKey[trend.key];
-  const listings = marketListings
-    .filter(
-      (listing) =>
-        listing.status === 'active' &&
-        (detail.listingIds.includes(listing.id) ||
-          detail.listingIds.includes(listing.slug) ||
-          (trendCategory !== undefined &&
-            listing.category === trendCategory &&
-            !Object.values(previewTrendDetails).some(
-              (other) => other !== detail && other.listingIds.includes(listing.id),
-            ))),
-    )
-    .map(toPreviewListing);
-  const posts = feedPosts
-    .filter(
-      (post) =>
-        detail.postIds.includes(post.id) ||
-        detail.postIds.includes(post.slug) ||
-        (trendCategory !== undefined &&
-          post.category === trendCategory &&
-          !Object.values(previewTrendDetails).some(
-            (other) => other !== detail && other.postIds.includes(post.slug),
-          )),
-    )
-    .map(toPreviewPost);
+  const rising = trend.change === null || !trend.change.trim().startsWith('−');
+  const listings = listingsFor(trend.key).map(toPreviewListing);
+  const posts = postsFor(trend.key).map(toPreviewPost);
   const heroHeight = Math.round(height * 0.5);
   // On a wide window the photo is framed on the left and the title heads the details beside it.
   const wide = useWideLayout();
   const title = (
     <>
-      <Sign icon={Flame} label="Hot this month" />
+      <Sign icon={Flame} label={detail.badge} />
       <SWText variant="displayHero" accessibilityRole="header">
         {trend.label}
       </SWText>
-      <Sticker
-        label={`${trend.change} this month`}
-        tone={rising ? 'marigold' : 'cobalt'}
-        style={styles.heroSticker}
-      />
+      {trend.change === null ? null : (
+        <Sticker
+          label={`${trend.change} this month`}
+          tone={rising ? 'marigold' : 'cobalt'}
+          style={styles.heroSticker}
+        />
+      )}
     </>
   );
 
@@ -164,14 +133,18 @@ export function TrendView({
         </View>
       )}
 
-      <DetailLayout hero={wide ? <DetailHero source={trend.photo} label={trend.label} /> : null}>
+      <DetailLayout
+        hero={wide ? <DetailHero source={trend.photo ?? undefined} label={trend.label} /> : null}
+      >
         {/* The photo fades into the page colour, and the body carries that same colour all the way
           down, so there is no step between the hero and the content. */}
         <DetailSheet style={styles.body}>
           {wide ? <View style={styles.titleBeside}>{title}</View> : null}
-          <Reveal index={0}>
-            <SWText variant="headingLarge">{detail.headline}</SWText>
-          </Reveal>
+          {detail.headline === null ? null : (
+            <Reveal index={0}>
+              <SWText variant="headingLarge">{detail.headline}</SWText>
+            </Reveal>
+          )}
 
           <Reveal index={1}>
             {/* The month's number gets the loudest colour in the brand: this is what's hot. */}
@@ -183,24 +156,34 @@ export function TrendView({
                 {formatPeso(detail.typicalPrice)}
               </SWText>
               <SWText variant="bodySmall" color={colors.onMarigold}>
-                Most sell between {formatPeso(detail.low)} and {formatPeso(detail.high)}
+                {detail.soldThisMonth === null
+                  ? `Most are asking between ${formatPeso(detail.low)} and ${formatPeso(detail.high)}`
+                  : `Most sell between ${formatPeso(detail.low)} and ${formatPeso(detail.high)}`}
               </SWText>
-              <Sparkline values={detail.series} height={72} color={colors.onMarigold} />
+              {detail.series.length > 0 ? (
+                <Sparkline values={detail.series} height={72} color={colors.onMarigold} />
+              ) : null}
               <View style={styles.statRow}>
-                <Stat label="Sold this month" value={String(detail.soldThisMonth)} />
-                <Stat label="12-week change" value={trend.change} />
+                {detail.soldThisMonth === null ? (
+                  <Stat label="Listed this month" value={String(detail.listedThisMonth ?? 0)} />
+                ) : (
+                  <Stat label="Sold this month" value={String(detail.soldThisMonth)} />
+                )}
+                <Stat label={detail.changeLabel} value={trend.change ?? '—'} />
               </View>
             </View>
           </Reveal>
 
-          <Reveal index={2} style={styles.section}>
-            <SWText variant="headingMedium" accessibilityRole="header">
-              Why it&apos;s hot
-            </SWText>
-            <SWText variant="bodyLarge" tone="textSecondary">
-              {detail.why}
-            </SWText>
-          </Reveal>
+          {detail.why === null ? null : (
+            <Reveal index={2} style={styles.section}>
+              <SWText variant="headingMedium" accessibilityRole="header">
+                Why it&apos;s hot
+              </SWText>
+              <SWText variant="bodyLarge" tone="textSecondary">
+                {detail.why}
+              </SWText>
+            </Reveal>
+          )}
 
           <Reveal index={3} style={styles.section}>
             <SWText variant="headingMedium" accessibilityRole="header">
@@ -267,8 +250,9 @@ export function TrendView({
                 Got one?
               </SWText>
               <SWText variant="bodyMedium" color={colors.onCobalt}>
-                Snap it to see what yours is worth while {trend.label.toLowerCase()} are{' '}
-                {rising ? 'up' : 'moving'}.
+                {trend.change === null
+                  ? `Snap it to see what yours is worth.`
+                  : `Snap it to see what yours is worth while ${trend.label.toLowerCase()} are ${rising ? 'up' : 'moving'}.`}
               </SWText>
               <Button label="Snap it" variant="accent" icon={SnapIcon} onPress={onSnap} />
             </View>

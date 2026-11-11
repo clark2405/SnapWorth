@@ -42,12 +42,9 @@ import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../d
 import { useFeed } from '../feed/feed-state';
 import { useHistoryItems } from '../history/scan-history-state';
 import { useMarketplace } from '../marketplace/marketplace-state';
-import {
-  formatPeso,
-  previewRecentSearches,
-  previewTrending,
-  type PreviewSearchResult,
-} from '../preview/sample-data';
+import { formatPeso, type PreviewSearchResult } from '../preview/sample-data';
+import { useTrends } from '../trends/use-trends';
+import { useRecentSearches } from './recent-searches';
 
 export type SearchScope = 'all' | 'market' | 'feed' | 'history';
 
@@ -83,15 +80,6 @@ const kindLabel: Record<PreviewSearchResult['kind'], string> = {
   listing: 'Listing',
   post: 'Feed post',
   item: 'Your history',
-};
-
-/** What a trending tile searches for; categories are broader than any one title. */
-const trendingQuery: Record<string, string> = {
-  'film-cameras': 'Polaroid',
-  sneakers: 'Jordan',
-  '90s-sportswear': 'Windbreaker',
-  'retro-audio': 'Walkman',
-  keyboards: 'Keyboard',
 };
 
 const fieldHeight = 44;
@@ -131,7 +119,8 @@ export function SearchView({
   const [query, setQuery] = useState('');
   const [focused, setFocused] = useState(false);
   const [scope, setScope] = useState<SearchScope>(initialScope);
-  const [recents, setRecents] = useState<readonly string[]>(previewRecentSearches);
+  const { recents, add: addRecent, clear: clearRecents } = useRecentSearches();
+  const { trends } = useTrends();
   // The field's resting frame in window coordinates, measured so it can start on the button.
   const [slot, setSlot] = useState<SearchOrigin | null>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
@@ -290,6 +279,7 @@ export function SearchView({
                 placeholderTextColor={colors.textMuted}
                 selectionColor={colors.accent}
                 returnKeyType="search"
+                onSubmitEditing={() => addRecent(query)}
                 onFocus={() => setFocused(true)}
                 onBlur={() => setFocused(false)}
                 autoCapitalize="none"
@@ -396,7 +386,7 @@ export function SearchView({
                       accessibilityLabel="Clear recent searches"
                       haptic="tap"
                       hitSlop={tokens.spacing[2]}
-                      onPress={() => setRecents([])}
+                      onPress={clearRecents}
                     >
                       <SWText variant="label" tone="textSecondary">
                         Clear
@@ -434,43 +424,47 @@ export function SearchView({
                 </View>
               ) : null}
 
-              <View style={styles.section}>
-                <SWText variant="headingMedium" accessibilityRole="header">
-                  Trending
-                </SWText>
-                <View style={styles.grid}>
-                  {previewTrending.slice(0, 4).map((trend) => {
-                    const falling = trend.change.startsWith('−');
-                    return (
-                      <PressableScale
-                        key={trend.key}
-                        accessibilityRole="button"
-                        accessibilityLabel={`${trend.label}, ${trend.change} this month`}
-                        haptic="none"
-                        depth="surface"
-                        onPress={() => setQuery(trendingQuery[trend.key] ?? trend.label)}
-                        containerStyle={styles.tileSlot}
-                        style={styles.tile}
-                      >
-                        <Photo
-                          source={trend.photo}
-                          label={trend.label}
-                          radius={tokens.radius.large}
-                          style={styles.tilePhoto}
-                        />
-                        <View style={styles.tileText}>
-                          <SWText variant="headingSmall" numberOfLines={1}>
-                            {trend.label}
-                          </SWText>
-                          <SWText variant="labelSmall" tone={falling ? 'danger' : 'success'}>
-                            {trend.change}
-                          </SWText>
-                        </View>
-                      </PressableScale>
-                    );
-                  })}
+              {trends.length > 0 ? (
+                <View style={styles.section}>
+                  <SWText variant="headingMedium" accessibilityRole="header">
+                    Trending
+                  </SWText>
+                  <View style={styles.grid}>
+                    {trends.slice(0, 4).map((trend) => {
+                      const falling = trend.change?.startsWith('−') ?? false;
+                      return (
+                        <PressableScale
+                          key={trend.key}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${trend.label}${trend.change === null ? '' : `, ${trend.change} this month`}`}
+                          haptic="none"
+                          depth="surface"
+                          onPress={() => setQuery(trend.query)}
+                          containerStyle={styles.tileSlot}
+                          style={styles.tile}
+                        >
+                          <Photo
+                            source={trend.photo}
+                            label={trend.label}
+                            radius={tokens.radius.large}
+                            style={styles.tilePhoto}
+                          />
+                          <View style={styles.tileText}>
+                            <SWText variant="headingSmall" numberOfLines={1}>
+                              {trend.label}
+                            </SWText>
+                            {trend.change === null ? null : (
+                              <SWText variant="labelSmall" tone={falling ? 'danger' : 'success'}>
+                                {trend.change}
+                              </SWText>
+                            )}
+                          </View>
+                        </PressableScale>
+                      );
+                    })}
+                  </View>
                 </View>
-              </View>
+              ) : null}
             </View>
           ) : results.length === 0 ? (
             <Animated.View entering={reduceMotion ? undefined : FadeIn.duration(200)}>
@@ -508,6 +502,7 @@ export function SearchView({
                     label={`${kindLabel[result.kind]}: ${result.title}`}
                     onPress={() => {
                       Keyboard.dismiss();
+                      addRecent(query);
                       onOpenResult?.({ kind: result.kind, id: result.id });
                     }}
                     style={[styles.result, index > 0 ? styles.divided : null]}

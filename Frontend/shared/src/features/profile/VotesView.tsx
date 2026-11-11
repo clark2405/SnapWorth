@@ -16,7 +16,7 @@ import {
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import type { VoteChoice, VoteCounts } from '../../types';
 import { formatRelativeAgo, useFeed } from '../feed/feed-state';
-import { formatPeso, previewVotesCast, type PreviewPost } from '../preview/sample-data';
+import { formatPeso, type PreviewPost } from '../preview/sample-data';
 
 export interface VotesViewProps {
   readonly onBack?: () => void;
@@ -52,14 +52,11 @@ export function VotesView({ onBack, onOpenPost, onBrowseFeed }: VotesViewProps) 
   const votes = userVotes.flatMap((entry) => {
     const post = findPreviewPost(entry.postSlug) ?? findPreviewPost(entry.postId);
     if (!post) return [];
-    const bundledAgo = previewVotesCast.find(
-      (candidate) => candidate.postId === entry.postSlug || candidate.postId === entry.postId,
-    )?.castAgo;
     return [
       {
         postId: post.id,
         vote: entry.choice,
-        castAgo: bundledAgo ?? formatRelativeAgo(entry.castAt),
+        castAgo: formatRelativeAgo(entry.castAt),
         post,
       },
     ];

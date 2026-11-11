@@ -1,4 +1,11 @@
-import { ArrowUp, ChevronRight, ShieldX, ShoppingBag, X } from 'lucide-react-native';
+import {
+  ArrowUp,
+  ChevronRight,
+  MessageSquareOff,
+  ShieldX,
+  ShoppingBag,
+  X,
+} from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -7,6 +14,7 @@ import {
   Avatar,
   BottomBar,
   Button,
+  EmptyState,
   EstimateBadge,
   IconButton,
   NavHeader,
@@ -14,6 +22,7 @@ import {
   PriceTagIcon,
   Reveal,
   Screen,
+  ScreenSkeleton,
   SWText,
   Surface,
   Tag,
@@ -31,13 +40,7 @@ import {
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import { commentBodyMaxLength, type ThreadComment } from '../../types/entities';
 import type { AppError } from '../../types/errors';
-import {
-  formatPeso,
-  photosOf,
-  previewPostDetail,
-  previewProfile,
-  type PreviewPost,
-} from '../preview/sample-data';
+import { formatPeso, type PreviewPost } from '../preview/sample-data';
 import { useAccountGate, useSession } from '../session';
 import { Tip, useTip } from '../tips';
 import { CommentList } from './CommentList';
@@ -83,23 +86,61 @@ function failureCopy(error: AppError): string {
  * Replying puts the composer into reply mode for that person; new comments land in the thread
  * as moderation left them, approved or visibly pending.
  */
-export function PostDetailView({
-  postId,
+export function PostDetailView(props: PostDetailViewProps) {
+  const { postId, onBack } = props;
+  const { findPost, findPreviewPost, loadPost, loading } = useFeed();
+  const rawPost = findPost(postId);
+  const post = findPreviewPost(postId);
+  const [looking, setLooking] = useState(true);
+
+  // A post that isn't in the loaded feed (a shared link) is fetched by its id or slug.
+  useEffect(() => {
+    if (!postId || rawPost) {
+      setLooking(false);
+      return;
+    }
+    let active = true;
+    setLooking(true);
+    void loadPost(postId).finally(() => {
+      if (active) setLooking(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [loadPost, postId, rawPost]);
+
+  if (post)
+    return (
+      <PostDiscussion {...props} post={post} isMine={rawPost?.isMine} scanId={rawPost?.scanId} />
+    );
+  if (looking || loading) return <ScreenSkeleton kind="detail" />;
+  return (
+    <Screen ambient="feed" header={<NavHeader title="Discussion" onBack={onBack} />}>
+      <EmptyState
+        icon={MessageSquareOff}
+        title="This post isn’t available"
+        body="It may have been removed, or the link is out of date."
+        actionLabel="Go back"
+        onAction={onBack}
+      />
+    </Screen>
+  );
+}
+
+function PostDiscussion({
+  post,
+  isMine,
+  scanId,
   onBack,
   onShare,
   onOpenListing,
   onListForSale,
-}: PostDetailViewProps) {
-  const { findPost, findPreviewPost, loadPost, voteFor, toggleVote } = useFeed();
-  const rawPost = findPost(postId);
-  // The post the user tapped; a link to a post outside the preview feed falls back to a sample.
-  const post = findPreviewPost(postId) ?? previewPostDetail;
-
-  useEffect(() => {
-    if (!postId || rawPost) return;
-    void loadPost(postId);
-  }, [loadPost, postId, rawPost]);
-
+}: PostDetailViewProps & {
+  readonly post: PreviewPost;
+  readonly isMine?: boolean;
+  readonly scanId?: string | null;
+}) {
+  const { voteFor, toggleVote } = useFeed();
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
@@ -309,7 +350,14 @@ export function PostDetailView({
       }
       contentStyle={styles.content}
     >
-      <DetailLayout hero={<DetailHero photos={photosOf(post)} />}>
+      <DetailLayout
+        hero={
+          <DetailHero
+            photos={post.photo ? [{ source: post.photo, label: post.photoLabel }] : []}
+            label={post.photoLabel}
+          />
+        }
+      >
         <DetailSheet
           style={styles.body}
           onLayout={(event) => {
@@ -333,8 +381,8 @@ export function PostDetailView({
             <SWText variant="bodyLarge">{post.body}</SWText>
             <CrossPost
               post={post}
-              isMine={rawPost?.isMine}
-              listTargetId={rawPost?.scanId ?? post.id}
+              isMine={isMine}
+              listTargetId={scanId ?? post.id}
               onOpenListing={onOpenListing}
               onListForSale={onListForSale}
             />
@@ -423,7 +471,7 @@ function CrossPost({
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const { isGuest } = useSession();
-  const mine = !isGuest && (isMine ?? post.author.handle === previewProfile.user.handle);
+  const mine = !isGuest && Boolean(isMine);
   const { listing } = post;
 
   if (listing) {

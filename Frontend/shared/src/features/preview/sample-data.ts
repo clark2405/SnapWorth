@@ -78,10 +78,11 @@ export function photosOf(entry: {
 
 export interface PreviewPost {
   readonly id: string;
-  readonly author: PreviewUser;
+  readonly author: { readonly handle: string; readonly avatar: ImageSourcePropType | null };
   readonly postedAgo: string;
   readonly body: string;
-  readonly photo: ImageSourcePropType;
+  /** Null when the post has no photo: the card shows a placeholder. */
+  readonly photo: ImageSourcePropType | null;
   readonly photoLabel: string;
   /** The AI estimate the author is asking the community to judge; none when the post has no scan. */
   readonly estimate: number | null;

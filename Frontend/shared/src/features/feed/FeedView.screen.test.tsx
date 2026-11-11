@@ -11,7 +11,8 @@ import { useSession } from '../session';
 import { TrendView } from '../trends/TrendView';
 import { CommentServiceProvider } from './comment-thread';
 import { CreatePostView } from './CreatePostView';
-import { buildPreviewFeedPosts, buildPreviewFeedVotes, FeedProvider } from './feed-state';
+import { buildPreviewFeedPosts, buildPreviewFeedVotes } from './feed-seed';
+import { FeedProvider } from './feed-state';
 import { FeedView } from './FeedView';
 import { PostDetailView } from './PostDetailView';
 

@@ -17,42 +17,20 @@ import type {
   PublishFeedPostInput,
   UserVoteRecord,
 } from '../../ports/feed';
-import type { MarketCategory } from '../../ports/marketplace';
 import type { UtcDateTime } from '../../types/date-time';
 import type { VoteChoice, VoteCounts } from '../../types/entities';
 import type { AppError } from '../../types/errors';
 import { ok, type Result } from '../../types/result';
-import {
-  previewAvatarByHandle,
-  previewItem,
-  previewOlderPosts,
-  previewPhotoByListingKey,
-  previewPosts as bundledPreviewPosts,
-  previewUsers,
-  previewVotesCast,
-  type PreviewPost,
-} from '../preview/sample-data';
+import type { PreviewPost } from '../preview/sample-data';
 import { useSession } from '../session';
-
-const bundledPostsAll: readonly PreviewPost[] = [...bundledPreviewPosts, ...previewOlderPosts];
-
-const bundledPostByKey: Readonly<Record<string, PreviewPost>> = Object.fromEntries(
-  bundledPostsAll.map((post) => [post.id, post]),
-);
-
-const bundledCategoryBySlug: Readonly<Record<string, MarketCategory>> = {
-  'retro-windbreaker': 'fashion',
-  'polaroid-sun-600': 'collectibles',
-  'retro-walkman-post': 'electronics',
-  'keychron-post': 'electronics',
-};
-
-const bundledCreatedOffsetMs: Readonly<Record<string, number>> = {
-  'retro-windbreaker': 2 * 60 * 1000,
-  'polaroid-sun-600': 60 * 60 * 1000,
-  'retro-walkman-post': 3 * 24 * 60 * 60 * 1000,
-  'keychron-post': 5 * 24 * 60 * 60 * 1000,
-};
+import {
+  buildPreviewFeedPosts,
+  buildPreviewFeedVotes,
+  isDevicePost,
+  sampleAvatarFor,
+  sampleFeedPhoto,
+  sampleFeedPost,
+} from './feed-seed';
 
 export function formatRelativeAgo(iso: string, fallback = 'Just now'): string {
   const time = Date.parse(iso);
@@ -67,53 +45,43 @@ export function formatRelativeAgo(iso: string, fallback = 'Just now'): string {
   return `${diffDays}d ago`;
 }
 
+/** A post's photo: its own, the bundled one of a post made on this device, or none. */
 export function feedPostPhotoSource(post: {
-  readonly slug?: string;
-  readonly id?: string;
+  readonly id: string;
   readonly photoUrl?: string | null;
   readonly listing?: { readonly slug?: string; readonly id?: string } | null;
-}): ImageSourcePropType {
-  if (post.photoUrl) {
-    return { uri: post.photoUrl };
-  }
-  const keys = [post.slug, post.id, post.listing?.slug, post.listing?.id].filter(
-    (entry): entry is string => Boolean(entry),
-  );
-  for (const key of keys) {
-    const bundledPost = bundledPostByKey[key];
-    if (bundledPost) return bundledPost.photo;
-    const bundledListingPhoto = previewPhotoByListingKey[key];
-    if (bundledListingPhoto) return bundledListingPhoto;
-  }
-  return previewItem.photo;
+}): ImageSourcePropType | null {
+  if (post.photoUrl) return { uri: post.photoUrl };
+  return isDevicePost(post) ? sampleFeedPhoto(post) : null;
 }
 
-export function feedAuthorAvatarSource(author: {
-  readonly handle: string;
-  readonly avatarUrl?: string | null;
-}): ImageSourcePropType {
-  if (author.avatarUrl) {
-    return { uri: author.avatarUrl };
-  }
-  const cleanHandle = author.handle.replace(/^@/, '').toLowerCase();
-  return previewAvatarByHandle[cleanHandle] ?? previewUsers.retroCurator.avatar;
+/** An author's photo: their own, a sample person's on this device, or null (their initial). */
+export function feedAuthorAvatarSource(
+  author: { readonly handle: string; readonly avatarUrl?: string | null },
+  post: { readonly id: string },
+): ImageSourcePropType | null {
+  if (author.avatarUrl) return { uri: author.avatarUrl };
+  return isDevicePost(post) ? sampleAvatarFor(author.handle) : null;
 }
 
 export function toPreviewPost(post: FeedPost): PreviewPost {
-  const bundled = bundledPostByKey[post.slug] ?? bundledPostByKey[post.id];
+  // A sample post keeps its sample discussion and "2m ago"; a post from Supabase never does.
+  const sample = isDevicePost(post)
+    ? (sampleFeedPost(post.slug) ?? sampleFeedPost(post.id))
+    : undefined;
   return {
     id: post.slug || post.id,
     author: {
       handle: post.author.handle,
-      avatar: feedAuthorAvatarSource(post.author),
+      avatar: feedAuthorAvatarSource(post.author, post),
     },
-    postedAgo: bundled?.postedAgo ?? formatRelativeAgo(post.createdAt),
+    postedAgo: sample?.postedAgo ?? formatRelativeAgo(post.createdAt),
     body: post.body,
     photo: feedPostPhotoSource(post),
     photoLabel: post.photoLabel || post.title || post.body,
     estimate: post.estimate,
     votes: post.votes,
-    comments: bundled?.comments ?? [],
+    comments: sample?.comments ?? [],
     listing: post.listing
       ? {
           id: post.listing.slug || post.listing.id,
@@ -121,49 +89,6 @@ export function toPreviewPost(post: FeedPost): PreviewPost {
         }
       : undefined,
   };
-}
-
-export function buildPreviewFeedPosts(): readonly FeedPost[] {
-  const now = Date.now();
-  return bundledPostsAll.map((post, index) => {
-    const offset = bundledCreatedOffsetMs[post.id] ?? (index + 1) * 3600_000;
-    return {
-      id: post.id,
-      slug: post.id,
-      title: post.photoLabel,
-      category: bundledCategoryBySlug[post.id] ?? 'collectibles',
-      body: post.body,
-      estimate: post.estimate,
-      photoUrl: null,
-      photoLabel: post.photoLabel,
-      votes: post.votes,
-      moderationStatus: 'approved',
-      createdAt: new Date(now - offset).toISOString() as UtcDateTime,
-      author: {
-        handle: post.author.handle,
-        avatarUrl: null,
-      },
-      scanId: post.id === 'polaroid-sun-600' ? 'polaroid-sun-600' : null,
-      listing: post.listing
-        ? {
-            id: post.listing.id,
-            slug: post.listing.id,
-            askingPrice: post.listing.askingPrice,
-          }
-        : null,
-      isMine: post.author.handle === 'retro_curator',
-    };
-  });
-}
-
-export function buildPreviewFeedVotes(): readonly UserVoteRecord[] {
-  const now = Date.now();
-  return previewVotesCast.map((entry, index) => ({
-    postId: entry.postId,
-    postSlug: entry.postId,
-    choice: entry.vote,
-    castAt: new Date(now - (index + 1) * 40 * 60 * 1000).toISOString() as UtcDateTime,
-  }));
 }
 
 function adjustTally(
@@ -227,11 +152,15 @@ export function FeedProvider({ repository, children }: FeedProviderProps) {
   }
   const activeRepo = repository ?? fallbackRepoRef.current;
 
-  const [posts, setPosts] = useState<readonly FeedPost[]>(() => buildPreviewFeedPosts());
-  const [userVotes, setUserVotes] = useState<readonly UserVoteRecord[]>(() =>
-    buildPreviewFeedVotes(),
+  // With a repository the Feed is whatever it holds (Supabase's posts, or the device
+  // repository's sample ones), empty until it has loaded; without one it starts from the samples.
+  const [posts, setPosts] = useState<readonly FeedPost[]>(() =>
+    repository ? [] : buildPreviewFeedPosts(),
   );
-  const [loading, setLoading] = useState(false);
+  const [userVotes, setUserVotes] = useState<readonly UserVoteRecord[]>(() =>
+    repository ? [] : buildPreviewFeedVotes(),
+  );
+  const [loading, setLoading] = useState(Boolean(repository));
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -239,16 +168,10 @@ export function FeedProvider({ repository, children }: FeedProviderProps) {
       activeRepo.list(),
       activeRepo.listVotes(),
     ]);
-    if (postsResult.ok && postsResult.value.length > 0) {
-      setPosts(postsResult.value);
-    }
-    if (votesResult.ok) {
-      setUserVotes(
-        votesResult.value.length > 0 || repository ? votesResult.value : buildPreviewFeedVotes(),
-      );
-    }
+    if (postsResult.ok) setPosts(postsResult.value);
+    if (votesResult.ok) setUserVotes(votesResult.value);
     setLoading(false);
-  }, [activeRepo, repository]);
+  }, [activeRepo]);
 
   useEffect(() => {
     if (!repository) return;
@@ -270,9 +193,10 @@ export function FeedProvider({ repository, children }: FeedProviderProps) {
       if (!idOrSlug) return undefined;
       const found = findPost(idOrSlug);
       if (found) return toPreviewPost(found);
-      return bundledPostByKey[idOrSlug];
+      // Only with no repository (a standalone screen) does a sample stand in for a missing post.
+      return repository ? undefined : sampleFeedPost(idOrSlug);
     },
-    [findPost],
+    [findPost, repository],
   );
 
   const loadPost = useCallback(
@@ -489,7 +413,7 @@ export function useFeed(): FeedContextValue {
       findPreviewPost: (idOrSlug?: string) => {
         if (!idOrSlug) return undefined;
         const found = findPost(idOrSlug);
-        return found ? toPreviewPost(found) : bundledPostByKey[idOrSlug];
+        return found ? toPreviewPost(found) : sampleFeedPost(idOrSlug);
       },
       loadPost: async (idOrSlug: string) => {
         const res = await repo.getByIdOrSlug(idOrSlug);
