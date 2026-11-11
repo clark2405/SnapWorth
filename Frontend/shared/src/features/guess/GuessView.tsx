@@ -173,7 +173,9 @@ function Round({
               {`You said ${formatPeso(guessed.amount)}: ${offByLabel(guessed.amount, item.worth)}.`}
             </SWText>
             <SWText variant="bodyMedium" tone="textSecondary">
-              {`It’s listed at ${formatPeso(item.askingPrice)}, and ${item.verdictShare}% of voters say that’s ${verdictWords[item.verdict]}.`}
+              {item.verdict === null || item.verdictShare === null
+                ? `It’s listed at ${formatPeso(item.askingPrice)}. Nobody has voted on that price yet.`
+                : `It’s listed at ${formatPeso(item.askingPrice)}, and ${item.verdictShare}% of voters say that’s ${verdictWords[item.verdict]}.`}
             </SWText>
           </Surface>
           <Button

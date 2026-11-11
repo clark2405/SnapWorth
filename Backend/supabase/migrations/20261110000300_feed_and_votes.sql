@@ -293,8 +293,67 @@ create trigger votes_enforce_rate_limit
   before insert on public.votes
   for each row execute function public.enforce_votes_rate_limit();
 
--- Adjusts the post's vote counters and, when the post reposts a listing, updates the listing's
--- community verdict and share.
+-- Works out a listing's community verdict from the votes on every approved post that reposts it:
+-- the choice with the most votes (just right wins a tie) and its share of all the votes. With no
+-- votes the verdict is null, so a new listing never shows a verdict nobody gave. Not callable by
+-- clients: the vote and post triggers below run it.
+create function public.refresh_listing_verdict(target uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  too_high bigint;
+  just_right bigint;
+  too_low bigint;
+  total bigint;
+  top_choice text;
+  top_count bigint;
+begin
+  if target is null then
+    return;
+  end if;
+
+  select coalesce(sum(p.too_high_count), 0),
+         coalesce(sum(p.just_right_count), 0),
+         coalesce(sum(p.too_low_count), 0)
+    into too_high, just_right, too_low
+    from public.feed_posts p
+   where p.listing_id = target
+     and p.moderation_status = 'approved';
+  total := too_high + just_right + too_low;
+
+  if total = 0 then
+    update public.listings l
+       set verdict = null,
+           verdict_share = null
+     where l.id = target
+       and (l.verdict is not null or l.verdict_share is not null);
+    return;
+  end if;
+
+  top_choice := 'just_right';
+  top_count := just_right;
+  if too_high > top_count then
+    top_choice := 'too_high';
+    top_count := too_high;
+  end if;
+  if too_low > top_count then
+    top_choice := 'too_low';
+    top_count := too_low;
+  end if;
+
+  update public.listings l
+     set verdict = top_choice,
+         verdict_share = round((top_count::numeric / total::numeric) * 100)::integer
+   where l.id = target;
+end;
+$$;
+
+revoke all on function public.refresh_listing_verdict(uuid) from public, anon, authenticated;
+
+-- Adjusts the post's vote counters and refreshes the verdict of the listing it reposts.
 create function public.sync_post_vote_counts()
 returns trigger
 language plpgsql
@@ -306,10 +365,7 @@ declare
   dh integer := 0;
   dr integer := 0;
   dl integer := 0;
-  post_row record;
-  total integer;
-  top_choice text;
-  top_count integer;
+  post_listing uuid;
 begin
   if tg_op = 'DELETE' or tg_op = 'UPDATE' then
     if old.choice = 'too_high' then dh := dh - 1;
@@ -334,28 +390,10 @@ begin
          just_right_count = greatest(0, p.just_right_count + dr),
          too_low_count = greatest(0, p.too_low_count + dl)
    where p.id = target_post_id
-   returning p.listing_id, p.too_high_count, p.just_right_count, p.too_low_count
-    into post_row;
+   returning p.listing_id into post_listing;
 
-  if found and post_row.listing_id is not null then
-    total := post_row.too_high_count + post_row.just_right_count + post_row.too_low_count;
-    if total > 0 then
-      top_choice := 'just_right';
-      top_count := post_row.just_right_count;
-      if post_row.too_high_count > top_count then
-        top_choice := 'too_high';
-        top_count := post_row.too_high_count;
-      end if;
-      if post_row.too_low_count > top_count then
-        top_choice := 'too_low';
-        top_count := post_row.too_low_count;
-      end if;
-
-      update public.listings l
-         set verdict = top_choice,
-             verdict_share = round((top_count::numeric / total::numeric) * 100)::integer
-       where l.id = post_row.listing_id;
-    end if;
+  if found then
+    perform public.refresh_listing_verdict(post_listing);
   end if;
 
   return coalesce(new, old);
@@ -402,3 +440,27 @@ grant select on public.votes to authenticated;
 grant insert (post_id, choice) on public.votes to authenticated;
 grant update (choice) on public.votes to authenticated;
 grant delete on public.votes to authenticated;
+
+-- A listing's verdict follows its posts: when a post is approved, held or deleted, the votes it
+-- carries start or stop counting.
+create function public.refresh_verdict_for_post()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform public.refresh_listing_verdict(case when tg_op = 'DELETE' then old.listing_id else new.listing_id end);
+  return null;
+end;
+$$;
+
+create trigger feed_posts_refresh_verdict_on_moderation
+  after update of moderation_status on public.feed_posts
+  for each row
+  when (old.moderation_status is distinct from new.moderation_status)
+  execute function public.refresh_verdict_for_post();
+
+create trigger feed_posts_refresh_verdict_on_delete
+  after delete on public.feed_posts
+  for each row execute function public.refresh_verdict_for_post();

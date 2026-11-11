@@ -141,6 +141,11 @@ select market_tests.check_rejected(
   array['42501'],
   'a seller cannot change the AI estimate afterwards'
 );
+select market_tests.check(
+  (select verdict is null and verdict_share is null
+     from public.listings where id = '00000000-0000-4000-fc00-000000000001'),
+  'a new listing has no community verdict'
+);
 insert into public.listings (id, title, asking_php)
 values ('00000000-0000-4000-fc00-000000000009', 'Loose find', 800);
 select market_tests.check(

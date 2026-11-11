@@ -31,7 +31,6 @@ import {
   Surface,
   SWText,
   useToast,
-  VerdictBar,
   TextField,
   shareIcon,
   DetailHero,
@@ -41,7 +40,6 @@ import {
   WorthySays,
 } from '../../components';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
-import type { VoteCounts } from '../../types';
 import {
   formatPeso,
   photosOf,
@@ -53,6 +51,7 @@ import {
 } from '../preview/sample-data';
 import { useAccountGate, useSession } from '../session';
 import { askingLine } from './asking-line';
+import { verdictChip, verdictLabel } from './ListingCard';
 import { listingPhotoSource, sellerAvatarSource, useMarketplace } from './marketplace-state';
 import { useTip } from '../tips';
 
@@ -87,15 +86,6 @@ const categoryDisplayLabel: Readonly<Record<string, string>> = {
 };
 
 const roundTo50 = (value: number) => Math.max(50, Math.round(value / 50) * 50);
-
-function communityTally(justRightShare: number): VoteCounts {
-  const remainder = 100 - justRightShare;
-  return {
-    just_right: justRightShare,
-    too_high: Math.round(remainder * 0.6),
-    too_low: Math.round(remainder * 0.4),
-  };
-}
 
 export function ListingDetailView({
   listingId,
@@ -140,7 +130,12 @@ export function ListingDetailView({
     marketListing && marketListing.description.length > 0
       ? marketListing.description
       : fallbackListing.description;
-  const justRightShare = marketListing?.verdictShare ?? fallbackListing.justRightShare;
+  // What voters make of the asking price. Null until someone has voted, so nothing is shown.
+  const verdict = marketListing
+    ? marketListing.verdict !== null && marketListing.verdictShare !== null
+      ? { choice: marketListing.verdict, share: marketListing.verdictShare }
+      : null
+    : { choice: 'just_right' as const, share: fallbackListing.justRightShare };
 
   const seller = marketListing
     ? {
@@ -196,7 +191,6 @@ export function ListingDetailView({
       saveTip.done();
       void toggleSavedInMarket(activeId);
     });
-  const tally = communityTally(justRightShare);
   const offerAmount = Number(offerText.replace(/,/g, '')) || 0;
 
   const offerNote = (() => {
@@ -331,7 +325,22 @@ export function ListingDetailView({
                 format={formatPeso}
                 animate={false}
               />
-              <VerdictBar tally={tally} />
+              {verdict ? (
+                <View style={styles.communityVerdict}>
+                  <Tag
+                    label={`${verdict.share}% ${verdictLabel[verdict.choice]}`}
+                    tone={verdictChip[verdict.choice].tone}
+                    icon={verdictChip[verdict.choice].icon}
+                  />
+                  <SWText variant="caption" tone="textMuted">
+                    of voters on the asking price
+                  </SWText>
+                </View>
+              ) : (
+                <SWText variant="caption" tone="textMuted">
+                  No votes on this price yet.
+                </SWText>
+              )}
             </Surface>
 
             <WorthySays>
@@ -545,6 +554,11 @@ const stylesFor = themedStyles((colors) => ({
   },
   sections: {
     gap: tokens.spacing[5],
+  },
+  communityVerdict: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing[2],
   },
   assessment: {
     gap: tokens.spacing[3],

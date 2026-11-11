@@ -431,8 +431,8 @@ function useMarketplaceStateInternal(repository: MarketplaceRepository | null): 
         estimatePhp: input.estimatePhp ?? null,
         estimateLowPhp: input.estimateLowPhp ?? null,
         estimateHighPhp: input.estimateHighPhp ?? null,
-        verdict: 'just_right',
-        verdictShare: 75,
+        verdict: null,
+        verdictShare: null,
         status: 'active',
         seller: {
           id: 'preview:retro_curator',

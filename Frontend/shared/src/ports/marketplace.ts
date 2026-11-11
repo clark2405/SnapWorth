@@ -37,8 +37,9 @@ export interface MarketListing {
   readonly estimatePhp: number | null;
   readonly estimateLowPhp: number | null;
   readonly estimateHighPhp: number | null;
-  readonly verdict: VoteChoice;
-  readonly verdictShare: number;
+  /** What most voters say of the asking price, and their share. Null until someone has voted. */
+  readonly verdict: VoteChoice | null;
+  readonly verdictShare: number | null;
   readonly status: ListingStatus;
   readonly seller: ListingSellerSummary;
   readonly stats: {

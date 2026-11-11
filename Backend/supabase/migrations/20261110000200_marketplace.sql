@@ -49,12 +49,14 @@ alter table public.listings
   add column estimate_low_php integer check (estimate_low_php is null or estimate_low_php >= 0),
   add column estimate_high_php integer
     check (estimate_high_php is null or (estimate_low_php is not null and estimate_high_php >= estimate_low_php)),
-  add column verdict text not null default 'just_right'
-    check (verdict in ('too_high', 'just_right', 'too_low')),
-  add column verdict_share integer not null default 75
-    check (verdict_share between 0 and 100),
+  -- The community's verdict on the asking price. Null until people have voted on a post that
+  -- reposts this listing; `refresh_listing_verdict` (feed_and_votes) sets it and clears it again
+  -- if the votes go. Never client-writable: it is in no column grant.
+  add column verdict text check (verdict in ('too_high', 'just_right', 'too_low')),
+  add column verdict_share integer check (verdict_share between 0 and 100),
   add column views_count integer not null default 0 check (views_count >= 0),
   add column saves_count integer not null default 0 check (saves_count >= 0),
+  add constraint listings_verdict_pair_check check ((verdict is null) = (verdict_share is null)),
   add constraint listings_photo_path_check
     check (
       photo_path is null

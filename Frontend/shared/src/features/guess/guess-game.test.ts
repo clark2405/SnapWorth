@@ -24,6 +24,25 @@ it('draws from every Market listing that has an AI estimate', () => {
   expect(guessPool()).toHaveLength(8);
 });
 
+it('carries no verdict for a listing nobody has voted on', () => {
+  const [item] = guessPool(
+    [
+      {
+        id: 'new',
+        title: 'New',
+        askingPrice: 1000,
+        photo: 1,
+        photoLabel: 'New',
+        verdict: null,
+        verdictShare: null,
+      },
+    ],
+    { new: { estimate: 900, low: 800, high: 1000 } },
+  );
+  expect(item?.verdict).toBeNull();
+  expect(item?.verdictShare).toBeNull();
+});
+
 it('deals five different things a day, the same ones all day', () => {
   const today = dailyItems('2026-11-04');
   expect(today).toHaveLength(roundsPerDay);

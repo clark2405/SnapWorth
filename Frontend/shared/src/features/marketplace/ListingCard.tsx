@@ -19,14 +19,14 @@ import { useAccountGate } from '../session';
 import { useTip } from '../tips';
 import { useMarketplace } from './marketplace-state';
 
-const verdictLabel: Record<VoteChoice, string> = {
+export const verdictLabel: Record<VoteChoice, string> = {
   too_high: 'Too High',
   just_right: 'Just Right',
   too_low: 'Too Low',
 };
 
 // The community verdict is a status, so it wears a soft tonal chip, never a bright colour.
-const verdictChip: Record<VoteChoice, { tone: TagTone; icon: LucideIcon }> = {
+export const verdictChip: Record<VoteChoice, { tone: TagTone; icon: LucideIcon }> = {
   too_high: { tone: 'warn', icon: TrendingUp },
   just_right: { tone: 'mint', icon: CircleCheck },
   too_low: { tone: 'sand', icon: TrendingDown },
@@ -46,7 +46,13 @@ export function ListingCard({ listing, onOpen, onMessageSeller }: ListingCardPro
   const saved = isSaved(listing.id);
   const requireAccount = useAccountGate();
   const saveTip = useTip('save');
-  const verdict = `${listing.verdictShare}% ${verdictLabel[listing.verdict]}`;
+  const verdict =
+    listing.verdict === null || listing.verdictShare === null
+      ? null
+      : {
+          text: `${listing.verdictShare}% ${verdictLabel[listing.verdict]}`,
+          choice: listing.verdict,
+        };
 
   const menu: readonly NavLinkMenuItem[] = [
     {
@@ -78,7 +84,7 @@ export function ListingCard({ listing, onOpen, onMessageSeller }: ListingCardPro
   return (
     <ZoomLink
       href={`/listing/${listing.id}`}
-      label={`${listing.title}, asking ${formatPeso(listing.askingPrice)}, community says ${verdict}`}
+      label={`${listing.title}, asking ${formatPeso(listing.askingPrice)}, ${verdict ? `, community says ${verdict.text}` : ''}`}
       onPress={onOpen}
       menu={menu}
       zoomFromSource
@@ -120,13 +126,15 @@ export function ListingCard({ listing, onOpen, onMessageSeller }: ListingCardPro
           {listing.title}
         </SWText>
         <SWText variant="priceMedium">{formatPeso(listing.askingPrice)}</SWText>
-        <View style={styles.verdictRow}>
-          <Tag
-            label={verdict}
-            tone={verdictChip[listing.verdict].tone}
-            icon={verdictChip[listing.verdict].icon}
-          />
-        </View>
+        {verdict ? (
+          <View style={styles.verdictRow}>
+            <Tag
+              label={verdict.text}
+              tone={verdictChip[verdict.choice].tone}
+              icon={verdictChip[verdict.choice].icon}
+            />
+          </View>
+        ) : null}
       </View>
     </ZoomLink>
   );

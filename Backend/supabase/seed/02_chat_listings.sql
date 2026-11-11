@@ -1,6 +1,9 @@
 -- Development seed: the market listings the app ships with, sold by the demo accounts from
 -- 01_feed_preview.sql, so a real account can message a seller. Slugs match the listing links in
 -- the app. Never run this against production.
+--
+-- The listings carry no community verdict: that comes only from votes on a post that reposts a
+-- listing (see refresh_listing_verdict), and the seed casts none.
 
 insert into public.listings (
   id,
@@ -16,8 +19,6 @@ insert into public.listings (
   estimate_php,
   estimate_low_php,
   estimate_high_php,
-  verdict,
-  verdict_share,
   views_count,
   saves_count,
   status
@@ -37,8 +38,6 @@ values
     2750,
     2300,
     3100,
-    'just_right',
-    85,
     184,
     23,
     'active'
@@ -57,8 +56,6 @@ values
     9400,
     8400,
     10400,
-    'too_low',
-    54,
     312,
     41,
     'active'
@@ -77,8 +74,6 @@ values
     1900,
     1600,
     2200,
-    'just_right',
-    92,
     129,
     15,
     'active'
@@ -97,8 +92,6 @@ values
     3900,
     3400,
     4300,
-    'too_high',
-    60,
     98,
     9,
     'active'
@@ -117,8 +110,6 @@ values
     2450,
     2100,
     2800,
-    'too_high',
-    58,
     214,
     18,
     'active'
@@ -137,8 +128,6 @@ values
     2400,
     2100,
     2700,
-    'too_low',
-    66,
     167,
     22,
     'active'
@@ -157,8 +146,6 @@ values
     2800,
     2400,
     3200,
-    'just_right',
-    74,
     142,
     14,
     'active'
@@ -177,8 +164,6 @@ values
     3600,
     3100,
     4100,
-    'just_right',
-    69,
     156,
     19,
     'active'
@@ -192,8 +177,6 @@ on conflict (id) do update
       estimate_php = excluded.estimate_php,
       estimate_low_php = excluded.estimate_low_php,
       estimate_high_php = excluded.estimate_high_php,
-      verdict = excluded.verdict,
-      verdict_share = excluded.verdict_share,
       views_count = excluded.views_count,
       saves_count = excluded.saves_count;
 

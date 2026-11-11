@@ -43,8 +43,8 @@ interface ListingRow {
   readonly estimate_php: number | null;
   readonly estimate_low_php: number | null;
   readonly estimate_high_php: number | null;
-  readonly verdict: VoteChoice;
-  readonly verdict_share: number;
+  readonly verdict: VoteChoice | null;
+  readonly verdict_share: number | null;
   readonly views_count: number;
   readonly saves_count: number;
   readonly status: ListingStatus;
@@ -131,8 +131,8 @@ function toMarketListing(
     estimatePhp: row.estimate_php,
     estimateLowPhp: row.estimate_low_php,
     estimateHighPhp: row.estimate_high_php,
-    verdict: row.verdict ?? 'just_right',
-    verdictShare: row.verdict_share ?? 75,
+    verdict: row.verdict ?? null,
+    verdictShare: row.verdict_share ?? null,
     status: row.status,
     seller: {
       id: row.seller_id,

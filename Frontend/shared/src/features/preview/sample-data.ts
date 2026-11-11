@@ -225,8 +225,9 @@ export interface PreviewListing {
   readonly askingPrice: number;
   readonly photo: ImageSourcePropType;
   readonly photoLabel: string;
-  readonly verdict: VoteChoice;
-  readonly verdictShare: number;
+  /** The community's verdict on the asking price; null while nobody has voted. */
+  readonly verdict: VoteChoice | null;
+  readonly verdictShare: number | null;
 }
 
 export const previewListings: readonly PreviewListing[] = [

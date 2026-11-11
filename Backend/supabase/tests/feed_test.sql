@@ -239,6 +239,27 @@ update public.feed_posts
        moderated_at = now()
  where id = '00000000-0000-4000-ff00-000000000002';
 
+set role authenticated;
+select feed_tests.sign_in('00000000-0000-4000-fd00-00000000000a');
+select feed_tests.check(
+  (select verdict is null and verdict_share is null
+     from public.listings
+    where id = '00000000-0000-4000-fe00-000000000002'),
+  'a new listing has no community verdict until someone votes'
+);
+select feed_tests.check_raises(
+  $$insert into public.listings (title, asking_php, verdict, verdict_share)
+    values ('Rigged', 1000, 'just_right', 99)$$,
+  '42501',
+  'a seller cannot write a community verdict when listing'
+);
+select feed_tests.check_raises(
+  $$update public.listings set verdict = 'just_right', verdict_share = 99
+     where id = '00000000-0000-4000-fe00-000000000002'$$,
+  '42501',
+  'a seller cannot write a community verdict afterwards'
+);
+
 -- Voter B votes 'too_high'
 set role authenticated;
 select feed_tests.sign_in('00000000-0000-4000-fd00-00000000000b');
@@ -298,6 +319,45 @@ select feed_tests.check(
     where id = '00000000-0000-4000-ff00-000000000002'),
   'withdrawing a vote decrements the post tally'
 );
+
+-- Voter C withdraws the last vote: the listing goes back to having no verdict
+select feed_tests.sign_in('00000000-0000-4000-fd00-00000000000c');
+delete from public.votes where post_id = '00000000-0000-4000-ff00-000000000002';
+select feed_tests.check(
+  (select verdict is null and verdict_share is null
+     from public.listings
+    where id = '00000000-0000-4000-fe00-000000000002'),
+  'when the votes are withdrawn the listing has no verdict again'
+);
+
+-- Votes on a post that moderation holds don't speak for the listing
+select feed_tests.sign_in('00000000-0000-4000-fd00-00000000000b');
+insert into public.votes (post_id, choice)
+values ('00000000-0000-4000-ff00-000000000002', 'too_low');
+select feed_tests.check(
+  (select verdict = 'too_low' and verdict_share = 100
+     from public.listings
+    where id = '00000000-0000-4000-fe00-000000000002'),
+  'an approved post''s votes set the listing verdict'
+);
+reset role;
+update public.feed_posts set moderation_status = 'held'
+ where id = '00000000-0000-4000-ff00-000000000002';
+select feed_tests.check(
+  (select verdict is null from public.listings
+    where id = '00000000-0000-4000-fe00-000000000002'),
+  'holding the post takes its votes out of the listing verdict'
+);
+update public.feed_posts set moderation_status = 'approved'
+ where id = '00000000-0000-4000-ff00-000000000002';
+select feed_tests.check(
+  (select verdict = 'too_low' from public.listings
+    where id = '00000000-0000-4000-fe00-000000000002'),
+  'approving the post brings its votes back'
+);
+set role authenticated;
+select feed_tests.sign_in('00000000-0000-4000-fd00-00000000000b');
+delete from public.votes where post_id = '00000000-0000-4000-ff00-000000000002';
 
 -- ---------------------------------------------------------------------------------------------
 -- 4. Flood limit on feed_posts (at most 10 posts in an hour)
