@@ -24,7 +24,7 @@ import type { HanapPost } from '../../ports/hanap';
 import { relativeTime } from '../feed/comment-thread-model';
 import { useMarketplace } from '../marketplace/marketplace-state';
 import { formatPeso } from '../preview/peso';
-import { previewListings, type PreviewListing } from '../preview/sample-data';
+import type { PreviewListing } from '../preview/sample-data';
 import { useAccountGate } from '../session';
 import { matchesHanap, parseBudget } from './hanap-match';
 import { useHanap } from './hanap-state';
@@ -36,10 +36,10 @@ export interface HanapViewProps {
   readonly onSnap?: () => void;
 }
 
-/** Listings that answer a hanap (Market's listings until they're stored in Supabase). */
+/** The Market's listings that answer a hanap. */
 export function hanapMatches(
   post: Pick<HanapPost, 'body' | 'maxPhp'>,
-  listings: readonly PreviewListing[] = previewListings,
+  listings: readonly PreviewListing[],
 ): readonly PreviewListing[] {
   return listings.filter((listing) => matchesHanap(post, listing));
 }

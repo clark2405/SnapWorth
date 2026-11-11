@@ -41,7 +41,7 @@ export function EditProfileView({ onBack, onSaved, onPickPhoto }: EditProfileVie
   const toast = useToast();
   const { profile, refresh } = useUserProfile();
 
-  const [avatar, setAvatar] = useState<ImageSourcePropType>(() =>
+  const [avatar, setAvatar] = useState<ImageSourcePropType | null>(() =>
     avatarSourceFor(profile.avatarUrl),
   );
   const [name, setName] = useState<string>(profile.displayName);

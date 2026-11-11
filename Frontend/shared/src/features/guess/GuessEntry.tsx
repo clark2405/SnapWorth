@@ -13,7 +13,7 @@ import { useGuessGame } from './guess-state';
 export function GuessEntry({ onOpen }: { readonly onOpen?: () => void }) {
   const styles = useThemedStyles(stylesFor);
   const { colors } = useTheme();
-  const { game, streak } = useGuessGame();
+  const { available, game, streak } = useGuessGame();
   const done = dayFinished(game);
   const started = game.guesses.length > 0;
   const line = done
@@ -21,6 +21,9 @@ export function GuessEntry({ onOpen }: { readonly onOpen?: () => void }) {
     : started
       ? `${game.guesses.length} of ${roundsPerDay} guessed. Finish today’s game.`
       : `${roundsPerDay} things, one guess each. How close can you get?`;
+
+  // Not enough real listings to deal a day: no game to offer yet.
+  if (!available) return null;
 
   return (
     <PressableScale

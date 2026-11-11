@@ -1,4 +1,4 @@
-import { ShieldX } from 'lucide-react-native';
+import { MessageSquareOff, ShieldX } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { TextInput, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
@@ -7,6 +7,7 @@ import {
   paperIn,
   BottomBar,
   Button,
+  EmptyState,
   EstimateBadge,
   Field,
   hideWebFocusOutline,
@@ -15,17 +16,18 @@ import {
   PriceTagIcon,
   Reveal,
   Screen,
+  ScreenSkeleton,
   typeStyle,
   SWText,
   Tag,
   useToast,
 } from '../../components';
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
-import type { MarketCategory } from '../../ports/marketplace';
+import type { MarketCategory, MarketListing } from '../../ports/marketplace';
 import { useScanHistory } from '../history/scan-history-state';
-import { useItemDetail } from '../item/item-source';
+import { useItemDetail, type ItemDetail } from '../item/item-source';
 import { listingPhotoSource, useMarketplace } from '../marketplace/marketplace-state';
-import { formatPeso, previewItem, previewMyListing } from '../preview/sample-data';
+import { formatPeso } from '../preview/sample-data';
 import { useFeed } from './feed-state';
 
 /**
@@ -61,45 +63,75 @@ function inferCategory(title: string, fallback?: MarketCategory | null): MarketC
  * given, so voters judge the AI's number, not a number the author edited. Publishing saves the
  * post to the feed repository and screens it, then hands off with a toast.
  */
-export function CreatePostView({
+export function CreatePostView(props: CreatePostViewProps) {
+  const { itemId, source = 'item', onBack } = props;
+  const lookup = useItemDetail(itemId);
+  const { findListing, status } = useMarketplace();
+
+  const foundItem = lookup.status === 'found' ? lookup.item : undefined;
+  const foundListing = source === 'listing' ? (findListing(itemId) ?? undefined) : undefined;
+
+  if (source === 'listing' ? foundListing : foundItem) {
+    return <CreatePost {...props} foundItem={foundItem} foundListing={foundListing} />;
+  }
+  if (lookup.status === 'loading' || (source === 'listing' && status === 'loading')) {
+    return <ScreenSkeleton kind="page" />;
+  }
+  return (
+    <Screen ambient="feed" header={<NavHeader title="Ask the community" onBack={onBack} banded />}>
+      <EmptyState
+        icon={MessageSquareOff}
+        title="Nothing to ask about"
+        body={
+          source === 'listing'
+            ? 'This isn’t one of your listings. Open it from the Market to ask the community.'
+            : 'This item isn’t one of your saved snaps. Open it from History to ask the community.'
+        }
+        actionLabel="Go back"
+        onAction={onBack}
+      />
+    </Screen>
+  );
+}
+
+function CreatePost({
   itemId,
   source = 'item',
   outcome,
   onBack,
   onPublish,
-}: CreatePostViewProps) {
-  const lookup = useItemDetail(itemId);
+  foundItem,
+  foundListing,
+}: CreatePostViewProps & {
+  readonly foundItem?: ItemDetail;
+  readonly foundListing?: MarketListing;
+}) {
   const { scans, reload: reloadScans } = useScanHistory();
-  const { findListing } = useMarketplace();
   const { publishPost } = useFeed();
 
   const savedScan = itemId ? scans.find((entry) => entry.id === itemId) : undefined;
-  const foundItem = lookup.status === 'found' ? lookup.item : undefined;
-  const foundListing = source === 'listing' ? findListing(itemId) : undefined;
 
-  const title =
-    source === 'listing'
-      ? (foundListing?.title ?? previewMyListing.title)
-      : (foundItem?.title ?? previewItem.title);
+  const title = (source === 'listing' ? foundListing?.title : foundItem?.title) ?? '';
+  // The AI estimate the post asks the community to judge: the listing's, or the scan's. A listing
+  // made without a scan has none.
   const estimate =
-    source === 'listing'
-      ? (foundListing?.estimatePhp ?? foundItem?.estimate ?? previewItem.estimate)
-      : (foundItem?.estimate ?? previewItem.estimate);
-  const asking =
-    source === 'listing' ? (foundListing?.askingPrice ?? previewMyListing.askingPrice) : null;
+    source === 'listing' ? (foundListing?.estimatePhp ?? null) : (foundItem?.estimate ?? null);
+  const asking = source === 'listing' ? (foundListing?.askingPrice ?? null) : null;
   const photo =
     source === 'listing' && foundListing
       ? listingPhotoSource(foundListing)
-      : (foundItem?.photos[0]?.source ?? previewItem.photo);
+      : (foundItem?.photos[0]?.source ?? null);
   const photoLabel =
     source === 'listing' && foundListing
       ? foundListing.photoLabel
-      : (foundItem?.photos[0]?.label ?? previewItem.photoLabel);
+      : (foundItem?.photos[0]?.label ?? title);
 
   const defaultQuestion =
-    asking === null
-      ? `Is ${formatPeso(estimate)} right for this ${title.toLowerCase()}?`
-      : `I'm asking ${formatPeso(asking)} for this ${title.toLowerCase()}. Fair price?`;
+    asking !== null
+      ? `I'm asking ${formatPeso(asking)} for this ${title.toLowerCase()}. Fair price?`
+      : estimate !== null
+        ? `Is ${formatPeso(estimate)} right for this ${title.toLowerCase()}?`
+        : `What's this ${title.toLowerCase()} worth?`;
 
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
@@ -205,7 +237,7 @@ export function CreatePostView({
       <Reveal index={0} style={styles.lockup}>
         <Photo source={photo} label={photoLabel} aspectRatio={4 / 3} radius={tokens.radius.large} />
         <View style={styles.badges}>
-          <EstimateBadge value={formatPeso(estimate)} />
+          {estimate === null ? null : <EstimateBadge value={formatPeso(estimate)} />}
           {asking === null ? null : (
             <Tag label={`For sale · ${formatPeso(asking)}`} tone="mint" icon={PriceTagIcon} />
           )}

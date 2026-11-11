@@ -1,4 +1,4 @@
-import { Award, ChevronRight, Flame, Share2 } from 'lucide-react-native';
+import { Award, ChevronRight, Flame, Share2, Target } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Platform, Share, View } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -6,6 +6,7 @@ import Animated from 'react-native-reanimated';
 import {
   Button,
   Divider,
+  EmptyState,
   NavHeader,
   paperIn,
   Photo,
@@ -58,7 +59,7 @@ const verdictWords: Record<VoteChoice, string> = {
  */
 export function GuessView({ onBack, onOpenListing, now }: GuessViewProps) {
   const styles = useThemedStyles(stylesFor);
-  const { status, items, game, guess, streak, sharpEyes } = useGuessGame(now);
+  const { status, available, items, game, guess, streak, sharpEyes } = useGuessGame(now);
   // Which of the day's things is on screen. It starts at the first one not yet guessed, so
   // leaving mid-game picks up where it was.
   const [step, setStep] = useState<number | null>(null);
@@ -76,7 +77,15 @@ export function GuessView({ onBack, onOpenListing, now }: GuessViewProps) {
       header={<NavHeader title="Guess the worth" onBack={onBack} banded />}
       contentStyle={styles.content}
     >
-      {status === 'loading' || step === null ? null : summary ? (
+      {status === 'ready' && !available ? (
+        <EmptyState
+          icon={Target}
+          title="Not enough to guess yet"
+          body={`Guess the worth deals ${roundsPerDay} listings a day, each with an AI estimate. The Market doesn’t have that many yet. Check back soon.`}
+          actionLabel="Back to the feed"
+          onAction={onBack}
+        />
+      ) : status === 'loading' || step === null ? null : summary ? (
         <DaySummary
           game={game}
           items={items}

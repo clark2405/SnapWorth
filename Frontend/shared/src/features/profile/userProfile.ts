@@ -15,7 +15,8 @@ export interface UserProfileDetails {
   readonly location: string;
   readonly bio: string;
   readonly joined: string;
-  readonly rating: string;
+  /** Sellers aren't rated yet, so a real account has none; the preview profile has one. */
+  readonly rating: string | null;
   readonly isAdmin: boolean;
   readonly stats: {
     readonly checked: number;
@@ -37,17 +38,17 @@ export interface ProfileUpdateInput {
   readonly avatarUrl?: string | null;
 }
 
-/** Formats an ISO date into "Joined [Month] [Year]" or "Joined [Year]". */
+/** Formats an ISO date into "Joined [Month] [Year]"; nothing when the date isn't known. */
 export function formatJoinedDate(isoDate?: string | number | null): string {
-  if (!isoDate) return previewProfile.joined;
+  if (!isoDate) return '';
   try {
     const date = new Date(isoDate);
-    if (isNaN(date.getTime())) return previewProfile.joined;
+    if (isNaN(date.getTime())) return '';
     const month = date.toLocaleString('en-US', { month: 'long' });
     const year = date.getFullYear();
     return `Joined ${month} ${year}`;
   } catch {
-    return `Joined ${new Date().getFullYear()}`;
+    return '';
   }
 }
 
@@ -62,7 +63,11 @@ function textOf(...values: unknown[]): string | undefined {
 /** The id of the preview profile shown with nobody signed in. */
 export const previewProfileId = 'demo-user';
 
-/** Returns fallback profile details when Supabase is unconfigured or user details are missing. */
+/**
+ * The profile as far as the account itself says: the sample profile when nobody is signed in (a
+ * preview), else only what the account holds, and zero for what a database has yet to count. A
+ * real account never gets the sample's bio, place, rating or numbers.
+ */
 export function buildFallbackProfile(user?: SessionUser | null): UserProfileDetails {
   if (!user) {
     return {
@@ -102,27 +107,19 @@ export function buildFallbackProfile(user?: SessionUser | null): UserProfileDeta
     displayName,
     handle,
     avatarUrl: textOf(meta.avatar_url, meta.picture) ?? null,
-    location: textOf(meta.location) ?? previewProfile.location,
-    bio: textOf(meta.bio) ?? previewProfile.bio,
+    location: textOf(meta.location) ?? '',
+    bio: textOf(meta.bio) ?? '',
     joined: formatJoinedDate(user.created_at),
-    rating: textOf(meta.rating) ?? previewProfile.rating,
+    rating: null,
     isAdmin: Boolean(
       meta.role === 'admin' ||
       meta.is_admin ||
       user.app_metadata?.role === 'admin' ||
       user.email?.endsWith('@snapworth.com'),
     ),
-    stats: {
-      // Their own scans, counted once they've loaded.
-      checked: 0,
-      listed: previewProfile.stats.listed,
-      sold: previewProfile.stats.sold,
-    },
-    activity: {
-      listings: previewProfile.stats.listed,
-      votes: previewVotesCast.length,
-      conversations: previewConversations.length,
-    },
+    // Counted once they've loaded: their own scans, listings, sales, votes and chats.
+    stats: { checked: 0, listed: 0, sold: 0 },
+    activity: { listings: 0, votes: 0, conversations: 0 },
   };
 }
 
@@ -158,6 +155,7 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
   let listedCount = fallback.stats.listed;
   let soldCount = fallback.stats.sold;
   let chatCount = fallback.activity.conversations;
+  let voteCount = fallback.activity.votes;
 
   if (isSupabaseConfigured()) {
     try {
@@ -181,7 +179,7 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
 
       // Query activity stats
       try {
-        const [checkedRes, listedRes, soldRes, chatRes] = await Promise.allSettled([
+        const [checkedRes, listedRes, soldRes, chatRes, voteRes] = await Promise.allSettled([
           supabase
             .from('scan_history')
             .select('id', { count: 'exact', head: true })
@@ -189,7 +187,8 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
           supabase
             .from('listings')
             .select('id', { count: 'exact', head: true })
-            .eq('seller_id', user.id),
+            .eq('seller_id', user.id)
+            .neq('status', 'removed'),
           supabase
             .from('listings')
             .select('id', { count: 'exact', head: true })
@@ -199,6 +198,10 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
             .from('conversations')
             .select('id', { count: 'exact', head: true })
             .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`),
+          supabase
+            .from('votes')
+            .select('post_id', { count: 'exact', head: true })
+            .eq('user_id', user.id),
         ]);
 
         if (checkedRes.status === 'fulfilled' && typeof checkedRes.value.count === 'number') {
@@ -212,6 +215,9 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
         }
         if (chatRes.status === 'fulfilled' && typeof chatRes.value.count === 'number') {
           chatCount = chatRes.value.count;
+        }
+        if (voteRes.status === 'fulfilled' && typeof voteRes.value.count === 'number') {
+          voteCount = voteRes.value.count;
         }
       } catch {
         // Keep fallback counts
@@ -232,7 +238,7 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
     },
     activity: {
       listings: listedCount,
-      votes: fallback.activity.votes,
+      votes: voteCount,
       conversations: chatCount,
     },
   };
@@ -359,11 +365,14 @@ export function useUserProfile() {
   };
 }
 
-/** Returns the avatar image source for a profile (either remote URL or local fallback). */
+/**
+ * The avatar image source for a profile: its photo, else `fallbackSource`. With no fallback
+ * there's no picture and the screen shows the person's initial.
+ */
 export function avatarSourceFor(
   avatarUrl?: string | null,
-  fallbackSource: ImageSourcePropType = previewProfile.user.avatar,
-): ImageSourcePropType {
+  fallbackSource: ImageSourcePropType | null = null,
+): ImageSourcePropType | null {
   if (avatarUrl && typeof avatarUrl === 'string' && avatarUrl.trim().length > 0) {
     return { uri: avatarUrl };
   }

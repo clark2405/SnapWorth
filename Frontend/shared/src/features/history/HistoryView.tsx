@@ -48,6 +48,7 @@ import {
   type PreviewItemStatus,
 } from '../preview/sample-data';
 import { ProfileButton } from '../profile/ProfileButton';
+import { useBackendMode } from '../session/backend-mode';
 import { CollectionsStrip } from './CollectionsStrip';
 import { flipOf, flipTotals, gainLabel, type FlipTotals } from './flips';
 import { usePaidPrices } from './paid-prices';
@@ -109,7 +110,8 @@ export function HistoryView({
   // person's own scans, so the two are never mixed.
   const [samples, setSamples] = useState<readonly PreviewHistoryItem[]>(previewHistory);
   const ownItems = useMemo(() => scans.map(scanToPreviewItem), [scans]);
-  const showingSamples = !propItems && ownItems.length === 0;
+  const mode = useBackendMode();
+  const showingSamples = !propItems && ownItems.length === 0 && mode === 'device';
   const items = propItems ?? (showingSamples ? samples : ownItems);
   const [filter, setFilter] = useState<FilterKey>('all');
   const { paid } = usePaidPrices();
@@ -233,13 +235,23 @@ export function HistoryView({
         <View style={wide ? styles.main : null}>
           {visible.length === 0 ? (
             <Animated.View entering={FadeIn} exiting={FadeOut}>
-              <EmptyState
-                icon={PackageSearch}
-                title="Nothing in this pile"
-                body="Nothing matches this filter yet. Try another, or snap something new."
-                actionLabel={filter === 'all' ? undefined : 'Show all'}
-                onAction={filter === 'all' ? undefined : () => setFilter('all')}
-              />
+              {items.length === 0 ? (
+                <EmptyState
+                  icon={PackageSearch}
+                  title="Nothing snapped yet"
+                  body="Snap something and its worth is kept here, with its photo, for every device you sign in on."
+                  actionLabel={onSnap ? 'Snap something' : undefined}
+                  onAction={onSnap}
+                />
+              ) : (
+                <EmptyState
+                  icon={PackageSearch}
+                  title="Nothing in this pile"
+                  body="Nothing matches this filter yet. Try another, or snap something new."
+                  actionLabel={filter === 'all' ? undefined : 'Show all'}
+                  onAction={filter === 'all' ? undefined : () => setFilter('all')}
+                />
+              )}
             </Animated.View>
           ) : (
             // The card eases to its new height as rows come and go, instead of snapping.

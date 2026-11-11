@@ -5,6 +5,7 @@ import { useFeed } from '../feed/feed-state';
 import { useScanHistory } from '../history/scan-history-state';
 import type { SavedScan } from '../history/scan-history';
 import { useMarketplace } from '../marketplace/marketplace-state';
+import { useBackendMode } from '../session/backend-mode';
 import {
   photosOf,
   previewConditions,
@@ -101,14 +102,17 @@ function sampleDetail(itemId: string | undefined): ItemDetail {
 const sampleIds = new Set(previewHistory.map((item) => item.id));
 
 /**
- * The thing an item screen is for: one of the account's saved scans, or, for the sample items
- * History shows before the first scan, the sample preview. With no id (a fresh snap still being
- * valued) it's the preview too. Anything else is missing, once the scans have loaded.
+ * The thing an item screen is for: one of the account's saved scans, or, on a device with no
+ * Supabase project, the sample preview (for the sample items History shows before the first scan,
+ * and with no id, a fresh snap still being valued). Anything else is missing, once the scans have
+ * loaded. With a project the sample never stands in: an id that isn't one of the account's scans
+ * is missing.
  */
 export function useItemDetail(itemId: string | undefined): ItemLookup {
   const { scans, status } = useScanHistory();
   const { myListings: listings } = useMarketplace();
   const { findPostForScan } = useFeed();
+  const mode = useBackendMode();
   return useMemo<ItemLookup>(() => {
     const scan = itemId ? scans.find((entry) => entry.id === itemId) : undefined;
     if (scan) {
@@ -119,7 +123,9 @@ export function useItemDetail(itemId: string | undefined): ItemLookup {
         item: scanDetail(scan, linkedListing?.id, linkedPost?.slug || linkedPost?.id),
       };
     }
-    if (!itemId || sampleIds.has(itemId)) return { status: 'found', item: sampleDetail(itemId) };
+    if (mode === 'device' && (!itemId || sampleIds.has(itemId))) {
+      return { status: 'found', item: sampleDetail(itemId) };
+    }
     return status === 'loading' ? { status: 'loading' } : { status: 'missing' };
-  }, [findPostForScan, itemId, listings, scans, status]);
+  }, [findPostForScan, itemId, listings, mode, scans, status]);
 }

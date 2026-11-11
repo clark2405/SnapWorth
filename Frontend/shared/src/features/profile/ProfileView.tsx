@@ -53,6 +53,7 @@ import {
 import { formatPeso, previewHeldContent, previewPortfolio } from '../preview/sample-data';
 import { useFeed } from '../feed/feed-state';
 import { useScanHistory } from '../history/scan-history-state';
+import { useBackendMode } from '../session/backend-mode';
 import { avatarSourceFor, previewProfileId, useUserProfile } from './userProfile';
 
 export type ProfileDestination =
@@ -102,6 +103,11 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
     profile.id !== previewProfileId && scanHistory.status === 'ready'
       ? scanHistory.scans.length
       : profile.stats.checked;
+  // The collection is worth what the AI said of the account's own scans. The sample total and its
+  // trend stand in only on a device with no Supabase project and no scans yet.
+  const mode = useBackendMode();
+  const collectionIsSample = mode === 'device' && scanHistory.scans.length === 0;
+  const collectionTotal = scanHistory.scans.reduce((sum, scan) => sum + scan.estimate, 0);
   const votesCount =
     profile.id !== previewProfileId && !feed.loading
       ? feed.userVotes.length
@@ -167,7 +173,9 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
                   ·
                 </SWText>
               )}
-              <Rating value={profile.rating} variant="bodySmall" tone="textSecondary" />
+              {profile.rating === null ? null : (
+                <Rating value={profile.rating} variant="bodySmall" tone="textSecondary" />
+              )}
             </View>
             {profile.bio ? (
               <SWText variant="bodySmall" tone="textSecondary" numberOfLines={2}>
@@ -209,19 +217,25 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
         ))}
       </Reveal>
 
-      <Reveal index={2}>
-        <Surface tone="feature" padding={tokens.spacing[5]} contentStyle={styles.collectionCard}>
-          <Overline icon={Wallet} label="Collection value" tone="onFeatureDim" />
-          <CountUp
-            value={previewPortfolio.total}
-            format={formatPeso}
-            variant="priceLarge"
-            tone="onFeature"
-          />
-          <Tag label={previewPortfolio.changeLabel} tone="mint" />
-          <Sparkline values={previewPortfolio.series} height={56} color={colors.onFeature} />
-        </Surface>
-      </Reveal>
+      {collectionIsSample || collectionTotal > 0 ? (
+        <Reveal index={2}>
+          <Surface tone="feature" padding={tokens.spacing[5]} contentStyle={styles.collectionCard}>
+            <Overline icon={Wallet} label="Collection value" tone="onFeatureDim" />
+            <CountUp
+              value={collectionIsSample ? previewPortfolio.total : collectionTotal}
+              format={formatPeso}
+              variant="priceLarge"
+              tone="onFeature"
+            />
+            {collectionIsSample ? (
+              <>
+                <Tag label={previewPortfolio.changeLabel} tone="mint" />
+                <Sparkline values={previewPortfolio.series} height={56} color={colors.onFeature} />
+              </>
+            ) : null}
+          </Surface>
+        </Reveal>
+      ) : null}
 
       <Reveal index={3} style={styles.sections}>
         <ListGroup title="Your activity" icon={History}>
@@ -266,7 +280,7 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
             <ListRow
               label="Moderation"
               icon={ShieldAlert}
-              value={String(previewHeldContent.length)}
+              value={mode === 'device' ? String(previewHeldContent.length) : undefined}
               onPress={() => onOpen?.('moderation')}
             />
           ) : null}

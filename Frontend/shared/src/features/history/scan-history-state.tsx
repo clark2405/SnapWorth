@@ -11,6 +11,7 @@ import {
 } from 'react';
 
 import { previewHistory, type PreviewHistoryItem } from '../preview/sample-data';
+import { useBackendMode } from '../session/backend-mode';
 import {
   deleteScan,
   formatCapturedDate,
@@ -170,8 +171,9 @@ export function useScanHistory(): ScanHistory {
 }
 
 /**
- * The things History holds: the account's own scans, or, before the first one, the sample items
- * as a preview, never the two mixed.
+ * The things History holds: the account's own scans. Before the first one, a build with no
+ * Supabase project shows the sample items as a preview (never mixed with real scans); with a
+ * project there's nothing yet, and History says so.
  */
 export function useHistoryItems(): {
   readonly items: readonly PreviewHistoryItem[];
@@ -179,11 +181,14 @@ export function useHistoryItems(): {
   readonly samples: boolean;
 } {
   const { scans } = useScanHistory();
+  const mode = useBackendMode();
   return useMemo(
     () =>
       scans.length > 0
         ? { items: scans.map(scanToPreviewItem), samples: false }
-        : { items: previewHistory, samples: true },
-    [scans],
+        : mode === 'device'
+          ? { items: previewHistory, samples: true }
+          : { items: [], samples: false },
+    [mode, scans],
   );
 }

@@ -1,4 +1,4 @@
-import { Users } from 'lucide-react-native';
+import { PackageSearch, Users } from 'lucide-react-native';
 import { useState } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -8,6 +8,7 @@ import {
   Button,
   ChoiceChips,
   CountUp,
+  EmptyState,
   Field,
   ListRow,
   NavHeader,
@@ -15,6 +16,7 @@ import {
   PriceRangeBar,
   Reveal,
   Screen,
+  ScreenSkeleton,
   SelectField,
   Surface,
   SWText,
@@ -23,18 +25,12 @@ import {
   Toggle,
 } from '../../components';
 import { haptic, themedStyles, tokens, useThemedStyles } from '../../design';
-import type { MarketArea, MarketCategory } from '../../ports/marketplace';
+import type { MarketArea, MarketCategory, MarketListing } from '../../ports/marketplace';
 import type { ModerationStatus } from '../../types/entities';
 import { useFeed } from '../feed/feed-state';
 import { useScanHistory } from '../history/scan-history-state';
-import { useItemDetail } from '../item/item-source';
-import {
-  formatPeso,
-  previewConditions,
-  previewItem,
-  previewValuation,
-  type PreviewCondition,
-} from '../preview/sample-data';
+import { useItemDetail, type ItemDetail } from '../item/item-source';
+import { formatPeso, previewConditions, type PreviewCondition } from '../preview/sample-data';
 import { listingPhotoSource, useMarketplace } from './marketplace-state';
 
 export interface ConfirmPriceViewProps {
@@ -82,10 +78,7 @@ export function parseEnteredPrice(text: string): number | null {
   return value > 0 ? value : null;
 }
 
-function suggestedPrice(
-  condition: PreviewCondition,
-  baseAmount: number = previewItem.estimate,
-): number {
+function suggestedPrice(condition: PreviewCondition, baseAmount: number): number {
   const factor = previewConditions.find((entry) => entry.key === condition)?.factor ?? 1;
   return Math.round((baseAmount * factor) / 10) * 10;
 }
@@ -97,16 +90,18 @@ function liveLine(status: ModerationStatus, live: string): string {
   return 'Held for review. Only you can see it until a moderator has looked.';
 }
 
-export function ConfirmPriceView({ itemId, onBack, onPublish }: ConfirmPriceViewProps) {
-  const styles = useThemedStyles(stylesFor);
-  const toast = useToast();
-  const { myListings: listings, publishListing, updateListing } = useMarketplace();
-  const { publishPost } = useFeed();
-  const { scans, reload: reloadScans } = useScanHistory();
+/**
+ * Setting the asking price: for a saved scan about to be listed, or one of the seller's own
+ * listings being edited. An item that isn't either (a stale link) says so; nothing is prefilled
+ * from a sample.
+ */
+export function ConfirmPriceView(props: ConfirmPriceViewProps) {
+  const { itemId, onBack } = props;
+  const { myListings } = useMarketplace();
   const lookup = useItemDetail(itemId);
 
   const existingListing = itemId
-    ? listings.find(
+    ? myListings.find(
         (entry) =>
           entry.id === itemId ||
           entry.slug === itemId ||
@@ -114,21 +109,64 @@ export function ConfirmPriceView({ itemId, onBack, onPublish }: ConfirmPriceView
           (entry.scanId !== null && entry.scanId === itemId),
       )
     : undefined;
-
-  const savedScan = itemId ? scans.find((entry) => entry.id === itemId) : undefined;
   const foundItem = lookup.status === 'found' ? lookup.item : undefined;
 
-  const title = existingListing?.title ?? foundItem?.title ?? previewItem.title;
-  const subtitle = foundItem?.explanation ? foundItem.explanation : previewItem.subtitle;
-  const baseValuation = existingListing?.estimatePhp ?? foundItem?.estimate ?? previewItem.estimate;
-  const valuationLow = existingListing?.estimateLowPhp ?? foundItem?.low ?? previewValuation.low;
-  const valuationHigh =
-    existingListing?.estimateHighPhp ?? foundItem?.high ?? previewValuation.high;
+  if (existingListing || foundItem) {
+    return <ConfirmPrice {...props} existingListing={existingListing} foundItem={foundItem} />;
+  }
+  if (lookup.status === 'loading') return <ScreenSkeleton kind="page" />;
+  return (
+    <Screen ambient="market" header={<NavHeader title="List for sale" onBack={onBack} banded />}>
+      <EmptyState
+        icon={PackageSearch}
+        title="Nothing to list here"
+        body="This item isn’t one of your saved snaps. Open it from History to list it."
+        actionLabel="Go back"
+        onAction={onBack}
+      />
+    </Screen>
+  );
+}
+
+function ConfirmPrice({
+  itemId,
+  existingListing,
+  foundItem,
+  onBack,
+  onPublish,
+}: ConfirmPriceViewProps & {
+  readonly existingListing?: MarketListing;
+  readonly foundItem?: ItemDetail;
+}) {
+  const styles = useThemedStyles(stylesFor);
+  const toast = useToast();
+  const { publishListing, updateListing } = useMarketplace();
+  const { publishPost } = useFeed();
+  const { scans, reload: reloadScans } = useScanHistory();
+
+  const savedScan = itemId ? scans.find((entry) => entry.id === itemId) : undefined;
+
+  const title = existingListing?.title ?? foundItem?.title ?? '';
+  const subtitle = foundItem?.explanation ?? '';
+  // The AI's range for this item, from the listing's scan or the saved scan: none when it has none.
+  const valuation =
+    existingListing &&
+    existingListing.estimatePhp !== null &&
+    existingListing.estimateLowPhp !== null &&
+    existingListing.estimateHighPhp !== null
+      ? {
+          estimate: existingListing.estimatePhp,
+          low: existingListing.estimateLowPhp,
+          high: existingListing.estimateHighPhp,
+        }
+      : foundItem
+        ? { estimate: foundItem.estimate, low: foundItem.low, high: foundItem.high }
+        : null;
+  const baseValuation = valuation?.estimate ?? null;
   const photoSource = existingListing
     ? listingPhotoSource(existingListing)
-    : (foundItem?.photos[0]?.source ?? previewItem.photo);
-  const photoLabel =
-    existingListing?.photoLabel ?? foundItem?.photos[0]?.label ?? previewItem.photoLabel;
+    : (foundItem?.photos[0]?.source ?? null);
+  const photoLabel = existingListing?.photoLabel ?? foundItem?.photos[0]?.label ?? title;
 
   const [alsoAskFeed, setAlsoAskFeed] = useState(false);
   const [condition, setCondition] = useState<PreviewCondition>(
@@ -146,21 +184,22 @@ export function ConfirmPriceView({ itemId, onBack, onPublish }: ConfirmPriceView
   const [priceText, setPriceText] = useState(() =>
     existingListing
       ? String(existingListing.askingPrice)
-      : String(suggestedPrice('good', baseValuation)),
+      : baseValuation === null
+        ? ''
+        : String(suggestedPrice('good', baseValuation)),
   );
   const [edited, setEdited] = useState(Boolean(existingListing));
   const [publishing, setPublishing] = useState(false);
 
   const enteredPrice = parseEnteredPrice(priceText);
-  const suggestion = suggestedPrice(condition, baseValuation);
+  const suggestion = baseValuation === null ? null : suggestedPrice(condition, baseValuation);
   const hint = previewConditions.find((entry) => entry.key === condition)?.hint ?? '';
-  const areaLabel = areaCycle.find((entry) => entry.key === area)?.label ?? previewItem.location;
-  const categoryLabel =
-    categoryCycle.find((entry) => entry.key === category)?.label ?? previewItem.category;
+  const areaLabel = areaCycle.find((entry) => entry.key === area)?.label ?? '';
+  const categoryLabel = categoryCycle.find((entry) => entry.key === category)?.label ?? '';
 
   const handleCondition = (key: PreviewCondition) => {
     setCondition(key);
-    if (!edited) setPriceText(String(suggestedPrice(key, baseValuation)));
+    if (!edited && baseValuation !== null) setPriceText(String(suggestedPrice(key, baseValuation)));
   };
 
   const cycleArea = () => {
@@ -218,9 +257,10 @@ export function ConfirmPriceView({ itemId, onBack, onPublish }: ConfirmPriceView
         description.trim().length > 0
           ? description.trim()
           : `${title} in ${condition.replace('_', ' ')} condition.`,
-      estimatePhp: baseValuation,
-      estimateLowPhp: valuationLow,
-      estimateHighPhp: valuationHigh,
+      // Only the on-device repository records these; Supabase copies them from the scan.
+      estimatePhp: valuation?.estimate ?? null,
+      estimateLowPhp: valuation?.low ?? null,
+      estimateHighPhp: valuation?.high ?? null,
     });
     setPublishing(false);
 
@@ -313,33 +353,37 @@ export function ConfirmPriceView({ itemId, onBack, onPublish }: ConfirmPriceView
           Condition
         </SWText>
         <ChoiceChips options={previewConditions} value={condition} onChange={handleCondition} />
-        <View style={styles.suggestion}>
-          <SWText variant="overline" tone="textMuted">
-            Suggested price
-          </SWText>
-          <CountUp value={suggestion} format={formatPeso} variant="priceLarge" />
-          <Animated.View
-            key={condition}
-            entering={FadeIn.duration(160)}
-            exiting={FadeOut.duration(120)}
-          >
-            <SWText variant="caption" tone="textMuted">
-              {hint}
+        {suggestion === null ? null : (
+          <View style={styles.suggestion}>
+            <SWText variant="overline" tone="textMuted">
+              Suggested price
             </SWText>
-          </Animated.View>
-        </View>
+            <CountUp value={suggestion} format={formatPeso} variant="priceLarge" />
+            <Animated.View
+              key={condition}
+              entering={FadeIn.duration(160)}
+              exiting={FadeOut.duration(120)}
+            >
+              <SWText variant="caption" tone="textMuted">
+                {hint}
+              </SWText>
+            </Animated.View>
+          </View>
+        )}
       </Reveal>
 
-      <Reveal index={2} style={styles.range}>
-        <PriceRangeBar
-          low={valuationLow}
-          high={valuationHigh}
-          estimate={baseValuation}
-          confidence={foundItem?.confidence ?? previewValuation.confidence}
-          asking={enteredPrice ?? suggestion}
-          format={formatPeso}
-        />
-      </Reveal>
+      {valuation ? (
+        <Reveal index={2} style={styles.range}>
+          <PriceRangeBar
+            low={valuation.low}
+            high={valuation.high}
+            estimate={valuation.estimate}
+            confidence={foundItem?.confidence}
+            asking={enteredPrice ?? suggestion ?? undefined}
+            format={formatPeso}
+          />
+        </Reveal>
+      ) : null}
 
       <Reveal index={3} style={styles.fields}>
         <Field label="Your asking price">
