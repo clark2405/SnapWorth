@@ -155,6 +155,47 @@ create trigger listings_prepare
   before insert or update on public.listings
   for each row execute function public.prepare_listing();
 
+-- A listing's identity, its AI numbers, its verdict, its moderation and its counters are never
+-- the seller's to change after it exists. The column grants already leave them out of every
+-- update; this is the second lock, so widening a grant later, or an update that reaches a column
+-- some other way, still can't rewrite them. It only judges a caller signed in as a client role:
+-- the votes, saves and moderation triggers (security definer) and the service role change these
+-- columns legitimately. Named so it fires before `listings_prepare`, which itself resets
+-- moderation when the words change.
+create function public.guard_listing_fields()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if current_user in ('anon', 'authenticated') and (
+    new.id is distinct from old.id
+    or new.slug is distinct from old.slug
+    or new.seller_id is distinct from old.seller_id
+    or new.scan_id is distinct from old.scan_id
+    or new.photo_path is distinct from old.photo_path
+    or new.created_at is distinct from old.created_at
+    or new.estimate_php is distinct from old.estimate_php
+    or new.estimate_low_php is distinct from old.estimate_low_php
+    or new.estimate_high_php is distinct from old.estimate_high_php
+    or new.verdict is distinct from old.verdict
+    or new.verdict_share is distinct from old.verdict_share
+    or new.moderation_status is distinct from old.moderation_status
+    or new.moderation_ref is distinct from old.moderation_ref
+    or new.moderated_at is distinct from old.moderated_at
+    or new.views_count is distinct from old.views_count
+    or new.saves_count is distinct from old.saves_count
+  ) then
+    raise exception 'That part of a listing can''t be changed.' using errcode = 'SWIMM';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger listings_guard_fields
+  before update on public.listings
+  for each row execute function public.guard_listing_fields();
+
 -- Flood limits: at most 20 listings created an hour and 100 active listings per seller.
 create function public.enforce_listings_rate_limit()
 returns trigger
@@ -313,10 +354,11 @@ begin
     into target
     from public.listings l
    where l.slug = listing_slug
-      or (
-        listing_slug ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-        and l.id = listing_slug::uuid
-      );
+      -- A CASE, so the cast only runs on text that is a uuid (AND doesn't promise that order).
+      or l.id = case
+        when listing_slug ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          then listing_slug::uuid
+      end;
   if not found or target.status = 'removed' then
     raise exception 'This listing is not available.' using errcode = 'P0002';
   end if;

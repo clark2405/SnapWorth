@@ -66,7 +66,8 @@ grant execute on all functions in schema market_tests to anon, authenticated, se
 -- Maya (seller) and Noel (buyer).
 insert into auth.users (id, email, raw_user_meta_data) values
   ('00000000-0000-4000-fa00-00000000000a', 'maya-market@test', '{"handle":"maya_sells"}'),
-  ('00000000-0000-4000-fa00-00000000000b', 'noel-market@test', '{"handle":"noel_buys"}');
+  ('00000000-0000-4000-fa00-00000000000b', 'noel-market@test', '{"handle":"noel_buys"}'),
+  ('00000000-0000-4000-fa00-00000000000c', 'cora-market@test', '{"handle":"cora_buys"}');
 
 -- 1. Seller profile fields: Maya sets her display name, bio and location.
 set role authenticated;
@@ -385,6 +386,16 @@ select market_tests.check(
     where id = '00000000-0000-4000-fc00-000000000001'$$) = 1,
   'a seller updates their asking price and marks the listing sold'
 );
+reset role;
+set role authenticated;
+select market_tests.sign_in('00000000-0000-4000-fa00-00000000000c');
+select market_tests.check_rejected(
+  $$select public.start_conversation('pentax-k1000-35mm-camera-00000000')$$,
+  array['SWCLO'],
+  'a new buyer cannot start a chat on a listing that has sold'
+);
+set role authenticated;
+select market_tests.sign_in('00000000-0000-4000-fa00-00000000000a');
 select market_tests.check(
   market_tests.changed($$update public.listings
     set status = 'removed'
@@ -413,6 +424,74 @@ select market_tests.check(
   (select saves_count from public.listings where id = '00000000-0000-4000-fc00-000000000001') = 0,
   'unsaving a listing decrements its saves_count'
 );
+
+-- 5b. A seller can't rewrite a listing's identity or server-owned columns after creating it.
+--     The column grants already refuse the update; widen them on purpose here to show the guard
+--     trigger would refuse it on its own.
+set role authenticated;
+select market_tests.sign_in('00000000-0000-4000-fa00-00000000000a');
+select market_tests.check_rejected(
+  $$update public.listings set scan_id = null
+     where id = '00000000-0000-4000-fc00-000000000001'$$,
+  array['42501'],
+  'the grants refuse a change to scan_id'
+);
+reset role;
+
+grant update (scan_id, photo_path, seller_id, slug, created_at, estimate_php, estimate_low_php,
+  estimate_high_php, verdict, verdict_share, moderation_status, moderation_ref, moderated_at,
+  views_count, saves_count) on public.listings to authenticated;
+
+set role authenticated;
+select market_tests.sign_in('00000000-0000-4000-fa00-00000000000a');
+select market_tests.check_rejected(
+  $$update public.listings set scan_id = null where id = '00000000-0000-4000-fc00-000000000001'$$,
+  array['SWIMM'], 'a seller cannot detach or swap the scan');
+select market_tests.check_rejected(
+  $$update public.listings set photo_path = null where id = '00000000-0000-4000-fc00-000000000001'$$,
+  array['SWIMM'], 'a seller cannot change the photo');
+select market_tests.check_rejected(
+  $$update public.listings set seller_id = '00000000-0000-4000-fa00-00000000000b'
+     where id = '00000000-0000-4000-fc00-000000000001'$$,
+  array['SWIMM'], 'a seller cannot hand the listing to someone else');
+select market_tests.check_rejected(
+  $$update public.listings set slug = 'something-else-00000000' where id = '00000000-0000-4000-fc00-000000000001'$$,
+  array['SWIMM'], 'a seller cannot change the slug');
+select market_tests.check_rejected(
+  $$update public.listings set created_at = now() - interval '5 years'
+     where id = '00000000-0000-4000-fc00-000000000001'$$,
+  array['SWIMM'], 'a seller cannot back-date the listing');
+select market_tests.check_rejected(
+  $$update public.listings set estimate_php = 1, estimate_low_php = 1, estimate_high_php = 1
+     where id = '00000000-0000-4000-fc00-000000000001'$$,
+  array['SWIMM'], 'a seller cannot change the AI estimate');
+select market_tests.check_rejected(
+  $$update public.listings set verdict = 'too_low', verdict_share = 99
+     where id = '00000000-0000-4000-fc00-000000000001'$$,
+  array['SWIMM'], 'a seller cannot change the community verdict');
+select market_tests.check_rejected(
+  $$update public.listings set moderation_status = 'held'
+     where id = '00000000-0000-4000-fc00-000000000001'$$,
+  array['SWIMM'], 'a seller cannot change the moderation state');
+select market_tests.check_rejected(
+  $$update public.listings set saves_count = 500 where id = '00000000-0000-4000-fc00-000000000001'$$,
+  array['SWIMM'], 'a seller cannot change the save count');
+-- What the seller may still change goes through.
+select market_tests.check(
+  market_tests.changed($$update public.listings set condition = 'fair', description = 'Tested again.'
+    where id = '00000000-0000-4000-fc00-000000000001'$$) = 1,
+  'a seller can still edit what is theirs to edit'
+);
+reset role;
+
+revoke update (scan_id, photo_path, seller_id, slug, created_at, estimate_php, estimate_low_php,
+  estimate_high_php, verdict, verdict_share, moderation_status, moderation_ref, moderated_at,
+  views_count, saves_count) on public.listings from authenticated;
+
+-- The service role (no client role) can still settle moderation, and the saves trigger still counts.
+update public.listings set moderation_status = 'approved', moderation_ref = 'rules',
+       moderated_at = now()
+ where id = '00000000-0000-4000-fc00-000000000001';
 
 -- 6. Flood limit: 20 listings an hour per seller.
 set role authenticated;
