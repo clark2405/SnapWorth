@@ -21,7 +21,7 @@ both apps.
 ## What's built and what isn't
 
 Keep this list current: when you finish or start something, move it here in the same change.
-Last updated 2026-11-10.
+Last updated 2026-11-11.
 
 ### Working for real
 
@@ -68,7 +68,8 @@ Last updated 2026-11-10.
 - **Saving snaps (PR #24):** each successful estimate is saved to History, in Supabase's
   `scan_history` table (private to its owner), with a copy on the phone for offline. A scan saved
   offline is sent when the app is back online. Each account on a shared phone sees only its own.
-  History shows your own scans once you have one; before that, the sample items as a preview.
+  History shows your own scans; with a backend it is empty until the first one (a build with no
+  Supabase project shows the sample items as a preview).
 - **Scan photos:** after a scan is saved, its photo is uploaded to Storage's private
   `scan-photos` bucket, so History shows it on every device, through links that last 12 hours.
   The phone's own copy shows until the upload has gone; a failed upload is tried again on the
@@ -85,42 +86,71 @@ Last updated 2026-11-10.
   backend they stay on the phone. Collections and prices a phone kept before move into the
   account that owns their things, once.
 - **Market and listings:** listings live in Supabase (`listings`), with photo, category, condition,
-  area, coordinates, description and AI worth range. Owners can list a scan from History (`ConfirmPriceView`
-  reads the real scan through `useItemDetail` and never copies `paid_php` or pre-fills the AI
-  estimate as the asking price), edit their listing, mark it sold, or delete it. A read policy on
-  `storage.objects` lets anyone view the scan photo of a public listing. Market, filters, listing
-  pages, seller profiles (`profiles.display_name`, `bio`, `location`), Search, Hanap matches and
-  Guess the worth all draw from real listings (falling back to the local sample seed when offline
-  or before any listings exist). Saved listings and price-drop alerts are stored per account in
-  `saved_listings`.
+  area, coordinates, description and AI worth range. Owners can list a scan from History
+  (`ConfirmPriceView` reads the real scan through `useItemDetail` and never copies `paid_php`; its
+  suggested price is the AI estimate scaled by condition, and the seller sets the real one), edit
+  their listing, mark it sold, or delete it. Market, filters, listing pages, seller profiles
+  (`profiles.display_name`, `bio`, `location`), Search, Hanap matches and Guess the worth all draw
+  from real listings. Saved listings and price-drop alerts are stored per account in
+  `saved_listings`. With a backend there is no sample fallback: an unknown listing or seller says
+  so, and a listing with no photo shows a placeholder. Rules the database enforces:
+  - **The AI estimate is the database's.** `estimate_php` / `estimate_low_php` / `estimate_high_php`
+    are copied from the linked `scan_history` row when the listing is created (null with no scan)
+    and can't be written or changed by a client; a feed post takes its estimate from the listing it
+    reposts or its scan (`feed_posts.estimate_php` is nullable).
+  - **The community verdict is null until people vote** (`verdict`, `verdict_share`): worked out by
+    `refresh_listing_verdict` from the votes on the listing's approved posts. No votes, no chip.
+  - **Listings are moderated** like Hanap and feed posts: `moderation_status` starts `pending`, only
+    the seller sees it until `moderate-content` approves it, and changing the title or description
+    sends it back to `pending`. Only approved, non-removed listings are public, can be messaged
+    (`start_conversation` takes the slug or the id) or share their scan photo (a read policy on
+    `storage.objects`). The seller sees their own with its state.
+  - **A seller can't change** a listing's id, slug, seller, scan, photo, created time, estimate,
+    verdict, moderation or counters (grants plus `guard_listing_fields`). Slugs are generated.
+  - **"Near me" is measured on the device.** No distance is stored: it's the viewer's position
+    (asked for only when they pick "Near me", never stored or sent) to the listing's coordinates,
+    which the database rounds to about 1 km, or to the centre of its area when it has none. If
+    location is denied the Market says so and shows everything. This uses `expo-location`, so
+    phone builds need a new `expo prebuild`.
+  - Sellers aren't rated: `rating` is null and "sales" is how many of their listings sold.
 - **Feed, votes and trends:** community price-check posts live in Supabase (`feed_posts`), linked
   to a saved scan (`scan_id`) or a marketplace listing (`listing_id`), and screened through
   `moderate-content`. A read policy on `storage.objects` lets anyone view the scan photo of an
   approved feed post. `CreatePostView` (`/ask/<id>`) reads the real scan or listing, and
   `ConfirmPriceView`'s "Also ask the feed" switch publishes a linked feed post alongside a new
   listing. Votes are stored per account in `votes` (one vote per person per post), with triggers
-  keeping each post's `too_high_count`, `just_right_count` and `too_low_count` and any linked
-  listing's `verdict` / `verdict_share` in sync. Feed, post discussion pages, Your votes
-  (`VotesView`), Search and Trends (`TrendView`) all draw from real feed posts and listings.
+  keeping each post's `too_high_count`, `just_right_count` and `too_low_count` and the verdict of
+  any listing it reposts in sync. Feed, post discussion pages and Your votes (`VotesView`) draw
+  from real feed posts. Trends (the Feed's "Most listed this month" row, `TrendView`, Search's
+  Trending) are worked out on the device from the real listings' asking prices (`trends.ts`): not
+  sale prices, no editorial copy, a change only when two months have enough listings. Recent
+  searches are kept on the device under the signed-in account.
+- **With a backend, no sample content:** every screen shows real data, or says there's nothing yet
+  (`useBackendMode()` is `supabase`). The sample experience (`features/preview/sample-data.ts`,
+  `marketplace-seed.ts`, `feed-seed.ts`) is for a build with no Supabase project, where the app
+  runs alone on the device. The web's Snap page, which only ever opened a sample estimate, says
+  Snap works in the phone app when a project is configured.
 - **Needs deploying:** `npx supabase db push` for the `scan_history`, `photo_storage`,
   `flips_and_collections`, `marketplace` and `feed_and_votes` migrations, and
-  `npx supabase functions deploy moderate-content` for feed post screening.
+  `npx supabase functions deploy moderate-content` (it now screens listings too). None of this is
+  deployed yet. Until a moderation provider is set (see below), every new listing is held.
 
 ### Kept on the device only
 
 - **Guess the worth:** a daily game on the Feed. It's five of the Market's listings, the same five
   for everyone that day. You guess each one's worth, then see the AI's estimate and what voters
   think of the asking price. Your scores, streak and Sharp eye badges stay on the device; no
-  account needed. It draws from the Market's real listings (or the sample listings when no backend
-  is connected).
+  account needed. It draws from the Market's real listings that carry an AI estimate; with a
+  backend it isn't offered until there are five (the sample listings fill in only with no backend).
 
 ### Screens built, but showing sample data
 
 These look finished but read from `shared/src/features/preview/sample-data.ts`, and what people do
 on them isn't saved.
 
-- **History, before the first scan:** the sample items, and their sample market detail (demand,
-  condition, trend and recent sales) on the item screen. A real scan has no market detail yet.
+- **With no backend only:** History's sample items before the first scan, and their sample market
+  detail (demand, condition, trend and recent sales) on the item screen. With a backend History is
+  empty until the first scan, and a real scan has no market detail yet.
 - **Profile:** the admin review queue. Your own profile, seller profiles, price alerts and your
   votes are real (see above).
 - **Worthy's cards:** price, trend and collection answers.
@@ -145,10 +175,19 @@ on them isn't saved.
   for development only. Set `EXPO_PUBLIC_MAP_TILES_URL` and `EXPO_PUBLIC_PLACE_SEARCH_URL`.
 - **Android:** not yet checked on a phone. The Snap bar may be hidden behind the tab bar.
 - **A moderation provider:** Supabase has no `MODERATION_PROVIDER` secret set, so
-  `moderate-content` holds every feed comment, feed post and hanap post: only its author sees it. Set
+  `moderate-content` holds every feed comment, feed post, hanap post and listing: only its author sees it. Set
   `MODERATION_PROVIDER=rules` for the built-in word rules (fine while testing), or `openai` with an
   `OPENAI_API_KEY` (OpenAI's moderation is free) before launch. Set it in the dashboard under Edge
   Functions → Secrets, or with `npx supabase secrets set`.
+- **Checked only against local tests:** the Market and Feed work (listing moderation, server-owned
+  estimates and verdicts, near-me, trends, no sample content with a backend) has passed the SQL
+  tests, the jest suites and `expo export` for the web and Android, but hasn't run against a live
+  Supabase project or on a device. `moderate-content`'s new handler tests were run under Node
+  with a stand-in for `Deno.test`; `Backend/scripts/test-functions.sh` (Deno) and the two-device
+  chat simulation haven't been run on it.
+- **Seller ratings and reviews:** not built, so sellers show their number of sales only.
+- **The web's Snap:** the website has no camera. With a Supabase project its Snap page points to
+  the phone app.
 - **Deployment:** EAS builds for the phones, and Vercel for the web.
 
 The detailed task lists are in `agents/specs/`. Git keeps that folder local, so ask whoever has it,
