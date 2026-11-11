@@ -1,5 +1,5 @@
 import type { UtcDateTime } from '../types/date-time';
-import type { VoteChoice } from '../types/entities';
+import type { ModerationStatus, VoteChoice } from '../types/entities';
 import type { AppError } from '../types/errors';
 import type { Result } from '../types/result';
 
@@ -46,6 +46,11 @@ export interface MarketListing {
   readonly verdict: VoteChoice | null;
   readonly verdictShare: number | null;
   readonly status: ListingStatus;
+  /**
+   * Whether moderation has cleared the listing's words. Only `approved` listings are public;
+   * the seller always sees their own, with this state.
+   */
+  readonly moderationStatus: ModerationStatus;
   readonly seller: ListingSellerSummary;
   readonly stats: {
     readonly views: number;

@@ -8,6 +8,7 @@ import type { UtcDateTime } from '../../types/date-time';
 import type { PublicProfile } from '../../types/entities';
 import { err, ok } from '../../types/result';
 import type { KeyValueStore } from './comment-repository';
+import { screenWithRules } from './screening';
 
 const listingsKey = 'snapworth.marketplace.listings.v1';
 const savedKey = 'snapworth.marketplace.saved.v1';
@@ -150,6 +151,8 @@ export function createLocalMarketplaceRepository({
         verdict: null,
         verdictShare: null,
         status: 'active',
+        // The same development rules as the server's `rules` provider: held text stays private.
+        moderationStatus: screenWithRules(`${title}\n${input.description}`),
         seller: {
           id: viewer.userId,
           handle: viewer.handle,
@@ -189,6 +192,12 @@ export function createLocalMarketplaceRepository({
         description:
           change.description !== undefined ? change.description.trim() : target.description,
         status: change.status ?? target.status,
+        // New words are screened again, as the database does.
+        moderationStatus:
+          nextTitle !== target.title ||
+          (change.description !== undefined && change.description.trim() !== target.description)
+            ? screenWithRules(`${nextTitle}\n${change.description ?? target.description}`)
+            : target.moderationStatus,
       };
       await writeListings(
         all.map((listing) => (listing.rowId === target.rowId ? updated : listing)),

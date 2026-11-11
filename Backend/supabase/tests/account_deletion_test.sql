@@ -101,11 +101,11 @@ insert into public.comment_reports (comment_id, reporter_id) values
   ('00000000-0000-4000-d200-000000000004', '00000000-0000-4000-d000-00000000000a'),
   ('00000000-0000-4000-d200-000000000001', '00000000-0000-4000-d000-00000000000b');
 
-insert into public.listings (id, slug, seller_id, title, asking_php) values
+insert into public.listings (id, slug, seller_id, title, asking_php, moderation_status) values
   ('00000000-0000-4000-d300-00000000000a', 'ana-lamp', '00000000-0000-4000-d000-00000000000a',
-   'Brass lamp', 1500),
+   'Brass lamp', 1500, 'approved'),
   ('00000000-0000-4000-d300-00000000000b', 'ben-radio', '00000000-0000-4000-d000-00000000000b',
-   'Transistor radio', 900);
+   'Transistor radio', 900, 'approved');
 -- Ana buys Ben's radio; Ben buys Ana's lamp.
 insert into public.conversations (id, listing_id, buyer_id, seller_id) values
   ('00000000-0000-4000-d400-000000000001', '00000000-0000-4000-d300-00000000000b',

@@ -1,106 +1,18 @@
-// POST { "type": "comment" | "hanap" | "listing" | "post", "id": "<uuid>" } — screens a pending
-// comment, hanap post, listing or feed post and approves or holds it. Called by the app right after
-// one is posted; requires a signed-in caller (the function's JWT check) and runs the database
-// update with the service role, which is the only way moderation fields can change.
+// Screens pending public text and approves or holds it; see handler.ts for the request shape.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 import { providerFromEnv } from '../_shared/providers/moderation.ts';
-import { moderateComment, type CommentStore, type ModerationStatus } from './moderate.ts';
+import { handleModeration } from './handler.ts';
+import type { ModerationDb } from './targets.ts';
 
-const cors = {
-  'access-control-allow-origin': '*',
-  'access-control-allow-headers': 'authorization, x-client-info, apikey, content-type',
-  'access-control-allow-methods': 'POST, OPTIONS',
-};
-/** What can be screened, and the table each lives in. All share the moderation columns. */
-function tableFor(type: unknown): string | null {
-  switch (type) {
-    case 'comment':
-      return 'comments';
-    case 'hanap':
-      return 'hanap_posts';
-    case 'listing':
-      return 'listings';
-    case 'post':
-      return 'feed_posts';
-    default:
-      return null;
-  }
-}
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function json(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...cors, 'content-type': 'application/json' },
-  });
-}
-
-Deno.serve(async (request: Request) => {
-  if (request.method === 'OPTIONS') return new Response(null, { headers: cors });
-  if (request.method !== 'POST') return json(405, { error: 'Use POST.' });
-
-  let target: { type?: unknown; id?: unknown };
-  try {
-    target = await request.json();
-  } catch {
-    return json(400, { error: 'Expected a JSON body.' });
-  }
-  const table = tableFor(target.type);
-  if (!table || typeof target.id !== 'string' || !uuid.test(target.id)) {
-    return json(400, {
-      error: 'Expected { "type": "comment" | "hanap" | "listing" | "post", "id": "<uuid>" }.',
-    });
-  }
-
-  const db = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    { auth: { persistSession: false } },
-  );
-  const store: CommentStore = {
-    async get(id) {
-      if (table === 'listings') {
-        const { data, error } = await db
-          .from(table)
-          .select('title, description, moderation_status')
-          .eq('id', id)
-          .maybeSingle();
-        if (error) throw error;
-        return data
-          ? {
-              body: [data.title, data.description ?? ''].filter(Boolean).join('\n\n'),
-              status: data.moderation_status as ModerationStatus,
-            }
-          : null;
-      }
-      const { data, error } = await db
-        .from(table)
-        .select('body, moderation_status')
-        .eq('id', id)
-        .maybeSingle();
-      if (error) throw error;
-      return data ? { body: data.body, status: data.moderation_status as ModerationStatus } : null;
-    },
-    async settle(id, status, ref) {
-      const { error } = await db
-        .from(table)
-        .update({ moderation_status: status, moderation_ref: ref, moderated_at: new Date().toISOString() })
-        .eq('id', id)
-        .eq('moderation_status', 'pending');
-      if (error) throw error;
-    },
-  };
-
-  const outcome = await moderateComment(
-    store,
-    providerFromEnv((name) => Deno.env.get(name)),
-    target.id,
-    request.signal,
-  );
-  if (outcome.kind === 'not_found') return json(404, { error: 'Nothing to screen with that id.' });
-  if (outcome.kind === 'retry_later') {
-    return json(503, { status: 'pending', retryable: true });
-  }
-  return json(200, { status: outcome.status });
-});
+Deno.serve((request: Request) =>
+  handleModeration(request, {
+    db: () =>
+      createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+        { auth: { persistSession: false } },
+      ) as unknown as ModerationDb,
+    provider: providerFromEnv((name) => Deno.env.get(name)),
+  }),
+);

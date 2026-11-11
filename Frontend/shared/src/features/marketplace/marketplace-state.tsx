@@ -143,6 +143,7 @@ export function buildPreviewMyMarketListing(): MarketListing {
     verdict: 'just_right',
     verdictShare: previewMyListing.justRightShare,
     status: 'active',
+    moderationStatus: 'approved',
     seller: {
       id: `preview:${previewMyListing.seller.handle}`,
       handle: previewMyListing.seller.handle,
@@ -186,6 +187,7 @@ export function buildPreviewMarketListings(): MarketListing[] {
       verdict: entry.verdict,
       verdictShare: entry.verdictShare,
       status: 'active',
+      moderationStatus: 'approved',
       seller: {
         id: `preview:${seller.handle}`,
         handle: seller.handle,
@@ -256,8 +258,10 @@ export function buildPreviewSellerSeeds(): Omit<SellerProfile, 'listings'>[] {
 
 export interface MarketplaceState {
   readonly status: MarketplaceLoadStatus;
-  /** Active listings shown in Market, newest first. */
+  /** Active listings anyone can see (approved by moderation), newest first: Market's. */
   readonly listings: readonly MarketListing[];
+  /** The viewer's own active listings, including those still waiting for or held by moderation. */
+  readonly myListings: readonly MarketListing[];
   /** Active listings in the `PreviewListing` shape for cards, Hanap and Guess. */
   readonly previewListings: readonly PreviewListing[];
   /** Saved listings & price alerts for the viewer. */
@@ -327,8 +331,17 @@ function useMarketplaceStateInternal(repository: MarketplaceRepository | null): 
     void refresh();
   }, [refresh]);
 
+  // Public: approved and active. The seller's own waiting or held listings stay out of the
+  // Market (the database hides them from everyone else too) but are in `myListings`.
   const activeListings = useMemo(
-    () => allListings.filter((listing) => listing.status === 'active'),
+    () =>
+      allListings.filter(
+        (listing) => listing.status === 'active' && listing.moderationStatus === 'approved',
+      ),
+    [allListings],
+  );
+  const myListings = useMemo(
+    () => allListings.filter((listing) => listing.status === 'active' && listing.mine),
     [allListings],
   );
 
@@ -437,6 +450,7 @@ function useMarketplaceStateInternal(repository: MarketplaceRepository | null): 
         verdict: null,
         verdictShare: null,
         status: 'active',
+        moderationStatus: 'approved',
         seller: {
           id: 'preview:retro_curator',
           handle: previewUsers.retroCurator.handle,
@@ -602,6 +616,7 @@ function useMarketplaceStateInternal(repository: MarketplaceRepository | null): 
     () => ({
       status,
       listings: activeListings,
+      myListings,
       previewListings: mappedPreviewListings,
       savedAlerts,
       findListing,
@@ -623,6 +638,7 @@ function useMarketplaceStateInternal(repository: MarketplaceRepository | null): 
       isSaved,
       loadSeller,
       mappedPreviewListings,
+      myListings,
       publishListing,
       refresh,
       removeAlert,

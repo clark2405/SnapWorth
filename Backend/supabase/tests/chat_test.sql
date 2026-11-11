@@ -45,13 +45,14 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('00000000-0000-4000-d000-0000000000b0', 'bo@test', '{"handle":"bo_buys"}'),
   ('00000000-0000-4000-d000-0000000000e0', 'eve@test', '{"handle":"eve_reads"}');
 
-insert into public.listings (id, slug, seller_id, title, asking_php, status) values
+insert into public.listings (id, slug, seller_id, title, asking_php, status, moderation_status)
+values
   ('00000000-0000-4000-e000-000000000001', 'test-lamp', '00000000-0000-4000-d000-00000000005a',
-   'Brass desk lamp', 1500, 'active'),
+   'Brass desk lamp', 1500, 'active', 'approved'),
   ('00000000-0000-4000-e000-000000000002', 'test-radio', '00000000-0000-4000-d000-00000000005a',
-   'Transistor radio', 900, 'sold'),
+   'Transistor radio', 900, 'sold', 'approved'),
   ('00000000-0000-4000-e000-000000000003', 'test-stool', '00000000-0000-4000-d000-00000000005a',
-   'Wooden stool', 700, 'active');
+   'Wooden stool', 700, 'active', 'approved');
 
 create table chat_tests.ids (name text primary key, id uuid);
 grant all on chat_tests.ids to authenticated;

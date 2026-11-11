@@ -165,9 +165,9 @@ async function main() {
       3,
     "each phone is a different account",
   );
-  // The seller lists a camera (listings have no client write path yet, so this is set up directly).
+  // The seller lists a camera, already approved by moderation (set up directly).
   asSuperuser(
-    `insert into public.listings (slug, seller_id, title, asking_php) values ('sim-camera', '${sellerId}', 'Film camera', 1500)`,
+    `insert into public.listings (slug, seller_id, title, asking_php, moderation_status) values ('sim-camera', '${sellerId}', 'Film camera', 1500, 'approved')`,
   );
 
   const stopSeller = seller.listen();

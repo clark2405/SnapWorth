@@ -11,6 +11,36 @@ function createMemoryStore() {
   };
 }
 
+describe('createLocalMarketplaceRepository moderation', () => {
+  const base = {
+    title: 'Pentax K1000',
+    askingPrice: 4500,
+    category: 'collectibles' as const,
+    condition: 'good' as const,
+    area: 'cebu-city' as const,
+  };
+  const repository = () =>
+    createLocalMarketplaceRepository({
+      store: createMemoryStore(),
+      viewer: { userId: 'usr_1' as never, handle: 'maya_sells' },
+      seedListings: [],
+      seedSaved: [],
+    });
+
+  it('holds a listing whose words break the rules, and screens an edit again', async () => {
+    const repo = repository();
+    const held = await repo.publish({ ...base, description: 'Text me on viber for less.' });
+    expect(held.ok && held.value.moderationStatus).toBe('held');
+    if (!held.ok) return;
+
+    const cleaned = await repo.update(held.value.id, { description: 'Clean viewfinder.' });
+    expect(cleaned.ok && cleaned.value.moderationStatus).toBe('approved');
+
+    const repriced = await repo.update(held.value.id, { askingPrice: 4400 });
+    expect(repriced.ok && repriced.value.moderationStatus).toBe('approved');
+  });
+});
+
 describe('createLocalMarketplaceRepository', () => {
   it('publishes, updates, saves, and removes listings on the device', async () => {
     const repo = createLocalMarketplaceRepository({
@@ -93,6 +123,7 @@ describe('createSupabaseMarketplaceRepository', () => {
       views_count: 14,
       saves_count: 2,
       status: 'active',
+      moderation_status: 'approved',
       created_at: '2026-11-10T10:00:00.000Z',
       seller: {
         id: 'usr_1',
@@ -195,5 +226,134 @@ describe('createSupabaseMarketplaceRepository', () => {
     const sold = await repo.update('pentax-k1000-00000000', { status: 'sold' });
     expect(sold.ok).toBe(true);
     expect(scanUpdates).toContainEqual({ id: 'scan_1', status: 'sold' });
+  });
+});
+
+describe('listing moderation in the Supabase repository', () => {
+  const row = {
+    id: '00000000-0000-4000-fc00-000000000001',
+    slug: 'pentax-k1000-00000000',
+    seller_id: 'usr_1',
+    scan_id: null,
+    title: 'Pentax K1000',
+    asking_php: 4500,
+    photo_url: null,
+    photo_path: null,
+    category: 'collectibles',
+    condition: 'good',
+    area: 'cebu-city',
+    lat: null,
+    lng: null,
+    description: 'Clean viewfinder.',
+    estimate_php: null,
+    estimate_low_php: null,
+    estimate_high_php: null,
+    verdict: null,
+    verdict_share: null,
+    views_count: 0,
+    saves_count: 0,
+    status: 'active',
+    moderation_status: 'pending',
+    created_at: '2026-11-10T10:00:00.000Z',
+    seller: { id: 'usr_1', handle: 'maya_sells', display_name: 'Maya', avatar_url: null },
+  };
+
+  function clientWith(invoke: jest.Mock) {
+    return {
+      auth: { getSession: async () => ({ data: { session: { user: { id: 'usr_1' } } } }) },
+      functions: { invoke },
+      from: (table: string) => {
+        if (table !== 'listings') return {};
+        return {
+          insert: () => ({ select: () => ({ single: async () => ({ data: row, error: null }) }) }),
+          select: () => ({
+            eq: () => ({ neq: () => ({ maybeSingle: async () => ({ data: row, error: null }) }) }),
+          }),
+          update: (patch: Record<string, unknown>) => ({
+            eq: () => ({
+              select: () => ({
+                single: async () => ({ data: { ...row, ...patch }, error: null }),
+              }),
+            }),
+          }),
+        };
+      },
+    };
+  }
+  const input = {
+    title: 'Pentax K1000',
+    askingPrice: 4500,
+    category: 'collectibles' as const,
+    condition: 'good' as const,
+    area: 'cebu-city' as const,
+    description: 'Clean viewfinder.',
+  };
+
+  it('screens a new listing right after publishing it and returns the outcome', async () => {
+    const invoke = jest.fn(async () => ({ data: { status: 'approved' }, error: null }));
+    const repo = createSupabaseMarketplaceRepository(clientWith(invoke) as never, {
+      upload: async () => null,
+      links: async () => ({}),
+      remove: async () => true,
+    });
+
+    const published = await repo.publish(input);
+
+    expect(invoke).toHaveBeenCalledWith('moderate-content', {
+      body: { type: 'listing', id: row.id },
+    });
+    expect(published.ok && published.value.moderationStatus).toBe('approved');
+  });
+
+  it('leaves a listing pending when screening can’t be reached', async () => {
+    const invoke = jest.fn(async () => {
+      throw new Error('offline');
+    });
+    const repo = createSupabaseMarketplaceRepository(clientWith(invoke) as never, {
+      upload: async () => null,
+      links: async () => ({}),
+      remove: async () => true,
+    });
+
+    const published = await repo.publish(input);
+
+    expect(published.ok && published.value.moderationStatus).toBe('pending');
+  });
+
+  it('screens again when an edit sent the listing back to pending, and not otherwise', async () => {
+    const invoke = jest.fn(async () => ({ data: { status: 'held' }, error: null }));
+    const repo = createSupabaseMarketplaceRepository(clientWith(invoke) as never, {
+      upload: async () => null,
+      links: async () => ({}),
+      remove: async () => true,
+    });
+
+    // The mock database echoes the patch; a changed title leaves the row pending.
+    const reworded = await repo.update(row.slug, { title: 'Pentax K1000 film camera' });
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(reworded.ok && reworded.value.moderationStatus).toBe('held');
+
+    // A row the database left approved (price only) isn't screened again.
+    invoke.mockClear();
+    const approvedRow = { ...row, moderation_status: 'approved' };
+    const client = clientWith(invoke) as unknown as { from: (t: string) => unknown };
+    const original = client.from.bind(client);
+    client.from = (table: string) => ({
+      ...(original(table) as object),
+      update: (patch: Record<string, unknown>) => ({
+        eq: () => ({
+          select: () => ({
+            single: async () => ({ data: { ...approvedRow, ...patch }, error: null }),
+          }),
+        }),
+      }),
+    });
+    const repriced = await createSupabaseMarketplaceRepository(client as never, {
+      upload: async () => null,
+      links: async () => ({}),
+      remove: async () => true,
+    }).update(row.slug, { askingPrice: 4400 });
+    expect(invoke).not.toHaveBeenCalled();
+    expect(repriced.ok && repriced.value.moderationStatus).toBe('approved');
   });
 });

@@ -238,6 +238,11 @@ update public.feed_posts
        moderation_ref = 'test-approved',
        moderated_at = now()
  where id = '00000000-0000-4000-ff00-000000000002';
+update public.listings
+   set moderation_status = 'approved',
+       moderation_ref = 'test-approved',
+       moderated_at = now()
+ where id = '00000000-0000-4000-fe00-000000000002';
 
 set role authenticated;
 select feed_tests.sign_in('00000000-0000-4000-fd00-00000000000a');

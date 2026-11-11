@@ -3,7 +3,9 @@
 -- the app. Never run this against production.
 --
 -- The listings carry no community verdict: that comes only from votes on a post that reposts a
--- listing (see refresh_listing_verdict), and the seed casts none.
+-- listing (see refresh_listing_verdict), and the seed casts none. The AI estimates and the
+-- `approved` moderation state are written here because the seed has no signed-in user; a real
+-- listing copies its estimate from its scan and starts `pending`.
 
 insert into public.listings (
   id,
@@ -20,7 +22,10 @@ insert into public.listings (
   estimate_high_php,
   views_count,
   saves_count,
-  status
+  status,
+  moderation_status,
+  moderation_ref,
+  moderated_at
 )
 values
   (
@@ -38,7 +43,10 @@ values
     3100,
     184,
     23,
-    'active'
+    'active',
+    'approved',
+    'seed',
+    now()
   ),
   (
     '00000000-0000-4000-9100-000000000002',
@@ -55,7 +63,10 @@ values
     10400,
     312,
     41,
-    'active'
+    'active',
+    'approved',
+    'seed',
+    now()
   ),
   (
     '00000000-0000-4000-9100-000000000003',
@@ -72,7 +83,10 @@ values
     2200,
     129,
     15,
-    'active'
+    'active',
+    'approved',
+    'seed',
+    now()
   ),
   (
     '00000000-0000-4000-9100-000000000004',
@@ -89,7 +103,10 @@ values
     4300,
     98,
     9,
-    'active'
+    'active',
+    'approved',
+    'seed',
+    now()
   ),
   (
     '00000000-0000-4000-9100-000000000005',
@@ -106,7 +123,10 @@ values
     2800,
     214,
     18,
-    'active'
+    'active',
+    'approved',
+    'seed',
+    now()
   ),
   (
     '00000000-0000-4000-9100-000000000006',
@@ -123,7 +143,10 @@ values
     2700,
     167,
     22,
-    'active'
+    'active',
+    'approved',
+    'seed',
+    now()
   ),
   (
     '00000000-0000-4000-9100-000000000007',
@@ -140,7 +163,10 @@ values
     3200,
     142,
     14,
-    'active'
+    'active',
+    'approved',
+    'seed',
+    now()
   ),
   (
     '00000000-0000-4000-9100-000000000008',
@@ -157,7 +183,10 @@ values
     4100,
     156,
     19,
-    'active'
+    'active',
+    'approved',
+    'seed',
+    now()
   )
 on conflict (id) do update
   set category = excluded.category,
@@ -168,7 +197,10 @@ on conflict (id) do update
       estimate_low_php = excluded.estimate_low_php,
       estimate_high_php = excluded.estimate_high_php,
       views_count = excluded.views_count,
-      saves_count = excluded.saves_count;
+      saves_count = excluded.saves_count,
+      moderation_status = excluded.moderation_status,
+      moderation_ref = excluded.moderation_ref,
+      moderated_at = excluded.moderated_at;
 
 update public.feed_posts
    set listing_id = '00000000-0000-4000-9100-000000000001'

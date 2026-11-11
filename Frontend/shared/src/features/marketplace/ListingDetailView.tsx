@@ -39,6 +39,7 @@ import {
   Toggle,
   WorthySays,
 } from '../../components';
+import type { ModerationStatus } from '../../types/entities';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import {
   formatPeso,
@@ -356,6 +357,10 @@ export function ListingDetailView({
               )}
             </WorthySays>
 
+            {owned && marketListing && marketListing.moderationStatus !== 'approved' ? (
+              <ModerationNotice status={marketListing.moderationStatus} />
+            ) : null}
+
             {owned ? (
               <OwnerPanel
                 stats={marketListing?.stats ?? previewMyListing.stats}
@@ -473,6 +478,27 @@ export function ListingDetailView({
   );
 }
 
+/**
+ * Tells a seller their listing isn't public yet: still being checked, or held for review. Until
+ * moderation approves it, only they can see it, and buyers can't message them about it.
+ */
+function ModerationNotice({ status }: { readonly status: ModerationStatus }) {
+  const styles = useThemedStyles(stylesFor);
+  const held = status === 'held' || status === 'removed';
+  return (
+    <Surface padding={tokens.spacing[4]} contentStyle={styles.communityVerdict}>
+      <View accessible accessibilityRole="alert" style={styles.moderationText}>
+        <SWText variant="label">{held ? 'Held for review' : 'Being checked'}</SWText>
+        <SWText variant="bodySmall" tone="textSecondary">
+          {held
+            ? 'Only you can see this listing. Change its title or description and it will be checked again.'
+            : 'Only you can see this listing until it has been checked. Buyers can message you once it is live.'}
+        </SWText>
+      </View>
+    </Surface>
+  );
+}
+
 /** What the seller sees in place of the seller card: how the listing is doing, and closing it. */
 function OwnerPanel({
   stats,
@@ -554,6 +580,10 @@ const stylesFor = themedStyles((colors) => ({
   },
   sections: {
     gap: tokens.spacing[5],
+  },
+  moderationText: {
+    flex: 1,
+    gap: tokens.spacing['0.5'],
   },
   communityVerdict: {
     flexDirection: 'row',

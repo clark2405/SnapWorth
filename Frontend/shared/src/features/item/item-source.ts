@@ -107,7 +107,7 @@ const sampleIds = new Set(previewHistory.map((item) => item.id));
  */
 export function useItemDetail(itemId: string | undefined): ItemLookup {
   const { scans, status } = useScanHistory();
-  const { listings } = useMarketplace();
+  const { myListings: listings } = useMarketplace();
   const { findPostForScan } = useFeed();
   return useMemo<ItemLookup>(() => {
     const scan = itemId ? scans.find((entry) => entry.id === itemId) : undefined;

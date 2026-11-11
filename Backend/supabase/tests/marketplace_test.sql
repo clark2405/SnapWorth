@@ -192,6 +192,82 @@ select market_tests.check_rejected(
 );
 reset role;
 
+-- 2b. A new listing is pending moderation: only Maya sees it, and nobody else can open a chat
+--     about it or read its photo. Held is the same; approved opens it up.
+set role anon;
+select market_tests.sign_in(null);
+select market_tests.check(
+  not exists (select 1 from public.listings where id = '00000000-0000-4000-fc00-000000000001'),
+  'a signed-out visitor cannot see a pending listing'
+);
+select market_tests.check(
+  not exists (select 1 from storage.objects where bucket_id = 'scan-photos'
+    and name = '00000000-0000-4000-fa00-00000000000a/00000000-0000-4000-fb00-000000000001.jpg'),
+  'a pending listing''s scan photo is still private'
+);
+reset role;
+
+set role authenticated;
+select market_tests.sign_in('00000000-0000-4000-fa00-00000000000b');
+select market_tests.check(
+  not exists (select 1 from public.listings where id = '00000000-0000-4000-fc00-000000000001'),
+  'another signed-in person cannot see a pending listing'
+);
+select market_tests.check_rejected(
+  $$select public.start_conversation('pentax-k1000-35mm-camera-00000000')$$,
+  array['P0002'],
+  'nobody can open a chat about a listing that is not approved'
+);
+reset role;
+
+set role authenticated;
+select market_tests.sign_in('00000000-0000-4000-fa00-00000000000a');
+select market_tests.check(
+  (select moderation_status = 'pending' from public.listings
+    where id = '00000000-0000-4000-fc00-000000000001'),
+  'the seller sees their own pending listing, with its state'
+);
+select market_tests.check_rejected(
+  $$update public.listings set moderation_status = 'approved'
+     where id = '00000000-0000-4000-fc00-000000000001'$$,
+  array['42501'],
+  'a seller cannot approve their own listing'
+);
+select market_tests.check_rejected(
+  $$insert into public.listings (title, asking_php, moderation_status)
+    values ('Self-approved', 1000, 'approved')$$,
+  array['42501'],
+  'a seller cannot publish a listing already approved'
+);
+select market_tests.check_rejected(
+  $$insert into public.listings (slug, title, asking_php)
+    values ('chosen-slug', 'Chosen slug', 1000)$$,
+  array['42501'],
+  'a seller cannot choose their own slug'
+);
+reset role;
+
+update public.listings set moderation_status = 'held', moderation_ref = 'rules (link)',
+       moderated_at = now()
+ where id = '00000000-0000-4000-fc00-000000000001';
+set role authenticated;
+select market_tests.sign_in('00000000-0000-4000-fa00-00000000000a');
+select market_tests.check(
+  (select moderation_status = 'held' from public.listings
+    where id = '00000000-0000-4000-fc00-000000000001'),
+  'the seller sees their held listing, with its state'
+);
+select market_tests.sign_in('00000000-0000-4000-fa00-00000000000b');
+select market_tests.check(
+  not exists (select 1 from public.listings where id = '00000000-0000-4000-fc00-000000000001'),
+  'a held listing is not public'
+);
+reset role;
+
+update public.listings set moderation_status = 'approved', moderation_ref = 'rules',
+       moderated_at = now()
+ where id = '00000000-0000-4000-fc00-000000000001';
+
 -- 3. Noel (and signed-out visitors) can now see the listing AND its scan photo in Storage,
 --    and Noel can open a chat using the new listing's slug.
 set role anon;
@@ -221,6 +297,11 @@ select market_tests.check(
   public.start_conversation('pentax-k1000-35mm-camera-00000000') is not null,
   'a buyer can start a chat on a newly published listing by its slug'
 );
+select market_tests.check(
+  public.start_conversation('00000000-0000-4000-fc00-000000000001')
+    = public.start_conversation('pentax-k1000-35mm-camera-00000000'),
+  'the same chat opens from the listing''s id as from its slug'
+);
 
 -- 4. Noel saves the listing with a price-drop alert; saves_count on the listing goes up.
 insert into public.saved_listings (listing_id, alert_below_php, alert_enabled)
@@ -245,6 +326,56 @@ select market_tests.check(
   (select count(*) from public.saved_listings) = 0,
   'another person''s saved listings and alerts are private'
 );
+
+-- 4b. Maya reword her title: the listing goes back to pending (hidden from the public and its
+--     photo) until it is screened again. Noel, who is already chatting about it, still sees it,
+--     and nobody new can start a chat.
+set role authenticated;
+select market_tests.sign_in('00000000-0000-4000-fa00-00000000000a');
+update public.listings set asking_php = 4400
+ where id = '00000000-0000-4000-fc00-000000000001';
+select market_tests.check(
+  (select moderation_status = 'approved' from public.listings
+    where id = '00000000-0000-4000-fc00-000000000001'),
+  'changing the price alone does not send a listing back to moderation'
+);
+update public.listings set title = 'Pentax K1000 35mm Film Camera'
+ where id = '00000000-0000-4000-fc00-000000000001';
+select market_tests.check(
+  (select moderation_status = 'pending' and moderation_ref is null and moderated_at is null
+     from public.listings where id = '00000000-0000-4000-fc00-000000000001'),
+  'changing the title sends a listing back to pending'
+);
+reset role;
+
+set role anon;
+select market_tests.sign_in(null);
+select market_tests.check(
+  not exists (select 1 from public.listings where id = '00000000-0000-4000-fc00-000000000001')
+  and not exists (select 1 from storage.objects where bucket_id = 'scan-photos'
+    and name = '00000000-0000-4000-fa00-00000000000a/00000000-0000-4000-fb00-000000000001.jpg'),
+  'an edited listing and its photo leave the public view until re-screened'
+);
+reset role;
+
+set role authenticated;
+select market_tests.sign_in('00000000-0000-4000-fa00-00000000000b');
+select market_tests.check(
+  exists (select 1 from public.listings where id = '00000000-0000-4000-fc00-000000000001'),
+  'someone already chatting about a listing keeps seeing it while it is re-screened'
+);
+select market_tests.check(
+  public.start_conversation('pentax-k1000-35mm-camera-00000000')
+    = (select id from public.conversations
+        where listing_id = '00000000-0000-4000-fc00-000000000001'
+          and buyer_id = '00000000-0000-4000-fa00-00000000000b'),
+  'an existing chat can still be reopened while the listing is re-screened'
+);
+reset role;
+
+update public.listings set moderation_status = 'approved', moderation_ref = 'rules',
+       moderated_at = now()
+ where id = '00000000-0000-4000-fc00-000000000001';
 
 -- 5. Maya edits her price, marks the listing sold, and later removes it; removing hides the scan
 --    photo from everyone else again.

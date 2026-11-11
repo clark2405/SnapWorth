@@ -10,7 +10,7 @@ import type {
   SavedListingAlert,
 } from '../../ports/marketplace';
 import type { UtcDateTime } from '../../types/date-time';
-import type { VoteChoice } from '../../types/entities';
+import type { ModerationStatus, VoteChoice } from '../../types/entities';
 import { err, ok } from '../../types/result';
 import { toAppError } from './errors';
 import { createSupabaseScanPhotos, type ScanPhotoStore } from './photo-storage';
@@ -49,6 +49,7 @@ interface ListingRow {
   readonly views_count: number;
   readonly saves_count: number;
   readonly status: ListingStatus;
+  readonly moderation_status: ModerationStatus;
   readonly created_at: string;
   readonly seller: ProfileJoin | readonly ProfileJoin[] | null;
 }
@@ -83,6 +84,7 @@ const listingColumns = [
   'views_count',
   'saves_count',
   'status',
+  'moderation_status',
   'created_at',
   'seller:profiles(id, handle, display_name, avatar_url, bio, location, created_at)',
 ].join(', ');
@@ -137,6 +139,7 @@ function toMarketListing(
     verdict: row.verdict ?? null,
     verdictShare: row.verdict_share ?? null,
     status: row.status,
+    moderationStatus: row.moderation_status ?? 'pending',
     seller: {
       id: row.seller_id,
       handle,
@@ -167,6 +170,22 @@ export function createSupabaseMarketplaceRepository(
   async function signRows(rows: readonly ListingRow[]): Promise<Readonly<Record<string, string>>> {
     const paths = rows.flatMap((row) => (row.photo_path ? [row.photo_path] : []));
     return paths.length > 0 ? photos.links(paths) : {};
+  }
+
+  /**
+   * Screens a listing that is waiting for moderation (a new one, or one whose title or
+   * description just changed) and returns the row as it stands after. A screening that can't be
+   * reached leaves the listing pending, hidden from everyone but its seller; it is screened the
+   * next time it is published or edited.
+   */
+  async function screened(row: ListingRow): Promise<ListingRow> {
+    if (row.moderation_status !== 'pending') return row;
+    const { data } = await client.functions
+      .invoke<{ status?: ModerationStatus }>('moderate-content', {
+        body: { type: 'listing', id: row.id },
+      })
+      .catch(() => ({ data: null }));
+    return data?.status ? { ...row, moderation_status: data.status } : row;
   }
 
   async function findRow(idOrSlug: string): Promise<ListingRow | null> {
@@ -307,7 +326,7 @@ export function createSupabaseMarketplaceRepository(
           );
       }
 
-      const row = data as unknown as ListingRow;
+      const row = await screened(data as unknown as ListingRow);
       const signed = await signRows([row]);
       return ok(toMarketListing(row, signedIn.value, signed));
     },
@@ -351,7 +370,8 @@ export function createSupabaseMarketplaceRepository(
           );
       }
 
-      const row = data as unknown as ListingRow;
+      // New words go back to moderation (the database sets the listing to pending); screen them.
+      const row = await screened(data as unknown as ListingRow);
       const signed = await signRows([row]);
       return ok(toMarketListing(row, signedIn.value, signed));
     },

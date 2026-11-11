@@ -7,8 +7,13 @@
 --   write them: `prepare_listing` copies them from the linked `scan_history` row (the app's own
 --   estimate for that photo) and leaves them null when the listing has no scan. They are not in
 --   any column grant. Only a caller with no signed-in user (the service role, a seed) can set them.
--- * `slug` stays the stable public key so `start_conversation(listing_slug)` and `/listing/[id]`
---   links work for both seeded slugs and newly published listings.
+-- * `slug` is the stable public key in `/listing/[id]` links and in `start_conversation`. For a
+--   signed-in seller it is always generated here (never chosen by the client), so one listing's
+--   slug can't be made to look like another's id. `start_conversation` also takes the id.
+-- * A listing is public text, so it is moderated like a Hanap post or a feed post: it starts
+--   `pending`, only its seller sees it until `moderate-content` marks it `approved`, and changing
+--   its title or description sends it back to `pending` to be screened again. Only approved,
+--   not-removed listings are public, can be messaged, or share their scan photo.
 
 -- ---------------------------------------------------------------------------------------------
 -- Seller profile fields on `public.profiles`
@@ -57,6 +62,9 @@ alter table public.listings
   -- if the votes go. Never client-writable: it is in no column grant.
   add column verdict text check (verdict in ('too_high', 'just_right', 'too_low')),
   add column verdict_share integer check (verdict_share between 0 and 100),
+  add column moderation_status public.moderation_status not null default 'pending',
+  add column moderation_ref text,
+  add column moderated_at timestamptz,
   add column views_count integer not null default 0 check (views_count >= 0),
   add column saves_count integer not null default 0 check (saves_count >= 0),
   add constraint listings_verdict_pair_check check ((verdict is null) = (verdict_share is null)),
@@ -69,9 +77,10 @@ alter table public.listings
 create index listings_status_created_idx on public.listings (status, created_at desc);
 create index listings_scan_idx on public.listings (scan_id) where scan_id is not null;
 
--- Tidies the title and description, builds a URL-friendly slug when the client didn't supply one,
--- checks that any linked scan belongs to the seller, and owns the AI estimate: for a signed-in
--- seller it is the scan's amount and range (null with no scan) and can't change afterwards.
+-- Tidies the title and description, builds the URL-friendly slug (always, for a signed-in seller),
+-- checks that any linked scan belongs to the seller, owns the AI estimate (for a signed-in seller
+-- the scan's amount and range, null with no scan, unchanged afterwards), and sends a listing whose
+-- words changed back to moderation.
 create function public.prepare_listing()
 returns trigger
 language plpgsql
@@ -92,7 +101,16 @@ begin
   new.lat := round(new.lat::numeric, 2)::double precision;
   new.lng := round(new.lng::numeric, 2)::double precision;
 
-  if tg_op = 'INSERT' and (new.slug is null or btrim(new.slug) = '') then
+  if tg_op = 'UPDATE'
+     and (new.title is distinct from old.title or new.description is distinct from old.description)
+     and new.moderation_status is not distinct from old.moderation_status then
+    new.moderation_status := 'pending';
+    new.moderation_ref := null;
+    new.moderated_at := null;
+  end if;
+
+  if tg_op = 'INSERT'
+     and ((select auth.uid()) is not null or new.slug is null or btrim(new.slug) = '') then
     base_slug := btrim(regexp_replace(lower(new.title), '[^a-z0-9]+', '-', 'g'), '-');
     base_slug := btrim(left(base_slug, 44), '-');
     if char_length(base_slug) < 2 then
@@ -171,12 +189,45 @@ create trigger listings_enforce_rate_limit
   before insert on public.listings
   for each row execute function public.enforce_listings_rate_limit();
 
-create policy "Sellers publish their own active listings"
+-- Replaces chat's "public until removed" rule: now a listing is public only once approved. Its
+-- seller always sees it, whatever its state. A buyer already chatting about it keeps seeing it
+-- while it is only waiting to be screened again after an edit, so their chat doesn't vanish
+-- (signed-out visitors have no access to conversations, hence the separate policies).
+drop policy "Listings are public until removed; sellers see their own" on public.listings;
+
+create policy "Approved listings are public"
+  on public.listings for select
+  to anon, authenticated
+  using (status <> 'removed' and moderation_status = 'approved');
+
+create policy "Sellers see their own listings, whatever their state"
+  on public.listings for select
+  to authenticated
+  using (seller_id = (select auth.uid()));
+
+create policy "Buyers in a chat keep seeing a listing while it is re-screened"
+  on public.listings for select
+  to authenticated
+  using (
+    status <> 'removed'
+    and moderation_status = 'pending'
+    and exists (
+      select 1
+        from public.conversations c
+       where c.listing_id = listings.id
+         and c.buyer_id = (select auth.uid())
+    )
+  );
+
+create policy "Sellers publish their own active listings, pending moderation"
   on public.listings for insert
   to authenticated
   with check (
     seller_id = (select auth.uid())
     and status = 'active'
+    and moderation_status = 'pending'
+    and moderation_ref is null
+    and moderated_at is null
   );
 
 create policy "Sellers update their own listings"
@@ -192,7 +243,6 @@ create policy "Sellers delete their own listings"
 
 grant insert (
   id,
-  slug,
   scan_id,
   title,
   asking_php,
@@ -220,7 +270,7 @@ grant update (
 grant delete on public.listings to authenticated;
 
 -- ---------------------------------------------------------------------------------------------
--- Scan photos of public listings: readable by everyone while the listing is not removed
+-- Scan photos of public listings: readable by everyone while the listing is approved and not removed
 -- ---------------------------------------------------------------------------------------------
 
 create policy "People see scan photos of public listings"
@@ -232,9 +282,76 @@ create policy "People see scan photos of public listings"
       select 1
         from public.listings l
        where l.photo_path = storage.objects.name
+         and l.moderation_status = 'approved'
          and l.status <> 'removed'
     )
   );
+
+-- ---------------------------------------------------------------------------------------------
+-- Opening a chat: any approved, active listing, by its slug or its id
+-- ---------------------------------------------------------------------------------------------
+
+-- Replaces chat's version, which knew nothing of moderation: a listing that isn't approved can't
+-- be messaged (it can't be seen either), and the key may be the slug or the listing's id, so a
+-- link made from either opens a chat. A conversation that already exists is returned as before.
+create or replace function public.start_conversation(listing_slug text)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  caller uuid := (select auth.uid());
+  target record;
+  conversation uuid;
+begin
+  if caller is null then
+    raise exception 'Sign in to message a seller.' using errcode = '42501';
+  end if;
+
+  select l.id, l.seller_id, l.status, l.moderation_status
+    into target
+    from public.listings l
+   where l.slug = listing_slug
+      or (
+        listing_slug ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        and l.id = listing_slug::uuid
+      );
+  if not found or target.status = 'removed' then
+    raise exception 'This listing is not available.' using errcode = 'P0002';
+  end if;
+  if target.seller_id = caller then
+    raise exception 'This is your own listing.' using errcode = '22023';
+  end if;
+
+  select c.id into conversation
+    from public.conversations c
+   where c.listing_id = target.id
+     and c.buyer_id = caller;
+  if found then
+    return conversation;
+  end if;
+
+  if target.moderation_status <> 'approved' then
+    raise exception 'This listing is not available.' using errcode = 'P0002';
+  end if;
+  if target.status <> 'active' then
+    raise exception 'This listing has sold.' using errcode = 'SWCLO';
+  end if;
+  if public.blocked_between(caller, target.seller_id) then
+    raise exception 'You can''t message this person.' using errcode = 'SWBLK';
+  end if;
+
+  insert into public.conversations (listing_id, buyer_id, seller_id)
+  values (target.id, caller, target.seller_id)
+  returning id into conversation;
+
+  insert into public.conversation_members (conversation_id, user_id)
+  values (conversation, caller), (conversation, target.seller_id);
+
+  return conversation;
+end;
+$$;
 
 -- ---------------------------------------------------------------------------------------------
 -- Saved listings & price-drop alerts (`public.saved_listings`)

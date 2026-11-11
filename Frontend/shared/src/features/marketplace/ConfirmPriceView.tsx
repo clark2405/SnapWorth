@@ -24,6 +24,7 @@ import {
 } from '../../components';
 import { haptic, themedStyles, tokens, useThemedStyles } from '../../design';
 import type { MarketArea, MarketCategory } from '../../ports/marketplace';
+import type { ModerationStatus } from '../../types/entities';
 import { useFeed } from '../feed/feed-state';
 import { useScanHistory } from '../history/scan-history-state';
 import { useItemDetail } from '../item/item-source';
@@ -89,10 +90,17 @@ function suggestedPrice(
   return Math.round((baseAmount * factor) / 10) * 10;
 }
 
+/** What to tell the seller: live, or not yet because moderation hasn't cleared it. */
+function liveLine(status: ModerationStatus, live: string): string {
+  if (status === 'approved') return live;
+  if (status === 'pending') return 'Others will see it once it has been checked.';
+  return 'Held for review. Only you can see it until a moderator has looked.';
+}
+
 export function ConfirmPriceView({ itemId, onBack, onPublish }: ConfirmPriceViewProps) {
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
-  const { listings, publishListing, updateListing } = useMarketplace();
+  const { myListings: listings, publishListing, updateListing } = useMarketplace();
   const { publishPost } = useFeed();
   const { scans, reload: reloadScans } = useScanHistory();
   const lookup = useItemDetail(itemId);
@@ -190,8 +198,8 @@ export function ConfirmPriceView({ itemId, onBack, onPublish }: ConfirmPriceView
       }
       toast.show({
         title: 'Listing updated',
-        body: `Live at ${formatPeso(enteredPrice)}.`,
-        celebrate: true,
+        body: liveLine(updated.value.moderationStatus, `Live at ${formatPeso(enteredPrice)}.`),
+        celebrate: updated.value.moderationStatus === 'approved',
       });
       onPublish?.(enteredPrice, alsoAskFeed, updated.value.id);
       return;
@@ -246,11 +254,15 @@ export function ConfirmPriceView({ itemId, onBack, onPublish }: ConfirmPriceView
     }
 
     toast.show({
-      title: 'Listing published',
-      body: alsoAskFeed
-        ? `Live at ${formatPeso(enteredPrice)}, and on the feed for a price check.`
-        : `Live at ${formatPeso(enteredPrice)}.`,
-      celebrate: true,
+      title:
+        published.value.moderationStatus === 'approved' ? 'Listing published' : 'Listing saved',
+      body: liveLine(
+        published.value.moderationStatus,
+        alsoAskFeed
+          ? `Live at ${formatPeso(enteredPrice)}, and on the feed for a price check.`
+          : `Live at ${formatPeso(enteredPrice)}.`,
+      ),
+      celebrate: published.value.moderationStatus === 'approved',
     });
     onPublish?.(enteredPrice, alsoAskFeed, published.value.id);
   };
