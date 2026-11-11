@@ -141,8 +141,12 @@ export interface FeedProviderProps {
   readonly children: ReactNode;
 }
 
+/**
+ * The Feed's posts and the viewer's votes. It sits with the other services above the session (the
+ * shells mount `AppServicesProvider` outside `SessionProvider`), so it knows nothing of who is
+ * signed in: `useFeed` hides a guest's votes.
+ */
 export function FeedProvider({ repository, children }: FeedProviderProps) {
-  const { isGuest } = useSession();
   const fallbackRepoRef = useRef<FeedRepository | null>(null);
   if (!fallbackRepoRef.current) {
     fallbackRepoRef.current = createLocalFeedRepository({
@@ -222,7 +226,6 @@ export function FeedProvider({ repository, children }: FeedProviderProps) {
 
   const voteFor = useCallback(
     (postIdOrSlug: string): VoteChoice | null => {
-      if (isGuest) return null;
       const post = findPost(postIdOrSlug);
       const record = userVotes.find(
         (entry) =>
@@ -232,7 +235,7 @@ export function FeedProvider({ repository, children }: FeedProviderProps) {
       );
       return record?.choice ?? null;
     },
-    [findPost, isGuest, userVotes],
+    [findPost, userVotes],
   );
 
   const toggleVote = useCallback(
@@ -332,7 +335,7 @@ export function FeedProvider({ repository, children }: FeedProviderProps) {
     () => ({
       posts,
       previewPosts: previewPostsList,
-      userVotes: isGuest ? [] : userVotes,
+      userVotes,
       loading,
       refresh,
       findPost,
@@ -348,7 +351,6 @@ export function FeedProvider({ repository, children }: FeedProviderProps) {
       findPost,
       findPostForScan,
       findPreviewPost,
-      isGuest,
       loadPost,
       loading,
       posts,
@@ -477,5 +479,10 @@ export function useFeed(): FeedContextValue {
     };
   }, [fallbackPosts, fallbackVotes, isGuest]);
 
-  return ctx ?? fallback;
+  // Votes belong to an account: a guest has none, whatever the provider holds.
+  const guarded = useMemo<FeedContextValue | null>(
+    () => (ctx && isGuest ? { ...ctx, userVotes: [], voteFor: () => null } : ctx),
+    [ctx, isGuest],
+  );
+  return guarded ?? fallback;
 }
