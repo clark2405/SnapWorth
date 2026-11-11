@@ -47,6 +47,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         microphonePermission: false,
       },
     ],
+    // "Near me" in the Market works out how far a listing is on the phone, only while the app is
+    // open; the position is never stored or sent.
+    [
+      'expo-location',
+      {
+        locationWhenInUsePermission:
+          'SnapWorth uses your location while the app is open to show how far listings are. It stays on your phone.',
+      },
+    ],
     // Local notifications only for now (an estimate finishing while you're away); push needs a
     // backend to send from.
     'expo-notifications',

@@ -16,7 +16,6 @@ import {
 import { held, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import {
   formatPeso,
-  previewListingPlaces,
   previewMarketAreas,
   previewPriceBrackets,
   type PreviewListing,
@@ -50,22 +49,22 @@ const radiusOptions: readonly { readonly key: RadiusKey; readonly label: string 
 ];
 
 /**
- * Preview-only matching against the sample listings. The real query belongs to the listing
- * service; this keeps the screen honest about what each filter would show.
+ * Whether a listing passes the price and place filters. `distanceKm` is how far it is from the
+ * viewer, worked out on their device; it is null while the viewer's position isn't known (not
+ * asked yet, or permission denied), and then "Near me" can't narrow anything, so it lets the
+ * listing through and the screen says why.
  */
 export function matchesPriceAndPlace(
-  listing: PreviewListing & { readonly area?: string; readonly distanceKm?: number },
+  listing: PreviewListing & { readonly area: string; readonly distanceKm: number | null },
   filters: Pick<MarketFilters, 'minPrice' | 'maxPrice' | 'area' | 'radiusKm'>,
 ): boolean {
   if (filters.minPrice !== null && listing.askingPrice < filters.minPrice) return false;
   if (filters.maxPrice !== null && listing.askingPrice > filters.maxPrice) return false;
-  const place =
-    listing.area !== undefined && listing.distanceKm !== undefined
-      ? { area: listing.area, distanceKm: listing.distanceKm }
-      : previewListingPlaces[listing.id];
-  if (filters.area === 'anywhere' || !place) return true;
-  if (filters.area === 'near-me') return place.distanceKm <= Number(filters.radiusKm);
-  return place.area === filters.area;
+  if (filters.area === 'anywhere') return true;
+  if (filters.area === 'near-me') {
+    return listing.distanceKm === null || listing.distanceKm <= Number(filters.radiusKm);
+  }
+  return listing.area === filters.area;
 }
 
 export function priceLabel(min: number | null, max: number | null): string | null {

@@ -107,7 +107,6 @@ insert into public.listings (
   category,
   condition,
   area,
-  distance_km,
   description
 )
 values (
@@ -119,7 +118,6 @@ values (
   'collectibles',
   'good',
   'cebu-city',
-  3,
   '  Clean viewfinder, working light meter, 50mm f/2 lens included.  '
 );
 
@@ -145,6 +143,22 @@ select market_tests.check(
   (select verdict is null and verdict_share is null
      from public.listings where id = '00000000-0000-4000-fc00-000000000001'),
   'a new listing has no community verdict'
+);
+-- A seller's exact spot is never stored: coordinates are rounded to two decimals (about 1 km),
+-- and there is no stored distance.
+update public.listings set lat = 10.318456, lng = 123.890123
+ where id = '00000000-0000-4000-fc00-000000000001';
+select market_tests.check(
+  (select lat = 10.32 and lng = 123.89 from public.listings
+    where id = '00000000-0000-4000-fc00-000000000001'),
+  'a listing''s coordinates are rounded to about 1 km'
+);
+select market_tests.check(
+  not exists (
+    select 1 from information_schema.columns
+     where table_schema = 'public' and table_name = 'listings' and column_name = 'distance_km'
+  ),
+  'listings store no distance'
 );
 insert into public.listings (id, title, asking_php)
 values ('00000000-0000-4000-fc00-000000000009', 'Loose find', 800);

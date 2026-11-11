@@ -39,10 +39,13 @@ alter table public.listings
     check (condition in ('new', 'like_new', 'good', 'fair')),
   add column area text not null default 'cebu-city'
     check (area in ('cebu-city', 'mandaue', 'lapu-lapu', 'metro-manila')),
+  -- Where the listing is, only roughly: `prepare_listing` rounds both to two decimals (about
+  -- 1 km), so a seller's exact spot is never stored. When they are null the app places the listing
+  -- at its `area`'s centre. A buyer's "near me" distance is worked out on their own device from
+  -- these and their own position; there is no stored distance, which could only be a guess made
+  -- for a viewer nobody knows yet.
   add column lat double precision check (lat is null or lat between 4.5 and 21.5),
   add column lng double precision check (lng is null or lng between 116.0 and 127.0),
-  add column distance_km numeric(6,1) not null default 5
-    check (distance_km >= 0 and distance_km <= 2000),
   add column description text not null default ''
     check (char_length(description) <= 1000),
   add column estimate_php integer check (estimate_php is null or estimate_php >= 0),
@@ -85,6 +88,9 @@ begin
 
   new.title := btrim(new.title);
   new.description := btrim(coalesce(new.description, ''));
+  -- Coordinates are kept coarse (see the column comment above), whatever the client sent.
+  new.lat := round(new.lat::numeric, 2)::double precision;
+  new.lng := round(new.lng::numeric, 2)::double precision;
 
   if tg_op = 'INSERT' and (new.slug is null or btrim(new.slug) = '') then
     base_slug := btrim(regexp_replace(lower(new.title), '[^a-z0-9]+', '-', 'g'), '-');
@@ -196,7 +202,6 @@ grant insert (
   area,
   lat,
   lng,
-  distance_km,
   description
 ) on public.listings to authenticated;
 
@@ -208,7 +213,6 @@ grant update (
   area,
   lat,
   lng,
-  distance_km,
   description,
   status
 ) on public.listings to authenticated;

@@ -1,5 +1,5 @@
 import { BadgePercent, LayoutGrid, PackageSearch } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -19,6 +19,7 @@ import {
   Sign,
   SnapIcon,
   Sticker,
+  Surface,
   SWText,
   useGridColumns,
   ZoomLink,
@@ -47,6 +48,8 @@ import {
   type MarketFilters,
 } from './MarketFilters';
 import { toPreviewListing, useMarketplace } from './marketplace-state';
+import { distanceKm, listingCoordinates } from './places';
+import { useViewerLocation } from './viewer-location';
 
 export interface MarketplaceViewProps {
   readonly onOpenListing?: (listingId: string) => void;
@@ -86,6 +89,7 @@ export function MarketplaceView({
 }: MarketplaceViewProps) {
   const styles = useThemedStyles(stylesFor);
   const { listings, refresh } = useMarketplace();
+  const location = useViewerLocation();
   const [filters, setFilters] = useState<MarketFilters>(defaultMarketFilters);
   const [openSheet, setOpenSheet] = useState<'price' | 'location' | null>(null);
   const ios = Platform.OS === 'ios';
@@ -96,16 +100,23 @@ export function MarketplaceView({
     onFiltersChange?.(next);
   };
 
+  // "Near me" asks where the viewer is the first time it's picked, never at launch.
+  const nearMe = filters.area === 'near-me';
+  const askForLocation = location.request;
+  useEffect(() => {
+    if (nearMe && location.status === 'idle') void askForLocation();
+  }, [askForLocation, location.status, nearMe]);
+
   const matching = (candidate: MarketFilters) =>
     listings.filter((listing) => {
       const category = listing.category ?? categoryByListing[listing.id];
       const preview = toPreviewListing(listing);
+      const distance = location.position
+        ? distanceKm(location.position, listingCoordinates(listing))
+        : null;
       return (
         (candidate.category === 'all' || category === candidate.category) &&
-        matchesPriceAndPlace(
-          { ...preview, area: listing.area, distanceKm: listing.distanceKm },
-          candidate,
-        )
+        matchesPriceAndPlace({ ...preview, area: listing.area, distanceKm: distance }, candidate)
       );
     });
 
@@ -230,6 +241,16 @@ export function MarketplaceView({
         <HanapEntry onOpen={onOpenHanap} />
       </Reveal>
 
+      {nearMe && location.position === null ? (
+        <Reveal index={1}>
+          <NearMeNotice
+            status={location.status}
+            onTryAgain={() => void location.request()}
+            onClear={() => update({ area: 'anywhere' })}
+          />
+        </Reveal>
+      ) : null}
+
       {underEstimate.length > 0 ? (
         <Reveal index={1} style={styles.highlightSection}>
           <Sign icon={BadgePercent} label="Steals · Under estimate" tone="cobalt" />
@@ -309,6 +330,49 @@ export function MarketplaceView({
   );
 }
 
+/**
+ * Why "Near me" isn't narrowing anything: still looking, or the viewer's position can't be had.
+ * While it can't, every listing shows, and this says so with a way out.
+ */
+function NearMeNotice({
+  status,
+  onTryAgain,
+  onClear,
+}: {
+  readonly status: ReturnType<typeof useViewerLocation>['status'];
+  readonly onTryAgain: () => void;
+  readonly onClear: () => void;
+}) {
+  const styles = useThemedStyles(stylesFor);
+  const looking = status === 'idle' || status === 'locating';
+  return (
+    <Surface padding={tokens.spacing[4]} contentStyle={styles.nearMe}>
+      <SWText variant="label" accessibilityRole="header">
+        {looking
+          ? 'Finding where you are…'
+          : status === 'denied'
+            ? 'Location is off for SnapWorth'
+            : 'Couldn’t find where you are'}
+      </SWText>
+      {looking ? null : (
+        <>
+          <SWText variant="bodySmall" tone="textSecondary">
+            {status === 'denied'
+              ? 'Allow location for SnapWorth in Settings to see what’s near you. Until then, every listing shows. Your position stays on your phone.'
+              : 'Check that location services are on. Until then, every listing shows.'}
+          </SWText>
+          <View style={styles.nearMeActions}>
+            {status === 'denied' ? null : (
+              <Button label="Try again" size="small" variant="secondary" onPress={onTryAgain} />
+            )}
+            <Button label="Clear Near me" size="small" variant="tertiary" onPress={onClear} />
+          </View>
+        </>
+      )}
+    </Surface>
+  );
+}
+
 /** Price's quick choices: none, then the brackets. */
 const priceChoices = [
   { key: 'any', label: 'Any price' },
@@ -372,6 +436,13 @@ function UnderEstimateCard({
 }
 
 const stylesFor = themedStyles((colors) => ({
+  nearMe: {
+    gap: tokens.spacing[2],
+  },
+  nearMeActions: {
+    flexDirection: 'row',
+    gap: tokens.spacing[2],
+  },
   // How far under the AI's estimate a steal is asking, slapped over the card's top corner.
   underSpot: {
     position: 'absolute',

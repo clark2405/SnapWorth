@@ -38,7 +38,8 @@ interface ListingRow {
   readonly category: MarketCategory;
   readonly condition: MarketCondition;
   readonly area: MarketArea;
-  readonly distance_km: number | string;
+  readonly lat: number | null;
+  readonly lng: number | null;
   readonly description: string;
   readonly estimate_php: number | null;
   readonly estimate_low_php: number | null;
@@ -71,7 +72,8 @@ const listingColumns = [
   'category',
   'condition',
   'area',
-  'distance_km',
+  'lat',
+  'lng',
   'description',
   'estimate_php',
   'estimate_low_php',
@@ -126,7 +128,8 @@ function toMarketListing(
     category: row.category,
     condition: row.condition,
     area: row.area,
-    distanceKm: Number(row.distance_km) || 5,
+    lat: row.lat ?? null,
+    lng: row.lng ?? null,
     description: row.description ?? '',
     estimatePhp: row.estimate_php,
     estimateLowPhp: row.estimate_low_php,
@@ -287,7 +290,6 @@ export function createSupabaseMarketplaceRepository(
           category: input.category,
           condition: input.condition,
           area: input.area,
-          distance_km: input.distanceKm ?? 3,
           description: input.description,
         })
         .select(listingColumns)

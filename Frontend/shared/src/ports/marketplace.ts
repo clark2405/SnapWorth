@@ -32,7 +32,12 @@ export interface MarketListing {
   readonly category: MarketCategory;
   readonly condition: MarketCondition;
   readonly area: MarketArea;
-  readonly distanceKm: number;
+  /**
+   * Where the listing is, rounded to about 1 km by the database (null: use the area's centre).
+   * Distance from a viewer is worked out on their device; it is not stored.
+   */
+  readonly lat: number | null;
+  readonly lng: number | null;
   readonly description: string;
   readonly estimatePhp: number | null;
   readonly estimateLowPhp: number | null;
@@ -80,7 +85,6 @@ export interface NewListingInput {
   readonly category: MarketCategory;
   readonly condition: MarketCondition;
   readonly area: MarketArea;
-  readonly distanceKm?: number;
   readonly description: string;
   /**
    * Only the on-device adapter uses the three estimate fields. Supabase ignores them: the database

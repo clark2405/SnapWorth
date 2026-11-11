@@ -4,6 +4,7 @@ export * from './collections';
 export * from './comments';
 export * from './feed';
 export * from './hanap';
+export * from './location';
 export * from './marketplace';
 export * from './platform';
 export * from './services';

@@ -24,6 +24,7 @@ import {
   type LocalSeedComment,
   type LocalSeedConversation,
 } from '../adapters';
+import { createDeviceLocation } from '../adapters/device/location';
 import { getSupabase } from '../adapters/supabaseClient';
 import { ChatServiceProvider } from '../features/chat/chat-state';
 import { SukiProvider } from '../features/chat/suki';
@@ -43,6 +44,7 @@ import {
   buildPreviewSellerSeeds,
   MarketplaceProvider,
 } from '../features/marketplace/marketplace-state';
+import { ViewerLocationProvider } from '../features/marketplace/viewer-location';
 import {
   previewChatListingKey,
   previewConversation,
@@ -311,6 +313,8 @@ export function createAppServices(config: BackendConfig): AppServices {
   };
 }
 
+const deviceLocation = createDeviceLocation();
+
 const PhotoPricingContext = createContext<PhotoPricingService | null>(null);
 
 export function usePhotoPricing(): PhotoPricingService {
@@ -355,7 +359,12 @@ export function AppServicesProvider({
                         repositoryFor={services.collectionsFor}
                       >
                         {/* Guess the worth needs no account, so its days stay on the device. */}
-                        <GuessProvider store={AsyncStorage}>{children}</GuessProvider>
+                        <GuessProvider store={AsyncStorage}>
+                          {/* Where the viewer is, only when they pick "Near me"; never stored. */}
+                          <ViewerLocationProvider port={deviceLocation}>
+                            {children}
+                          </ViewerLocationProvider>
+                        </GuessProvider>
                       </CollectionsProvider>
                     </PaidPricesProvider>
                   </ScanHistoryProvider>

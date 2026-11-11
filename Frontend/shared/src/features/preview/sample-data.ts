@@ -1214,18 +1214,17 @@ export const previewMarketCategories: readonly { readonly key: string; readonly 
     { key: 'home', label: 'Home' },
   ];
 
-/** Where each preview listing is, for the location filter, until listings carry a place. */
-export const previewListingPlaces: Readonly<Record<string, { area: string; distanceKm: number }>> =
-  {
-    'polaroid-sun-600': { area: 'cebu-city', distanceKm: 2 },
-    'air-jordan-1-bred': { area: 'lapu-lapu', distanceKm: 11 },
-    'retro-walkman': { area: 'mandaue', distanceKm: 6 },
-    'keychron-keyboard': { area: 'metro-manila', distanceKm: 570 },
-    'nike-teal-windbreaker': { area: 'lapu-lapu', distanceKm: 9 },
-    'colour-block-windbreaker': { area: 'mandaue', distanceKm: 5 },
-    'black-puffer-jacket': { area: 'cebu-city', distanceKm: 3 },
-    'polaroid-film-bundle': { area: 'cebu-city', distanceKm: 4 },
-  };
+/** Where each preview listing is, for the local sample listings' area (the app measures distance from the area's centre). */
+export const previewListingPlaces: Readonly<Record<string, { area: string }>> = {
+  'polaroid-sun-600': { area: 'cebu-city' },
+  'air-jordan-1-bred': { area: 'lapu-lapu' },
+  'retro-walkman': { area: 'mandaue' },
+  'keychron-keyboard': { area: 'metro-manila' },
+  'nike-teal-windbreaker': { area: 'lapu-lapu' },
+  'colour-block-windbreaker': { area: 'mandaue' },
+  'black-puffer-jacket': { area: 'cebu-city' },
+  'polaroid-film-bundle': { area: 'cebu-city' },
+};
 
 export const previewMarketAreas: readonly { readonly key: string; readonly label: string }[] = [
   { key: 'anywhere', label: 'Anywhere' },
