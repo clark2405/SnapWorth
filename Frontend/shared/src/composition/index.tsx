@@ -34,6 +34,7 @@ import {
   CommentServiceProvider,
   FeedProvider,
 } from '../features/feed';
+import { BackendModeProvider } from '../features/session/backend-mode';
 import { HanapProvider } from '../features/hanap/hanap-state';
 import { GuessProvider } from '../features/guess/guess-state';
 import { CollectionsProvider } from '../features/history/collections';
@@ -41,9 +42,10 @@ import { ScanHistoryProvider } from '../features/history/scan-history-state';
 import { PaidPricesProvider } from '../features/history/paid-prices';
 import {
   buildPreviewMarketListings,
+  buildPreviewMyMarketListing,
   buildPreviewSellerSeeds,
-  MarketplaceProvider,
-} from '../features/marketplace/marketplace-state';
+} from '../features/marketplace/marketplace-seed';
+import { MarketplaceProvider } from '../features/marketplace/marketplace-state';
 import { ViewerLocationProvider } from '../features/marketplace/viewer-location';
 import {
   previewChatListingKey,
@@ -299,7 +301,7 @@ export function createAppServices(config: BackendConfig): AppServices {
     marketplace: createLocalMarketplaceRepository({
       store: AsyncStorage,
       viewer: profileOf(previewProfile.user),
-      seedListings: buildPreviewMarketListings(),
+      seedListings: [...buildPreviewMarketListings(), buildPreviewMyMarketListing()],
       seedSaved: previewPriceAlerts,
       seedSellers: buildPreviewSellerSeeds(),
     }),
@@ -335,45 +337,47 @@ export function AppServicesProvider({
     [config.supabaseUrl, config.supabaseAnonKey],
   );
   return (
-    <PhotoPricingContext.Provider value={services.pricing}>
-      <CommentServiceProvider service={services.comments}>
-        <ChatServiceProvider service={services.chats}>
-          <HanapProvider repository={services.hanap}>
-            <MarketplaceProvider repository={services.marketplace}>
-              <FeedProvider repository={services.feed}>
-                <SukiProvider repository={services.suki}>
-                  {/* Saved scans, and what was paid for each: in Supabase with a backend, on the
+    <BackendModeProvider mode={services.backend}>
+      <PhotoPricingContext.Provider value={services.pricing}>
+        <CommentServiceProvider service={services.comments}>
+          <ChatServiceProvider service={services.chats}>
+            <HanapProvider repository={services.hanap}>
+              <MarketplaceProvider repository={services.marketplace}>
+                <FeedProvider repository={services.feed}>
+                  <SukiProvider repository={services.suki}>
+                    {/* Saved scans, and what was paid for each: in Supabase with a backend, on the
                     phone without. */}
-                  <ScanHistoryProvider
-                    client={services.supabaseClient ?? null}
-                    store={AsyncStorage}
-                  >
-                    {/* The sample items' prices: kept on the device without a backend; with one
-                      they're a preview, so they aren't kept. */}
-                    <PaidPricesProvider
-                      store={services.backend === 'device' ? AsyncStorage : undefined}
-                      seed={previewPaidPrices}
+                    <ScanHistoryProvider
+                      client={services.supabaseClient ?? null}
+                      store={AsyncStorage}
                     >
-                      <CollectionsProvider
-                        account={services.account}
-                        repositoryFor={services.collectionsFor}
+                      {/* The sample items' prices: kept on the device without a backend; with one
+                      they're a preview, so they aren't kept. */}
+                      <PaidPricesProvider
+                        store={services.backend === 'device' ? AsyncStorage : undefined}
+                        seed={previewPaidPrices}
                       >
-                        {/* Guess the worth needs no account, so its days stay on the device. */}
-                        <GuessProvider store={AsyncStorage}>
-                          {/* Where the viewer is, only when they pick "Near me"; never stored. */}
-                          <ViewerLocationProvider port={deviceLocation}>
-                            {children}
-                          </ViewerLocationProvider>
-                        </GuessProvider>
-                      </CollectionsProvider>
-                    </PaidPricesProvider>
-                  </ScanHistoryProvider>
-                </SukiProvider>
-              </FeedProvider>
-            </MarketplaceProvider>
-          </HanapProvider>
-        </ChatServiceProvider>
-      </CommentServiceProvider>
-    </PhotoPricingContext.Provider>
+                        <CollectionsProvider
+                          account={services.account}
+                          repositoryFor={services.collectionsFor}
+                        >
+                          {/* Guess the worth needs no account, so its days stay on the device. */}
+                          <GuessProvider store={AsyncStorage}>
+                            {/* Where the viewer is, only when they pick "Near me"; never stored. */}
+                            <ViewerLocationProvider port={deviceLocation}>
+                              {children}
+                            </ViewerLocationProvider>
+                          </GuessProvider>
+                        </CollectionsProvider>
+                      </PaidPricesProvider>
+                    </ScanHistoryProvider>
+                  </SukiProvider>
+                </FeedProvider>
+              </MarketplaceProvider>
+            </HanapProvider>
+          </ChatServiceProvider>
+        </CommentServiceProvider>
+      </PhotoPricingContext.Provider>
+    </BackendModeProvider>
   );
 }

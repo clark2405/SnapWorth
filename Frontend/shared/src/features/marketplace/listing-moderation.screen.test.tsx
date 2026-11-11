@@ -7,11 +7,8 @@ import type { MarketListing } from '../../ports/marketplace';
 import { renderScreen } from '../../testing/render-screen';
 import { useSession } from '../session';
 import { ListingDetailView } from './ListingDetailView';
-import {
-  MarketplaceProvider,
-  buildPreviewMarketListings,
-  useMarketplace,
-} from './marketplace-state';
+import { buildPreviewMarketListings } from './marketplace-seed';
+import { MarketplaceProvider, useMarketplace } from './marketplace-state';
 
 const memoryStore = () => {
   const map = new Map<string, string>();

@@ -1,5 +1,5 @@
 import { Flag, UserX } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -13,6 +13,7 @@ import {
   Rating,
   Reveal,
   Screen,
+  ScreenSkeleton,
   SWText,
 } from '../../components';
 import { themedStyles, tokens, useThemedStyles } from '../../design';
@@ -23,7 +24,6 @@ import {
   toPreviewListing,
   useMarketplace,
 } from '../marketplace/marketplace-state';
-import { previewSellers } from '../preview/sample-data';
 import { useAccountGate } from '../session';
 
 export interface SellerProfileViewProps {
@@ -42,65 +42,27 @@ export function SellerProfileView({
 }: SellerProfileViewProps) {
   const styles = useThemedStyles(stylesFor);
   const requireAccount = useAccountGate();
-  const { listings: marketListings, loadSeller } = useMarketplace();
+  const { loadSeller } = useMarketplace();
   const normalized = handle?.trim().toLowerCase().replace(/^@/, '');
 
-  const immediateSeller = useMemo<SellerProfile | null>(() => {
-    if (!normalized) return null;
-    const preview = previewSellers[normalized];
-    const matchingListings = marketListings.filter((entry) =>
-      preview
-        ? preview.listingIds.includes(entry.id) || entry.seller.handle.toLowerCase() === normalized
-        : entry.seller.handle.toLowerCase() === normalized,
-    );
-    if (preview) {
-      return {
-        id: `preview:${preview.user.handle}`,
-        handle: preview.user.handle,
-        displayName: preview.displayName,
-        avatarUrl: null,
-        rating: preview.rating,
-        sales: preview.sales,
-        joined: preview.joined,
-        bio: preview.bio,
-        location: 'Cebu City',
-        listings: matchingListings,
-      };
-    }
-    const first = matchingListings[0]?.seller;
-    if (!first) return null;
-    return {
-      id: first.id,
-      handle: first.handle,
-      displayName: first.displayName,
-      avatarUrl: first.avatarUrl,
-      rating: first.rating,
-      sales: first.sales,
-      joined: 'Joined 2026',
-      bio: '',
-      location: 'Cebu City',
-      listings: matchingListings,
-    };
-  }, [marketListings, normalized]);
-
-  const [remoteSeller, setRemoteSeller] = useState<SellerProfile | null>(null);
+  // `undefined` while the seller is being looked up; `null` once they're known not to exist.
+  const [seller, setSeller] = useState<SellerProfile | null | undefined>(undefined);
 
   useEffect(() => {
-    if (!normalized || immediateSeller) {
-      setRemoteSeller(null);
+    if (!normalized) {
+      setSeller(null);
       return;
     }
     let active = true;
     void loadSeller(normalized).then((loaded) => {
-      if (active && loaded) setRemoteSeller(loaded);
+      if (active) setSeller(loaded);
     });
     return () => {
       active = false;
     };
-  }, [immediateSeller, loadSeller, normalized]);
+  }, [loadSeller, normalized]);
 
-  const seller = remoteSeller ?? immediateSeller;
-
+  if (seller === undefined) return <ScreenSkeleton kind="page" />;
   if (!seller) {
     return (
       <Screen ambient="market" header={<NavHeader title="Seller" onBack={onBack} />}>
@@ -142,12 +104,18 @@ export function SellerProfileView({
           <SWText variant="displayMedium" accessibilityRole="header">
             {seller.displayName}
           </SWText>
-          <Rating
-            value={seller.rating}
-            detail={`${seller.sales} sales`}
-            variant="bodySmall"
-            tone="textSecondary"
-          />
+          {seller.rating === null ? (
+            <SWText variant="bodySmall" tone="textSecondary">
+              {seller.sales === 1 ? '1 sale' : `${seller.sales} sales`}
+            </SWText>
+          ) : (
+            <Rating
+              value={seller.rating}
+              detail={`${seller.sales} sales`}
+              variant="bodySmall"
+              tone="textSecondary"
+            />
+          )}
           <SWText variant="caption" tone="textMuted">
             {seller.joined}
           </SWText>

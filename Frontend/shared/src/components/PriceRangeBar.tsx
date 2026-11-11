@@ -19,7 +19,8 @@ export interface PriceRangeBarProps {
   readonly low: number;
   readonly high: number;
   readonly estimate: number;
-  readonly confidence: EstimateConfidence;
+  /** How sure the AI is. Omit it where the estimate carries no confidence (a listing's). */
+  readonly confidence?: EstimateConfidence;
   readonly format: (value: number) => string;
   /** Optional asking price to plot against the range, e.g. on a listing. */
   readonly asking?: number;
@@ -87,7 +88,7 @@ export function PriceRangeBar({
     <View
       style={styles.root}
       accessible
-      accessibilityLabel={`Likely between ${format(low)} and ${format(high)}. ${confidenceCopy[confidence]}.${asking !== undefined ? ` Asking ${format(asking)}.` : ''}`}
+      accessibilityLabel={`Likely between ${format(low)} and ${format(high)}.${confidence ? ` ${confidenceCopy[confidence]}.` : ''}${asking !== undefined ? ` Asking ${format(asking)}.` : ''}`}
     >
       <View style={styles.track} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
         <View style={styles.rail}>
@@ -112,9 +113,9 @@ export function PriceRangeBar({
                 styles.band,
                 confidence === 'high'
                   ? styles.bandStrong
-                  : confidence === 'medium'
-                    ? styles.bandMedium
-                    : styles.bandWeak,
+                  : confidence === 'low'
+                    ? styles.bandWeak
+                    : styles.bandMedium,
                 { left: at(low), width: at(high) - at(low) },
                 drawn ? null : bandStyle,
               ]}
@@ -157,9 +158,9 @@ export function PriceRangeBar({
       </View>
       {/* A key under the bar, aligned to its edges like the rest of the card: how sure the
           estimate is on the left, and what the asking tick means on the right. */}
-      {showConfidence || asking !== undefined ? (
+      {(showConfidence && confidence) || asking !== undefined ? (
         <View style={styles.legend}>
-          {showConfidence ? (
+          {showConfidence && confidence ? (
             <SWText
               variant="labelSmall"
               tone={confidence === 'low' ? 'warning' : 'textSecondary'}

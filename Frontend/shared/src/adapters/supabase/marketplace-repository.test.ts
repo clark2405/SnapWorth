@@ -160,6 +160,11 @@ describe('createSupabaseMarketplaceRepository', () => {
                 neq: () => ({
                   maybeSingle: async () => ({ data: sampleRow, error: null }),
                 }),
+                // The seller's sold listings, for their sales count.
+                in: async () => ({
+                  data: [{ seller_id: 'usr_1' }, { seller_id: 'usr_1' }],
+                  error: null,
+                }),
               }),
             }),
             insert: (payload: Record<string, unknown>) => {
@@ -200,6 +205,9 @@ describe('createSupabaseMarketplaceRepository', () => {
       expect(listed.value[0]?.photoUrl).toBe('https://signed.test/scan_1.jpg');
       expect(listed.value[0]?.seller.displayName).toBe('Maya Reyes');
       expect(listed.value[0]?.mine).toBe(true);
+      // Nobody is rated yet; sales is how many of the seller's listings sold.
+      expect(listed.value[0]?.seller.rating).toBeNull();
+      expect(listed.value[0]?.seller.sales).toBe(2);
     }
 
     const published = await repo.publish({
@@ -267,7 +275,10 @@ describe('listing moderation in the Supabase repository', () => {
         return {
           insert: () => ({ select: () => ({ single: async () => ({ data: row, error: null }) }) }),
           select: () => ({
-            eq: () => ({ neq: () => ({ maybeSingle: async () => ({ data: row, error: null }) }) }),
+            eq: () => ({
+              neq: () => ({ maybeSingle: async () => ({ data: row, error: null }) }),
+              in: async () => ({ data: [], error: null }),
+            }),
           }),
           update: (patch: Record<string, unknown>) => ({
             eq: () => ({

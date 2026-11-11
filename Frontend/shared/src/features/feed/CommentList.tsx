@@ -15,6 +15,7 @@ import {
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import type { ThreadComment } from '../../types/entities';
 import { previewAvatarByHandle } from '../preview/sample-data';
+import { useBackendMode } from '../session/backend-mode';
 import { relativeTime, type ThreadGroup } from './comment-thread-model';
 
 export interface CommentListProps {
@@ -232,7 +233,13 @@ export function AuthorAvatar({
   readonly size: number;
 }) {
   const styles = useThemedStyles(stylesFor);
-  const source = avatarUrl ? { uri: avatarUrl } : previewAvatarByHandle[handle];
+  const device = useBackendMode() === 'device';
+  // Their own photo, else (only with no Supabase project) the sample person's, else their initial.
+  const source = avatarUrl
+    ? { uri: avatarUrl }
+    : device
+      ? previewAvatarByHandle[handle]
+      : undefined;
   if (source) return <Avatar source={source} name={handle} size={size} />;
   return (
     <View

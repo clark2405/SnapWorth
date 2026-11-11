@@ -10,8 +10,6 @@ import {
 import type { ImageSourcePropType } from 'react-native';
 
 import type {
-  MarketArea,
-  MarketCategory,
   MarketListing,
   MarketplaceRepository,
   NewListingInput,
@@ -23,87 +21,44 @@ import type { UtcDateTime } from '../../types/date-time';
 import type { AppError } from '../../types/errors';
 import { ok, type Result } from '../../types/result';
 import {
-  previewAvatarByHandle,
-  previewListingDetail,
-  previewListingInsight,
-  previewListingPlaces,
-  previewListings,
-  previewListingWorth,
-  previewMyListing,
-  previewMyListingInsight,
-  previewPhotoByListingKey,
   previewPriceAlerts,
   previewSellers,
   previewUsers,
   type PreviewListing,
-  type PreviewUser,
 } from '../preview/sample-data';
+import {
+  buildPreviewMarketListings,
+  buildPreviewMyMarketListing,
+  buildPreviewSellerSeeds,
+  sampleListingPhoto,
+  sampleSellerAvatar,
+} from './marketplace-seed';
 
 export type MarketplaceLoadStatus = 'loading' | 'ready' | 'failed';
 
-const categoryBySeedSlug: Readonly<Record<string, MarketCategory>> = {
-  'polaroid-sun-600': 'collectibles',
-  'air-jordan-1-bred': 'sneakers',
-  'retro-walkman': 'electronics',
-  'keychron-keyboard': 'electronics',
-  'nike-teal-windbreaker': 'fashion',
-  'colour-block-windbreaker': 'fashion',
-  'black-puffer-jacket': 'fashion',
-  'polaroid-film-bundle': 'collectibles',
-};
-
-const sellerBySeedSlug: Readonly<Record<string, PreviewUser>> = {
-  'polaroid-sun-600': previewUsers.mariaCruz,
-  'air-jordan-1-bred': previewUsers.justinV,
-  'retro-walkman': previewUsers.sugboHype,
-  'keychron-keyboard': previewUsers.mariaCruz,
-  'nike-teal-windbreaker': previewUsers.retroCurator,
-  'colour-block-windbreaker': previewUsers.sugboHype,
-  'black-puffer-jacket': previewUsers.justinV,
-  'polaroid-film-bundle': previewUsers.mariaCruz,
-};
-
-const descriptionBySeedSlug: Readonly<Record<string, string>> = {
-  'polaroid-sun-600': previewListingDetail.description,
-  'air-jordan-1-bred':
-    'Classic black and red Air Jordan 1 High. Clean uppers, minimal star loss on the soles, and comes with the original box and extra red laces.',
-  'retro-walkman':
-    'Silver portable cassette Walkman with working belt clip and fresh drive belt. Plays both sides of the tape cleanly with no warble.',
-  'keychron-keyboard':
-    'Hot-swappable wireless mechanical keyboard with tactile brown switches and RGB backlight. Includes original braided USB-C cable and Mac/Windows keycaps.',
-  'nike-teal-windbreaker':
-    'Early 90s Nike half-zip windbreaker in bright teal. Original swoosh embroidery, crisp nylon shell, elastic cuffs still tight.',
-  'colour-block-windbreaker':
-    'Teal and purple colour-block nylon shell jacket. Lightweight, zip runs smoothly, fits relaxed medium to large.',
-  'black-puffer-jacket':
-    'Matte black quilted puffer jacket with high collar and zip pockets. Warm without bulk, no snags or stains.',
-  'polaroid-film-bundle':
-    'Tested Polaroid 600 instant camera bundled with two fridge-stored colour film packs so you can shoot right away.',
-};
-
-/** Resolves a listing's photo: its remote/device URI when present, or the bundled sample photo. */
+/**
+ * A listing's photo: its own (uploaded or on this device), the bundled photo of a sample listing,
+ * or null when it has none, so the screen shows a placeholder rather than somebody else's photo.
+ */
 export function listingPhotoSource(
-  listing: Pick<MarketListing, 'id' | 'slug' | 'photoUrl'>,
-): ImageSourcePropType {
+  listing: Pick<MarketListing, 'id' | 'slug' | 'rowId' | 'photoUrl'>,
+): ImageSourcePropType | null {
   if (listing.photoUrl && listing.photoUrl.trim().length > 0) {
     return { uri: listing.photoUrl };
   }
-  return (
-    previewPhotoByListingKey[listing.slug] ??
-    previewPhotoByListingKey[listing.id] ??
-    previewListingDetail.photo
-  );
+  return sampleListingPhoto(listing);
 }
 
-/** Resolves a seller's avatar: their uploaded URL when present, or the bundled sample avatar. */
+/** A seller's avatar: their uploaded photo, a sample seller's bundled one, or null (their initial). */
 export function sellerAvatarSource(seller: {
+  readonly id?: string;
   readonly handle: string;
   readonly avatarUrl?: string | null;
-}): ImageSourcePropType {
+}): ImageSourcePropType | null {
   if (seller.avatarUrl && seller.avatarUrl.trim().length > 0) {
     return { uri: seller.avatarUrl };
   }
-  return previewAvatarByHandle[seller.handle] ?? previewUsers.mariaCruz.avatar;
+  return sampleSellerAvatar(seller);
 }
 
 /** Maps a `MarketListing` into the `PreviewListing` shape used by cards, Hanap and Guess. */
@@ -117,143 +72,6 @@ export function toPreviewListing(listing: MarketListing): PreviewListing {
     verdict: listing.verdict,
     verdictShare: listing.verdictShare,
   };
-}
-
-/** Builds the preview owner's own sample listing (`nike-neon-windbreaker`). */
-export function buildPreviewMyMarketListing(): MarketListing {
-  return {
-    id: previewMyListing.id,
-    rowId: previewMyListing.id,
-    slug: previewMyListing.id,
-    scanId: previewMyListing.id,
-    title: previewMyListing.title,
-    askingPrice: previewMyListing.askingPrice,
-    photoUrl: null,
-    photoPath: null,
-    photoLabel: previewMyListing.photoLabel,
-    category: 'fashion',
-    condition: 'like_new',
-    area: 'cebu-city',
-    lat: null,
-    lng: null,
-    description: previewMyListing.description,
-    estimatePhp: previewMyListingInsight.estimate,
-    estimateLowPhp: previewMyListingInsight.estimateLow,
-    estimateHighPhp: previewMyListingInsight.estimateHigh,
-    verdict: 'just_right',
-    verdictShare: previewMyListing.justRightShare,
-    status: 'active',
-    moderationStatus: 'approved',
-    seller: {
-      id: `preview:${previewMyListing.seller.handle}`,
-      handle: previewMyListing.seller.handle,
-      displayName: 'Rico Santos',
-      avatarUrl: null,
-      rating: previewMyListing.seller.rating,
-      sales: previewMyListing.seller.sales,
-    },
-    stats: previewMyListing.stats,
-    createdAt: '2026-10-12T08:00:00.000Z' as UtcDateTime,
-    mine: true,
-  };
-}
-
-/** Builds the initial `MarketListing` seed from `sample-data.ts`. */
-export function buildPreviewMarketListings(): MarketListing[] {
-  return previewListings.map((entry, index) => {
-    const worth = previewListingWorth[entry.id];
-    const place = previewListingPlaces[entry.id];
-    const seller = sellerBySeedSlug[entry.id] ?? previewUsers.mariaCruz;
-    const sellerMeta = previewSellers[seller.handle];
-    return {
-      id: entry.id,
-      rowId: `seed-listing-${index + 1}`,
-      slug: entry.id,
-      scanId: null,
-      title: entry.title,
-      askingPrice: entry.askingPrice,
-      photoUrl: null,
-      photoPath: null,
-      photoLabel: entry.photoLabel,
-      category: categoryBySeedSlug[entry.id] ?? 'collectibles',
-      condition: 'good',
-      area: (place?.area as MarketArea | undefined) ?? 'cebu-city',
-      lat: null,
-      lng: null,
-      description: descriptionBySeedSlug[entry.id] ?? previewListingDetail.description,
-      estimatePhp: worth?.estimate ?? previewListingInsight.estimate,
-      estimateLowPhp: worth?.low ?? previewListingInsight.estimateLow,
-      estimateHighPhp: worth?.high ?? previewListingInsight.estimateHigh,
-      verdict: entry.verdict,
-      verdictShare: entry.verdictShare,
-      status: 'active',
-      moderationStatus: 'approved',
-      seller: {
-        id: `preview:${seller.handle}`,
-        handle: seller.handle,
-        displayName: sellerMeta?.displayName ?? seller.handle,
-        avatarUrl: null,
-        rating: sellerMeta?.rating ?? '4.9',
-        sales: sellerMeta?.sales ?? 42,
-      },
-      stats: {
-        views: 180,
-        saves: previewListingInsight.watchers,
-        chats: 2,
-      },
-      createdAt: new Date(Date.now() - index * 3_600_000).toISOString() as UtcDateTime,
-      mine: false,
-    };
-  });
-}
-
-export function buildPreviewSellerSeeds(): Omit<SellerProfile, 'listings'>[] {
-  return [
-    {
-      id: 'preview:mariacruz',
-      handle: 'mariacruz',
-      displayName: 'Maria Cruz',
-      avatarUrl: null,
-      rating: '4.9',
-      sales: 42,
-      joined: 'Joined January 2026',
-      bio: 'Film cameras and 90s electronics. Everything is tested before it is listed.',
-      location: 'Cebu City',
-    },
-    {
-      id: 'preview:retro_curator',
-      handle: 'retro_curator',
-      displayName: 'Rico Santos',
-      avatarUrl: null,
-      rating: '4.8',
-      sales: 12,
-      joined: 'Joined March 2026',
-      bio: 'Thrifting 90s sportswear and film cameras around Cebu. Everything I sell is tested.',
-      location: 'Lahug, Cebu City',
-    },
-    {
-      id: 'preview:sugbo_hype',
-      handle: 'sugbo_hype',
-      displayName: 'Sugbo Hype',
-      avatarUrl: null,
-      rating: '4.8',
-      sales: 19,
-      joined: 'Joined February 2026',
-      bio: 'Vintage streetwear, cassette audio and rare finds around Mandaue.',
-      location: 'Mandaue',
-    },
-    {
-      id: 'preview:justin_v',
-      handle: 'justin_v',
-      displayName: 'Justin V.',
-      avatarUrl: null,
-      rating: '4.9',
-      sales: 27,
-      joined: 'Joined January 2026',
-      bio: 'Sneaker collector and outerwear enthusiast. Original boxes included.',
-      location: 'Lapu-Lapu',
-    },
-  ];
 }
 
 export interface MarketplaceState {
@@ -295,16 +113,21 @@ const MarketplaceStateContext = createContext<MarketplaceState | null>(null);
 
 const roundTo50 = (value: number) => Math.max(50, Math.round(value / 50) * 50);
 
+/**
+ * With a repository, the Market is whatever it holds (Supabase's listings, or the device
+ * repository's sample ones), and starts empty until it has loaded. Without one (a standalone
+ * screen in a unit test) it's an in-memory copy of the sample listings.
+ */
 function useMarketplaceStateInternal(repository: MarketplaceRepository | null): MarketplaceState {
   const [status, setStatus] = useState<MarketplaceLoadStatus>(repository ? 'loading' : 'ready');
   const [allListings, setAllListings] = useState<readonly MarketListing[]>(() =>
-    buildPreviewMarketListings(),
+    repository ? [] : buildPreviewMarketListings(),
   );
   const [mySampleListing, setMySampleListing] = useState<MarketListing>(() =>
     buildPreviewMyMarketListing(),
   );
   const [savedAlerts, setSavedAlerts] = useState<readonly SavedListingAlert[]>(() =>
-    previewPriceAlerts.map((entry) => ({ ...entry })),
+    repository ? [] : previewPriceAlerts.map((entry) => ({ ...entry })),
   );
 
   const refresh = useCallback(async () => {
@@ -352,20 +175,24 @@ function useMarketplaceStateInternal(repository: MarketplaceRepository | null): 
 
   const findListing = useCallback(
     (idOrSlug: string | undefined): MarketListing | null => {
-      if (!idOrSlug) return activeListings[0] ?? buildPreviewMarketListings()[0] ?? null;
+      // With a repository, a listing that isn't there isn't there: no sample stands in for it.
+      if (!idOrSlug) return repository ? null : (activeListings[0] ?? null);
       const inList = allListings.find(
         (entry) =>
           (entry.id === idOrSlug || entry.slug === idOrSlug || entry.rowId === idOrSlug) &&
           entry.status !== 'removed',
       );
-      if (inList) return inList;
+      if (inList || repository) return inList ?? null;
       if (idOrSlug === mySampleListing.id && mySampleListing.status !== 'removed') {
         return mySampleListing;
       }
-      const fallback = buildPreviewMarketListings().find((entry) => entry.id === idOrSlug);
-      return fallback ?? activeListings[0] ?? buildPreviewMarketListings()[0] ?? null;
+      return (
+        buildPreviewMarketListings().find((entry) => entry.id === idOrSlug) ??
+        activeListings[0] ??
+        null
+      );
     },
-    [activeListings, allListings, mySampleListing],
+    [activeListings, allListings, mySampleListing, repository],
   );
 
   const loadSeller = useCallback(
@@ -373,7 +200,7 @@ function useMarketplaceStateInternal(repository: MarketplaceRepository | null): 
       const normalized = handle.trim().toLowerCase().replace(/^@/, '');
       if (repository) {
         const result = await repository.sellerByHandle(normalized);
-        if (result.ok && result.value) return result.value;
+        return result.ok ? result.value : null;
       }
       const seedSeller = previewSellers[normalized];
       const seedMeta = buildPreviewSellerSeeds().find(

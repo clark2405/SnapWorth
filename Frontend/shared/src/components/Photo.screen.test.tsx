@@ -2,7 +2,7 @@ import { act, screen } from '@testing-library/react-native';
 import { Image } from 'react-native';
 
 import { renderScreen } from '../testing/render-screen';
-import { Photo } from './Photo';
+import { Avatar, Photo } from './Photo';
 
 it('replaces the fading image with a fresh native image after the fallback', () => {
   jest.useFakeTimers();
@@ -15,4 +15,17 @@ it('replaces the fading image with a fresh native image after the fallback', () 
   expect(settledImage).not.toBe(fadingImage);
   expect(settledImage.props.source).toEqual({ uri: 'sample.jpg' });
   jest.useRealTimers();
+});
+
+it('shows a placeholder, not a picture, when there is no photo', () => {
+  renderScreen(<Photo source={null} label="Brass lamp" aspectRatio={1} />);
+  expect(screen.queryByTestId('photo-image')).toBeNull();
+  expect(screen.UNSAFE_queryByType(Image)).toBeNull();
+  expect(screen.getByLabelText('Brass lamp, no photo')).toBeOnTheScreen();
+});
+
+it('shows a person’s initial when they have no profile photo', () => {
+  renderScreen(<Avatar source={null} name="maya_sells" />);
+  expect(screen.UNSAFE_queryByType(Image)).toBeNull();
+  expect(screen.getByText('M')).toBeOnTheScreen();
 });

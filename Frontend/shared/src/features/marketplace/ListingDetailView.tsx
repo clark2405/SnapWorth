@@ -2,6 +2,7 @@ import {
   BadgeCheck,
   ChevronRight,
   Eye,
+  PackageSearch,
   Heart,
   MessageSquare,
   PencilLine,
@@ -18,6 +19,7 @@ import {
   BottomBar,
   Button,
   ChoiceChips,
+  EmptyState,
   IconButton,
   LikeButton,
   ListRow,
@@ -27,6 +29,7 @@ import {
   Reveal,
   PriceRangeBar,
   Screen,
+  ScreenSkeleton,
   Sheet,
   Surface,
   SWText,
@@ -39,17 +42,10 @@ import {
   Toggle,
   WorthySays,
 } from '../../components';
+import type { MarketListing } from '../../ports/marketplace';
 import type { ModerationStatus } from '../../types/entities';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
-import {
-  formatPeso,
-  photosOf,
-  previewListingDetail,
-  previewListingInsight,
-  previewMyListing,
-  previewMyListingInsight,
-  type PreviewConfidence,
-} from '../preview/sample-data';
+import { formatPeso } from '../preview/sample-data';
 import { useAccountGate, useSession } from '../session';
 import { askingLine } from './asking-line';
 import { verdictChip, verdictLabel } from './ListingCard';
@@ -88,8 +84,30 @@ const categoryDisplayLabel: Readonly<Record<string, string>> = {
 
 const roundTo50 = (value: number) => Math.max(50, Math.round(value / 50) * 50);
 
-export function ListingDetailView({
-  listingId,
+/**
+ * A listing's page. The listing comes from the Market (Supabase's, or the device's sample ones in
+ * a build with no project); one that isn't there says so rather than showing a stand-in.
+ */
+export function ListingDetailView(props: ListingDetailViewProps) {
+  const { findListing, status } = useMarketplace();
+  const listing = findListing(props.listingId);
+  if (listing) return <ListingDetail {...props} listing={listing} />;
+  if (status === 'loading') return <ScreenSkeleton kind="detail" />;
+  return (
+    <Screen ambient="market" header={<NavHeader title="Listing" onBack={props.onBack} />}>
+      <EmptyState
+        icon={PackageSearch}
+        title="This listing isn’t available"
+        body="It may have been sold or removed, or the link is out of date."
+        actionLabel="Go back"
+        onAction={props.onBack}
+      />
+    </Screen>
+  );
+}
+
+function ListingDetail({
+  listing: marketListing,
   onBack,
   onMessageSeller,
   onSendOffer,
@@ -99,14 +117,13 @@ export function ListingDetailView({
   onMarkSold,
   onDeleteListing,
   onShare,
-}: ListingDetailViewProps) {
+}: ListingDetailViewProps & { readonly listing: MarketListing }) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
   const { isGuest } = useSession();
   const requireAccount = useAccountGate();
   const {
-    findListing,
     isSaved,
     getAlert,
     toggleSaved: toggleSavedInMarket,
@@ -115,67 +132,47 @@ export function ListingDetailView({
     removeListing,
   } = useMarketplace();
 
-  const marketListing = findListing(listingId);
   // The seller sees their own listing with its numbers and controls instead of buy actions.
-  const owned = !isGuest && Boolean(marketListing?.mine || listingId === previewMyListing.id);
-  const fallbackListing = owned ? previewMyListing : previewListingDetail;
-  const fallbackInsight = owned ? previewMyListingInsight : previewListingInsight;
+  const owned = !isGuest && marketListing.mine;
 
-  const activeId = marketListing?.id ?? fallbackListing.id;
-  const title = marketListing?.title ?? fallbackListing.title;
-  const categoryLabel = marketListing
-    ? (categoryDisplayLabel[marketListing.category] ?? marketListing.category)
-    : fallbackListing.category;
-  const askingPrice = marketListing?.askingPrice ?? fallbackListing.askingPrice;
-  const description =
-    marketListing && marketListing.description.length > 0
-      ? marketListing.description
-      : fallbackListing.description;
+  const activeId = marketListing.id;
+  const title = marketListing.title;
+  const categoryLabel = categoryDisplayLabel[marketListing.category] ?? marketListing.category;
+  const askingPrice = marketListing.askingPrice;
+  const description = marketListing.description;
   // What voters make of the asking price. Null until someone has voted, so nothing is shown.
-  const verdict = marketListing
-    ? marketListing.verdict !== null && marketListing.verdictShare !== null
+  const verdict =
+    marketListing.verdict !== null && marketListing.verdictShare !== null
       ? { choice: marketListing.verdict, share: marketListing.verdictShare }
-      : null
-    : { choice: 'just_right' as const, share: fallbackListing.justRightShare };
+      : null;
 
-  const seller = marketListing
-    ? {
-        handle: marketListing.seller.handle,
-        avatar: sellerAvatarSource(marketListing.seller),
-        rating: marketListing.seller.rating,
-        sales: marketListing.seller.sales,
-      }
-    : fallbackListing.seller;
+  const seller = {
+    handle: marketListing.seller.handle,
+    avatar: sellerAvatarSource(marketListing.seller),
+    rating: marketListing.seller.rating,
+    sales: marketListing.seller.sales,
+  };
 
-  const heroPhotos = marketListing
-    ? [
-        {
-          source:
-            marketListing.id === previewListingDetail.id && !marketListing.photoUrl
-              ? previewListingDetail.photo
-              : listingPhotoSource(marketListing),
-          label: marketListing.photoLabel,
-        },
-      ]
-    : photosOf(fallbackListing);
+  const photo = listingPhotoSource(marketListing);
+  const heroPhotos = photo ? [{ source: photo, label: marketListing.photoLabel }] : [];
 
-  const estimate = marketListing?.estimatePhp ?? fallbackInsight.estimate;
-  const estimateLow = marketListing?.estimateLowPhp ?? fallbackInsight.estimateLow;
-  const estimateHigh = marketListing?.estimateHighPhp ?? fallbackInsight.estimateHigh;
-  const confidence: PreviewConfidence = fallbackInsight.confidence;
-  const watchers = marketListing
-    ? Math.max(1, marketListing.stats.saves)
-    : fallbackInsight.watchers;
-  const offerSuggestions =
-    marketListing &&
-    marketListing.id !== previewListingDetail.id &&
-    marketListing.id !== previewMyListing.id
-      ? [
-          roundTo50(askingPrice * 0.88),
-          roundTo50(askingPrice * 0.93),
-          roundTo50(askingPrice * 0.97),
-        ]
-      : fallbackInsight.offerSuggestions;
+  // The AI's range, copied from the listing's scan. A listing made without one has none.
+  const aiRange =
+    marketListing.estimatePhp !== null &&
+    marketListing.estimateLowPhp !== null &&
+    marketListing.estimateHighPhp !== null
+      ? {
+          estimate: marketListing.estimatePhp,
+          low: marketListing.estimateLowPhp,
+          high: marketListing.estimateHighPhp,
+        }
+      : null;
+  const saves = marketListing.stats.saves;
+  const offerSuggestions = [
+    roundTo50(askingPrice * 0.88),
+    roundTo50(askingPrice * 0.93),
+    roundTo50(askingPrice * 0.97),
+  ];
 
   const [markingSold, setMarkingSold] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -195,14 +192,12 @@ export function ListingDetailView({
   const offerAmount = Number(offerText.replace(/,/g, '')) || 0;
 
   const offerNote = (() => {
+    if (!aiRange) return 'Offers go to the seller, who can accept, decline or counter.';
+    const range = `${formatPeso(aiRange.low)}–${formatPeso(aiRange.high)}`;
     if (offerAmount <= 0) return 'Enter an amount to compare it with the AI range.';
-    if (offerAmount < estimateLow) {
-      return `Below the AI range of ${formatPeso(estimateLow)}–${formatPeso(estimateHigh)}.`;
-    }
-    if (offerAmount > estimateHigh) {
-      return `Above the AI range of ${formatPeso(estimateLow)}–${formatPeso(estimateHigh)}.`;
-    }
-    return `Within the AI range of ${formatPeso(estimateLow)}–${formatPeso(estimateHigh)}.`;
+    if (offerAmount < aiRange.low) return `Below the AI range of ${range}.`;
+    if (offerAmount > aiRange.high) return `Above the AI range of ${range}.`;
+    return `Within the AI range of ${range}.`;
   })();
 
   // The offer goes into the chat with the seller, as an offer they can accept, decline or
@@ -317,15 +312,20 @@ export function ListingDetailView({
           <Reveal index={2} style={styles.sections}>
             <Surface padding={tokens.spacing[4]} contentStyle={styles.assessment}>
               <SWText variant="headingSmall">Is the price fair?</SWText>
-              <PriceRangeBar
-                low={estimateLow}
-                high={estimateHigh}
-                estimate={estimate}
-                confidence={confidence}
-                asking={askingPrice}
-                format={formatPeso}
-                animate={false}
-              />
+              {aiRange ? (
+                <PriceRangeBar
+                  low={aiRange.low}
+                  high={aiRange.high}
+                  estimate={aiRange.estimate}
+                  asking={askingPrice}
+                  format={formatPeso}
+                  animate={false}
+                />
+              ) : (
+                <SWText variant="bodySmall" tone="textSecondary">
+                  This listing has no AI estimate, so there is no range to compare the price with.
+                </SWText>
+              )}
               {verdict ? (
                 <View style={styles.communityVerdict}>
                   <Tag
@@ -344,18 +344,11 @@ export function ListingDetailView({
               )}
             </Surface>
 
-            <WorthySays>
-              {askingLine(
-                {
-                  asking: askingPrice,
-                  estimate,
-                  low: estimateLow,
-                  high: estimateHigh,
-                },
-                owned,
-                formatPeso,
-              )}
-            </WorthySays>
+            {aiRange ? (
+              <WorthySays>
+                {askingLine({ asking: askingPrice, ...aiRange }, owned, formatPeso)}
+              </WorthySays>
+            ) : null}
 
             {owned && marketListing && marketListing.moderationStatus !== 'approved' ? (
               <ModerationNotice status={marketListing.moderationStatus} />
@@ -363,7 +356,7 @@ export function ListingDetailView({
 
             {owned ? (
               <OwnerPanel
-                stats={marketListing?.stats ?? previewMyListing.stats}
+                stats={marketListing.stats}
                 marking={markingSold}
                 deleting={deleting}
                 onMarkSold={async () => {
@@ -385,7 +378,7 @@ export function ListingDetailView({
             ) : (
               <PressableScale
                 accessibilityRole="link"
-                accessibilityLabel={`Seller ${seller.handle}, rated ${seller.rating} from ${seller.sales} sales`}
+                accessibilityLabel={`Seller ${seller.handle}${seller.rating === null ? '' : `, rated ${seller.rating}`}, ${seller.sales} ${seller.sales === 1 ? 'sale' : 'sales'}`}
                 onPress={() => onOpenSeller?.(seller.handle)}
               >
                 <Surface padding={tokens.spacing[3]}>
@@ -393,7 +386,13 @@ export function ListingDetailView({
                     <Avatar source={seller.avatar} name={seller.handle} size={40} ring />
                     <View style={styles.sellerText}>
                       <SWText variant="label">@{seller.handle}</SWText>
-                      <Rating value={seller.rating} detail={`${seller.sales} sales`} />
+                      {seller.rating === null ? (
+                        <SWText variant="caption" tone="textMuted">
+                          {seller.sales === 1 ? '1 sale' : `${seller.sales} sales`}
+                        </SWText>
+                      ) : (
+                        <Rating value={seller.rating} detail={`${seller.sales} sales`} />
+                      )}
                     </View>
                     <ChevronRight size={20} strokeWidth={2} color={colors.textMuted} />
                   </View>
@@ -401,14 +400,16 @@ export function ListingDetailView({
               </PressableScale>
             )}
 
-            <View style={styles.description}>
-              <SWText variant="overline" tone="textMuted" accessibilityRole="header">
-                About this item
-              </SWText>
-              <SWText variant="bodyMedium" tone="textSecondary">
-                {description}
-              </SWText>
-            </View>
+            {description.length > 0 ? (
+              <View style={styles.description}>
+                <SWText variant="overline" tone="textMuted" accessibilityRole="header">
+                  About this item
+                </SWText>
+                <SWText variant="bodyMedium" tone="textSecondary">
+                  {description}
+                </SWText>
+              </View>
+            ) : null}
 
             {owned ? null : (
               <>
@@ -435,9 +436,13 @@ export function ListingDetailView({
                     }
                   />
                 </Surface>
-                <SWText variant="caption" tone="textMuted">
-                  {watchers} people watching this listing
-                </SWText>
+                {saves > 0 ? (
+                  <SWText variant="caption" tone="textMuted">
+                    {saves === 1
+                      ? '1 person has saved this listing'
+                      : `${saves} people have saved this listing`}
+                  </SWText>
+                ) : null}
               </>
             )}
           </Reveal>

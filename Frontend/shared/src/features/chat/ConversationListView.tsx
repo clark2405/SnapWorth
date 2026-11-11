@@ -19,7 +19,8 @@ import {
 import { themedStyles, tokens, useThemedStyles } from '../../design';
 import type { ConversationSummary } from '../../types/entities';
 import { AuthorAvatar } from '../feed/CommentList';
-import { previewPhotoByListingKey } from '../preview/sample-data';
+import { useBackendMode } from '../session/backend-mode';
+import { chatListingPhoto } from './chat-listing-photo';
 import { ProfileButton } from '../profile/ProfileButton';
 import { describeLatest, formatListTime } from './chat-format';
 import { useConversationList } from './chat-state';
@@ -138,9 +139,7 @@ function ConversationRow({
   const sentAt = formatListTime(conversation.latestActivityAt);
   const handle = conversation.other.handle;
   const title = conversation.listing.title;
-  const photo = conversation.listing.photoUrl
-    ? { uri: conversation.listing.photoUrl }
-    : previewPhotoByListingKey[conversation.listing.key];
+  const photo = chatListingPhoto(conversation.listing, useBackendMode());
 
   return (
     <ZoomLink

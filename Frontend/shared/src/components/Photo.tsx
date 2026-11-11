@@ -1,3 +1,4 @@
+import { ImageOff } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
   Image,
@@ -15,10 +16,12 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 
-import { themedStyles, tokens, useThemedStyles } from '../design';
+import { themedStyles, tokens, useTheme, useThemedStyles } from '../design';
+import { SWText } from './SWText';
 
 export interface PhotoProps {
-  readonly source: ImageSourcePropType;
+  /** The picture, or null when there isn't one: the frame then holds a quiet placeholder. */
+  readonly source: ImageSourcePropType | null;
   /** Describes the item, e.g. "Photo of a vintage Polaroid camera". */
   readonly label: string;
   readonly aspectRatio?: number;
@@ -43,6 +46,7 @@ export function Photo({
   style,
 }: PhotoProps) {
   const styles = useThemedStyles(stylesFor);
+  const { colors } = useTheme();
   const reduceMotion = useReducedMotion();
   const loaded = useSharedValue(reduceMotion ? 1 : 0);
   // Once developed, the photo drops its animated style and renders plainly. A fade can fail to
@@ -63,6 +67,18 @@ export function Photo({
 
   // Detaching an animated style does not clear its last native opacity. A fresh
   // Image guarantees that a missed fade cannot leave the photo invisible.
+  if (source === null) {
+    return (
+      <View
+        accessibilityRole="image"
+        accessibilityLabel={`${label}, no photo`}
+        style={[styles.frame, styles.empty, { borderRadius: radius, aspectRatio }, style]}
+      >
+        <ImageOff size={22} strokeWidth={1.75} color={colors.textMuted} />
+      </View>
+    );
+  }
+
   const imageProps = {
     accessibilityRole: 'image',
     accessibilityLabel: label,
@@ -95,7 +111,8 @@ export function Photo({
 }
 
 export interface AvatarProps {
-  readonly source: ImageSourcePropType;
+  /** The profile photo, or null for the person's initial. */
+  readonly source: ImageSourcePropType | null;
   readonly name: string;
   readonly size?: number;
   /** A sand ring, e.g. for a verified or top seller. */
@@ -104,14 +121,25 @@ export interface AvatarProps {
 
 export function Avatar({ source, name, size = 36, ring = false }: AvatarProps) {
   const styles = useThemedStyles(stylesFor);
-  const photo = (
-    <Photo
-      source={source}
-      label={`${name}'s profile photo`}
-      radius={tokens.radius.full}
-      style={{ width: size, height: size }}
-    />
-  );
+  const photo =
+    source === null ? (
+      <View
+        accessibilityRole="image"
+        accessibilityLabel={`${name}'s profile photo`}
+        style={[styles.frame, styles.empty, { width: size, height: size, borderRadius: size / 2 }]}
+      >
+        <SWText variant="labelSmall" tone="textSecondary">
+          {name.replace(/^@/, '').charAt(0).toUpperCase()}
+        </SWText>
+      </View>
+    ) : (
+      <Photo
+        source={source}
+        label={`${name}'s profile photo`}
+        radius={tokens.radius.full}
+        style={{ width: size, height: size }}
+      />
+    );
   if (!ring) return photo;
   return <View style={[styles.ring, { borderRadius: size }]}>{photo}</View>;
 }
@@ -120,6 +148,10 @@ const stylesFor = themedStyles((colors) => ({
   frame: {
     overflow: 'hidden',
     backgroundColor: colors.sunken,
+  },
+  empty: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   // Explicit size: on web the image otherwise renders at its natural size inside the frame.
   image: {

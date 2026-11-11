@@ -110,6 +110,7 @@ function toMarketListing(
   viewerId: string | null,
   signedUrls: Readonly<Record<string, string>>,
   chatsCount = 0,
+  sales = 0,
 ): MarketListing {
   const seller = unwrapSeller(row.seller);
   const handle = seller?.handle ?? 'seller';
@@ -145,8 +146,9 @@ function toMarketListing(
       handle,
       displayName,
       avatarUrl: seller?.avatar_url ?? null,
-      rating: '4.9',
-      sales: 12,
+      // Sellers aren't rated yet; `sales` is how many of their listings sold.
+      rating: null,
+      sales,
     },
     stats: {
       views: row.views_count ?? 0,
@@ -165,6 +167,24 @@ export function createSupabaseMarketplaceRepository(
   async function viewerId(): Promise<string | null> {
     const { data } = await client.auth.getSession();
     return data.session?.user.id ?? null;
+  }
+
+  /** How many listings each seller has sold, from the sold listings anyone can see. */
+  async function soldCounts(
+    sellerIds: readonly string[],
+  ): Promise<Readonly<Record<string, number>>> {
+    const ids = [...new Set(sellerIds)];
+    if (ids.length === 0) return {};
+    const { data } = await client
+      .from('listings')
+      .select('seller_id')
+      .eq('status', 'sold')
+      .in('seller_id', ids);
+    const counts: Record<string, number> = {};
+    for (const row of (data ?? []) as { seller_id: string }[]) {
+      counts[row.seller_id] = (counts[row.seller_id] ?? 0) + 1;
+    }
+    return counts;
   }
 
   async function signRows(rows: readonly ListingRow[]): Promise<Readonly<Record<string, string>>> {
@@ -213,14 +233,17 @@ export function createSupabaseMarketplaceRepository(
       ]);
       if (error) return err(toAppError(error, 'load_marketplace', 'listing'));
       const rows = (data ?? []) as unknown as ListingRow[];
-      const signed = await signRows(rows);
-      return ok(rows.map((row) => toMarketListing(row, viewer, signed)));
+      const [signed, sold] = await Promise.all([
+        signRows(rows),
+        soldCounts(rows.map((row) => row.seller_id)),
+      ]);
+      return ok(rows.map((row) => toMarketListing(row, viewer, signed, 0, sold[row.seller_id])));
     },
 
     async findById(idOrSlug) {
       const [row, viewer] = await Promise.all([findRow(idOrSlug), viewerId()]);
       if (!row) return ok(null);
-      const signed = await signRows([row]);
+      const [signed, sold] = await Promise.all([signRows([row]), soldCounts([row.seller_id])]);
       let chatsCount = 0;
       if (viewer && row.seller_id === viewer) {
         const { count } = await client
@@ -229,7 +252,7 @@ export function createSupabaseMarketplaceRepository(
           .eq('listing_id', row.id);
         chatsCount = count ?? 0;
       }
-      return ok(toMarketListing(row, viewer, signed, chatsCount));
+      return ok(toMarketListing(row, viewer, signed, chatsCount, sold[row.seller_id]));
     },
 
     async sellerByHandle(handle) {
@@ -273,7 +296,7 @@ export function createSupabaseMarketplaceRepository(
               ? profile.display_name
               : profile.handle,
           avatarUrl: profile.avatar_url ?? null,
-          rating: '4.9',
+          rating: null,
           sales,
         },
       }));
@@ -286,7 +309,7 @@ export function createSupabaseMarketplaceRepository(
             ? profile.display_name
             : profile.handle,
         avatarUrl: profile.avatar_url ?? null,
-        rating: '4.9',
+        rating: null,
         sales,
         joined: formatJoined(profile.created_at),
         bio: profile.bio ?? '',

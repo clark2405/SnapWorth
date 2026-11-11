@@ -7,7 +7,7 @@ import { MarketplaceView } from './MarketplaceView';
 import { MarketplaceProvider } from './marketplace-state';
 import { ViewerLocationProvider } from './viewer-location';
 import { createLocalMarketplaceRepository } from '../../adapters/local/marketplace-repository';
-import { buildPreviewMarketListings } from './marketplace-state';
+import { buildPreviewMarketListings } from './marketplace-seed';
 
 const memoryStore = () => {
   const map = new Map<string, string>();

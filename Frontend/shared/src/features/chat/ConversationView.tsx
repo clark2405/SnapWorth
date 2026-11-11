@@ -38,7 +38,9 @@ import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../d
 import type { MeetupProposal } from '../../ports/services';
 import type { ChatReportReason, MeetupPurpose, Message } from '../../types/entities';
 import type { AppError } from '../../types/errors';
-import { formatPeso, previewPhotoByListingKey } from '../preview/sample-data';
+import { formatPeso } from '../preview/sample-data';
+import { useBackendMode } from '../session/backend-mode';
+import { chatListingPhoto } from './chat-listing-photo';
 import { MeetupCard, OfferCard } from './ChatCards';
 import { ChatActionsSheet, MeetupSheet, OfferSheet, SafetySheet, SukiSheet } from './ChatSheets';
 import { useSuki } from './suki';
@@ -83,6 +85,7 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
   const chat = useConversation(conversationId);
+  const backend = useBackendMode();
   const { conversation, messages, typing } = chat;
   const handle = conversation?.other.handle ?? 'seller';
   const askingPrice = conversation?.listing.askingPricePhp ?? 0;
@@ -217,9 +220,7 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
   }
 
   const listing = conversation.listing;
-  const itemPhoto = listing.photoUrl
-    ? { uri: listing.photoUrl }
-    : previewPhotoByListingKey[listing.key];
+  const itemPhoto = chatListingPhoto(listing, backend);
 
   const composer = closed ? (
     <View style={styles.notice} accessibilityLiveRegion="polite">

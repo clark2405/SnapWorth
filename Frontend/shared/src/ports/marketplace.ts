@@ -13,7 +13,9 @@ export interface ListingSellerSummary {
   readonly handle: string;
   readonly displayName: string;
   readonly avatarUrl: string | null;
-  readonly rating: string;
+  /** Sellers aren't rated yet, so a real seller has none; only the device's sample sellers do. */
+  readonly rating: string | null;
+  /** How many of their listings sold. */
   readonly sales: number;
 }
 
@@ -66,7 +68,7 @@ export interface SellerProfile {
   readonly handle: string;
   readonly displayName: string;
   readonly avatarUrl: string | null;
-  readonly rating: string;
+  readonly rating: string | null;
   readonly sales: number;
   readonly joined: string;
   readonly bio: string;

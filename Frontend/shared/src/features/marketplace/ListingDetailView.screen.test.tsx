@@ -43,10 +43,10 @@ describe('ListingDetailView', () => {
     });
   });
 
-  it('renders a seller profile and their active listings by handle', () => {
+  it('renders a seller profile and their active listings by handle', async () => {
     renderScreen(<SellerProfileView handle="mariacruz" />);
 
-    expect(screen.getByText('Maria Cruz')).toBeOnTheScreen();
+    expect(await screen.findByText('Maria Cruz')).toBeOnTheScreen();
     expect(screen.getByText('Vintage Polaroid Sun 600')).toBeOnTheScreen();
   });
 });

@@ -8,7 +8,7 @@ import { previewListings, previewListingWorth, type PreviewListing } from '../pr
 export interface GuessItem {
   readonly id: string;
   readonly title: string;
-  readonly photo: ImageSourcePropType;
+  readonly photo: ImageSourcePropType | null;
   readonly photoLabel: string;
   /** The answer: the AI's estimate. */
   readonly worth: number;

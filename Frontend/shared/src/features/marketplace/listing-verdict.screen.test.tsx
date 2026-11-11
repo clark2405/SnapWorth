@@ -5,7 +5,8 @@ import type { MarketListing } from '../../ports/marketplace';
 import { renderScreen } from '../../testing/render-screen';
 import { ListingCard } from './ListingCard';
 import { ListingDetailView } from './ListingDetailView';
-import { MarketplaceProvider, buildPreviewMarketListings } from './marketplace-state';
+import { MarketplaceProvider } from './marketplace-state';
+import { buildPreviewMarketListings } from './marketplace-seed';
 
 const viewer = { userId: 'usr_viewer' as never, handle: 'viewer' };
 const memoryStore = () => {

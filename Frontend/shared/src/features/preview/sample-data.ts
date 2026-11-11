@@ -223,7 +223,8 @@ export interface PreviewListing {
   readonly id: string;
   readonly title: string;
   readonly askingPrice: number;
-  readonly photo: ImageSourcePropType;
+  /** Null when the listing has no photo: the card shows a placeholder. */
+  readonly photo: ImageSourcePropType | null;
   readonly photoLabel: string;
   /** The community's verdict on the asking price; null while nobody has voted. */
   readonly verdict: VoteChoice | null;
@@ -997,7 +998,7 @@ export interface PreviewSearchResult {
   readonly id: string;
   readonly kind: 'listing' | 'post' | 'item';
   readonly title: string;
-  readonly photo: ImageSourcePropType;
+  readonly photo: ImageSourcePropType | null;
   readonly photoLabel: string;
   /** Asking price for listings; AI estimate for posts and history items, when there is one. */
   readonly amount: number | null;
@@ -1313,7 +1314,9 @@ export const previewChatListingKey = (itemTitle: string): string =>
 /** Bundled photos by listing key, for listings that have no uploaded photo yet. */
 export const previewPhotoByListingKey: Readonly<Record<string, ImageSourcePropType>> =
   Object.fromEntries([
-    ...previewListings.map((listing) => [listing.id, listing.photo] as const),
+    ...previewListings.flatMap((listing) =>
+      listing.photo ? [[listing.id, listing.photo] as const] : [],
+    ),
     [previewMyListing.id, previewMyListing.photo] as const,
     ...previewConversations.map(
       (conversation) =>

@@ -13,6 +13,7 @@ import type { AppError, OperationName } from '../../types/errors';
 import type { ConversationId, MessageId, UserId } from '../../types/ids';
 import { err, ok, type Result } from '../../types/result';
 import { toAppError } from './errors';
+import { createSupabaseScanPhotos, type ScanPhotoStore } from './photo-storage';
 import { ensureSignedIn } from './session';
 
 interface MessageRow {
@@ -129,8 +130,35 @@ function summaryFromRow(row: ConversationRow): ConversationSummary {
  * translates. Until email sign-in is wired up, a device without a session signs in
  * anonymously, the same way comments do.
  */
-export function createSupabaseChatRepository(client: SupabaseClient): ChatRepository {
+export function createSupabaseChatRepository(
+  client: SupabaseClient,
+  photos: ScanPhotoStore = createSupabaseScanPhotos(client),
+): ChatRepository {
   const viewerId = () => ensureSignedIn(client);
+
+  /**
+   * Gives each row its listing's photo. A listing's photo is a private scan photo that Storage
+   * lets people see while the listing is approved, so it comes as a link that lasts a while. A
+   * listing with no photo, or one this person may no longer see, has none, and the chat shows a
+   * placeholder.
+   */
+  async function withListingPhotos(rows: ConversationRow[]): Promise<ConversationRow[]> {
+    const slugs = [...new Set(rows.map((row) => row.listing_slug))];
+    if (slugs.length === 0) return rows;
+    const { data } = await client.from('listings').select('slug, photo_path').in('slug', slugs);
+    const pathBySlug = new Map(
+      ((data ?? []) as { slug: string; photo_path: string | null }[]).flatMap((listing) =>
+        listing.photo_path ? [[listing.slug, listing.photo_path] as const] : [],
+      ),
+    );
+    if (pathBySlug.size === 0) return rows;
+    const links = await photos.links([...new Set(pathBySlug.values())]);
+    return rows.map((row) => {
+      const path = pathBySlug.get(row.listing_slug);
+      const link = path ? links[path] : undefined;
+      return link ? { ...row, listing_photo_url: link } : row;
+    });
+  }
 
   async function conversationRows(
     target: string | null,
@@ -140,7 +168,7 @@ export function createSupabaseChatRepository(client: SupabaseClient): ChatReposi
     if (!viewer.ok) return viewer;
     const { data, error } = await client.rpc('conversation_list', { target });
     if (error) return err(toAppError(error, operation));
-    return ok(data as ConversationRow[]);
+    return ok(await withListingPhotos(data as ConversationRow[]));
   }
 
   // One Realtime channel per device, shared by every screen that listens: supabase-js keeps one
