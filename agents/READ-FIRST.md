@@ -381,6 +381,21 @@ any new artwork:
   the Supabase dashboard.
 - Without Supabase configured, sign-in starts a local session on the device. The app still runs.
 
+### Making someone an admin
+
+An admin is a row in `public.admins`. Only the database owner can write it: the app can't read or
+change the table, and nothing an account controls (its metadata, its email address) grants the
+role. In the dashboard's SQL editor, with the person's sign-up email:
+
+```sql
+insert into public.admins (user_id) select id from auth.users where email = 'them@example.com';
+-- and to take it away again:
+delete from public.admins where user_id = (select id from auth.users where email = 'them@example.com');
+```
+
+The app asks `is_admin()` and shows Profile → Moderation to a yes. Needs the `admin_role`
+migration deployed.
+
 ### Sign-in setup
 
 Dashboard settings the code can't make. `<web>` is the web app's address (for example

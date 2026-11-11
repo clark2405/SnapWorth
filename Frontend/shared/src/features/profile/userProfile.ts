@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ImageSourcePropType } from 'react-native';
 
+import { fetchIsAdmin } from '../../adapters/supabase/admin-role';
 import { uploadAvatar } from '../../adapters/supabase/photo-storage';
 import { getSupabase, isSupabaseConfigured } from '../../adapters/supabaseClient';
 import { previewConversations, previewProfile, previewVotesCast } from '../preview/sample-data';
@@ -62,6 +63,15 @@ function textOf(...values: unknown[]): string | undefined {
 /** The id of the preview profile shown with nobody signed in. */
 export const previewProfileId = 'demo-user';
 
+/**
+ * Whether the preview owner is an admin. Only a build with no backend says so, to show the
+ * sample review queue: with one, the database decides (`fetchIsAdmin`), and the answer starts
+ * as no. Never read from the account's metadata or email, which people control.
+ */
+function deviceAdmin(): boolean {
+  return !isSupabaseConfigured() && previewProfile.isAdmin;
+}
+
 /** Returns fallback profile details when Supabase is unconfigured or user details are missing. */
 export function buildFallbackProfile(user?: SessionUser | null): UserProfileDetails {
   if (!user) {
@@ -75,7 +85,7 @@ export function buildFallbackProfile(user?: SessionUser | null): UserProfileDeta
       bio: previewProfile.bio,
       joined: previewProfile.joined,
       rating: previewProfile.rating,
-      isAdmin: previewProfile.isAdmin,
+      isAdmin: deviceAdmin(),
       stats: {
         checked: previewProfile.stats.checked,
         listed: previewProfile.stats.listed,
@@ -106,12 +116,7 @@ export function buildFallbackProfile(user?: SessionUser | null): UserProfileDeta
     bio: textOf(meta.bio) ?? previewProfile.bio,
     joined: formatJoinedDate(user.created_at),
     rating: textOf(meta.rating) ?? previewProfile.rating,
-    isAdmin: Boolean(
-      meta.role === 'admin' ||
-      meta.is_admin ||
-      user.app_metadata?.role === 'admin' ||
-      user.email?.endsWith('@snapworth.com'),
-    ),
+    isAdmin: deviceAdmin(),
     stats: {
       // Their own scans, counted once they've loaded.
       checked: 0,
@@ -158,10 +163,14 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
   let listedCount = fallback.stats.listed;
   let soldCount = fallback.stats.sold;
   let chatCount = fallback.activity.conversations;
+  let isAdmin = fallback.isAdmin;
 
   if (isSupabaseConfigured()) {
     try {
       const supabase = getSupabase();
+
+      // Only the database grants the role; this is asking it, not deciding.
+      isAdmin = await fetchIsAdmin(supabase);
 
       // Query public.profiles
       try {
@@ -225,6 +234,7 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
     ...fallback,
     handle,
     avatarUrl,
+    isAdmin,
     stats: {
       checked: checkedCount,
       listed: listedCount,
