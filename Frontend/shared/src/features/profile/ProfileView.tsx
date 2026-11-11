@@ -50,7 +50,8 @@ import {
   deleteConfirmationWord,
   type DeleteAccountOutcome,
 } from '../auth/account-deletion';
-import { formatPeso, previewHeldContent, previewPortfolio } from '../preview/sample-data';
+import { useReviewCount } from '../admin/admin-state';
+import { formatPeso, previewPortfolio } from '../preview/sample-data';
 import { useFeed } from '../feed/feed-state';
 import { useScanHistory } from '../history/scan-history-state';
 import { useBackendMode } from '../session/backend-mode';
@@ -86,6 +87,19 @@ const appearanceOptions: readonly { readonly key: ThemePreference; readonly labe
   { key: 'light', label: 'Light' },
   { key: 'dark', label: 'Dark' },
 ];
+
+/** The way into the review queue, with how many cases wait once the database has said. */
+function ModerationRow({ onPress }: { readonly onPress: () => void }) {
+  const waiting = useReviewCount();
+  return (
+    <ListRow
+      label="Moderation"
+      icon={ShieldAlert}
+      value={waiting === null ? undefined : String(waiting)}
+      onPress={onPress}
+    />
+  );
+}
 
 export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: ProfileViewProps) {
   const { colors, preference, setPreference } = useTheme();
@@ -276,14 +290,7 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
             icon={TrendingDown}
             onPress={() => onOpen?.('price-alerts')}
           />
-          {profile.isAdmin ? (
-            <ListRow
-              label="Moderation"
-              icon={ShieldAlert}
-              value={mode === 'device' ? String(previewHeldContent.length) : undefined}
-              onPress={() => onOpen?.('moderation')}
-            />
-          ) : null}
+          {profile.isAdmin ? <ModerationRow onPress={() => onOpen?.('moderation')} /> : null}
           <ListRow label="Help" icon={CircleHelp} onPress={() => onOpen?.('help')} />
           <ListRow
             label="Replay introduction"

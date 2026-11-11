@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 
 import {
+  createLocalAdminRepository,
   createLocalChatRepository,
   createLocalCollectionRepository,
   createLocalCommentRepository,
@@ -11,6 +12,7 @@ import {
   createLocalMarketplaceRepository,
   createLocalSukiRepository,
   createSupabaseAccountObserver,
+  createSupabaseAdminRepository,
   createSupabaseChatRepository,
   createSupabaseCollectionRepository,
   createSupabaseCommentRepository,
@@ -26,6 +28,8 @@ import {
 } from '../adapters';
 import { createDeviceLocation } from '../adapters/device/location';
 import { getSupabase } from '../adapters/supabaseClient';
+import { AdminProvider } from '../features/admin/admin-state';
+import { buildPreviewReviewCases } from '../features/admin/review-seed';
 import { ChatServiceProvider } from '../features/chat/chat-state';
 import { SukiProvider } from '../features/chat/suki';
 import {
@@ -64,6 +68,7 @@ import {
   type PreviewUser,
 } from '../features/preview/sample-data';
 import type { AccountObserver } from '../ports/account';
+import type { AdminRepository } from '../ports/admin';
 import type { CollectionRepository } from '../ports/collections';
 import type { FeedRepository } from '../ports/feed';
 import type { HanapRepository } from '../ports/hanap';
@@ -86,6 +91,7 @@ export interface AppServices {
   /** `supabase` when a project is configured; otherwise comments live on this device. */
   readonly backend: 'supabase' | 'device';
   readonly comments: CommentService;
+  readonly admin: AdminRepository;
   readonly chats: ChatService;
   readonly feed: FeedRepository;
   readonly hanap: HanapRepository;
@@ -241,6 +247,7 @@ export function createAppServices(config: BackendConfig): AppServices {
     return {
       backend: 'supabase',
       comments: createCommentService(createSupabaseCommentRepository(client)),
+      admin: createSupabaseAdminRepository(client),
       chats: createChatService(createSupabaseChatRepository(client)),
       feed: createSupabaseFeedRepository(client),
       hanap: createSupabaseHanapRepository(client),
@@ -275,6 +282,7 @@ export function createAppServices(config: BackendConfig): AppServices {
         screen: screenWithRules,
       }),
     ),
+    admin: createLocalAdminRepository({ seed: buildPreviewReviewCases() }),
     chats: createChatService(
       createLocalChatRepository({
         store: AsyncStorage,
@@ -365,7 +373,7 @@ export function AppServicesProvider({
                           <GuessProvider store={AsyncStorage}>
                             {/* Where the viewer is, only when they pick "Near me"; never stored. */}
                             <ViewerLocationProvider port={deviceLocation}>
-                              {children}
+                              <AdminProvider repository={services.admin}>{children}</AdminProvider>
                             </ViewerLocationProvider>
                           </GuessProvider>
                         </CollectionsProvider>

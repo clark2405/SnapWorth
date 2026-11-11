@@ -24,6 +24,7 @@ import { chatListingPhoto } from './chat-listing-photo';
 import { ProfileButton } from '../profile/ProfileButton';
 import { describeLatest, formatListTime } from './chat-format';
 import { useConversationList } from './chat-state';
+import { UpcomingMeetups } from './UpcomingMeetups';
 
 export interface ConversationListViewProps {
   readonly onOpenConversation?: (conversationId: string) => void;
@@ -80,6 +81,7 @@ export function ConversationListView({
         />
       ) : (
         <View style={styles.body}>
+          <UpcomingMeetups onOpenConversation={onOpenConversation} />
           <SegmentedControl
             options={[
               { key: 'open', label: 'Open' },

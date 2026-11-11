@@ -40,7 +40,8 @@ export async function loadNotificationPreferences(): Promise<NotificationPrefere
   }
 }
 
-async function readAccess(): Promise<NotificationAccess> {
+/** Whether iOS lets SnapWorth notify at all, as of now. */
+export async function readAccess(): Promise<NotificationAccess> {
   const { status, ios } = await Notifications.getPermissionsAsync();
   // A provisional (quiet) permission still delivers, to Notification Centre.
   if (status === 'granted' || ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL) {

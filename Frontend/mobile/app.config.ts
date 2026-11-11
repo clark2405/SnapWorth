@@ -56,9 +56,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
           'SnapWorth uses your location while the app is open to show how far listings are. It stays on your phone.',
       },
     ],
-    // Local notifications only for now (an estimate finishing while you're away); push needs a
-    // backend to send from.
-    'expo-notifications',
+    // Local notifications only (an estimate finishing, a meetup reminder): they need no Apple
+    // entitlement. Remote push adds `aps-environment`, which a free Personal Team can't sign, so
+    // it's off. With the paid account and a backend to send from, remove this option.
+    ['expo-notifications', { enableRemoteNotifications: false }],
     'expo-status-bar',
     'expo-system-ui',
     [

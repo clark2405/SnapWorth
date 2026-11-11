@@ -35,6 +35,9 @@ jest.mock('expo-notifications/build/Notifications.types', () => ({
 jest.mock('expo-notifications/build/scheduleNotificationAsync', () => ({
   scheduleNotificationAsync: mockSchedule,
 }));
+jest.mock('expo-notifications/build/getAllScheduledNotificationsAsync', () => ({
+  getAllScheduledNotificationsAsync: jest.fn().mockResolvedValue([]),
+}));
 jest.mock('expo-notifications/build/cancelScheduledNotificationAsync', () => ({
   cancelScheduledNotificationAsync: mockCancel,
 }));

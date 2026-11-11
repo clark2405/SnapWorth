@@ -1,3 +1,4 @@
+import type { UtcDateTime } from '../types/date-time';
 import type {
   AppError,
   AuthError,
@@ -48,7 +49,7 @@ import type {
 import type { AiEstimate, AskingPriceDraft } from '../types/money';
 import type { Cursor, Page } from '../types/pagination';
 import type { Result } from '../types/result';
-import type { ChatListener } from './chat';
+import type { ChatListener, ConfirmedMeetup } from './chat';
 import type { Unsubscribe } from './platform';
 
 export interface AuthService {
@@ -130,6 +131,7 @@ export interface ChatService {
   ): Promise<SendResult>;
   respondToOffer(messageId: MessageId, accept: boolean): Promise<Result<OfferStatus, AppError>>;
   confirmMeetup(messageId: MessageId): Promise<Result<void, AppError>>;
+  confirmedMeetups(since: UtcDateTime): Promise<Result<readonly ConfirmedMeetup[], AppError>>;
   markRead(id: ConversationId): Promise<Result<void, AppError>>;
   report(id: ConversationId, reason: ChatReportReason): Promise<Result<void, AppError>>;
   setBlocked(userId: UserId, blocked: boolean): Promise<Result<void, AppError>>;

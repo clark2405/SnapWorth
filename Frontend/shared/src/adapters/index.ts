@@ -1,4 +1,5 @@
 export * from './local/account';
+export * from './local/admin-repository';
 export * from './local/chat-repository';
 export * from './local/collection-repository';
 export * from './local/comment-repository';
@@ -8,6 +9,7 @@ export * from './local/marketplace-repository';
 export * from './local/screening';
 export * from './local/suki-repository';
 export * from './supabase/account';
+export * from './supabase/admin-repository';
 export * from './supabase/chat-repository';
 export * from './supabase/client';
 export * from './supabase/collection-repository';

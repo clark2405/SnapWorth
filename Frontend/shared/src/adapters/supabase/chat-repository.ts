@@ -56,6 +56,16 @@ interface ConversationRow {
   readonly blocked_by_me: boolean;
 }
 
+/** The columns `confirmedMeetups` reads: a confirmed meetup always has a place and a time. */
+interface MeetupRow {
+  readonly id: string;
+  readonly conversation_id: string;
+  readonly meetup_place: string;
+  readonly meetup_when: string;
+  readonly meetup_purpose: MeetupPurpose | null;
+  readonly created_at: string;
+}
+
 const messageColumns =
   'id, conversation_id, sender_id, kind, body, offer_php, offer_status, meetup_place, meetup_when, meetup_status, meetup_purpose, meetup_spot, meetup_lat, meetup_lng, created_at';
 
@@ -305,6 +315,31 @@ export function createSupabaseChatRepository(
     async confirmMeetup(messageId) {
       const { error } = await client.rpc('confirm_meetup', { target: messageId });
       return error ? err(toAppError(error, 'send_message')) : ok(undefined);
+    },
+
+    async confirmedMeetups(since) {
+      const viewer = await viewerId();
+      if (!viewer.ok) return viewer;
+      // Row-level security keeps this to the viewer's own conversations.
+      const { data, error } = await client
+        .from('messages')
+        .select('id, conversation_id, meetup_place, meetup_when, meetup_purpose, created_at')
+        .eq('kind', 'meetup')
+        .eq('meetup_status', 'confirmed')
+        .gte('created_at', since)
+        .order('created_at', { ascending: true })
+        .limit(100);
+      if (error) return err(toAppError(error, 'load_messages'));
+      return ok(
+        (data as MeetupRow[]).map((row) => ({
+          messageId: row.id as MessageId,
+          conversationId: row.conversation_id as ConversationId,
+          place: row.meetup_place,
+          when: row.meetup_when,
+          purpose: row.meetup_purpose ?? ('pickup' as const),
+          proposedAt: row.created_at as UtcDateTime,
+        })),
+      );
     },
 
     async markRead(id) {
