@@ -2,6 +2,7 @@ export * from './AiFoil';
 export * from './AmbientBackdrop';
 export * from './backdrop-host';
 export * from './AskingPriceBadge';
+export * from './Banner';
 export * from './Brand';
 export * from './BrandIcons';
 export * from './Button';

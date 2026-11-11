@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import {
+  BannerProvider,
   Companion,
   RevealGate,
   SignInHandoff,
@@ -23,10 +24,13 @@ import {
 import { companionConfigFor } from '@snapworth/shared/features/companion';
 import { AppServicesProvider, type BackendConfig } from '@snapworth/shared/composition';
 import { useSnapWorthFonts } from '@snapworth/shared/design/font-assets';
+import { ChatBannerHost } from '@snapworth/shared/features/chat';
 import { SplashView } from '@snapworth/shared/features/launch';
+import { wantsNotification } from '@snapworth/shared/features/profile';
 import { SessionProvider, useAccountGate } from '@snapworth/shared/features/session';
 import { TipsProvider } from '@snapworth/shared/features/tips';
 
+import { loadNotificationPreferences } from '../src/notifications';
 import { browserTipStore } from '../src/tip-store';
 
 const appearanceKey = 'snapworth.appearance';
@@ -66,7 +70,9 @@ export default function RootLayout() {
         <AppServicesProvider config={backend}>
           <ThemeProvider store={browserThemeStore}>
             <ToastProvider>
-              <Shell />
+              <BannerProvider>
+                <Shell />
+              </BannerProvider>
             </ToastProvider>
           </ThemeProvider>
         </AppServicesProvider>
@@ -104,6 +110,11 @@ function Shell() {
             }}
           />
           <WebCompanion ready={launched} />
+          {/* A new message, offer or meetup in a chat that isn't open: a banner that opens it. */}
+          <ChatBannerHost
+            onOpenConversation={(id) => router.push(`/chat/${id}`)}
+            wants={(kind) => wantsNotification(loadNotificationPreferences(), kind)}
+          />
           {/* Signing in closes the screen into Worthy's tag and opens it onto the app. */}
           <SignInHandoff />
         </RevealGate>

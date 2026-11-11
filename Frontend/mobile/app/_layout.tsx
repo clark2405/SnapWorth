@@ -9,6 +9,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import {
+  BannerProvider,
   NavLinkProvider,
   RevealGate,
   SignInHandoff,
@@ -17,13 +18,15 @@ import {
 import { ThemeProvider, useTheme } from '@snapworth/shared/design';
 import { AppServicesProvider, type BackendConfig } from '@snapworth/shared/composition';
 import { useSnapWorthFonts } from '@snapworth/shared/design/font-assets';
+import { ChatBannerHost } from '@snapworth/shared/features/chat';
 import { SplashView } from '@snapworth/shared/features/launch';
+import { wantsNotification } from '@snapworth/shared/features/profile';
 import { SessionProvider } from '@snapworth/shared/features/session';
 import { TipsProvider } from '@snapworth/shared/features/tips';
 
 import { CompanionHost } from '../src/CompanionHost';
 import { renderNavLink, renderZoomSource, renderZoomTarget } from '../src/nav-bridge';
-import { useOpenTappedNotifications } from '../src/notifications';
+import { loadNotificationPreferences, useOpenTappedNotifications } from '../src/notifications';
 import { deviceThemeStore } from '../src/theme-store';
 import { deviceTipStore } from '../src/tip-store';
 
@@ -45,13 +48,15 @@ export default function RootLayout() {
         <AppServicesProvider config={backend}>
           <ThemeProvider store={deviceThemeStore}>
             <ToastProvider>
-              <NavLinkProvider
-                link={renderNavLink}
-                target={renderZoomTarget}
-                source={renderZoomSource}
-              >
-                <Shell />
-              </NavLinkProvider>
+              <BannerProvider>
+                <NavLinkProvider
+                  link={renderNavLink}
+                  target={renderZoomTarget}
+                  source={renderZoomSource}
+                >
+                  <Shell />
+                </NavLinkProvider>
+              </BannerProvider>
             </ToastProvider>
           </ThemeProvider>
         </AppServicesProvider>
@@ -131,6 +136,11 @@ function Shell() {
             <Stack.Screen name="list/[id]" options={{ presentation: 'modal' }} />
           </Stack>
           <CompanionHost ready={launched} />
+          {/* A new message, offer or meetup in a chat that isn't open: a banner that opens it. */}
+          <ChatBannerHost
+            onOpenConversation={(id) => openPath(`/chat/${id}`)}
+            wants={async (kind) => wantsNotification(await loadNotificationPreferences(), kind)}
+          />
           {/* Signing in closes the screen into Worthy's tag and opens it onto the app. */}
           <SignInHandoff />
         </RevealGate>
