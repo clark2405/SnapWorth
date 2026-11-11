@@ -21,7 +21,7 @@ both apps.
 ## What's built and what isn't
 
 Keep this list current: when you finish or start something, move it here in the same change.
-Last updated 2026-11-10.
+Last updated 2026-11-11.
 
 ### Working for real
 
@@ -50,8 +50,28 @@ Last updated 2026-11-10.
 - **On-device AI:** the photo check and label reading on every iPhone. With Apple Intelligence,
   also a first look at the item and Worthy's answers to light questions.
 - **Feed comments:** stored in Supabase, moderated, threaded.
+- **Admin review:** Profile → Moderation (shown only to an admin, see "Making someone an admin")
+  lists what moderation holds (comments, feed posts, hanap) and what people reported (comments,
+  and conversations, whose messages stay private). An admin approves, holds, removes or dismisses
+  reports. Both the list and every decision go through `admin_review_queue()` and
+  `admin_review_decide()`, which refuse anyone who isn't an admin, and each decision is logged in
+  `moderation_log` (who and when), which the app can't read. Listings aren't in the queue yet: they
+  need moderation columns first, then one select in the queue function and one branch in the
+  decide function. Held and reported content shows no photos. Without a backend the screen shows
+  sample cases. Needs the `admin_role` and `admin_review` migrations deployed.
 - **Chats:** real messages over Supabase Realtime, offers, and agreeing a meetup on a map. Deployed
   to Supabase on 2026-10-30. The phone's Chats tab counts unread messages.
+- **In-app banners:** while the app is open, a new message, offer or meetup proposal in a chat you
+  aren't looking at shows a tappable banner that opens it, on the web and the phone. Not for your
+  own messages, answers, blocked chats or the chat on screen; follows the Notifications switches.
+- **Meetup reminders:** once a meetup is confirmed, the phone schedules local notifications for an
+  hour before and, for a meetup at 11:00 or later, 8:00 that morning (no server or push needed).
+  They follow the meetup: replaced if it changes, withdrawn if the chat closes, the person is
+  blocked or you sign out. On the web and the phone, Chats also shows an Upcoming meetups card and
+  a banner when each reminder's time comes while the app is open. The phone asks for notification
+  permission from the Notifications screen. The meetup sheet writes only "Today, 2:00 PM" style
+  words, so the time is worked out from when it was proposed; a time that can't be read gets no
+  reminder. An exact start time on the message would be sturdier.
 - **Sharing a tag:** an item's share button makes a picture of its tag and opens the share sheet.
   Needs an app build made after 2026-10-30; older builds share text.
 - **Native pickers on iOS:** choices use the system's segmented controls and menus on iOS; Android
@@ -121,8 +141,6 @@ on them isn't saved.
 
 - **History, before the first scan:** the sample items, and their sample market detail (demand,
   condition, trend and recent sales) on the item screen. A real scan has no market detail yet.
-- **Profile:** the admin review queue. Your own profile, seller profiles, price alerts and your
-  votes are real (see above).
 - **Worthy's cards:** price, trend and collection answers.
 
 ### Not done yet
@@ -132,14 +150,16 @@ on them isn't saved.
     Supabase's Google provider set up first; see "Sign-in setup".
   - Sign in with Apple is written but hidden: it needs the paid Apple Developer account. See
     "Sign-in setup" to turn it on.
-- **The rest of the data on Supabase:** the admin review queue.
 - **Cloud AI** (a teammate owns this; see "Handoff" below):
   - Worthy's chat in the cloud.
   - Real data behind Worthy's cards.
   - Deploying the `estimate-price` update.
 - **Notifications:**
-  - Push needs the paid Apple Developer account.
-  - Meetup reminders and in-app banners aren't built yet.
+  - Push needs the paid Apple Developer account. Until then `app.config.ts` sets the
+    `expo-notifications` plugin to `enableRemoteNotifications: false`, so a prebuild doesn't add the
+    `aps-environment` entitlement a free Personal Team can't sign. Remove that option to turn push on.
+  - With the app closed, only meetup reminders and estimates reach the phone (local
+    notifications). New messages and offers need push. The web has no reminders for a closed tab.
 - **Map tiles and place search for launch:** a provider and plan for each. The defaults
   (OpenStreetMap's own tiles, and its Nominatim search behind the meetup map's search box) are
   for development only. Set `EXPO_PUBLIC_MAP_TILES_URL` and `EXPO_PUBLIC_PLACE_SEARCH_URL`.
