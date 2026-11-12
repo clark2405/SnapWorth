@@ -3,12 +3,7 @@ import { useEffect } from 'react';
 
 import { closeIntoTag, firstNameOf, openFromTag, useToast } from '@snapworth/shared/components';
 
-import {
-  LoginView,
-  isSupabaseConfigured,
-  performAuth,
-  type AuthInput,
-} from '@snapworth/shared/features/auth';
+import { LoginView, submitAuth, type AuthInput } from '@snapworth/shared/features/auth';
 import { useSession, type SessionUser } from '@snapworth/shared/features/session';
 
 import { useGoogleSignIn } from '../../src/google-sign-in';
@@ -26,38 +21,26 @@ export default function SignupRoute() {
   const done = async (input?: AuthInput) => {
     let authUser: SessionUser | null = null;
 
-    if (input?.email && input?.password && isSupabaseConfigured()) {
-      try {
-        const { data, error } = await performAuth(input);
-        if (error) {
-          toast.show({ title: 'Signup failed', body: error.message });
-          return;
-        }
-        if (input.mode === 'signup' && !data.session) {
-          toast.show({
-            title: 'Check your email',
-            body: 'We sent you a confirmation link to finish signing up.',
-          });
-          return;
-        }
-        authUser = data.user;
-      } catch (err) {
+    // Google's callback finishes with no form; a form must be filled in. With a Supabase project
+    // nothing here ever starts a local session.
+    if (input) {
+      const outcome = await submitAuth(input);
+      if (outcome.kind === 'invalid') {
+        toast.show({ title: 'Check your details', body: outcome.message });
+        return;
+      }
+      if (outcome.kind === 'failed') {
+        toast.show({ title: 'Signup failed', body: outcome.message });
+        return;
+      }
+      if (outcome.kind === 'check-email') {
         toast.show({
-          title: 'Signup failed',
-          body: err instanceof Error ? err.message : 'Something went wrong. Try again.',
+          title: 'Check your email',
+          body: 'We sent you a confirmation link to finish signing up.',
         });
         return;
       }
-    } else if (input) {
-      authUser = {
-        id: 'local_user',
-        email: input.email || 'user@snapworth.com',
-        user_metadata: {
-          full_name: input.fullName || (input.email ? input.email.split('@')[0] : 'User'),
-          gender: input.gender,
-        },
-        created_at: new Date().toISOString(),
-      };
+      authUser = outcome.user;
     }
 
     await closeIntoTag({

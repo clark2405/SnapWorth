@@ -13,6 +13,7 @@ import {
 import {
   completeAuthFromUrl,
   isSupabaseConfigured,
+  missingFromAuthInput,
   performAppleAuth,
   performAuth,
   performGoogleAuth,
@@ -47,8 +48,10 @@ export function useSignIn() {
   };
 
   const submit = async (input: AuthInput) => {
-    if (!input.email || !input.password) {
-      Alert.alert('Invalid Input', 'Please provide both an email and password.');
+    // An empty form never starts a session, with or without a Supabase project.
+    const missing = missingFromAuthInput(input);
+    if (missing) {
+      Alert.alert('Invalid Input', missing);
       return;
     }
     const closing = closeIntoTag({
