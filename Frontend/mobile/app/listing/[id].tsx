@@ -32,7 +32,6 @@ export default function ListingDetailRoute() {
       onAskFeed={() => router.push(`/ask/${listingId ?? ''}?from=listing`)}
       onEditPrice={() => router.push(`/list/${listingId ?? ''}`)}
       onShare={() => share(`/listing/${listingId ?? ''}`, 'For sale on SnapWorth.')}
-      onMarkSold={() => router.replace('/history')}
       onDeleteListing={() => router.replace('/marketplace')}
     />
   );

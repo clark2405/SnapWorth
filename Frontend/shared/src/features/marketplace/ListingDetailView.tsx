@@ -7,6 +7,7 @@ import {
   MessageSquare,
   PencilLine,
   Trash2,
+  Undo2,
   Users,
 } from 'lucide-react-native';
 import { useState } from 'react';
@@ -66,7 +67,7 @@ export interface ListingDetailViewProps {
   readonly onAskFeed?: () => void;
   /** Owner only: change the asking price (back through manual price confirmation). */
   readonly onEditPrice?: () => void;
-  /** Owner only: close the listing as sold. */
+  /** Owner only: called after the listing has been closed as sold. It stays on screen, as sold. */
   readonly onMarkSold?: () => void;
   /** Owner only: delete the listing. */
   readonly onDeleteListing?: () => void;
@@ -174,8 +175,10 @@ function ListingDetail({
     roundTo50(askingPrice * 0.97),
   ];
 
+  const sold = marketListing.status === 'sold';
   const [markingSold, setMarkingSold] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [offerOpen, setOfferOpen] = useState(false);
   const [offerText, setOfferText] = useState('');
   const [sendingOffer, setSendingOffer] = useState(false);
@@ -190,6 +193,45 @@ function ListingDetail({
       void toggleSavedInMarket(activeId);
     });
   const offerAmount = Number(offerText.replace(/,/g, '')) || 0;
+
+  // Closing a listing as sold keeps it on screen, now as sold; it can be put back on sale.
+  const changeStatus = async (next: 'active' | 'sold') => {
+    setMarkingSold(true);
+    const result = await updateListing(activeId, { status: next });
+    setMarkingSold(false);
+    if (!result.ok) {
+      toast.show({
+        title: next === 'sold' ? 'Couldn’t mark it as sold' : 'Couldn’t put it back on sale',
+        body: 'Please check your connection and try again.',
+        tone: 'error',
+      });
+      return;
+    }
+    if (next === 'sold') {
+      toast.show({ title: 'Marked as sold', celebrate: true });
+      onMarkSold?.();
+    } else {
+      toast.show({ title: 'Back on sale', body: 'Buyers can message you about it again.' });
+    }
+  };
+
+  const deleteListing = async () => {
+    setDeleting(true);
+    const result = await removeListing(activeId);
+    setDeleting(false);
+    setConfirmingDelete(false);
+    if (!result.ok) {
+      toast.show({
+        title: 'Couldn’t delete the listing',
+        body: 'Please check your connection and try again.',
+        tone: 'error',
+      });
+      return;
+    }
+    toast.show({ title: 'Listing deleted' });
+    if (onDeleteListing) onDeleteListing();
+    else onMarkSold?.();
+  };
 
   const offerNote = (() => {
     if (!aiRange) return 'Offers go to the seller, who can accept, decline or counter.';
@@ -249,7 +291,27 @@ function ListingDetail({
         />
       }
       footer={
-        owned ? (
+        owned && sold ? (
+          <BottomBar>
+            <View style={styles.footerRow}>
+              <Button
+                label="Delete listing"
+                variant="secondary"
+                icon={Trash2}
+                loading={deleting}
+                onPress={() => setConfirmingDelete(true)}
+                containerStyle={styles.footerButton}
+              />
+              <Button
+                label="Mark available"
+                icon={Undo2}
+                loading={markingSold}
+                onPress={() => void changeStatus('active')}
+                containerStyle={styles.footerButton}
+              />
+            </View>
+          </BottomBar>
+        ) : owned ? (
           <BottomBar>
             <View style={styles.footerRow}>
               <Button
@@ -282,12 +344,14 @@ function ListingDetail({
               <Button
                 label="Make offer"
                 variant="secondary"
+                disabled={sold}
                 onPress={() => requireAccount('offer', () => setOfferOpen(true))}
                 containerStyle={styles.footerButton}
               />
               <Button
                 label="Message"
                 icon={MessageSquare}
+                disabled={sold}
                 onPress={() => requireAccount('message', onMessageSeller)}
                 containerStyle={styles.footerButton}
               />
@@ -302,7 +366,10 @@ function ListingDetail({
       <DetailLayout hero={<DetailHero photos={heroPhotos} />}>
         <DetailSheet style={styles.body}>
           <Reveal index={1} style={styles.titleBlock}>
-            <Tag label={categoryLabel} tone="sand" />
+            <View style={styles.tagRow}>
+              <Tag label={categoryLabel} tone="sand" />
+              {sold ? <Tag label="Sold" tone="grave" icon={BadgeCheck} /> : null}
+            </View>
             <SWText variant="headingLarge" accessibilityRole="header">
               {title}
             </SWText>
@@ -357,23 +424,11 @@ function ListingDetail({
             {owned ? (
               <OwnerPanel
                 stats={marketListing.stats}
+                sold={sold}
                 marking={markingSold}
                 deleting={deleting}
-                onMarkSold={async () => {
-                  setMarkingSold(true);
-                  await updateListing(activeId, { status: 'sold' });
-                  setMarkingSold(false);
-                  toast.show({ title: 'Marked as sold', celebrate: true });
-                  onMarkSold?.();
-                }}
-                onDeleteListing={async () => {
-                  setDeleting(true);
-                  await removeListing(activeId);
-                  setDeleting(false);
-                  toast.show({ title: 'Listing deleted' });
-                  if (onDeleteListing) onDeleteListing();
-                  else onMarkSold?.();
-                }}
+                onMarkSold={() => void changeStatus('sold')}
+                onDeleteListing={() => setConfirmingDelete(true)}
               />
             ) : (
               <PressableScale
@@ -449,6 +504,33 @@ function ListingDetail({
         </DetailSheet>
       </DetailLayout>
 
+      {/* Deleting can't be undone, so it stops to ask first. */}
+      <Sheet
+        visible={confirmingDelete}
+        onClose={() => (deleting ? undefined : setConfirmingDelete(false))}
+        title="Delete this listing?"
+      >
+        <View style={styles.deleteSheet}>
+          <SWText variant="bodyMedium" tone="textSecondary">
+            This removes “{title}” from the Market, along with any chats about it. It can’t be
+            undone.
+          </SWText>
+          <Button
+            label={deleting ? 'Deleting…' : 'Delete listing'}
+            variant="danger"
+            icon={Trash2}
+            loading={deleting}
+            onPress={() => void deleteListing()}
+          />
+          <Button
+            label="Keep listing"
+            variant="secondary"
+            disabled={deleting}
+            onPress={() => setConfirmingDelete(false)}
+          />
+        </View>
+      </Sheet>
+
       <Sheet visible={offerOpen} onClose={() => setOfferOpen(false)} title="Make an offer">
         <ChoiceChips
           kind="action"
@@ -507,12 +589,14 @@ function ModerationNotice({ status }: { readonly status: ModerationStatus }) {
 /** What the seller sees in place of the seller card: how the listing is doing, and closing it. */
 function OwnerPanel({
   stats,
+  sold,
   marking,
   deleting,
   onMarkSold,
   onDeleteListing,
 }: {
   readonly stats: { readonly views: number; readonly saves: number; readonly chats: number };
+  readonly sold: boolean;
   readonly marking: boolean;
   readonly deleting: boolean;
   readonly onMarkSold: () => void;
@@ -545,20 +629,28 @@ function OwnerPanel({
           </Surface>
         ))}
       </View>
-      <Button
-        label="Mark as sold"
-        variant="secondary"
-        icon={BadgeCheck}
-        loading={marking}
-        onPress={onMarkSold}
-      />
-      <Button
-        label="Delete listing"
-        variant="tertiary"
-        icon={Trash2}
-        loading={deleting}
-        onPress={onDeleteListing}
-      />
+      {sold ? (
+        <SWText variant="bodySmall" tone="textSecondary" accessibilityRole="alert">
+          Marked as sold. Buyers can no longer make an offer or message you about it.
+        </SWText>
+      ) : (
+        <>
+          <Button
+            label="Mark as sold"
+            variant="secondary"
+            icon={BadgeCheck}
+            loading={marking}
+            onPress={onMarkSold}
+          />
+          <Button
+            label="Delete listing"
+            variant="tertiary"
+            icon={Trash2}
+            loading={deleting}
+            onPress={onDeleteListing}
+          />
+        </>
+      )}
     </View>
   );
 }
@@ -576,6 +668,14 @@ const stylesFor = themedStyles((colors) => ({
   },
   body: {
     gap: tokens.spacing[5],
+  },
+  deleteSheet: {
+    gap: tokens.spacing[3],
+  },
+  tagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing[2],
   },
   titleBlock: {
     gap: tokens.spacing[2],
