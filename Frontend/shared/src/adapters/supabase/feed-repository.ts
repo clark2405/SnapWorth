@@ -53,7 +53,7 @@ interface VoteRow {
 }
 
 const postColumns =
-  'id, slug, owner_id, title, category, body, estimate_php, scan_id, listing_id, photo_path, too_high_count, just_right_count, too_low_count, moderation_status, created_at, author:profiles(id, handle, avatar_url), listing:listings(id, slug, asking_php, photo_path)';
+  'id, slug, owner_id, title, category, body, estimate_php, scan_id, listing_id, photo_path, too_high_count, just_right_count, too_low_count, moderation_status, created_at, author:profiles!feed_posts_owner_id_fkey(id, handle, avatar_url), listing:listings!feed_posts_listing_id_fkey(id, slug, asking_php, photo_path)';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -248,7 +248,7 @@ export function createSupabaseFeedRepository(
       if (!viewer) return ok([]);
       const { data, error } = await client
         .from('votes')
-        .select('post_id, choice, updated_at, post:feed_posts(id, slug)')
+        .select('post_id, choice, updated_at, post:feed_posts!votes_post_id_fkey(id, slug)')
         .eq('user_id', viewer)
         .order('updated_at', { ascending: false });
       if (error) return err(toAppError(error, 'load_post'));

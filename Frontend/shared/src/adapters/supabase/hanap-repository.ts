@@ -19,7 +19,7 @@ interface HanapRow {
 }
 
 const columns =
-  'id, author_id, body, max_php, status, moderation_status, created_at, author:profiles(handle)';
+  'id, author_id, body, max_php, status, moderation_status, created_at, author:profiles!hanap_posts_author_id_fkey(handle)';
 
 function fromRow(row: HanapRow, viewerId: string | null): HanapPost {
   const author = Array.isArray(row.author) ? row.author[0] : row.author;

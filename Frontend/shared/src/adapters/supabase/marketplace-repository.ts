@@ -86,7 +86,7 @@ const listingColumns = [
   'status',
   'moderation_status',
   'created_at',
-  'seller:profiles(id, handle, display_name, avatar_url, bio, location, created_at)',
+  'seller:profiles!listings_seller_id_fkey(id, handle, display_name, avatar_url, bio, location, created_at)',
 ].join(', ');
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -434,7 +434,9 @@ export function createSupabaseMarketplaceRepository(
       if (!viewer) return ok([]);
       const { data, error } = await client
         .from('saved_listings')
-        .select('listing_id, alert_below_php, alert_enabled, listing:listings(slug)')
+        .select(
+          'listing_id, alert_below_php, alert_enabled, listing:listings!saved_listings_listing_id_fkey(slug)',
+        )
         .eq('user_id', viewer)
         .order('created_at', { ascending: false });
       if (error) return err(toAppError(error, 'load_marketplace', 'listing'));

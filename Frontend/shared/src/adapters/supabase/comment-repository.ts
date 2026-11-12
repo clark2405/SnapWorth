@@ -70,7 +70,7 @@ export function createSupabaseCommentRepository(client: SupabaseClient): Comment
         .from('comments')
         .insert({ post_id: post.data.id, parent_id: replyTo ?? null, body })
         .select(
-          'id, parent_id, body, moderation_status, created_at, author_id, author:profiles(handle, avatar_url)',
+          'id, parent_id, body, moderation_status, created_at, author_id, author:profiles!comments_author_id_fkey(handle, avatar_url)',
         )
         .single();
       if (error) return err(toAppError(error, 'submit_comment'));
