@@ -5,3 +5,4 @@ export * from './ResetPasswordView';
 export * from './account-deletion';
 export * from './authApi';
 export * from './password-reset';
+export * from './use-leave-when-signed-in';

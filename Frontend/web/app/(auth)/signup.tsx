@@ -7,6 +7,7 @@ import {
   LoginView,
   isSupabaseConfigured,
   performAuth,
+  useLeaveWhenSignedIn,
   type AuthInput,
 } from '@snapworth/shared/features/auth';
 import { useSession, type SessionUser } from '@snapworth/shared/features/session';
@@ -23,7 +24,13 @@ export default function SignupRoute() {
   // The feed is fetched while you type, so it's ready to unfold out of the tag.
   useEffect(() => router.prefetch('/feed'), [router]);
 
-  const done = async (input?: AuthInput) => {
+  // Someone who is already signed in has no use for this screen: back to what they were doing,
+  // or the Feed. (Signing in here is wrapped, so it can finish its own way out.)
+  const signingIn = useLeaveWhenSignedIn(() =>
+    returning && router.canGoBack() ? router.back() : router.replace('/feed'),
+  );
+
+  const done = signingIn(async (input?: AuthInput) => {
     let authUser: SessionUser | null = null;
 
     if (input?.email && input?.password && isSupabaseConfigured()) {
@@ -69,7 +76,7 @@ export default function SignupRoute() {
     if (returning && router.canGoBack()) router.back();
     else router.replace('/feed');
     openFromTag();
-  };
+  });
   const google = useGoogleSignIn(() => void done());
 
   return (
