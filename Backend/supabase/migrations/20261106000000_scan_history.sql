@@ -4,6 +4,21 @@
 -- `photo_uri` is where the photo is on the phone that took it, so it only shows there; uploading
 -- photos to Storage is a follow-up.
 
+-- The live project already has a `scan_history` table, made by hand from an early draft of this
+-- feature (PR #24's first version) and never recorded as a migration. Its rules let anyone read,
+-- and anyone write, a scan without an owner. It was empty when checked on 2026-11-12, so it's
+-- replaced by the table below. If it ever holds a row, this stops rather than lose anyone's scan.
+do $$
+begin
+  if to_regclass('public.scan_history') is not null then
+    if exists (select 1 from public.scan_history) then
+      raise exception 'public.scan_history already exists and holds rows: move them by hand first.';
+    end if;
+    drop table public.scan_history;
+  end if;
+end;
+$$;
+
 create table public.scan_history (
   -- The app makes the id, so a scan keeps the same one on the phone and here.
   id uuid primary key default gen_random_uuid(),

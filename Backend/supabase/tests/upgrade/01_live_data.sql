@@ -133,3 +133,24 @@ union all select 'user_blocks', count(*) from public.user_blocks
 union all select 'hanap_posts', count(*) from public.hanap_posts
 union all select 'suki_discounts', count(*) from public.suki_discounts
 union all select 'meetup_spots', count(*) from public.meetup_spots;
+
+-- The hand-made `scan_history` the live project has (from PR #24's first draft, not a migration):
+-- empty, with the leaky rules it was made with. The scan_history migration must replace it.
+create table public.scan_history (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users (id) on delete cascade,
+  item_name text not null,
+  amount_php integer not null check (amount_php >= 0),
+  low_php integer not null check (low_php >= 0),
+  high_php integer not null check (high_php >= 0),
+  explanation text,
+  assumptions jsonb not null default '[]'::jsonb,
+  photo_uri text,
+  status text not null default 'private' check (status in ('listed', 'on_feed', 'private', 'sold')),
+  created_at timestamptz not null default now()
+);
+alter table public.scan_history enable row level security;
+create policy "Users can view own scan history" on public.scan_history for select
+  using (auth.uid() = user_id or user_id is null);
+create policy "Users can insert own scan history" on public.scan_history for insert
+  with check (auth.uid() = user_id or user_id is null);
