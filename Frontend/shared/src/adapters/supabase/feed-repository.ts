@@ -287,13 +287,23 @@ export function createSupabaseFeedRepository(
           .eq('user_id', userId);
         if (error) return err(toAppError(error, 'submit_comment'));
       } else {
-        const { error } = await client
-          .from('votes')
-          .upsert(
-            { post_id: target.id, user_id: userId, choice },
-            { onConflict: 'post_id,user_id' },
-          );
-        if (error) return err(toAppError(error, 'submit_comment'));
+        // Change the person's vote if they have one, else add it. Not an upsert: its DO UPDATE
+        // would also rewrite post_id and user_id, which the table's grants refuse (42501). The
+        // update needs no user_id because the row policy only lets people change their own.
+        const changeVote = () =>
+          client.from('votes').update({ choice }).eq('post_id', target.id).select('post_id');
+        const changed = await changeVote();
+        if (changed.error) return err(toAppError(changed.error, 'submit_comment'));
+        if ((changed.data ?? []).length === 0) {
+          const added = await client.from('votes').insert({ post_id: target.id, choice });
+          if (added.error?.code === '23505') {
+            // Another tab voted between the two statements: change that vote instead.
+            const raced = await changeVote();
+            if (raced.error) return err(toAppError(raced.error, 'submit_comment'));
+          } else if (added.error) {
+            return err(toAppError(added.error, 'submit_comment'));
+          }
+        }
       }
 
       const { data: refreshed } = await client

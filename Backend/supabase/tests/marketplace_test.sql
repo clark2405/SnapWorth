@@ -318,6 +318,67 @@ select market_tests.check(
     where listing_id = '00000000-0000-4000-fc00-000000000001'$$) = 1,
   'a buyer updates their own price-drop alert'
 );
+
+-- 4a. The statements the app sends to save a listing or set an alert. They are an update, then an
+--     insert when nothing changed, and never carry `user_id`. A PostgREST upsert is refused (even
+--     for a first save), because ON CONFLICT DO UPDATE needs UPDATE privilege on every column it
+--     sends and the grants (insert: listing_id, alert_below_php, alert_enabled; update:
+--     alert_below_php, alert_enabled) don't let anyone rewrite `listing_id` or `user_id`.
+--     Keep those grants as they are: the app works with them.
+select market_tests.check_rejected(
+  $$insert into public.saved_listings (listing_id, alert_below_php, alert_enabled)
+    values ('00000000-0000-4000-fc00-000000000001', 3900, true)
+    on conflict (user_id, listing_id) do update set
+      listing_id = excluded.listing_id,
+      alert_below_php = excluded.alert_below_php,
+      alert_enabled = excluded.alert_enabled$$,
+  array['42501'],
+  'the old upsert shape is refused: it would rewrite listing_id on a conflict'
+);
+select market_tests.check(
+  market_tests.changed($$delete from public.saved_listings
+    where listing_id = '00000000-0000-4000-fc00-000000000001'$$) = 1,
+  'a buyer unsaves their own listing'
+);
+select market_tests.check_rejected(
+  $$insert into public.saved_listings (listing_id, alert_below_php, alert_enabled)
+    values ('00000000-0000-4000-fc00-000000000001', 3900, true)
+    on conflict (user_id, listing_id) do update set
+      listing_id = excluded.listing_id,
+      alert_below_php = excluded.alert_below_php,
+      alert_enabled = excluded.alert_enabled$$,
+  array['42501'],
+  'the old upsert shape is refused even when there is no row to conflict with'
+);
+select market_tests.check(
+  market_tests.changed($$update public.saved_listings
+    set alert_below_php = 3900, alert_enabled = true
+    where listing_id = '00000000-0000-4000-fc00-000000000001'$$) = 0,
+  'the app first updates: nothing changes for a listing that is not saved yet'
+);
+select market_tests.check(
+  market_tests.changed($$insert into public.saved_listings (listing_id, alert_below_php, alert_enabled)
+    values ('00000000-0000-4000-fc00-000000000001', 3900, true)$$) = 1,
+  'then it inserts the save, with no user_id'
+);
+select market_tests.check(
+  (select user_id = '00000000-0000-4000-fa00-00000000000b' and alert_below_php = 3900
+     from public.saved_listings
+    where listing_id = '00000000-0000-4000-fc00-000000000001'),
+  'the save belongs to the caller by default'
+);
+select market_tests.check(
+  market_tests.changed($$update public.saved_listings
+    set alert_below_php = 3800, alert_enabled = false
+    where listing_id = '00000000-0000-4000-fc00-000000000001'$$) = 1,
+  'saving it again updates the alert in place'
+);
+select market_tests.check(
+  (select count(*) = 1 and bool_and(alert_below_php = 3800 and not alert_enabled)
+     from public.saved_listings
+    where listing_id = '00000000-0000-4000-fc00-000000000001'),
+  'there is still one save, with the new alert'
+);
 reset role;
 
 -- Maya cannot see Noel's saved listings or price alerts.

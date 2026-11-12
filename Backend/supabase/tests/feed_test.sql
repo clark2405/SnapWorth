@@ -61,6 +61,16 @@ begin
 end;
 $$;
 
+create function feed_tests.changed(statement text) returns integer
+language plpgsql as $$
+declare
+  rows integer;
+begin
+  execute statement;
+  get diagnostics rows = row_count;
+  return rows;
+end;
+$$;
 grant usage on schema feed_tests to anon, authenticated;
 grant execute on all functions in schema feed_tests to anon, authenticated;
 
@@ -361,6 +371,60 @@ select feed_tests.check(
   'approving the post brings its votes back'
 );
 set role authenticated;
+select feed_tests.sign_in('00000000-0000-4000-fd00-00000000000b');
+delete from public.votes where post_id = '00000000-0000-4000-ff00-000000000002';
+
+-- The statements the app sends to vote: an update, then an insert when nothing changed, and
+-- never `user_id`. A PostgREST upsert is refused (even for a first vote), because ON CONFLICT DO
+-- UPDATE needs UPDATE privilege on every column it sends, and the grants (insert: post_id,
+-- choice; update: choice) don't let anyone rewrite `post_id` or `user_id`. Keep those grants.
+select feed_tests.check_raises(
+  $$insert into public.votes (post_id, user_id, choice)
+    values ('00000000-0000-4000-ff00-000000000002', '00000000-0000-4000-fd00-00000000000b', 'too_high')
+    on conflict (post_id, user_id) do update set
+      post_id = excluded.post_id, user_id = excluded.user_id, choice = excluded.choice$$,
+  '42501',
+  'the old upsert shape is refused, even for a first vote'
+);
+select feed_tests.check(
+  feed_tests.changed($$update public.votes set choice = 'too_high'
+    where post_id = '00000000-0000-4000-ff00-000000000002'$$) = 0,
+  'the app first updates: no row changes when the person has not voted yet'
+);
+select feed_tests.check(
+  feed_tests.changed($$insert into public.votes (post_id, choice)
+    values ('00000000-0000-4000-ff00-000000000002', 'too_high')$$) = 1,
+  'then it inserts the vote, with no user_id'
+);
+select feed_tests.check(
+  (select user_id = '00000000-0000-4000-fd00-00000000000b'
+     from public.votes where post_id = '00000000-0000-4000-ff00-000000000002'),
+  'the vote belongs to the caller by default'
+);
+select feed_tests.check(
+  feed_tests.changed($$update public.votes set choice = 'too_low'
+    where post_id = '00000000-0000-4000-ff00-000000000002'$$) = 1,
+  'voting again updates the same vote in place'
+);
+select feed_tests.check(
+  (select too_low_count = 1 and too_high_count = 0
+     from public.feed_posts where id = '00000000-0000-4000-ff00-000000000002'),
+  'the tally follows the update'
+);
+select feed_tests.check_raises(
+  $$insert into public.votes (post_id, user_id, choice)
+    values ('00000000-0000-4000-ff00-000000000002', '00000000-0000-4000-fd00-00000000000b', 'too_low')
+    on conflict (post_id, user_id) do update set
+      post_id = excluded.post_id, user_id = excluded.user_id, choice = excluded.choice$$,
+  '42501',
+  'the old upsert shape is refused when a vote already exists too'
+);
+select feed_tests.sign_in('00000000-0000-4000-fd00-00000000000c');
+select feed_tests.check(
+  feed_tests.changed($$update public.votes set choice = 'just_right'
+    where post_id = '00000000-0000-4000-ff00-000000000002'$$) = 0,
+  'the same update cannot touch another voter''s vote'
+);
 select feed_tests.sign_in('00000000-0000-4000-fd00-00000000000b');
 delete from public.votes where post_id = '00000000-0000-4000-ff00-000000000002';
 

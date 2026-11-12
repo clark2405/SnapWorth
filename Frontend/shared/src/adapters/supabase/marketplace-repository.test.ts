@@ -368,3 +368,159 @@ describe('listing moderation in the Supabase repository', () => {
     expect(repriced.ok && repriced.value.moderationStatus).toBe('approved');
   });
 });
+
+describe('saving a listing in the Supabase repository', () => {
+  const listingId = '00000000-0000-4000-fc00-000000000001';
+  const listingRow = {
+    id: listingId,
+    slug: 'pentax-k1000-00000000',
+    seller_id: 'usr_seller',
+    scan_id: null,
+    title: 'Pentax K1000',
+    asking_php: 4500,
+    photo_url: null,
+    photo_path: null,
+    category: 'collectibles',
+    condition: 'good',
+    area: 'cebu-city',
+    lat: null,
+    lng: null,
+    description: '',
+    estimate_php: null,
+    estimate_low_php: null,
+    estimate_high_php: null,
+    verdict: null,
+    verdict_share: null,
+    views_count: 0,
+    saves_count: 0,
+    status: 'active',
+    moderation_status: 'approved',
+    created_at: '2026-11-10T10:00:00.000Z',
+    seller: { id: 'usr_seller', handle: 'maya_sells', display_name: 'Maya', avatar_url: null },
+  };
+
+  /**
+   * A saved_listings table like the live one: insert(listing_id, alert_below_php, alert_enabled)
+   * and update(alert_below_php, alert_enabled) only. Anything else, including an upsert whose DO
+   * UPDATE rewrites listing_id, is refused with 42501.
+   */
+  function savedClient(existing: Record<string, unknown> | null, insertFailsWith?: string) {
+    const calls: { op: string; payload?: Record<string, unknown>; filters: [string, unknown][] }[] =
+      [];
+    let saved = existing;
+    const refused = { code: '42501', message: 'permission denied for table saved_listings' };
+    const table = {
+      update: (payload: Record<string, unknown>) => {
+        const filters: [string, unknown][] = [];
+        calls.push({ op: 'update', payload, filters });
+        const chain = {
+          eq: (column: string, value: unknown) => {
+            filters.push([column, value]);
+            return chain;
+          },
+          select: async () => {
+            if (
+              Object.keys(payload).some((k) => k !== 'alert_below_php' && k !== 'alert_enabled')
+            ) {
+              return { data: null, error: refused };
+            }
+            if (saved) saved = { ...saved, ...payload };
+            return { data: saved ? [{ listing_id: listingId }] : [], error: null };
+          },
+        };
+        return chain;
+      },
+      insert: async (payload: Record<string, unknown>) => {
+        calls.push({ op: 'insert', payload, filters: [] });
+        const allowed = ['listing_id', 'alert_below_php', 'alert_enabled'];
+        if (Object.keys(payload).some((key) => !allowed.includes(key))) return { error: refused };
+        if (insertFailsWith) {
+          saved = { listing_id: listingId, alert_below_php: 1, alert_enabled: true };
+          return { error: { code: insertFailsWith, message: 'duplicate key' } };
+        }
+        saved = payload;
+        return { error: null };
+      },
+      upsert: async () => {
+        calls.push({ op: 'upsert', filters: [] });
+        return { error: refused };
+      },
+    };
+    const client = {
+      auth: { getSession: async () => ({ data: { session: { user: { id: 'usr_buyer' } } } }) },
+      from: (name: string) => {
+        if (name === 'saved_listings') return table;
+        if (name === 'listings') {
+          return {
+            select: () => ({
+              eq: () => ({
+                neq: () => ({ maybeSingle: async () => ({ data: listingRow, error: null }) }),
+              }),
+            }),
+          };
+        }
+        throw new Error(`Unexpected table ${name}`);
+      },
+    };
+    const repo = createSupabaseMarketplaceRepository(client as never, {
+      upload: async () => null,
+      links: async () => ({}),
+    });
+    return { repo, calls, current: () => saved };
+  }
+
+  it('saves a new listing with an update that changes nothing, then an insert without user_id', async () => {
+    const { repo, calls, current } = savedClient(null);
+    const saved = await repo.saveListing('pentax-k1000-00000000', 4000, true);
+    expect(saved).toEqual({
+      ok: true,
+      value: { listingId: 'pentax-k1000-00000000', alertBelow: 4000, on: true },
+    });
+    expect(calls.map((call) => call.op)).toEqual(['update', 'insert']);
+    expect(calls[1]?.payload).toEqual({
+      listing_id: listingId,
+      alert_below_php: 4000,
+      alert_enabled: true,
+    });
+    expect(current()).toMatchObject({ alert_below_php: 4000 });
+  });
+
+  it('changes the alert of a listing that is already saved without inserting or upserting', async () => {
+    const { repo, calls, current } = savedClient({
+      listing_id: listingId,
+      alert_below_php: 4050,
+      alert_enabled: true,
+    });
+    const changed = await repo.saveListing('pentax-k1000-00000000', 3800, false);
+    expect(changed.ok).toBe(true);
+    expect(calls.map((call) => call.op)).toEqual(['update']);
+    expect(calls[0]?.payload).toEqual({ alert_below_php: 3800, alert_enabled: false });
+    expect(calls[0]?.filters).toEqual([['listing_id', listingId]]);
+    expect(current()).toMatchObject({ alert_below_php: 3800, alert_enabled: false });
+  });
+
+  it('never upserts and never sends user_id', async () => {
+    const { repo, calls } = savedClient(null);
+    await repo.saveListing('pentax-k1000-00000000');
+    await repo.saveListing('pentax-k1000-00000000', 3500);
+    expect(calls.some((call) => call.op === 'upsert')).toBe(false);
+    for (const call of calls) expect(call.payload ?? {}).not.toHaveProperty('user_id');
+  });
+
+  it('changes the save another tab just made instead of failing', async () => {
+    const { repo, calls, current } = savedClient(null, '23505');
+    const saved = await repo.saveListing('pentax-k1000-00000000', 3900);
+    expect(saved.ok).toBe(true);
+    expect(calls.map((call) => call.op)).toEqual(['update', 'insert', 'update']);
+    expect(current()).toMatchObject({ alert_below_php: 3900 });
+  });
+
+  it('returns the error when saving is refused', async () => {
+    const { repo } = savedClient(null, '42501');
+    const saved = await repo.saveListing('pentax-k1000-00000000', 3900);
+    expect(saved).toEqual({
+      ok: false,
+      error: { kind: 'authorization', code: 'not_found_or_denied' },
+    });
+  });
+});

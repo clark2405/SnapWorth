@@ -468,15 +468,30 @@ export function createSupabaseMarketplaceRepository(
           ? Math.max(1, Math.round(alertBelow))
           : roundTo50(target.asking_php * 0.9);
 
-      const { error } = await client.from('saved_listings').upsert(
-        {
-          listing_id: target.id,
-          alert_below_php: targetAlertBelow,
-          alert_enabled: on,
-        },
-        { onConflict: 'user_id,listing_id' },
-      );
-      if (error) return err(toAppError(error, 'load_marketplace', 'listing'));
+      // Change the alert if the listing is already saved, else save it. Not an upsert: its DO
+      // UPDATE would also rewrite listing_id, which the table's grants refuse (42501). Neither
+      // statement sends user_id: the default and the row policy make the row the caller's.
+      const alert = { alert_below_php: targetAlertBelow, alert_enabled: on };
+      const changeAlert = () =>
+        client
+          .from('saved_listings')
+          .update(alert)
+          .eq('listing_id', target.id)
+          .select('listing_id');
+      const changed = await changeAlert();
+      if (changed.error) return err(toAppError(changed.error, 'load_marketplace', 'listing'));
+      if ((changed.data ?? []).length === 0) {
+        const added = await client
+          .from('saved_listings')
+          .insert({ listing_id: target.id, ...alert });
+        if (added.error?.code === '23505') {
+          // Another tab saved it between the two statements: change that save instead.
+          const raced = await changeAlert();
+          if (raced.error) return err(toAppError(raced.error, 'load_marketplace', 'listing'));
+        } else if (added.error) {
+          return err(toAppError(added.error, 'load_marketplace', 'listing'));
+        }
+      }
 
       return ok({
         listingId: target.slug,

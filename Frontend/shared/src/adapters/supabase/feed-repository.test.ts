@@ -149,10 +149,65 @@ describe('createSupabaseFeedRepository', () => {
     expect(result.value.photoUrl).toBe(`https://signed.example/${userId}/${scanId}.jpg`);
   });
 
-  it('upserts and deletes votes and returns updated post tallies', async () => {
-    const upsertedVotes: Record<string, unknown>[] = [];
-    let deletedVote = false;
-
+  /**
+   * A votes table that behaves like the live one: the grants allow insert(post_id, choice) and
+   * update(choice) only, so any write that sends `user_id`, or an upsert (whose DO UPDATE would
+   * rewrite post_id and user_id), is refused with 42501, and an update only reaches the caller's
+   * own row.
+   */
+  function votesClient(existing: { choice: string } | null, insertFailsWith?: string) {
+    const calls: { op: string; payload?: Record<string, unknown>; filters: [string, unknown][] }[] =
+      [];
+    let row = existing;
+    const refused = { code: '42501', message: 'permission denied for table votes' };
+    const votes = {
+      update: (payload: Record<string, unknown>) => {
+        const filters: [string, unknown][] = [];
+        calls.push({ op: 'update', payload, filters });
+        const chain = {
+          eq: (column: string, value: unknown) => {
+            filters.push([column, value]);
+            return chain;
+          },
+          select: async () => {
+            if (Object.keys(payload).some((key) => key !== 'choice')) {
+              return { data: null, error: refused };
+            }
+            if (row) row = { choice: payload.choice as string };
+            return { data: row ? [{ post_id: postId }] : [], error: null };
+          },
+        };
+        return chain;
+      },
+      insert: async (payload: Record<string, unknown>) => {
+        calls.push({ op: 'insert', payload, filters: [] });
+        if (Object.keys(payload).some((key) => key !== 'post_id' && key !== 'choice')) {
+          return { error: refused };
+        }
+        if (insertFailsWith) {
+          // Someone else got in first: the vote exists by now.
+          row = { choice: 'too_high' };
+          return { error: { code: insertFailsWith, message: 'duplicate key' } };
+        }
+        row = { choice: payload.choice as string };
+        return { error: null };
+      },
+      upsert: async () => {
+        calls.push({ op: 'upsert', filters: [] });
+        return { error: refused };
+      },
+      delete: () => {
+        const chain = {
+          eq: (): unknown => chain,
+          then: (resolve: (value: { error: null }) => void) => {
+            calls.push({ op: 'delete', filters: [] });
+            row = null;
+            resolve({ error: null });
+          },
+        };
+        return chain;
+      },
+    };
     const client = {
       auth: {
         getSession: jest.fn(async () => ({
@@ -169,11 +224,11 @@ describe('createSupabaseFeedRepository', () => {
                   data: {
                     id: postId,
                     slug: 'retro-windbreaker',
-                    owner_id: userId,
+                    owner_id: '00000000-0000-4000-8000-0000000000aa',
                     body: 'Fair price?',
                     estimate_php: 2450,
                     too_high_count: 12,
-                    just_right_count: deletedVote ? 38 : 39,
+                    just_right_count: 39,
                     too_low_count: 4,
                     moderation_status: 'approved',
                     created_at: '2026-11-10T10:00:00.000Z',
@@ -184,42 +239,67 @@ describe('createSupabaseFeedRepository', () => {
             }),
           };
         }
-        if (table === 'votes') {
-          return {
-            upsert: async (payload: Record<string, unknown>) => {
-              upsertedVotes.push(payload);
-              return { error: null };
-            },
-            delete: () => ({
-              eq: () => ({
-                eq: async () => {
-                  deletedVote = true;
-                  return { error: null };
-                },
-              }),
-            }),
-          };
-        }
+        if (table === 'votes') return votes;
         throw new Error(`Unexpected table ${table}`);
       }),
     } as unknown as SupabaseClient;
-
     const repo = createSupabaseFeedRepository(client, {
       scanPhotos: { upload: async () => null, links: async () => ({}) },
     });
+    return { repo, calls, current: () => row };
+  }
 
+  it('adds a first vote with an update that changes nothing, then an insert without user_id', async () => {
+    const { repo, calls, current } = votesClient(null);
     const cast = await repo.setVote('retro-windbreaker', 'just_right');
     expect(cast.ok).toBe(true);
-    expect(upsertedVotes).toEqual([{ post_id: postId, user_id: userId, choice: 'just_right' }]);
-    if (cast.ok) {
-      expect(cast.value.votes.just_right).toBe(39);
-    }
+    expect(calls.map((call) => call.op)).toEqual(['update', 'insert']);
+    expect(calls[0]?.payload).toEqual({ choice: 'just_right' });
+    expect(calls[1]?.payload).toEqual({ post_id: postId, choice: 'just_right' });
+    expect(current()).toEqual({ choice: 'just_right' });
+    if (cast.ok) expect(cast.value.votes.just_right).toBe(39);
+  });
 
+  it('changes an existing vote with one update and no insert', async () => {
+    const { repo, calls, current } = votesClient({ choice: 'too_high' });
+    const changed = await repo.setVote('retro-windbreaker', 'too_low');
+    expect(changed.ok).toBe(true);
+    expect(calls.map((call) => call.op)).toEqual(['update']);
+    expect(calls[0]?.payload).toEqual({ choice: 'too_low' });
+    expect(calls[0]?.filters).toEqual([['post_id', postId]]);
+    expect(current()).toEqual({ choice: 'too_low' });
+  });
+
+  it('never upserts and never sends user_id', async () => {
+    const { repo, calls } = votesClient(null);
+    await repo.setVote('retro-windbreaker', 'too_high');
+    await repo.setVote('retro-windbreaker', 'too_low');
+    expect(calls.some((call) => call.op === 'upsert')).toBe(false);
+    for (const call of calls) expect(call.payload ?? {}).not.toHaveProperty('user_id');
+  });
+
+  it('changes the vote another tab just added instead of failing', async () => {
+    const { repo, calls, current } = votesClient(null, '23505');
+    const cast = await repo.setVote('retro-windbreaker', 'just_right');
+    expect(cast.ok).toBe(true);
+    expect(calls.map((call) => call.op)).toEqual(['update', 'insert', 'update']);
+    expect(current()).toEqual({ choice: 'just_right' });
+  });
+
+  it('returns the database error when a vote is refused', async () => {
+    const { repo } = votesClient(null, '42501');
+    const cast = await repo.setVote('retro-windbreaker', 'just_right');
+    expect(cast).toEqual({
+      ok: false,
+      error: { kind: 'authorization', code: 'not_found_or_denied' },
+    });
+  });
+
+  it('withdraws a vote with a delete and returns the updated tallies', async () => {
+    const { repo, calls, current } = votesClient({ choice: 'too_high' });
     const withdrawn = await repo.setVote('retro-windbreaker', null);
     expect(withdrawn.ok).toBe(true);
-    expect(deletedVote).toBe(true);
-    if (withdrawn.ok) {
-      expect(withdrawn.value.votes.just_right).toBe(38);
-    }
+    expect(calls.map((call) => call.op)).toEqual(['delete']);
+    expect(current()).toBeNull();
   });
 });
