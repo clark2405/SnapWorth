@@ -131,7 +131,7 @@ export function buildFallbackProfile(user?: SessionUser | null): UserProfileDeta
 /**
  * Fetches user profile from Supabase:
  * 1. Current user metadata & auth details
- * 2. `public.profiles` row (handle, avatar_url)
+ * 2. `public.profiles` row (handle, avatar_url, display_name, bio, location)
  * 3. Actual activity metrics (scans, listings and chats counts)
  */
 export async function fetchUserProfile(authUser?: SessionUser | null): Promise<UserProfileDetails> {
@@ -155,6 +155,9 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
 
   const fallback = buildFallbackProfile(user);
   let handle = fallback.handle;
+  let displayName = fallback.displayName;
+  let bio = fallback.bio;
+  let location = fallback.location;
   let avatarUrl = fallback.avatarUrl;
   let checkedCount = fallback.stats.checked;
   let listedCount = fallback.stats.listed;
@@ -174,13 +177,17 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
       try {
         const { data: profileRow } = await supabase
           .from('profiles')
-          .select('handle, avatar_url')
+          .select('handle, avatar_url, display_name, bio, location')
           .eq('id', user.id)
           .maybeSingle();
 
+        // What the profile holds is what others see, so it wins over the account's own copy.
         if (profileRow) {
           if (profileRow.handle) handle = profileRow.handle;
           if (profileRow.avatar_url) avatarUrl = profileRow.avatar_url;
+          displayName = textOf(profileRow.display_name) ?? displayName;
+          bio = textOf(profileRow.bio) ?? bio;
+          location = textOf(profileRow.location) ?? location;
         }
       } catch {
         // Table or row may not exist yet
@@ -239,6 +246,9 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
   return {
     ...fallback,
     handle,
+    displayName,
+    bio,
+    location,
     avatarUrl,
     isAdmin,
     stats: {
@@ -270,8 +280,9 @@ function isDevicePhoto(uri: string): boolean {
  * Updates user profile in Supabase. The handle goes to the `public.profiles` row first, since
  * that's the one comments and chats show, and a handle someone else has is refused there before
  * anything else is saved. A new photo picked on the device is uploaded to the person's avatar
- * folder in Storage and set on `public.profiles` too, so others see it. The rest (name, place,
- * bio, and the photo's URL) is kept on the account.
+ * folder in Storage and set on `public.profiles` too, so others see it. The name, place and bio
+ * go to `public.profiles` as well, which is what seller pages show. The account's own copy of all
+ * of them is kept in step, since it is what a signed-in person's own screens start from.
  */
 export async function updateUserProfile(
   updates: ProfileUpdateInput,
@@ -288,8 +299,14 @@ export async function updateUserProfile(
         : undefined;
     let avatarUrl = updates.avatarUrl;
 
+    // The public details, which seller pages read from `public.profiles`.
+    const details: Record<string, string> = {};
+    if (updates.displayName !== undefined) details.display_name = updates.displayName;
+    if (updates.bio !== undefined) details.bio = updates.bio;
+    if (updates.location !== undefined) details.location = updates.location;
+
     let userId: string | undefined;
-    if (updates.handle !== undefined || newPhoto !== undefined) {
+    if (updates.handle !== undefined || newPhoto !== undefined || Object.keys(details).length > 0) {
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -305,6 +322,17 @@ export async function updateUserProfile(
         .select('id');
       // No row back means the database let nothing change.
       if (error || !data?.length) return { success: false, error: handleRefusal(error?.code) };
+    }
+
+    if (Object.keys(details).length > 0 && userId) {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(details)
+        .eq('id', userId)
+        .select('id');
+      if (error || !data?.length) {
+        return { success: false, error: 'Your profile details couldn’t be saved. Try again.' };
+      }
     }
 
     if (newPhoto !== undefined && userId) {

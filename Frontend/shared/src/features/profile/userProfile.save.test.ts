@@ -69,10 +69,11 @@ const edit = {
   avatarUrl: pickedPhoto,
 };
 
-it('saves the handle, uploads the new photo for everyone to see, then the rest to the account', async () => {
+it('saves the handle and the public details, uploads the new photo for everyone to see, then the account’s own copy', async () => {
   expect(await updateUserProfile(edit)).toEqual({ success: true });
   expect(calls).toEqual([
     'profiles usr_1 {"handle":"pia_thrifts"}',
+    'profiles usr_1 {"display_name":"Pia","bio":"Ukay finds","location":"Cebu City"}',
     'storage avatars upload usr_1/avatar.jpg image/jpeg',
     `profiles usr_1 {"avatar_url":"${uploadedPhoto}"}`,
     `account {"full_name":"Pia","handle":"pia_thrifts","location":"Cebu City","bio":"Ukay finds","avatar_url":"${uploadedPhoto}"}`,
@@ -85,7 +86,10 @@ it('says so when the photo can’t be uploaded, and saves nothing more', async (
     success: false,
     error: 'Your photo couldn’t be saved. Try again.',
   });
-  expect(calls).toEqual(['storage avatars upload usr_1/avatar.jpg image/jpeg']);
+  expect(calls).toEqual([
+    'profiles usr_1 {"bio":"New bio"}',
+    'storage avatars upload usr_1/avatar.jpg image/jpeg',
+  ]);
 });
 
 it('says so when the profile won’t take the photo, and saves nothing more', async () => {
@@ -94,7 +98,7 @@ it('says so when the profile won’t take the photo, and saves nothing more', as
     success: false,
     error: 'Your photo couldn’t be saved. Try again.',
   });
-  expect(calls).toHaveLength(2);
+  expect(calls).toHaveLength(3);
 });
 
 it('keeps a photo that is already online as it is', async () => {
@@ -119,7 +123,39 @@ it('says so when the database let nothing change', async () => {
   expect(calls).toHaveLength(1);
 });
 
-it('leaves the public profile alone when the handle isn’t being changed', async () => {
-  expect(await updateUserProfile({ bio: 'New bio' })).toEqual({ success: true });
-  expect(calls).toEqual(['account {"bio":"New bio"}']);
+it('writes the name, bio and place to the public profile, and keeps the account in step', async () => {
+  expect(
+    await updateUserProfile({ displayName: 'Pia R.', bio: 'New bio', location: 'Mandaue' }),
+  ).toEqual({ success: true });
+  expect(calls).toEqual([
+    'profiles usr_1 {"display_name":"Pia R.","bio":"New bio","location":"Mandaue"}',
+    'account {"full_name":"Pia R.","location":"Mandaue","bio":"New bio"}',
+  ]);
+});
+
+it('writes only what is being changed, and clears a bio when it is emptied', async () => {
+  expect(await updateUserProfile({ bio: '' })).toEqual({ success: true });
+  expect(calls).toEqual(['profiles usr_1 {"bio":""}', 'account {"bio":""}']);
+});
+
+it('says so when the profile won’t take the details, and changes nothing on the account', async () => {
+  profileReply = { data: null, error: { code: '23514' } };
+  expect(await updateUserProfile({ bio: 'x'.repeat(300) })).toEqual({
+    success: false,
+    error: 'Your profile details couldn’t be saved. Try again.',
+  });
+  expect(calls).toHaveLength(1);
+});
+
+it('says so when the database lets no row of the profile change', async () => {
+  profileReply = { data: [], error: null };
+  const result = await updateUserProfile({ displayName: 'Pia' });
+  expect(result.success).toBe(false);
+  expect(calls).toHaveLength(1);
+});
+
+it('saves nothing to the public profile when only the photo is already online', async () => {
+  const online = 'https://lh3.googleusercontent.com/a/photo';
+  await updateUserProfile({ avatarUrl: online });
+  expect(calls.some((call) => call.startsWith('profiles'))).toBe(false);
 });

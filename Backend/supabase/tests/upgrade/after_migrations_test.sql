@@ -109,9 +109,17 @@ select upgrade_tests.check(
   = 'rina_buys,user_0000000000'
   and not exists (
     select 1 from public.profiles
-     where display_name <> '' or bio <> '' or location <> '' or avatar_url is not null
+     where id <> '00000000-0000-4000-b000-000000000003'
+       and (display_name <> '' or bio <> '' or location <> '' or avatar_url is not null)
   ),
   'profiles keep their handles, and the new profile fields start empty'
+);
+select upgrade_tests.check(
+  (select handle = 'paolo_finds' and display_name = 'Paolo Reyes'
+          and bio = 'Ukay finds, mostly cameras.' and location = 'Mandaue City'
+          and avatar_url is null
+     from public.profiles where id = '00000000-0000-4000-b000-000000000003'),
+  'the profile details an account had only in its metadata are copied to its profile (not the photo)'
 );
 
 -- 2. Backfills: listings that were public stay public, and new ones start unscreened.

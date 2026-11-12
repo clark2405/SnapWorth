@@ -5,7 +5,7 @@
 -- may mention a column a later migration adds.
 --
 -- Cast: four demo accounts (the dev seed's, with its two feed posts, eight listings and
--- discussions), and two real people. Rina buys. Tomas, a demo seller's regular, has a sold
+-- discussions), and three real people (Paolo only has a profile, filled in on his account). Rina buys. Tomas, a demo seller's regular, has a sold
 -- listing's chat. Nobody has a moderation state on a listing yet: the column doesn't exist.
 
 \set ON_ERROR_STOP on
@@ -18,7 +18,10 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('00000000-0000-4000-8000-000000000004', 'justin_v@seed.snapworth.test', '{"handle":"justin_v"}'),
   -- Real accounts: Rina picked a handle at sign-up, Tomas didn't (so he has the derived one).
   ('00000000-0000-4000-b000-000000000001', 'rina@example.com', '{"handle":"rina_buys"}'),
-  ('00000000-0000-4000-b000-000000000002', 'tomas@example.com', '{}');
+  ('00000000-0000-4000-b000-000000000002', 'tomas@example.com', '{}'),
+  -- Paolo used the old Edit profile screen, which saved his name, bio and place only here.
+  ('00000000-0000-4000-b000-000000000003', 'paolo@example.com',
+   '{"handle":"paolo_finds","full_name":"Paolo Reyes","bio":"Ukay finds, mostly cameras.","location":"Mandaue City","avatar_url":"https://example.com/p.jpg"}');
 
 -- The two seed feed posts the live project has, and two the current seed adds later: the old
 -- shape has no title, category or counters.
