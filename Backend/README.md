@@ -57,7 +57,7 @@ You need the [Supabase CLI](https://supabase.com/docs/guides/cli) (`npx supabase
    npx supabase db push --include-seed   # leave out --include-seed for production
    ```
 
-2. **Allow anonymous sign-ins** (Dashboard → Authentication → Sign In / Providers → Anonymous). Until email sign-in is wired into the app, each device comments under its own anonymous account with a generated handle.
+2. **Anonymous sign-ins are not used.** The app never signs a device in anonymously: looking around works signed out, and posting, voting, saving, messaging and snapping need a real (email or Google) account. The setting can stay off.
 
 3. **Deploy moderation** and choose its provider:
 
@@ -99,8 +99,8 @@ free-tier quota can block estimates until its applicable limit resets. The five-
 [3.6 comparison](../docs/benchmarks/gemini-3.6-comparison.md) records provider errors and
 timings for low and medium reasoning. These tests do not establish pricing accuracy.
 
-Enable Anonymous Sign-Ins in the project's Authentication settings. This is a backend session
-for the camera; the existing app login screen remains visible and is still a demo UI session.
+The camera needs a signed-in account (the app asks for one before Snap); it no longer makes an
+anonymous session for it, so Anonymous Sign-Ins can stay off.
 
 After signing into the Supabase CLI with `supabase login`, deploy from `Backend/`:
 

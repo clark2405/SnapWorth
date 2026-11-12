@@ -14,7 +14,8 @@ import type { ModerationStatus, VoteChoice } from '../../types/entities';
 import { err, ok } from '../../types/result';
 import { toAppError } from './errors';
 import { createSupabaseScanPhotos, type ScanPhotoStore } from './photo-storage';
-import { ensureSignedIn } from './session';
+import { accountIdOf } from './account';
+import { requireSignedIn } from './session';
 
 interface ProfileJoin {
   readonly id: string;
@@ -166,7 +167,7 @@ export function createSupabaseMarketplaceRepository(
 ): MarketplaceRepository {
   async function viewerId(): Promise<string | null> {
     const { data } = await client.auth.getSession();
-    return data.session?.user.id ?? null;
+    return accountIdOf(data.session);
   }
 
   /** How many listings each seller has sold, from the sold listings anyone can see. */
@@ -319,7 +320,7 @@ export function createSupabaseMarketplaceRepository(
     },
 
     async publish(input) {
-      const signedIn = await ensureSignedIn(client);
+      const signedIn = await requireSignedIn(client);
       if (!signedIn.ok) return err(signedIn.error);
 
       const { data, error } = await client
@@ -355,7 +356,7 @@ export function createSupabaseMarketplaceRepository(
     },
 
     async update(idOrSlug, change) {
-      const signedIn = await ensureSignedIn(client);
+      const signedIn = await requireSignedIn(client);
       if (!signedIn.ok) return err(signedIn.error);
 
       const target = await findRow(idOrSlug);
@@ -400,7 +401,7 @@ export function createSupabaseMarketplaceRepository(
     },
 
     async remove(idOrSlug) {
-      const signedIn = await ensureSignedIn(client);
+      const signedIn = await requireSignedIn(client);
       if (!signedIn.ok) return err(signedIn.error);
 
       const target = await findRow(idOrSlug);
@@ -457,7 +458,7 @@ export function createSupabaseMarketplaceRepository(
     },
 
     async saveListing(idOrSlug, alertBelow, on = true) {
-      const signedIn = await ensureSignedIn(client);
+      const signedIn = await requireSignedIn(client);
       if (!signedIn.ok) return err(signedIn.error);
 
       const target = await findRow(idOrSlug);
@@ -501,7 +502,7 @@ export function createSupabaseMarketplaceRepository(
     },
 
     async unsaveListing(idOrSlug) {
-      const signedIn = await ensureSignedIn(client);
+      const signedIn = await requireSignedIn(client);
       if (!signedIn.ok) return err(signedIn.error);
 
       const target = await findRow(idOrSlug);

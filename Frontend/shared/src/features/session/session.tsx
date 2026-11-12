@@ -149,7 +149,8 @@ export function SessionProvider({ onCreateAccount, onSignIn, children }: Session
         .getSession()
         .then(({ data }) => {
           if (!active) return;
-          if (data?.session?.user) {
+          // An anonymous session (left by an earlier build) is not an account: still a guest.
+          if (data?.session?.user && !data.session.user.is_anonymous) {
             setStatus('member');
             setUser(data.session.user);
           }
@@ -160,7 +161,7 @@ export function SessionProvider({ onCreateAccount, onSignIn, children }: Session
         data: { subscription },
       } = supabase.auth.onAuthStateChange((_event, session) => {
         if (!active) return;
-        if (session?.user) {
+        if (session?.user && !session.user.is_anonymous) {
           setStatus('member');
           setUser(session.user);
         } else {

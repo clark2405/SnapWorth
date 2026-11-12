@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 
+import { accountIdOf } from '../../adapters/supabase/account';
 import { previewHistory, type PreviewHistoryItem } from '../preview/sample-data';
 import { useBackendMode } from '../session/backend-mode';
 import {
@@ -79,13 +80,12 @@ export function ScanHistoryProvider({
     if (!client) return;
     let active = true;
     void client.auth.getSession().then(({ data }) => {
-      if (active)
-        setOwner((known) => (known === undefined ? (data.session?.user.id ?? null) : known));
+      if (active) setOwner((known) => (known === undefined ? accountIdOf(data.session) : known));
     });
     const {
       data: { subscription },
     } = client.auth.onAuthStateChange((_event, session) => {
-      if (active) setOwner(session?.user.id ?? null);
+      if (active) setOwner(accountIdOf(session));
     });
     return () => {
       active = false;

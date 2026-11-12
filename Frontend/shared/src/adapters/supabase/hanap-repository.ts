@@ -5,7 +5,8 @@ import type { UtcDateTime } from '../../types/date-time';
 import type { ModerationStatus } from '../../types/entities';
 import { err, ok } from '../../types/result';
 import { toAppError } from './errors';
-import { ensureSignedIn } from './session';
+import { accountIdOf } from './account';
+import { requireSignedIn } from './session';
 
 interface HanapRow {
   readonly id: string;
@@ -43,7 +44,7 @@ function fromRow(row: HanapRow, viewerId: string | null): HanapPost {
 export function createSupabaseHanapRepository(client: SupabaseClient): HanapRepository {
   async function viewerId(): Promise<string | null> {
     const { data } = await client.auth.getSession();
-    return data.session?.user.id ?? null;
+    return accountIdOf(data.session);
   }
 
   return {
@@ -61,7 +62,7 @@ export function createSupabaseHanapRepository(client: SupabaseClient): HanapRepo
     },
 
     async post({ body, maxPhp }) {
-      const signedIn = await ensureSignedIn(client);
+      const signedIn = await requireSignedIn(client);
       if (!signedIn.ok) return err(signedIn.error);
       const { data, error } = await client
         .from('hanap_posts')

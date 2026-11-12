@@ -14,7 +14,8 @@ import type { ConversationId, MessageId, UserId } from '../../types/ids';
 import { err, ok, type Result } from '../../types/result';
 import { toAppError } from './errors';
 import { createSupabaseScanPhotos, type ScanPhotoStore } from './photo-storage';
-import { ensureSignedIn } from './session';
+import { accountIdOf } from './account';
+import { requireSignedIn } from './session';
 
 interface MessageRow {
   readonly id: string;
@@ -137,14 +138,14 @@ function summaryFromRow(row: ConversationRow): ConversationSummary {
 /**
  * Chats stored in Supabase, with new messages and answers streamed over Realtime. Who may see
  * or do what is decided by the database's row-level security and functions; this adapter only
- * translates. Until email sign-in is wired up, a device without a session signs in
- * anonymously, the same way comments do.
+ * translates. Chats belong to an account: signed out there are none (and nothing is created to
+ * hold any); sending, opening and answering need a signed-in one.
  */
 export function createSupabaseChatRepository(
   client: SupabaseClient,
   photos: ScanPhotoStore = createSupabaseScanPhotos(client),
 ): ChatRepository {
-  const viewerId = () => ensureSignedIn(client);
+  const viewerId = () => requireSignedIn(client);
 
   /**
    * Gives each row its listing's photo. A listing's photo is a private scan photo that Storage
@@ -221,7 +222,7 @@ export function createSupabaseChatRepository(
   // is the session the app started with, which isn't a change.
   let account: string | null | undefined;
   client.auth.onAuthStateChange((_event, session) => {
-    const next = session?.user.id ?? null;
+    const next = accountIdOf(session);
     const known = account;
     account = next;
     if (known === undefined || known === next) return;
@@ -243,6 +244,8 @@ export function createSupabaseChatRepository(
     },
 
     async list() {
+      // Signed out there are no chats to load, and asking must not sign anyone in.
+      if (!(await viewerId()).ok) return ok([]);
       const rows = await conversationRows(null, 'load_conversations');
       return rows.ok ? ok(rows.value.map(summaryFromRow)) : rows;
     },
@@ -319,7 +322,8 @@ export function createSupabaseChatRepository(
 
     async confirmedMeetups(since) {
       const viewer = await viewerId();
-      if (!viewer.ok) return viewer;
+      // Signed out there are none, and asking must not sign anyone in.
+      if (!viewer.ok) return ok([]);
       // Row-level security keeps this to the viewer's own conversations.
       const { data, error } = await client
         .from('messages')

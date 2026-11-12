@@ -7,7 +7,8 @@ import type { ModerationStatus, VoteChoice, VoteCounts } from '../../types/entit
 import { err, ok } from '../../types/result';
 import { toAppError } from './errors';
 import { createSupabaseScanPhotos, type ScanPhotoStore } from './photo-storage';
-import { ensureSignedIn } from './session';
+import { accountIdOf } from './account';
+import { requireSignedIn } from './session';
 
 interface ProfileJoin {
   readonly id: string;
@@ -128,7 +129,7 @@ export function createSupabaseFeedRepository(
 
   async function viewerId(): Promise<string | null> {
     const { data } = await client.auth.getSession();
-    return data.session?.user.id ?? null;
+    return accountIdOf(data.session);
   }
 
   async function resolvePhotoUrls(
@@ -176,7 +177,7 @@ export function createSupabaseFeedRepository(
     },
 
     async publish(input: PublishFeedPostInput) {
-      const signedIn = await ensureSignedIn(client);
+      const signedIn = await requireSignedIn(client);
       if (!signedIn.ok) return err(signedIn.error);
       const userId = signedIn.value;
 
@@ -229,7 +230,7 @@ export function createSupabaseFeedRepository(
     },
 
     async remove(idOrSlug) {
-      const signedIn = await ensureSignedIn(client);
+      const signedIn = await requireSignedIn(client);
       if (!signedIn.ok) return err(signedIn.error);
       const column = uuidPattern.test(idOrSlug) ? 'id' : 'slug';
       const { data, error } = await client
@@ -270,7 +271,7 @@ export function createSupabaseFeedRepository(
     },
 
     async setVote(postIdOrSlug, choice) {
-      const signedIn = await ensureSignedIn(client);
+      const signedIn = await requireSignedIn(client);
       if (!signedIn.ok) return err(signedIn.error);
       const userId = signedIn.value;
 
