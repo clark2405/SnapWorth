@@ -14,6 +14,8 @@ import {
   TextField,
 } from '../../components';
 import { held, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import { NearMeNotice } from './NearMeNotice';
+import { useViewerLocation } from './viewer-location';
 import {
   formatPeso,
   previewMarketAreas,
@@ -294,12 +296,21 @@ export function LocationFilterSheet({
   const styles = useThemedStyles(stylesFor);
   const [area, setArea] = useState(filters.area);
   const [radius, setRadius] = useState<RadiusKey>(filters.radiusKm);
+  const location = useViewerLocation();
+  const askForLocation = location.request;
 
   useEffect(() => {
     if (!visible) return;
     setArea(nearMeOnly ? 'near-me' : filters.area);
     setRadius(filters.radiusKm);
   }, [filters.area, filters.radiusKm, nearMeOnly, visible]);
+
+  // Choosing "Near me" is what asks where the viewer is, so a refusal can be said right here, in
+  // the sheet, instead of only once it has been closed.
+  useEffect(() => {
+    if (visible && area === 'near-me' && location.status === 'idle') void askForLocation();
+  }, [area, askForLocation, location.status, visible]);
+  const locationFailed = location.status === 'denied' || location.status === 'unavailable';
 
   return (
     <Sheet visible={visible} onClose={onClose} title={nearMeOnly ? 'Near me' : 'Location'}>
@@ -317,6 +328,13 @@ export function LocationFilterSheet({
           </SWText>
           <SegmentedControl options={radiusOptions} value={radius} onChange={setRadius} />
         </Animated.View>
+      ) : null}
+      {area === 'near-me' && locationFailed ? (
+        <NearMeNotice
+          status={location.status}
+          onTryAgain={() => void location.request()}
+          onClear={() => (nearMeOnly ? onApply('anywhere', radius) : setArea('anywhere'))}
+        />
       ) : null}
       <SheetActions
         count={countFor(area, radius)}

@@ -104,6 +104,16 @@ export interface EstimateResultViewProps {
 
 const roundTo50 = (value: number) => Math.round(value / 50) * 50;
 
+/** Whether a photo's source points at something: anything but a link that is missing or blank. */
+function hasImage(photo: ItemDetail['photos'][number]): boolean {
+  const source = photo.source;
+  if (Array.isArray(source)) return source.length > 0;
+  if (typeof source === 'object' && source !== null && 'uri' in source) {
+    return typeof source.uri === 'string' && source.uri.trim() !== '';
+  }
+  return true;
+}
+
 const conditionFactor = (sample: SampleValuation, key: PreviewCondition) =>
   sample.conditions.find((condition) => condition.key === key)?.factor ?? 1;
 
@@ -210,7 +220,12 @@ function ItemResult({
   const { value, low, high } = sample
     ? sampleAt(item, sample, condition)
     : { value: item.estimate, low: item.low, high: item.high };
-  const cover = item.photos[0];
+  // A scan saved without a usable photo has none to show, and doesn't claim one was kept.
+  const photos = item.photos.filter(hasImage);
+  const cover = photos[0];
+  // "Ready to sell?" is for an item that is still only a scan: not once it is for sale or sold.
+  const alreadyForSale =
+    placement.listed === true || placement.sold === true || placement.listingId !== undefined;
 
   return (
     <Screen
@@ -263,7 +278,7 @@ function ItemResult({
       <DetailLayout
         hero={
           asSheet ? null : (
-            <DetailHero photos={item.photos} heightRatio={estimated ? 0.5 : 0.62}>
+            <DetailHero photos={photos} heightRatio={estimated ? 0.5 : 0.62}>
               {status === 'estimating' ? <ScanOverlay /> : null}
             </DetailHero>
           )
@@ -371,7 +386,7 @@ function ItemResult({
                 <PaidPriceSection itemId={item.id} worth={value} />
               </Reveal>
 
-              <Tip id="list" />
+              {alreadyForSale ? null : <Tip id="list" />}
 
               {sample ? (
                 <SampleMarket
@@ -387,7 +402,7 @@ function ItemResult({
             </>
           ) : null}
 
-          <SavedNote sharing={placement} />
+          <SavedNote sharing={placement} hasPhoto={photos.length > 0} />
         </DetailSheet>
       </DetailLayout>
 
@@ -578,7 +593,13 @@ function Insight({
 }
 
 /** Saved to history always; then wherever else the item lives. */
-function SavedNote({ sharing }: { readonly sharing: ItemPlacement }) {
+function SavedNote({
+  sharing,
+  hasPhoto,
+}: {
+  readonly sharing: ItemPlacement;
+  readonly hasPhoto: boolean;
+}) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const onFeed = sharing.onFeed || sharing.postId !== undefined;
@@ -588,7 +609,7 @@ function SavedNote({ sharing }: { readonly sharing: ItemPlacement }) {
       <View style={styles.savedLine}>
         <CircleCheck size={15} strokeWidth={2} color={colors.success} />
         <SWText variant="labelMedium" tone="textSecondary">
-          Photo saved to your history
+          {hasPhoto ? 'Photo saved to your history' : 'Saved to your history'}
         </SWText>
       </View>
       <View style={styles.sharedTags}>

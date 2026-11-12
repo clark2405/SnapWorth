@@ -26,7 +26,11 @@ export default function AuthCallbackRoute() {
       startSession(outcome.user);
       router.replace('/feed');
     } else if (outcome?.kind === 'cancelled') {
-      toast.show({ title: 'Google sign-in cancelled', body: 'Log in another way, or try again.' });
+      toast.show({
+        title: 'Google sign-in cancelled',
+        body: 'Log in another way, or try again.',
+        tone: 'error',
+      });
       router.replace('/login');
     }
   }, [outcome]);

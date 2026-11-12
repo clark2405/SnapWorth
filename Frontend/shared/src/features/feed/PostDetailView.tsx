@@ -175,6 +175,7 @@ function PostDiscussion({
       toast.show({
         title: target ? 'Reply not posted' : 'Comment not posted',
         body: failureCopy(result.error),
+        tone: 'error',
       });
       // A blocked comment keeps its text so the author can fix it, with the reason on screen.
       if (result.error.kind === 'validation' && result.error.code === 'blocked') {
@@ -212,7 +213,7 @@ function PostDiscussion({
       toast.show(
         result.ok
           ? { title: comment.parentId ? 'Reply deleted' : 'Comment deleted' }
-          : { title: 'Not deleted', body: failureCopy(result.error) },
+          : { title: 'Not deleted', body: failureCopy(result.error), tone: 'error' },
       );
     },
     [thread, toast],
@@ -224,7 +225,7 @@ function PostDiscussion({
       toast.show(
         result.ok
           ? { title: 'Comment reported', body: 'Our moderators will take a look.' }
-          : { title: 'Not reported', body: failureCopy(result.error) },
+          : { title: 'Not reported', body: failureCopy(result.error), tone: 'error' },
       );
     },
     [thread, toast],

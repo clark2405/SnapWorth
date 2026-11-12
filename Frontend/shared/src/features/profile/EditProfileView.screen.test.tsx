@@ -32,6 +32,24 @@ describe('EditProfileView', () => {
     await waitFor(() => expect(save()).toBeEnabled());
   });
 
+  it('opens the picker from the "Change photo" words too, as one control with one label', async () => {
+    const onPickPhoto = jest.fn().mockResolvedValue({ uri: 'file:///me.jpg' });
+    renderScreen(<EditProfileView onPickPhoto={onPickPhoto} />);
+
+    // One button, named for what it does; the caption is part of it, not a second target.
+    expect(screen.getAllByRole('button', { name: 'Change profile photo' })).toHaveLength(1);
+    fireEvent.press(screen.getByText('Change photo'));
+
+    await waitFor(() => expect(onPickPhoto).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
+  });
+
+  it('shows no "Change photo" caption where no photo can be picked', () => {
+    renderScreen(<EditProfileView />);
+
+    expect(screen.queryByText('Change photo')).toBeNull();
+  });
+
   it('explains a username it cannot take and holds Save back', () => {
     renderScreen(<EditProfileView />);
 

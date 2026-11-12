@@ -55,7 +55,10 @@ export function TrendView({
   const { colors } = useTheme();
   const { height } = useWindowDimensions();
   const { trends, detailFor, listingsFor, postsFor } = useTrends();
-  const trend = trends.find((entry) => entry.key === trendKey) ?? trends[0];
+  // Every hook runs before the not-found return below: the trends arrive after the first render,
+  // and a hook that only runs once they are here changes the hook order and crashes the screen.
+  const wide = useWideLayout();
+  const trend = trends.find((entry) => entry.key === trendKey);
   const detail = trend ? detailFor(trend.key) : undefined;
 
   if (!trend || !detail) {
@@ -77,7 +80,6 @@ export function TrendView({
   const posts = postsFor(trend.key).map(toPreviewPost);
   const heroHeight = Math.round(height * 0.5);
   // On a wide window the photo is framed on the left and the title heads the details beside it.
-  const wide = useWideLayout();
   const title = (
     <>
       <Sign icon={Flame} label={detail.badge} />

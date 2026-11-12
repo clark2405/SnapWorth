@@ -20,7 +20,6 @@ import {
   Sign,
   SnapIcon,
   Sticker,
-  Surface,
   SWText,
   useGridColumns,
   ZoomLink,
@@ -49,6 +48,7 @@ import {
   type MarketFilters,
 } from './MarketFilters';
 import { toPreviewListing, useMarketplace } from './marketplace-state';
+import { NearMeNotice } from './NearMeNotice';
 import { distanceKm, listingCoordinates } from './places';
 import { useViewerLocation } from './viewer-location';
 
@@ -345,49 +345,6 @@ export function MarketplaceView({
   );
 }
 
-/**
- * Why "Near me" isn't narrowing anything: still looking, or the viewer's position can't be had.
- * While it can't, every listing shows, and this says so with a way out.
- */
-function NearMeNotice({
-  status,
-  onTryAgain,
-  onClear,
-}: {
-  readonly status: ReturnType<typeof useViewerLocation>['status'];
-  readonly onTryAgain: () => void;
-  readonly onClear: () => void;
-}) {
-  const styles = useThemedStyles(stylesFor);
-  const looking = status === 'idle' || status === 'locating';
-  return (
-    <Surface padding={tokens.spacing[4]} contentStyle={styles.nearMe}>
-      <SWText variant="label" accessibilityRole="header">
-        {looking
-          ? 'Finding where you are…'
-          : status === 'denied'
-            ? 'Location is off for SnapWorth'
-            : 'Couldn’t find where you are'}
-      </SWText>
-      {looking ? null : (
-        <>
-          <SWText variant="bodySmall" tone="textSecondary">
-            {status === 'denied'
-              ? 'Allow location for SnapWorth in Settings to see what’s near you. Until then, every listing shows. Your position stays on your phone.'
-              : 'Check that location services are on. Until then, every listing shows.'}
-          </SWText>
-          <View style={styles.nearMeActions}>
-            {status === 'denied' ? null : (
-              <Button label="Try again" size="small" variant="secondary" onPress={onTryAgain} />
-            )}
-            <Button label="Clear Near me" size="small" variant="tertiary" onPress={onClear} />
-          </View>
-        </>
-      )}
-    </Surface>
-  );
-}
-
 /** Price's quick choices: none, then the brackets. */
 const priceChoices = [
   { key: 'any', label: 'Any price' },
@@ -451,13 +408,6 @@ function UnderEstimateCard({
 }
 
 const stylesFor = themedStyles((colors) => ({
-  nearMe: {
-    gap: tokens.spacing[2],
-  },
-  nearMeActions: {
-    flexDirection: 'row',
-    gap: tokens.spacing[2],
-  },
   // How far under the AI's estimate a steal is asking, slapped over the card's top corner.
   underSpot: {
     position: 'absolute',

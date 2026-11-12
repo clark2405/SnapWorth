@@ -64,6 +64,16 @@ it('counts what the account has checked from its own saved scans', async () => {
   expect(await screen.findByLabelText('3 checked')).toBeOnTheScreen();
 });
 
+describe('ProfileView: the header', () => {
+  it('leaves out a location and bio that are empty, with no stray "·" separators', async () => {
+    renderScreen(<ProfileView />);
+
+    expect(await screen.findByText('· pia@example.com')).toBeOnTheScreen();
+    expect(screen.queryByText('·')).toBeNull();
+    expect(screen.queryByText(/·\s*$/)).toBeNull();
+  });
+});
+
 describe('ProfileView: deleting the account', () => {
   const openSheet = () => {
     fireEvent.press(screen.getByText('Delete account'));

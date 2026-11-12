@@ -3,7 +3,12 @@ import { useEffect } from 'react';
 
 import { closeIntoTag, firstNameOf, openFromTag, useToast } from '@snapworth/shared/components';
 
-import { LoginView, submitAuth, type AuthInput } from '@snapworth/shared/features/auth';
+import {
+  LoginView,
+  submitAuth,
+  useLeaveWhenSignedIn,
+  type AuthInput,
+} from '@snapworth/shared/features/auth';
 import { useSession, type SessionUser } from '@snapworth/shared/features/session';
 
 import { useGoogleSignIn } from '../../src/google-sign-in';
@@ -18,7 +23,13 @@ export default function SignupRoute() {
   // The feed is fetched while you type, so it's ready to unfold out of the tag.
   useEffect(() => router.prefetch('/feed'), [router]);
 
-  const done = async (input?: AuthInput) => {
+  // Someone who is already signed in has no use for this screen: back to what they were doing,
+  // or the Feed. (Signing in here is wrapped, so it can finish its own way out.)
+  const signingIn = useLeaveWhenSignedIn(() =>
+    returning && router.canGoBack() ? router.back() : router.replace('/feed'),
+  );
+
+  const done = signingIn(async (input?: AuthInput) => {
     let authUser: SessionUser | null = null;
 
     // Google's callback finishes with no form; a form must be filled in. With a Supabase project
@@ -26,11 +37,11 @@ export default function SignupRoute() {
     if (input) {
       const outcome = await submitAuth(input);
       if (outcome.kind === 'invalid') {
-        toast.show({ title: 'Check your details', body: outcome.message });
+        toast.show({ title: 'Check your details', body: outcome.message, tone: 'error' });
         return;
       }
       if (outcome.kind === 'failed') {
-        toast.show({ title: 'Signup failed', body: outcome.message });
+        toast.show({ title: 'Signup failed', body: outcome.message, tone: 'error' });
         return;
       }
       if (outcome.kind === 'check-email') {
@@ -51,7 +62,7 @@ export default function SignupRoute() {
     if (returning && router.canGoBack()) router.back();
     else router.replace('/feed');
     openFromTag();
-  };
+  });
   const google = useGoogleSignIn(() => void done());
 
   return (

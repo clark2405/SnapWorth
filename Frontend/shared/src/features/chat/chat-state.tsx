@@ -189,7 +189,7 @@ export function useMessageSeller(): (listingKey: string) => Promise<Conversation
         void refresh();
         return result.value;
       }
-      toast.show(chatErrorCopy(result.error));
+      toast.show({ ...chatErrorCopy(result.error), tone: 'error' });
       return null;
     },
     [refresh, service, toast],
@@ -211,13 +211,13 @@ export function useOfferToSeller(): (
     async (listingKey, amountPhp) => {
       const started = await service.start(listingKey);
       if (!started.ok) {
-        toast.show(chatErrorCopy(started.error));
+        toast.show({ ...chatErrorCopy(started.error), tone: 'error' });
         return null;
       }
       const sent = await service.sendOffer(service.nextMessageId(), started.value, amountPhp);
       void refresh();
       if (!sent.ok) {
-        toast.show(chatErrorCopy(sent.error));
+        toast.show({ ...chatErrorCopy(sent.error), tone: 'error' });
         return null;
       }
       return started.value;

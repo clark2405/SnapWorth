@@ -6,3 +6,4 @@ export * from './account-deletion';
 export * from './authApi';
 export * from './password-reset';
 export * from './submit-auth';
+export * from './use-leave-when-signed-in';

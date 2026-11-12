@@ -59,7 +59,11 @@ export function AdminReviewView({ onBack }: AdminReviewViewProps) {
     setDeciding(item.id);
     const result = await decide(item, decision);
     setDeciding(null);
-    toast.show(result.ok ? decisionToast(item, decision) : reviewErrorCopy(result.error));
+    toast.show(
+      result.ok
+        ? decisionToast(item, decision)
+        : { ...reviewErrorCopy(result.error), tone: 'error' },
+    );
   };
 
   return (

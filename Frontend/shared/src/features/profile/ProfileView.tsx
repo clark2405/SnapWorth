@@ -156,6 +156,9 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
     { label: 'Sold', value: profile.stats.sold },
   ];
 
+  // Where they are and since when: only what is there, with no stray separators for what isn't.
+  const meta = [profile.location, profile.joined].filter((part) => part.trim() !== '');
+
   return (
     <Screen header={<NavHeader title="Profile" onBack={onBack} />} contentStyle={styles.content}>
       <Reveal index={0}>
@@ -183,15 +186,16 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
               </SWText>
               {profile.email ? (
                 <SWText variant="bodySmall" tone="textSecondary">
-                  · {profile.email} ·
+                  · {profile.email}
                 </SWText>
-              ) : (
-                <SWText variant="bodySmall" tone="textSecondary">
-                  ·
-                </SWText>
-              )}
+              ) : null}
               {profile.rating === null ? null : (
-                <Rating value={profile.rating} variant="bodySmall" tone="textSecondary" />
+                <>
+                  <SWText variant="bodySmall" tone="textSecondary">
+                    ·
+                  </SWText>
+                  <Rating value={profile.rating} variant="bodySmall" tone="textSecondary" />
+                </>
               )}
             </View>
             {profile.bio ? (
@@ -199,14 +203,11 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
                 {profile.bio}
               </SWText>
             ) : null}
-            <View style={styles.metaRow}>
+            {meta.length > 0 ? (
               <SWText variant="caption" tone="textMuted">
-                {profile.location}
+                {meta.join(' · ')}
               </SWText>
-              <SWText variant="caption" tone="textMuted">
-                · {profile.joined}
-              </SWText>
-            </View>
+            ) : null}
           </View>
           <ChevronRight size={18} strokeWidth={2} color={colors.textMuted} />
         </PressableScale>
@@ -389,11 +390,6 @@ const stylesFor = themedStyles(() => ({
     alignItems: 'center',
     gap: tokens.spacing[1],
     flexWrap: 'wrap',
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.spacing[1],
   },
   stats: {
     flexDirection: 'row',

@@ -159,7 +159,13 @@ export function PriceRangeBar({
       {/* A key under the bar, aligned to its edges like the rest of the card: how sure the
           estimate is on the left, and what the asking tick means on the right. */}
       {(showConfidence && confidence) || asking !== undefined ? (
-        <View style={styles.legend}>
+        <View
+          style={[
+            styles.legend,
+            // Both parts: one at each end. Alone, the asking key sits at the left.
+            showConfidence && confidence && asking !== undefined ? styles.legendSplit : null,
+          ]}
+        >
           {showConfidence && confidence ? (
             <SWText
               variant="labelSmall"
@@ -168,9 +174,7 @@ export function PriceRangeBar({
             >
               {confidenceCopy[confidence]}
             </SWText>
-          ) : (
-            <View />
-          )}
+          ) : null}
           {asking !== undefined ? (
             <View style={styles.askingKey}>
               <View style={styles.askingSwatch} />
@@ -228,16 +232,21 @@ const stylesFor = themedStyles((colors) => ({
   legend: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: tokens.spacing[3],
+  },
+  legendSplit: {
+    justifyContent: 'space-between',
   },
   legendConfidence: {
     flexShrink: 1,
   },
+  // At the left under the ruler when it's the only thing in the key: the right-hand edge is where
+  // Worthy floats, and it hid the key there.
   askingKey: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing[1] + 2,
+    flexShrink: 0,
   },
   askingSwatch: {
     width: 2,

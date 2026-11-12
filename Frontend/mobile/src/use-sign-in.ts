@@ -17,6 +17,7 @@ import {
   performAppleAuth,
   performAuth,
   performGoogleAuth,
+  useLeaveWhenSignedIn,
   type AuthInput,
 } from '@snapworth/shared/features/auth';
 import { useSession, type SessionUser } from '@snapworth/shared/features/session';
@@ -40,6 +41,13 @@ export function useSignIn() {
   const { return: returning } = useLocalSearchParams<{ return?: string }>();
   const configured = isSupabaseConfigured();
 
+  // Someone who is already signed in has no use for these screens: back to what they were doing,
+  // or the Feed. Each way of signing in here is wrapped, so it can finish its own way out.
+  const signingIn = useLeaveWhenSignedIn(() => {
+    if (returning && router.canGoBack()) router.back();
+    else router.replace('/feed');
+  });
+
   const enter = (userData?: SessionUser | null) => {
     startSession(userData);
     if (returning && router.canGoBack()) router.back();
@@ -47,7 +55,7 @@ export function useSignIn() {
     openFromTag();
   };
 
-  const submit = async (input: AuthInput) => {
+  const submit = signingIn(async (input: AuthInput) => {
     // An empty form never starts a session, with or without a Supabase project.
     const missing = missingFromAuthInput(input);
     if (missing) {
@@ -93,9 +101,9 @@ export function useSignIn() {
       cancelHandoff();
       Alert.alert(failed, messageOf(failure));
     }
-  };
+  });
 
-  const google = async () => {
+  const google = signingIn(async () => {
     if (!configured) {
       await closeIntoTag({ stamp: 'WELCOME' });
       enter({
@@ -150,10 +158,10 @@ export function useSignIn() {
       cancelHandoff();
       Alert.alert('Google sign-in failed', messageOf(failure));
     }
-  };
+  });
 
   // Only offered once Sign in with Apple is set up (see apple-sign-in.ts), and with Supabase.
-  const apple = async () => {
+  const apple = signingIn(async () => {
     if (!requestAppleCredential || !configured) return;
     try {
       const credential = await requestAppleCredential();
@@ -172,7 +180,7 @@ export function useSignIn() {
       if (appleCancelled(failure)) return;
       Alert.alert('Apple sign-in failed', messageOf(failure));
     }
-  };
+  });
 
   const close = returning && router.canGoBack() ? () => router.back() : undefined;
 

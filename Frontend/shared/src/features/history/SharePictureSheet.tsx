@@ -7,12 +7,13 @@ import { themedStyles, tokens, useThemedStyles } from '../../design';
 import { shareCardImage, type ShareOutcome } from './share-image';
 import { shareCardSize } from './ShareTagCard';
 
-const outcomeToast: Record<ShareOutcome, { title: string; body?: string } | null> = {
-  opened: null,
-  saved: { title: 'Picture saved', body: 'It’s in your downloads, ready to post.' },
-  text: { title: 'Shared as text', body: 'This device couldn’t make the picture.' },
-  failed: { title: 'Couldn’t share', body: 'Try again in a moment.' },
-};
+const outcomeToast: Record<ShareOutcome, { title: string; body?: string; tone?: 'error' } | null> =
+  {
+    opened: null,
+    saved: { title: 'Picture saved', body: 'It’s in your downloads, ready to post.' },
+    text: { title: 'Shared as text', body: 'This device couldn’t make the picture.' },
+    failed: { title: 'Couldn’t share', body: 'Try again in a moment.', tone: 'error' },
+  };
 
 /**
  * Shows a card exactly as the picture that will be shared, then shares it. The card is drawn by

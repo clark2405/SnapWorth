@@ -77,7 +77,7 @@ export function CollectionView({
   // A change that couldn't be kept is undone; say so.
   const keep = (saved: Promise<boolean>) =>
     void saved.then((kept) => {
-      if (!kept) toast.show(collectionNotSaved);
+      if (!kept) toast.show({ ...collectionNotSaved, tone: 'error' });
     });
 
   if (!collection) {

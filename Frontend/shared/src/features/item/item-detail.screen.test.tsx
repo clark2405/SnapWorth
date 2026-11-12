@@ -75,6 +75,47 @@ it('shows where a scan lives once it’s listed', async () => {
   expect(screen.queryByText('Private')).toBeNull();
 });
 
+it('offers "Ready to sell?" only for an item that is still just a scan', async () => {
+  const Scans = await withScans([lamp, { ...lamp, id: 'listed-lamp', status: 'listed' }]);
+  const { unmount } = renderScreen(
+    <Scans>
+      <EstimateResultView itemId={lamp.id} />
+    </Scans>,
+  );
+  expect(await screen.findByText('Ready to sell?')).toBeOnTheScreen();
+  unmount();
+
+  renderScreen(
+    <Scans>
+      <EstimateResultView itemId="listed-lamp" />
+    </Scans>,
+  );
+  expect(await screen.findByText('Listed')).toBeOnTheScreen();
+  expect(screen.queryByText('Ready to sell?')).toBeNull();
+});
+
+it('does not say a photo was saved for a scan that has none', async () => {
+  const Scans = await withScans([
+    { ...lamp, photoUri: '' },
+    { ...lamp, id: 'with-photo' },
+  ]);
+  const { unmount } = renderScreen(
+    <Scans>
+      <EstimateResultView itemId={lamp.id} />
+    </Scans>,
+  );
+  expect(await screen.findByText('Saved to your history')).toBeOnTheScreen();
+  expect(screen.queryByText('Photo saved to your history')).toBeNull();
+  unmount();
+
+  renderScreen(
+    <Scans>
+      <EstimateResultView itemId="with-photo" />
+    </Scans>,
+  );
+  expect(await screen.findByText('Photo saved to your history')).toBeOnTheScreen();
+});
+
 it('says so when the item isn’t in History, and offers the way back', async () => {
   const onBack = jest.fn();
   const Scans = await withScans([lamp]);
