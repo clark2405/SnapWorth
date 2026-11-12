@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ImageSourcePropType } from 'react-native';
 
 import { fetchIsAdmin } from '../../adapters/supabase/admin-role';
@@ -19,15 +19,19 @@ export interface UserProfileDetails {
   /** Sellers aren't rated yet, so a real account has none; the preview profile has one. */
   readonly rating: string | null;
   readonly isAdmin: boolean;
+  /**
+   * What the account has done, counted by the database. `null` means the count couldn't be loaded:
+   * that is not the same as none, and a screen shows it as unknown rather than as 0.
+   */
   readonly stats: {
-    readonly checked: number;
-    readonly listed: number;
-    readonly sold: number;
+    readonly checked: number | null;
+    readonly listed: number | null;
+    readonly sold: number | null;
   };
   readonly activity: {
-    readonly listings: number;
-    readonly votes: number;
-    readonly conversations: number;
+    readonly listings: number | null;
+    readonly votes: number | null;
+    readonly conversations: number | null;
   };
 }
 
@@ -134,7 +138,23 @@ export function buildFallbackProfile(user?: SessionUser | null): UserProfileDeta
  * 2. `public.profiles` row (handle, avatar_url, display_name, bio, location)
  * 3. Actual activity metrics (scans, listings and chats counts)
  */
-export async function fetchUserProfile(authUser?: SessionUser | null): Promise<UserProfileDetails> {
+export function fetchUserProfile(authUser?: SessionUser | null): Promise<UserProfileDetails> {
+  // Several parts of a screen ask for the profile at once (the header button, the screen itself):
+  // they share one load, so the database is asked once, not once each. A save ends the sharing so
+  // nobody is handed what was loaded before it.
+  const key = authUser?.id ?? '';
+  const loading = inFlight.get(key);
+  if (loading) return loading;
+  const load = loadUserProfile(authUser).finally(() => {
+    if (inFlight.get(key) === load) inFlight.delete(key);
+  });
+  inFlight.set(key, load);
+  return load;
+}
+
+const inFlight = new Map<string, Promise<UserProfileDetails>>();
+
+async function loadUserProfile(authUser?: SessionUser | null): Promise<UserProfileDetails> {
   let user = authUser;
 
   if (isSupabaseConfigured()) {
@@ -159,11 +179,11 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
   let bio = fallback.bio;
   let location = fallback.location;
   let avatarUrl = fallback.avatarUrl;
-  let checkedCount = fallback.stats.checked;
-  let listedCount = fallback.stats.listed;
-  let soldCount = fallback.stats.sold;
-  let chatCount = fallback.activity.conversations;
-  let voteCount = fallback.activity.votes;
+  let checkedCount: number | null = fallback.stats.checked;
+  let listedCount: number | null = fallback.stats.listed;
+  let soldCount: number | null = fallback.stats.sold;
+  let chatCount: number | null = fallback.activity.conversations;
+  let voteCount: number | null = fallback.activity.votes;
   let isAdmin = fallback.isAdmin;
 
   if (isSupabaseConfigured()) {
@@ -220,23 +240,14 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
             .eq('user_id', user.id),
         ]);
 
-        if (checkedRes.status === 'fulfilled' && typeof checkedRes.value.count === 'number') {
-          checkedCount = checkedRes.value.count;
-        }
-        if (listedRes.status === 'fulfilled' && typeof listedRes.value.count === 'number') {
-          listedCount = listedRes.value.count;
-        }
-        if (soldRes.status === 'fulfilled' && typeof soldRes.value.count === 'number') {
-          soldCount = soldRes.value.count;
-        }
-        if (chatRes.status === 'fulfilled' && typeof chatRes.value.count === 'number') {
-          chatCount = chatRes.value.count;
-        }
-        if (voteRes.status === 'fulfilled' && typeof voteRes.value.count === 'number') {
-          voteCount = voteRes.value.count;
-        }
+        // A count that couldn't be loaded is unknown (null), not zero.
+        checkedCount = countOf(checkedRes);
+        listedCount = countOf(listedRes);
+        soldCount = countOf(soldRes);
+        chatCount = countOf(chatRes);
+        voteCount = countOf(voteRes);
       } catch {
-        // Keep fallback counts
+        checkedCount = listedCount = soldCount = chatCount = voteCount = null;
       }
     } catch {
       // Keep fallbacks
@@ -262,6 +273,14 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
       conversations: chatCount,
     },
   };
+}
+
+/** A head-count query's answer: its number, or null when it failed (an error is not a zero). */
+function countOf(
+  result: PromiseSettledResult<{ readonly count: number | null; readonly error?: unknown }>,
+): number | null {
+  if (result.status !== 'fulfilled' || result.value.error) return null;
+  return typeof result.value.count === 'number' ? result.value.count : null;
 }
 
 /** What to tell someone whose new handle the database refused, by Postgres error code. */
@@ -290,6 +309,8 @@ export async function updateUserProfile(
   if (!isSupabaseConfigured()) {
     return { success: true };
   }
+  // Whatever is being loaded now predates this save.
+  inFlight.clear();
 
   try {
     const supabase = getSupabase();
@@ -377,21 +398,44 @@ export function useUserProfile() {
   const [profile, setProfile] = useState<UserProfileDetails>(() => buildFallbackProfile(user));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Moves on with each load and each account change, so an older answer is thrown away. */
+  const generation = useRef(0);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const refresh = useCallback(async () => {
+    const mine = ++generation.current;
+    // Only the latest load, for the account still signed in, may change what's on screen, and
+    // nothing may once the screen has gone.
+    const current = () => mounted.current && mine === generation.current;
     setLoading(true);
     setError(null);
     try {
       const data = await fetchUserProfile(user);
-      setProfile(data);
+      if (current()) setProfile(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to fetch user details');
+      if (current()) setError(e instanceof Error ? e.message : 'Failed to fetch user details');
     } finally {
-      setLoading(false);
+      if (current()) setLoading(false);
     }
   }, [user]);
 
+  // A different account starts from what it holds itself, at once: the last one's profile (and
+  // counts) never show for it while its own load is on the way.
+  const shownFor = useRef<string | null>(user?.id ?? null);
   useEffect(() => {
+    const account = user?.id ?? null;
+    if (account !== shownFor.current) {
+      shownFor.current = account;
+      generation.current += 1;
+      setProfile(buildFallbackProfile(user));
+    }
     void refresh();
   }, [refresh, user, status]);
 

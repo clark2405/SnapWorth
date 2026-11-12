@@ -101,6 +101,9 @@ function ModerationRow({ onPress }: { readonly onPress: () => void }) {
   );
 }
 
+/** A count for a row, or a dash when it couldn't be loaded. */
+const countText = (count: number | null) => (count === null ? '–' : String(count));
+
 export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: ProfileViewProps) {
   const { colors, preference, setPreference } = useTheme();
   const styles = useThemedStyles(stylesFor);
@@ -217,12 +220,20 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
             style={styles.statTile}
             contentStyle={styles.stat}
           >
-            <View accessible accessibilityLabel={`${stat.value} ${stat.label.toLowerCase()}`}>
-              <CountUp
-                value={stat.value}
-                format={(value) => String(Math.round(value))}
-                variant="priceMedium"
-              />
+            <View
+              accessible
+              accessibilityLabel={`${stat.value ?? 'unknown'} ${stat.label.toLowerCase()}`}
+            >
+              {/* A count that couldn't be loaded is shown as unknown, never as 0. */}
+              {stat.value === null ? (
+                <SWText variant="priceMedium">–</SWText>
+              ) : (
+                <CountUp
+                  value={stat.value}
+                  format={(value) => String(Math.round(value))}
+                  variant="priceMedium"
+                />
+              )}
               <SWText variant="labelSmall" tone="textSecondary">
                 {stat.label}
               </SWText>
@@ -256,19 +267,19 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
           <ListRow
             label="Your listings"
             icon={PriceTagIcon}
-            value={String(profile.activity.listings)}
+            value={countText(profile.activity.listings)}
             onPress={() => onOpen?.('listings')}
           />
           <ListRow
             label="Votes cast"
             icon={Vote}
-            value={String(votesCount)}
+            value={countText(votesCount)}
             onPress={() => onOpen?.('votes')}
           />
           <ListRow
             label="Conversations"
             icon={MessagesSquare}
-            value={String(profile.activity.conversations)}
+            value={countText(profile.activity.conversations)}
             onPress={() => onOpen?.('conversations')}
           />
         </ListGroup>
