@@ -190,6 +190,8 @@ function ConfirmPrice({
   );
   const [edited, setEdited] = useState(Boolean(existingListing));
   const [publishing, setPublishing] = useState(false);
+  // An existing listing of the seller's is being changed, not published again.
+  const editing = Boolean(existingListing?.mine);
 
   const enteredPrice = parseEnteredPrice(priceText);
   const suggestion = baseValuation === null ? null : suggestedPrice(condition, baseValuation);
@@ -316,7 +318,7 @@ function ConfirmPrice({
       footer={
         <BottomBar>
           <Button
-            label="Publish listing"
+            label={editing ? 'Save changes' : 'Publish listing'}
             disabled={enteredPrice === null}
             loading={publishing}
             onPress={() => void handlePublish()}
@@ -328,7 +330,7 @@ function ConfirmPrice({
               align="center"
               accessibilityLiveRegion="polite"
             >
-              Enter your asking price to publish.
+              {editing ? 'Enter your asking price to save.' : 'Enter your asking price to publish.'}
             </SWText>
           ) : null}
         </BottomBar>
