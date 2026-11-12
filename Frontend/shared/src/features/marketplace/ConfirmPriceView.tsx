@@ -232,6 +232,7 @@ function ConfirmPrice({
         toast.show({
           title: 'Couldn’t update listing',
           body: 'Please check your connection and try again.',
+          tone: 'error',
         });
         return;
       }
@@ -271,6 +272,7 @@ function ConfirmPrice({
           published.error.kind === 'rate_limited'
             ? 'You are listing items too quickly. Try again in a while.'
             : 'Please check your connection and try again.',
+        tone: 'error',
       });
       return;
     }

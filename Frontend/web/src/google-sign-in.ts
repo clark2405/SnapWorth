@@ -22,6 +22,6 @@ export function useGoogleSignIn(preview: () => void): () => Promise<void> {
     const failure = await startWebGoogleSignIn(siteLink(oauthCallbackPath), (url) =>
       globalThis.location.assign(url),
     );
-    if (failure) toast.show({ title: 'Google sign-in failed', body: failure });
+    if (failure) toast.show({ title: 'Google sign-in failed', body: failure, tone: 'error' });
   };
 }

@@ -30,7 +30,7 @@ export default function SignupRoute() {
       try {
         const { data, error } = await performAuth(input);
         if (error) {
-          toast.show({ title: 'Signup failed', body: error.message });
+          toast.show({ title: 'Signup failed', body: error.message, tone: 'error' });
           return;
         }
         if (input.mode === 'signup' && !data.session) {
@@ -45,6 +45,7 @@ export default function SignupRoute() {
         toast.show({
           title: 'Signup failed',
           body: err instanceof Error ? err.message : 'Something went wrong. Try again.',
+          tone: 'error',
         });
         return;
       }

@@ -107,7 +107,11 @@ export function EditProfileView({ onBack, onSaved, onPickPhoto }: EditProfileVie
 
       if (!res.success) {
         setSaving(false);
-        toast.show({ title: 'Update failed', body: res.error || 'Failed to update profile' });
+        toast.show({
+          title: 'Update failed',
+          body: res.error || 'Failed to update profile',
+          tone: 'error',
+        });
         return;
       }
 
@@ -120,6 +124,7 @@ export function EditProfileView({ onBack, onSaved, onPickPhoto }: EditProfileVie
       toast.show({
         title: 'Update failed',
         body: err instanceof Error ? err.message : 'Failed to update profile',
+        tone: 'error',
       });
     }
   };

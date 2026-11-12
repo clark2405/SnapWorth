@@ -119,7 +119,7 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
   // Offline sends stay in the thread, marked to retry; anything else is worth a word.
   const complain = useCallback(
     (error: AppError) => {
-      if (error.kind !== 'offline') toast.show(chatErrorCopy(error));
+      if (error.kind !== 'offline') toast.show({ ...chatErrorCopy(error), tone: 'error' });
     },
     [toast],
   );
@@ -471,7 +471,11 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
         onSave={(pct) => {
           void suki.set(pct).then((saved) => {
             if (!saved) {
-              toast.show({ title: 'Couldn’t save that', body: 'Try again in a moment.' });
+              toast.show({
+                title: 'Couldn’t save that',
+                body: 'Try again in a moment.',
+                tone: 'error',
+              });
               return;
             }
             setSheet(null);

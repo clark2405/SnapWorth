@@ -30,7 +30,7 @@ export default function LoginRoute() {
       try {
         const { data, error } = await performAuth(input);
         if (error) {
-          toast.show({ title: 'Sign-in failed', body: error.message });
+          toast.show({ title: 'Sign-in failed', body: error.message, tone: 'error' });
           return;
         }
         authUser = data.user;
@@ -38,6 +38,7 @@ export default function LoginRoute() {
         toast.show({
           title: 'Sign-in failed',
           body: err instanceof Error ? err.message : 'Something went wrong. Try again.',
+          tone: 'error',
         });
         return;
       }

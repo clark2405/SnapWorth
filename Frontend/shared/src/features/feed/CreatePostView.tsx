@@ -186,6 +186,7 @@ function CreatePost({
           result.error.kind === 'rate_limited'
             ? 'You are posting too quickly. Try again in a while.'
             : 'Please check your connection and try again.',
+        tone: 'error',
       });
       return;
     }

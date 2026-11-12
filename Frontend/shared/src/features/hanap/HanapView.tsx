@@ -88,14 +88,15 @@ export function HanapView({ onBack, onOpenListing, onSnap }: HanapViewProps) {
               onOpenListing={onOpenListing}
               onFound={async (found) => {
                 const result = await setFound(entry.id, found);
-                if (!result.ok) toast.show({ title: 'Couldn’t update it', body: 'Try again.' });
+                if (!result.ok)
+                  toast.show({ title: 'Couldn’t update it', body: 'Try again.', tone: 'error' });
               }}
               onRemove={async () => {
                 const result = await remove(entry.id);
                 toast.show(
                   result.ok
                     ? { title: 'Hanap deleted' }
-                    : { title: 'Couldn’t delete it', body: 'Try again.' },
+                    : { title: 'Couldn’t delete it', body: 'Try again.', tone: 'error' },
                 );
               }}
             />
@@ -150,8 +151,12 @@ export function HanapView({ onBack, onOpenListing, onSnap }: HanapViewProps) {
           if (!result.ok) {
             toast.show(
               result.error.kind === 'rate_limited'
-                ? { title: 'Slow down a little', body: 'You can post a few an hour.' }
-                : { title: 'Couldn’t post it', body: 'Check it and try again.' },
+                ? {
+                    title: 'Slow down a little',
+                    body: 'You can post a few an hour.',
+                    tone: 'error',
+                  }
+                : { title: 'Couldn’t post it', body: 'Check it and try again.', tone: 'error' },
             );
             return;
           }

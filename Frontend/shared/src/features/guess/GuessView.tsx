@@ -295,7 +295,7 @@ function DaySummary({
               const shared = await shareScore(game);
               if (shared === 'copied') toast.show({ title: 'Score copied' });
               if (shared === 'failed')
-                toast.show({ title: 'Couldn’t share it', body: 'Try again.' });
+                toast.show({ title: 'Couldn’t share it', body: 'Try again.', tone: 'error' });
             }}
           />
         </Surface>

@@ -76,7 +76,7 @@ export function CollectionsStrip({
           setMaking(false);
           onOpenCollection?.(id);
           void saved.then((kept) => {
-            if (!kept) toast.show(collectionNotSaved);
+            if (!kept) toast.show({ ...collectionNotSaved, tone: 'error' });
           });
         }}
       />
