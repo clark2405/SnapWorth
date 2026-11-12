@@ -13,6 +13,7 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import { useState } from 'react';
+import { Platform } from 'react-native';
 
 import {
   EstimateIcon,
@@ -143,6 +144,18 @@ const groups: readonly {
   },
 ];
 
+/**
+ * What can reach someone on the web: the banners that show while SnapWorth is open, for new
+ * messages, offers and meetup times. Estimates, votes, comments, price drops and the notes from
+ * SnapWorth only ever reach the phone app, so a browser shows no switches for them.
+ */
+const webKeys: ReadonlySet<NotificationKey> = new Set(['messages', 'offers', 'meetups']);
+
+/** Meetup reminders reach a browser as a banner when the time comes, not an hour ahead. */
+const webDetail: Partial<Record<NotificationKey, string>> = {
+  meetups: 'A banner when a confirmed meetup is near',
+};
+
 // Everything about your own items and deals is on; news from SnapWorth is opt-in apart from
 // the monthly trends note.
 export const defaultNotificationPreferences: NotificationPreferences = {
@@ -179,6 +192,7 @@ export function NotificationsView({
   onOpenSettings,
 }: NotificationsViewProps) {
   const styles = useThemedStyles(stylesFor);
+  const web = Platform.OS === 'web';
   const [own, setOwn] = useState(defaultNotificationPreferences);
   const current = preferences ?? own;
   const { paused, enabled } = current;
@@ -191,15 +205,23 @@ export function NotificationsView({
   const toggle = (key: NotificationKey, value: boolean) => {
     change({ ...current, enabled: { ...enabled, [key]: value } });
     // Turning something on is the moment to ask, when the reason is obvious.
-    if (value && access === 'undetermined') onAllow?.();
+    // (The web's banners sit in the page, so they need no permission from the browser.)
+    if (value && access === 'undetermined' && !web) onAllow?.();
   };
+
+  const shown = groups
+    .map((group) => ({
+      ...group,
+      options: web ? group.options.filter((option) => webKeys.has(option.key)) : group.options,
+    }))
+    .filter((group) => group.options.length > 0);
 
   return (
     <Screen
       header={<NavHeader title="Notifications" onBack={onBack} banded />}
       contentStyle={styles.content}
     >
-      {access === 'undetermined' || (access === 'denied' && onOpenSettings) ? (
+      {!web && (access === 'undetermined' || (access === 'denied' && onOpenSettings)) ? (
         <Reveal index={0}>
           <ListGroup>
             {access === 'undetermined' ? (
@@ -238,14 +260,14 @@ export function NotificationsView({
         </ListGroup>
       </Reveal>
 
-      {groups.map((group, groupIndex) => (
+      {shown.map((group, groupIndex) => (
         <Reveal key={group.title} index={groupIndex + 1} style={paused ? styles.muted : null}>
           <ListGroup title={group.title} icon={group.icon}>
             {group.options.map((option) => (
               <ListRow
                 key={option.key}
                 label={option.label}
-                detail={option.detail}
+                detail={(web ? webDetail[option.key] : undefined) ?? option.detail}
                 icon={option.icon}
                 trailing={
                   <Toggle
@@ -262,9 +284,11 @@ export function NotificationsView({
       ))}
 
       <SWText variant="caption" tone="textMuted" style={styles.footnote}>
-        {access === 'unsupported'
-          ? 'This browser can’t show notifications; your choices still apply in the app.'
-          : 'You can also turn SnapWorth’s notifications off entirely in your phone’s Settings.'}
+        {web
+          ? 'These show as banners while SnapWorth is open, and are kept in this browser. Estimates, votes and the rest reach you in the phone app.'
+          : access === 'unsupported'
+            ? 'This device can’t show notifications; your choices still apply in the app.'
+            : 'You can also turn SnapWorth’s notifications off entirely in your phone’s Settings.'}
       </SWText>
     </Screen>
   );
