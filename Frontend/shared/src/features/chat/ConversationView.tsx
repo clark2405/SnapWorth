@@ -201,7 +201,10 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
 
   if (chat.status === 'loading' && !conversation) return <ScreenSkeleton kind="detail" />;
   if (!conversation) {
-    const missing = chat.error?.kind === 'authorization';
+    // A chat that isn't there, isn't yours, or whose address isn't a chat's at all is not a
+    // connection problem: only a failed request is, and anything else gets a plainer "try again".
+    const missing = chat.error?.kind === 'authorization' || chat.error?.kind === 'validation';
+    const offline = chat.error?.kind === 'offline' || chat.error?.kind === 'timeout';
     return (
       <Screen ambient="chat" header={<NavHeader title="Chat" onBack={onBack} banded />}>
         <EmptyState
@@ -209,8 +212,10 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
           title={missing ? 'This conversation isn’t available' : 'Couldn’t load this chat'}
           body={
             missing
-              ? 'It may have been removed, or it belongs to someone else.'
-              : 'Check your connection and try again.'
+              ? 'It may have been removed, or the link is out of date.'
+              : offline
+                ? 'Check your connection and try again.'
+                : 'Something went wrong on our side. Try again in a moment.'
           }
           actionLabel={missing ? undefined : 'Try again'}
           onAction={missing ? undefined : chat.reload}
