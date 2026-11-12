@@ -49,7 +49,12 @@ import { formatPeso } from '../preview/sample-data';
 import { useAccountGate, useSession } from '../session';
 import { askingLine } from './asking-line';
 import { verdictChip, verdictLabel } from './ListingCard';
-import { listingPhotoSource, sellerAvatarSource, useMarketplace } from './marketplace-state';
+import {
+  listingPhotoSource,
+  savedNotKept,
+  sellerAvatarSource,
+  useMarketplace,
+} from './marketplace-state';
 import { useTip } from '../tips';
 
 export interface ListingDetailViewProps {
@@ -187,7 +192,9 @@ function ListingDetail({
   const toggleSaved = () =>
     requireAccount('save', () => {
       saveTip.done();
-      void toggleSavedInMarket(activeId);
+      void toggleSavedInMarket(activeId).then((result) => {
+        if (!result.ok) toast.show(savedNotKept);
+      });
     });
   const offerAmount = Number(offerText.replace(/,/g, '')) || 0;
 
@@ -421,14 +428,16 @@ function ListingDetail({
                         value={priceAlert}
                         onValueChange={(value) =>
                           requireAccount('alert', () => {
-                            void saveAlert(activeId, undefined, value);
-                            if (value) {
-                              haptic('select');
-                              toast.show({
-                                title: 'Alert set',
-                                body: "We'll notify you if the price drops.",
-                              });
-                            }
+                            void saveAlert(activeId, undefined, value).then((result) => {
+                              if (!result.ok) toast.show(savedNotKept);
+                              else if (value) {
+                                haptic('select');
+                                toast.show({
+                                  title: 'Alert set',
+                                  body: "We'll notify you if the price drops.",
+                                });
+                              }
+                            });
                           })
                         }
                         accessibilityLabel="Alert me if the price drops"

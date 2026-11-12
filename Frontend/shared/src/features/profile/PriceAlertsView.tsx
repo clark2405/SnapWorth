@@ -18,7 +18,7 @@ import {
   Toggle,
 } from '../../components';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
-import { useMarketplace } from '../marketplace/marketplace-state';
+import { savedNotKept, useMarketplace } from '../marketplace/marketplace-state';
 import { formatPeso, type PreviewListing, type PreviewPriceAlert } from '../preview/sample-data';
 
 export interface PriceAlertsViewProps {
@@ -98,7 +98,9 @@ export function PriceAlertsView({ onBack, onOpenListing, onBrowseMarket }: Price
                   onEdit={() => openEditor({ alert, listing })}
                   onToggle={(on) => {
                     haptic('select');
-                    void saveAlert(alert.listingId, alert.alertBelow, on);
+                    void saveAlert(alert.listingId, alert.alertBelow, on).then((result) => {
+                      if (!result.ok) toast.show(savedNotKept);
+                    });
                   }}
                 />
               ))}
@@ -138,7 +140,9 @@ export function PriceAlertsView({ onBack, onOpenListing, onBrowseMarket }: Price
                   editingRow.alert.listingId,
                   roundTo50(editingRow.listing.askingPrice * (1 - Number(cut) / 100)),
                   true,
-                );
+                ).then((result) => {
+                  if (!result.ok) toast.show(savedNotKept);
+                });
                 haptic('success');
                 setEditing(null);
               }}
@@ -147,9 +151,10 @@ export function PriceAlertsView({ onBack, onOpenListing, onBrowseMarket }: Price
               label="Stop watching"
               variant="tertiary"
               onPress={() => {
-                void removeAlert(editingRow.alert.listingId);
+                void removeAlert(editingRow.alert.listingId).then((result) =>
+                  toast.show(result.ok ? { title: 'Alert removed' } : savedNotKept),
+                );
                 setEditing(null);
-                toast.show({ title: 'Alert removed' });
               }}
             />
           </View>

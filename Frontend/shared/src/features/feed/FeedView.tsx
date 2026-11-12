@@ -15,6 +15,7 @@ import {
   SearchButton,
   SWText,
   useGridColumns,
+  useToast,
   type SearchOrigin,
 } from '../../components';
 import { held, themedStyles, tokens, useThemedStyles, useWideLayout } from '../../design';
@@ -24,7 +25,7 @@ import type { Trend } from '../trends/trends';
 import { useTrends } from '../trends/use-trends';
 import { useAccountGate } from '../session';
 import { Tip, useTip } from '../tips';
-import { useFeed } from './feed-state';
+import { useFeed, voteNotSaved } from './feed-state';
 import { PostCard } from './PostCard';
 
 export interface FeedViewProps {
@@ -61,6 +62,7 @@ export function FeedView({
   const { previewPosts: feedPosts, voteFor, toggleVote, refresh } = useFeed();
   const { heading, trends } = useTrends();
   const requireAccount = useAccountGate();
+  const toast = useToast();
   const voteTip = useTip('vote');
   // One column of posts on a phone; on a wide window as many as fit, up to three.
   const grid = useGridColumns(feedPosts.length, {
@@ -137,7 +139,9 @@ export function FeedView({
               onVote={(choice) =>
                 requireAccount('vote', () => {
                   voteTip.done();
-                  void toggleVote(post.id, choice);
+                  void toggleVote(post.id, choice).then((result) => {
+                    if (!result.ok) toast.show(voteNotSaved);
+                  });
                 })
               }
               onOpen={() => onOpenPost?.(post.id)}

@@ -19,7 +19,7 @@ import type {
 } from '../../ports/marketplace';
 import type { UtcDateTime } from '../../types/date-time';
 import type { AppError } from '../../types/errors';
-import { ok, type Result } from '../../types/result';
+import { err, ok, type Result } from '../../types/result';
 import {
   previewPriceAlerts,
   previewSellers,
@@ -99,7 +99,8 @@ export interface MarketplaceState {
     change: UpdateListingInput,
   ) => Promise<Result<MarketListing, AppError>>;
   readonly removeListing: (idOrSlug: string) => Promise<Result<void, AppError>>;
-  readonly toggleSaved: (idOrSlug: string) => Promise<boolean>;
+  /** Saves or unsaves a listing; on success, whether it is saved now. A failure is undone. */
+  readonly toggleSaved: (idOrSlug: string) => Promise<Result<boolean, AppError>>;
   readonly saveAlert: (
     idOrSlug: string,
     alertBelow?: number,
@@ -112,6 +113,12 @@ const MarketplaceRepositoryContext = createContext<MarketplaceRepository | null>
 const MarketplaceStateContext = createContext<MarketplaceState | null>(null);
 
 const roundTo50 = (value: number) => Math.max(50, Math.round(value / 50) * 50);
+
+/** What to tell someone whose save or price alert didn't go through. It is put back as it was. */
+export const savedNotKept = {
+  title: 'Couldn’t save that',
+  body: 'Your saved listings are as they were. Check your connection and try again.',
+} as const;
 
 /**
  * With a repository, the Market is whatever it holds (Supabase's listings, or the device
@@ -382,6 +389,7 @@ function useMarketplaceStateInternal(repository: MarketplaceRepository | null): 
           : (savedAlerts.find((entry) => entry.listingId === listingKey)?.alertBelow ??
             roundTo50((target?.askingPrice ?? 2000) * 0.9));
 
+      const previous = savedAlerts.find((entry) => entry.listingId === listingKey);
       const optimistic: SavedListingAlert = {
         listingId: listingKey,
         alertBelow: computedAlertBelow,
@@ -396,9 +404,16 @@ function useMarketplaceStateInternal(repository: MarketplaceRepository | null): 
 
       if (repository) {
         const result = await repository.saveListing(idOrSlug, computedAlertBelow, on);
-        if (result.ok) {
-          await refresh();
+        if (!result.ok) {
+          // Put back what was there: the earlier alert, or nothing.
+          setSavedAlerts((current) =>
+            previous
+              ? current.map((entry) => (entry.listingId === listingKey ? previous : entry))
+              : current.filter((entry) => entry.listingId !== listingKey),
+          );
+          return result;
         }
+        await refresh();
         return result;
       }
       return ok(optimistic);
@@ -410,31 +425,43 @@ function useMarketplaceStateInternal(repository: MarketplaceRepository | null): 
     async (idOrSlug: string): Promise<Result<void, AppError>> => {
       const target = findListing(idOrSlug);
       const listingKey = target?.id ?? idOrSlug;
+      const previous = savedAlerts.find(
+        (entry) => entry.listingId === listingKey || entry.listingId === idOrSlug,
+      );
       setSavedAlerts((current) =>
         current.filter((entry) => entry.listingId !== listingKey && entry.listingId !== idOrSlug),
       );
       if (repository) {
         const result = await repository.unsaveListing(idOrSlug);
-        if (result.ok) {
-          await refresh();
+        if (!result.ok) {
+          // It's still saved: bring it back.
+          if (previous) {
+            setSavedAlerts((current) =>
+              current.some((entry) => entry.listingId === previous.listingId)
+                ? current
+                : [...current, previous],
+            );
+          }
+          return result;
         }
+        await refresh();
         return result;
       }
       return ok(undefined);
     },
-    [findListing, refresh, repository],
+    [findListing, refresh, repository, savedAlerts],
   );
 
   const toggleSaved = useCallback(
-    async (idOrSlug: string): Promise<boolean> => {
+    async (idOrSlug: string): Promise<Result<boolean, AppError>> => {
       const target = findListing(idOrSlug);
       const listingKey = target?.id ?? idOrSlug;
       if (isSaved(listingKey)) {
-        await removeAlert(listingKey);
-        return false;
+        const removed = await removeAlert(listingKey);
+        return removed.ok ? ok(false) : err(removed.error);
       }
-      await saveAlert(listingKey);
-      return true;
+      const saved = await saveAlert(listingKey);
+      return saved.ok ? ok(true) : err(saved.error);
     },
     [findListing, isSaved, removeAlert, saveAlert],
   );

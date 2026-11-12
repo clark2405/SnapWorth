@@ -45,7 +45,7 @@ import { useAccountGate, useSession } from '../session';
 import { Tip, useTip } from '../tips';
 import { CommentList } from './CommentList';
 import { useCommentThread } from './comment-thread';
-import { useFeed } from './feed-state';
+import { useFeed, voteNotSaved } from './feed-state';
 import { verdictLine } from './verdict';
 
 export interface PostDetailViewProps {
@@ -400,7 +400,9 @@ function PostDiscussion({
               onVote={(choice) =>
                 requireAccount('vote', () => {
                   voteTip.done();
-                  void toggleVote(post.id, choice);
+                  void toggleVote(post.id, choice).then((result) => {
+                    if (!result.ok) toast.show(voteNotSaved);
+                  });
                 })
               }
             />

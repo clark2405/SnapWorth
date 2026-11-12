@@ -20,7 +20,7 @@ import type {
 import type { UtcDateTime } from '../../types/date-time';
 import type { VoteChoice, VoteCounts } from '../../types/entities';
 import type { AppError } from '../../types/errors';
-import { ok, type Result } from '../../types/result';
+import { err, ok, type Result } from '../../types/result';
 import type { PreviewPost } from '../preview/sample-data';
 import { useSession } from '../session';
 import {
@@ -136,6 +136,12 @@ export interface FeedContextValue {
 
 const FeedContext = createContext<FeedContextValue | null>(null);
 
+/** What to tell someone whose vote didn't go through. The tally and their choice are put back. */
+export const voteNotSaved = {
+  title: 'Couldn’t save your vote',
+  body: 'Your vote is as it was. Check your connection and try again.',
+} as const;
+
 export interface FeedProviderProps {
   readonly repository?: FeedRepository;
   readonly children: ReactNode;
@@ -246,26 +252,29 @@ export function FeedProvider({ repository, children }: FeedProviderProps) {
       const target = findPost(postIdOrSlug);
       const currentChoice = voteFor(postIdOrSlug);
       const nextChoice: VoteChoice | null = currentChoice === choice ? null : choice;
+      const previousRecord = userVotes.find(
+        (entry) =>
+          entry.postId === postIdOrSlug ||
+          entry.postSlug === postIdOrSlug ||
+          (target && (entry.postId === target.id || entry.postSlug === target.slug)),
+      );
+      const isTarget = (entry: FeedPost) =>
+        target !== undefined && (entry.id === target.id || entry.slug === target.slug);
+      const isTargetVote = (entry: UserVoteRecord) =>
+        entry.postId === postIdOrSlug ||
+        entry.postSlug === postIdOrSlug ||
+        (target !== undefined && (entry.postId === target.id || entry.postSlug === target.slug));
 
       if (target) {
         const optimisticVotes = adjustTally(target.votes, currentChoice, nextChoice);
         setPosts((current) =>
-          current.map((entry) =>
-            entry.id === target.id || entry.slug === target.slug
-              ? { ...entry, votes: optimisticVotes }
-              : entry,
-          ),
+          current.map((entry) => (isTarget(entry) ? { ...entry, votes: optimisticVotes } : entry)),
         );
       }
 
       const now = new Date().toISOString() as UtcDateTime;
       setUserVotes((current) => {
-        const filtered = current.filter(
-          (entry) =>
-            entry.postId !== postIdOrSlug &&
-            entry.postSlug !== postIdOrSlug &&
-            (!target || (entry.postId !== target.id && entry.postSlug !== target.slug)),
-        );
+        const filtered = current.filter((entry) => !isTargetVote(entry));
         if (nextChoice === null) return filtered;
         return [
           {
@@ -279,18 +288,33 @@ export function FeedProvider({ repository, children }: FeedProviderProps) {
       });
 
       const result = await activeRepo.setVote(target?.slug ?? postIdOrSlug, nextChoice);
-      if (result.ok && target) {
+      if (!result.ok) {
+        // The vote didn't go through: put the tally and the person's choice back as they were.
+        if (target) {
+          setPosts((current) =>
+            current.map((entry) =>
+              isTarget(entry)
+                ? { ...entry, votes: adjustTally(entry.votes, nextChoice, currentChoice) }
+                : entry,
+            ),
+          );
+        }
+        setUserVotes((current) => {
+          const filtered = current.filter((entry) => !isTargetVote(entry));
+          return previousRecord ? [previousRecord, ...filtered] : filtered;
+        });
+        return err(result.error);
+      }
+      if (target) {
         setPosts((current) =>
           current.map((entry) =>
-            entry.id === target.id || entry.slug === target.slug
-              ? { ...entry, votes: result.value.votes }
-              : entry,
+            isTarget(entry) ? { ...entry, votes: result.value.votes } : entry,
           ),
         );
       }
       return ok(nextChoice);
     },
-    [activeRepo, findPost, voteFor],
+    [activeRepo, findPost, userVotes, voteFor],
   );
 
   const publishPost = useCallback(

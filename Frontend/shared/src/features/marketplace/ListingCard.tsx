@@ -17,7 +17,7 @@ import type { VoteChoice } from '../../types';
 import { formatPeso, type PreviewListing } from '../preview/sample-data';
 import { useAccountGate } from '../session';
 import { useTip } from '../tips';
-import { useMarketplace } from './marketplace-state';
+import { savedNotKept, useMarketplace } from './marketplace-state';
 
 export const verdictLabel: Record<VoteChoice, string> = {
   too_high: 'Too High',
@@ -61,8 +61,11 @@ export function ListingCard({ listing, onOpen, onMessageSeller }: ListingCardPro
       onPress: () =>
         requireAccount('save', () => {
           saveTip.done();
-          void toggleSaved(listing.id);
-          toast.show({ title: saved ? 'Removed from saved' : 'Saved' });
+          void toggleSaved(listing.id).then((result) =>
+            toast.show(
+              result.ok ? { title: saved ? 'Removed from saved' : 'Saved' } : savedNotKept,
+            ),
+          );
         }),
     },
     {
@@ -106,7 +109,9 @@ export function ListingCard({ listing, onOpen, onMessageSeller }: ListingCardPro
             onToggle={() =>
               requireAccount('save', () => {
                 saveTip.done();
-                void toggleSaved(listing.id);
+                void toggleSaved(listing.id).then((result) => {
+                  if (!result.ok) toast.show(savedNotKept);
+                });
               })
             }
             likeLabel="Save listing"
