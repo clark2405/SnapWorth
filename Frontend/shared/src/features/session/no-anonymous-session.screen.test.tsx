@@ -119,6 +119,41 @@ describe('SessionProvider and anonymous sessions', () => {
     expect(screen.getByText('status:guest user:none')).toBeOnTheScreen();
   });
 
+  it('is loading until the saved session has been read, then a member (not a guest first)', async () => {
+    let release: (value: unknown) => void = () => undefined;
+    const read = new Promise((resolve) => (release = resolve));
+    const seen: string[] = [];
+    function Watch() {
+      const { status, isLoading, isGuest } = useSession();
+      seen.push(`${status}${isLoading ? ':loading' : ''}${isGuest ? ':guest' : ''}`);
+      return null;
+    }
+    const original = mockClient.auth.getSession;
+    mockClient.auth.getSession = () => read as never;
+    try {
+      shell(<Watch />);
+      expect(seen[0]).toBe('loading:loading:guest');
+      await act(async () => {
+        release({
+          data: { session: { user: { id: 'usr_1', is_anonymous: false, email: 'a@b.c' } } },
+          error: null,
+        });
+        await read;
+      });
+      expect(seen[seen.length - 1]).toBe('member');
+      // Signed in all along: it was never reported as a settled guest.
+      expect(seen.some((entry) => entry === 'guest:guest')).toBe(false);
+    } finally {
+      mockClient.auth.getSession = original;
+    }
+  });
+
+  it('becomes a guest, not stuck loading, when nobody is signed in or the read fails', async () => {
+    shell(<Status />);
+    await act(async () => undefined);
+    expect(screen.getByText('status:guest user:none')).toBeOnTheScreen();
+  });
+
   it('starts a signed-in session as a member on launch', async () => {
     mockState.session = { user: { id: 'usr_1', is_anonymous: false, email: 'a@b.c' } };
     shell(<Status />);

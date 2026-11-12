@@ -10,8 +10,11 @@ import { useSession } from '@snapworth/shared/features/session';
 const devStartRoute = __DEV__ ? process.env.EXPO_PUBLIC_DEV_START_ROUTE : undefined;
 
 export default function RootRoute() {
-  const { isGuest } = useSession();
+  const { isGuest, isLoading } = useSession();
 
   if (devStartRoute) return <Redirect href={devStartRoute as Href} />;
+  // Not yet known whether someone is signed in: the launch screen is still up, so wait rather
+  // than send a signed-in person to the introduction.
+  if (isLoading) return null;
   return <Redirect href={isGuest ? '/onboarding' : '/feed'} />;
 }

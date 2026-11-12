@@ -8,6 +8,7 @@ import TabsLayout from '../app/(tabs)/_layout';
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
 let mockIsGuest = true;
+let mockIsLoading = false;
 let mockReplay: string | undefined;
 let mockCanGoBack = false;
 
@@ -52,7 +53,8 @@ jest.mock('expo-router', () => ({
 
 jest.mock('@snapworth/shared/features/session', () => ({
   useSession: () => ({
-    status: mockIsGuest ? 'guest' : 'member',
+    status: mockIsLoading ? 'loading' : mockIsGuest ? 'guest' : 'member',
+    isLoading: mockIsLoading,
     isGuest: mockIsGuest,
     startSession: jest.fn(),
     endSession: jest.fn(),
@@ -77,6 +79,7 @@ jest.mock('@snapworth/shared/features/onboarding', () => ({
 beforeEach(() => {
   jest.clearAllMocks();
   mockIsGuest = true;
+  mockIsLoading = false;
   mockReplay = undefined;
   mockCanGoBack = false;
   delete process.env.EXPO_PUBLIC_DEV_START_ROUTE;
@@ -90,6 +93,20 @@ it('opens onboarding on every signed-out launch', () => {
 it('opens the feed for an existing in-memory session', () => {
   mockIsGuest = false;
   render(<RootRoute />);
+  expect(screen.getByText('/feed')).toBeTruthy();
+});
+
+it('waits, rather than opening the introduction, until the saved session has been read', () => {
+  // Signed in, but the session isn't read yet: the first frame says "guest" and must not act on it.
+  mockIsGuest = true;
+  mockIsLoading = true;
+  const { rerender } = render(<RootRoute />);
+  expect(screen.queryByText('/onboarding')).toBeNull();
+  expect(screen.queryByText('/feed')).toBeNull();
+
+  mockIsGuest = false;
+  mockIsLoading = false;
+  rerender(<RootRoute />);
   expect(screen.getByText('/feed')).toBeTruthy();
 });
 

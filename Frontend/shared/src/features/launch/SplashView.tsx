@@ -14,6 +14,7 @@ import Animated, {
 
 import { SWText, Wordmark, Worthy } from '../../components';
 import { themedStyles, tokens, useThemedStyles } from '../../design';
+import { useSession } from '../session';
 
 const exitCurve = tokens.motion.bezier.exit;
 const exitEasing = Easing.bezier(
@@ -152,3 +153,15 @@ const stylesFor = themedStyles((colors) => ({
     alignSelf: 'center',
   },
 }));
+
+/**
+ * The launch screen, held until the app knows whether someone is signed in, so the first route
+ * sends a signed-in person to the feed and not, for a moment, to the introduction.
+ */
+export function SessionSplashView({
+  ready = true,
+  ...props
+}: Partial<SplashViewProps> & Pick<SplashViewProps, 'onDone'>) {
+  const { isLoading } = useSession();
+  return <SplashView {...props} ready={ready && !isLoading} />;
+}

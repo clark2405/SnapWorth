@@ -25,7 +25,7 @@ import { companionConfigFor } from '@snapworth/shared/features/companion';
 import { AppServicesProvider, type BackendConfig } from '@snapworth/shared/composition';
 import { useSnapWorthFonts } from '@snapworth/shared/design/font-assets';
 import { ChatBannerHost, MeetupRemindersHost } from '@snapworth/shared/features/chat';
-import { SplashView } from '@snapworth/shared/features/launch';
+import { SessionSplashView } from '@snapworth/shared/features/launch';
 import { wantsNotification, type NotificationKey } from '@snapworth/shared/features/profile';
 import { SessionProvider, useAccountGate } from '@snapworth/shared/features/session';
 import { TipsProvider } from '@snapworth/shared/features/tips';
@@ -123,7 +123,7 @@ function Shell() {
           <SignInHandoff />
         </RevealGate>
         {launched ? null : (
-          <SplashView ready onExit={() => setRevealOpen(true)} onDone={() => setLaunched(true)} />
+          <SessionSplashView onExit={() => setRevealOpen(true)} onDone={() => setLaunched(true)} />
         )}
       </TipsProvider>
     </SessionProvider>
