@@ -1,5 +1,7 @@
 -- Behaviour tests for deleting an account: the delete-account function deletes the Auth user,
--- and every row of theirs must go with it, in every table, with nothing standing in the way.
+-- and every row of theirs must go with it, in every table, with nothing standing in the way. The
+-- one thing that stays is what the OTHER person in a chat has: the conversation and its messages,
+-- with the deleted person's side emptied (see 20261112000100_chats_survive_account_deletion.sql).
 -- Run with Backend/scripts/test-db.sh (local Postgres + auth stub). Each check raises on failure.
 
 \set ON_ERROR_STOP on
@@ -49,10 +51,29 @@ select account_tests.check(
   'the audit sees every table that refers to a person'
 );
 select account_tests.check(
-  not exists (select 1 from account_tests.person_keys where confdeltype <> 'c'),
-  'every reference to a person is deleted with them: '
+  not exists (
+    select 1 from account_tests.person_keys
+     where confdeltype <> 'c'
+       and (tbl::text, col) not in (values
+         ('conversations', 'buyer_id'), ('conversations', 'seller_id'), ('messages', 'sender_id'))
+  ),
+  'every reference to a person is deleted with them, except the ones that keep the other person''s chat: '
     || coalesce((select string_agg(format('%s.%s', tbl, col), ', ')
-                   from account_tests.person_keys where confdeltype <> 'c'), 'none left behind')
+                   from account_tests.person_keys
+                  where confdeltype <> 'c'
+                    and (tbl::text, col) not in (values
+                      ('conversations', 'buyer_id'), ('conversations', 'seller_id'),
+                      ('messages', 'sender_id'))), 'none left behind')
+);
+-- Those three are the whole exception, and each only empties the deleted person's side.
+select account_tests.check(
+  (select count(*) from account_tests.person_keys where confdeltype = 'n') = 3
+  and (select count(*) from account_tests.person_keys
+        where confdeltype = 'n'
+          and (tbl::text, col) in (values
+            ('conversations', 'buyer_id'), ('conversations', 'seller_id'),
+            ('messages', 'sender_id'))) = 3,
+  'a chat survives its other person leaving through exactly three set-null references'
 );
 -- Whatever the cascade deletes (their listings, posts, conversations…) mustn't be held in place
 -- by something else pointing at it.
@@ -161,14 +182,34 @@ select account_tests.check(
                   or id = '00000000-0000-4000-d200-000000000001'),
   'her post goes with its discussion, and her comments with the replies under them'
 );
+-- Ben's chats survive, with Ana's side emptied. Her listing went with her, so the chat about it
+-- has no listing; the chat about Ben's radio still has its listing.
 select account_tests.check(
-  not exists (select 1 from public.conversations
-               where id in ('00000000-0000-4000-d400-000000000001',
-                            '00000000-0000-4000-d400-000000000002'))
-  and not exists (select 1 from public.messages
-                   where conversation_id in ('00000000-0000-4000-d400-000000000001',
-                                             '00000000-0000-4000-d400-000000000002')),
-  'her conversations go, with every message in them'
+  (select count(*) from public.conversations
+    where id in ('00000000-0000-4000-d400-000000000001', '00000000-0000-4000-d400-000000000002')) = 2
+  and (select count(*) from public.messages
+        where conversation_id in ('00000000-0000-4000-d400-000000000001',
+                                  '00000000-0000-4000-d400-000000000002')) = 3,
+  'her conversations stay for Ben, with every message in them'
+);
+select account_tests.check(
+  (select buyer_id is null and seller_id = '00000000-0000-4000-d000-00000000000b'
+          and listing_id = '00000000-0000-4000-d300-00000000000b'
+     from public.conversations where id = '00000000-0000-4000-d400-000000000001')
+  and (select seller_id is null and buyer_id = '00000000-0000-4000-d000-00000000000b'
+              and listing_id is null
+         from public.conversations where id = '00000000-0000-4000-d400-000000000002'),
+  'Ana is gone from each chat (and the chat about her deleted lamp has no listing); Ben is still in both'
+);
+select account_tests.check(
+  (select sender_id is null from public.messages where body = 'Is the radio working?')
+  and (select sender_id = '00000000-0000-4000-d000-00000000000b'
+         from public.messages where body = 'Yes, new batteries.')
+  and (select count(*) from public.conversation_members
+        where conversation_id in ('00000000-0000-4000-d400-000000000001',
+                                  '00000000-0000-4000-d400-000000000002')
+          and user_id <> '00000000-0000-4000-d000-00000000000b') = 0,
+  'her messages stay but are nobody''s now, and she is no longer a member of either chat'
 );
 select account_tests.check(
   (select count(*) from public.profiles where id = '00000000-0000-4000-d000-00000000000b') = 1
@@ -189,6 +230,12 @@ select account_tests.check(
   'reports, blocks and suki discounts involving her go too'
 );
 select account_tests.check(
+  (select count(*) from public.conversation_reports
+    where conversation_id = '00000000-0000-4000-d400-000000000001'
+      and reporter_id = '00000000-0000-4000-d000-00000000000b') = 1,
+  'Ben''s report on the chat stays: it was his'
+);
+select account_tests.check(
   (select count(*) from public.profiles where handle in ('retro_curator', 'mariacruz')) = 2,
   'nobody else is touched'
 );
@@ -200,6 +247,20 @@ select account_tests.check(
   (select handle from public.profiles where id = '00000000-0000-4000-d000-00000000000c')
     = 'ana_deletes',
   'a deleted account''s handle can be taken again'
+);
+
+
+-- 4. When Ben deletes his account too, the chats nobody is left in go, and nothing refers to him.
+delete from auth.users where id = '00000000-0000-4000-d000-00000000000b';
+select account_tests.check(
+  not exists (select 1 from public.conversations
+               where id in ('00000000-0000-4000-d400-000000000001',
+                            '00000000-0000-4000-d400-000000000002'))
+  and not exists (select 1 from public.messages
+                   where conversation_id in ('00000000-0000-4000-d400-000000000001',
+                                             '00000000-0000-4000-d400-000000000002'))
+  and account_tests.rows_pointing_at('00000000-0000-4000-d000-00000000000b') = 0,
+  'a chat nobody is left in is deleted with the last person''s account'
 );
 
 \echo 'All account deletion tests passed.'

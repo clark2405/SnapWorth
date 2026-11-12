@@ -336,4 +336,24 @@ select upgrade_tests.check(
 );
 reset role;
 
+-- 3. Chats survive an account deletion (20261112000100): the old chats are untouched, and the
+--    references that used to cascade now empty the deleted person's side instead.
+select upgrade_tests.check(
+  (select count(*) = 3 from public.conversations
+    where id in ('00000000-0000-4000-c000-000000000001', '00000000-0000-4000-c000-000000000002',
+                 '00000000-0000-4000-c000-000000000003')
+      and buyer_id is not null and seller_id is not null and listing_id is not null),
+  'every chat the old app made is still there, with both people and its listing'
+);
+select upgrade_tests.check(
+  (select count(*) = 4
+     from pg_constraint c
+     join pg_attribute a on a.attrelid = c.conrelid and a.attnum = c.conkey[1]
+    where c.contype = 'f' and c.confdeltype = 'n'
+      and (c.conrelid::regclass::text, a.attname) in (
+        ('conversations', 'listing_id'), ('conversations', 'buyer_id'),
+        ('conversations', 'seller_id'), ('messages', 'sender_id'))),
+  'a chat''s listing, people and message senders are set to null, not deleted, when they go'
+);
+
 \echo 'All upgrade checks passed.'

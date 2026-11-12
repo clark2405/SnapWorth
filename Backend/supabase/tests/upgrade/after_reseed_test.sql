@@ -54,7 +54,8 @@ select upgrade_tests.check(
 );
 
 -- 3. Deleting an account removes what it touched, old and new, without a foreign key getting in
---    the way: Tomas's chats, comments, hanap, reports, votes and block go with him.
+--    the way: Tomas's comments, hanap, reports, votes and block go with him. His chat with Retro
+--    Curator stays for Retro Curator (20261112000100), with Tomas's side emptied and closed.
 delete from auth.users where id = '00000000-0000-4000-b000-000000000002';
 select upgrade_tests.check(
   not exists (select 1 from public.profiles where id = '00000000-0000-4000-b000-000000000002')
@@ -66,5 +67,23 @@ select upgrade_tests.check(
   and (select too_high_count from public.feed_posts where id = '00000000-0000-4000-9000-000000000002') >= 0,
   'an account that has chats, votes, comments, Hanap and a block can be deleted'
 );
+select upgrade_tests.check(
+  (select buyer_id is null and seller_id = '00000000-0000-4000-8000-000000000001'
+     from public.conversations where id = '00000000-0000-4000-c000-000000000003')
+  and (select count(*) = 1 and bool_and(sender_id is null)
+         from public.messages where conversation_id = '00000000-0000-4000-c000-000000000003'
+          and body = 'Can you do 2,000?')
+  and (select count(*) from public.conversation_members
+        where conversation_id = '00000000-0000-4000-c000-000000000003') = 1,
+  'the chat Tomas was in stays for Retro Curator, with Tomas''s messages from nobody'
+);
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000001', false);
+select upgrade_tests.check(
+  (select other_id is null and closed = 'deleted'
+     from public.conversation_list('00000000-0000-4000-c000-000000000003')),
+  'and Retro Curator sees it as closed, with a deleted account on the other side'
+);
+reset role;
 
 \echo 'All upgrade re-seed checks passed.'

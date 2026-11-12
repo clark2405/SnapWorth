@@ -102,7 +102,7 @@ export function ConversationListView({
                 body={
                   view === 'open'
                     ? 'Message a seller from any listing to start one.'
-                    : 'Chats about sold or archived items move here.'
+                    : 'Chats about sold or archived items, or with a deleted account, move here.'
                 }
               />
             ) : (
@@ -126,7 +126,7 @@ export function ConversationListView({
   );
 }
 
-function ConversationRow({
+export function ConversationRow({
   conversation,
   selected = false,
   onPress,
@@ -139,7 +139,7 @@ function ConversationRow({
   const unread = conversation.unread > 0;
   const preview = `${conversation.latest?.fromMe ? 'You: ' : ''}${describeLatest(conversation.latest)}`;
   const sentAt = formatListTime(conversation.latestActivityAt);
-  const handle = conversation.other.handle;
+  const handle = conversation.otherGone ? 'Deleted account' : `@${conversation.other.handle}`;
   const title = conversation.listing.title;
   const photo = chatListingPhoto(conversation.listing, useBackendMode());
 
@@ -168,7 +168,7 @@ function ConversationRow({
       <View style={styles.text}>
         <View style={styles.topLine}>
           <SWText variant="headingSmall" numberOfLines={1} style={styles.handle}>
-            @{handle}
+            {handle}
           </SWText>
           <SWText variant="caption" tone={unread ? 'textPrimary' : 'textMuted'}>
             {sentAt}
@@ -179,7 +179,16 @@ function ConversationRow({
             {title}
           </SWText>
           {conversation.closed ? (
-            <Tag label={conversation.closed === 'sold' ? 'Sold' : 'Archived'} tone="grave" />
+            <Tag
+              label={
+                conversation.closed === 'sold'
+                  ? 'Sold'
+                  : conversation.closed === 'deleted'
+                    ? 'Closed'
+                    : 'Archived'
+              }
+              tone="grave"
+            />
           ) : null}
         </View>
         <View style={styles.bottomLine}>

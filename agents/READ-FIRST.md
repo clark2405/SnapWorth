@@ -35,6 +35,10 @@ Last updated 2026-11-12.
   password: Google and Apple accounts have none), then the `delete-account` Edge Function removes
   the person's files in the `avatars` and `scan-photos` buckets and their Auth user, which every
   table cascades from (`account_deletion_test.sql` checks each one). This device's copies go too.
+  The one exception is the other person's side of a chat: their conversation and its messages stay,
+  shown as from a "Deleted account" and closed (a chat about a deleted listing stays too, archived);
+  a chat nobody is left in goes with the last person's account. Needs the
+  `chats_survive_account_deletion` migration deployed.
 - **One sign-in:** chats, comments, Hanap and suki use the same Supabase client as sign-in, so what
   someone does belongs to the account they signed in with (PR #20).
 - **Your own profile:** name, handle, photo, location and bio come from the account, and the listed,
@@ -161,6 +165,10 @@ Last updated 2026-11-12.
   project had a hand-made `scan_history` (PR #24's first draft, empty, with leaky rules); the
   scan_history migration replaced it. Never use `db push --include-seed` on the live project.
   `Backend/scripts/test-db.sh --upgrade` rehearses future deploys on rows like the live project's.
+- **Written after that deploy, not on live yet:** `20261112000000_profile_details_backfill` (copies
+  names, bios and places from account metadata into `public.profiles`, and new accounts start with
+  them) and `20261112000100_chats_survive_account_deletion`. Both are upgrade-rehearsed; deploy them
+  with the app changes that write and read these (Edit profile, the chat list's "Deleted account").
 - **Not on live:** the demo seed's newer details (categories, descriptions, AI estimates of the
   demo listings). The old demo listings show without them unless `seed/01` and `seed/02` are run
   in the SQL editor. Nobody is an admin until someone runs the one-liner under "Making someone an

@@ -37,13 +37,15 @@ interface MessageRow {
 
 interface ConversationRow {
   readonly id: string;
-  readonly listing_slug: string;
+  /** Null, with no photo or price, when the listing is gone (deleted by its seller). */
+  readonly listing_slug: string | null;
   readonly listing_title: string;
   readonly listing_photo_url: string | null;
-  readonly asking_php: number;
-  readonly closed: 'sold' | 'archived' | null;
-  readonly other_id: string;
-  readonly other_handle: string;
+  readonly asking_php: number | null;
+  readonly closed: 'sold' | 'archived' | 'deleted' | null;
+  /** Null when the other person deleted their account. */
+  readonly other_id: string | null;
+  readonly other_handle: string | null;
   readonly other_avatar_url: string | null;
   readonly i_am_seller: boolean;
   readonly last_kind: MessageRow['kind'] | null;
@@ -106,19 +108,21 @@ function messageFromRow(row: MessageRow, viewer: string): Message {
 }
 
 function summaryFromRow(row: ConversationRow): ConversationSummary {
+  const otherGone = row.other_id === null;
   return {
     id: row.id as ConversationId,
     listing: {
-      key: row.listing_slug,
+      key: row.listing_slug ?? '',
       title: row.listing_title,
-      askingPricePhp: row.asking_php,
+      askingPricePhp: row.asking_php ?? 0,
       photoUrl: row.listing_photo_url ?? undefined,
     },
     other: {
-      userId: row.other_id as UserId,
-      handle: row.other_handle,
+      userId: (row.other_id ?? '') as UserId,
+      handle: row.other_handle ?? 'Deleted account',
       avatarUrl: row.other_avatar_url ?? undefined,
     },
+    otherGone,
     iAmSeller: row.i_am_seller,
     latest:
       row.last_kind === null
@@ -156,7 +160,9 @@ export function createSupabaseChatRepository(
    * placeholder.
    */
   async function withListingPhotos(rows: ConversationRow[]): Promise<ConversationRow[]> {
-    const slugs = [...new Set(rows.map((row) => row.listing_slug))];
+    const slugs = [
+      ...new Set(rows.flatMap((row) => (row.listing_slug === null ? [] : [row.listing_slug]))),
+    ];
     if (slugs.length === 0) return rows;
     const { data } = await client.from('listings').select('slug, photo_path').in('slug', slugs);
     const pathBySlug = new Map(
@@ -167,7 +173,7 @@ export function createSupabaseChatRepository(
     if (pathBySlug.size === 0) return rows;
     const links = await photos.links([...new Set(pathBySlug.values())]);
     return rows.map((row) => {
-      const path = pathBySlug.get(row.listing_slug);
+      const path = row.listing_slug === null ? undefined : pathBySlug.get(row.listing_slug);
       const link = path ? links[path] : undefined;
       return link ? { ...row, listing_photo_url: link } : row;
     });

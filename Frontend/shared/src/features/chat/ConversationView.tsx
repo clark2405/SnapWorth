@@ -88,9 +88,14 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
   const backend = useBackendMode();
   const { conversation, messages, typing } = chat;
   const handle = conversation?.other.handle ?? 'seller';
+  // The other person deleted their account: the history stays, shown as theirs-no-longer.
+  const gone = conversation?.otherGone ?? false;
+  const name = gone ? 'Deleted account' : `@${handle}`;
   const askingPrice = conversation?.listing.askingPricePhp ?? 0;
   const iAmSeller = conversation?.iAmSeller ?? false;
-  const suki = useSuki(conversation ? { otherUserId: conversation.other.userId, iAmSeller } : null);
+  const suki = useSuki(
+    conversation && !gone ? { otherUserId: conversation.other.userId, iAmSeller } : null,
+  );
   const [draft, setDraft] = useState('');
   const [sheet, setSheet] = useState<OpenSheet>(null);
   const [counterTo, setCounterTo] = useState<number | undefined>(undefined);
@@ -228,7 +233,9 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
       <SWText variant="bodySmall" tone="textSecondary" style={styles.noticeText}>
         {closed === 'sold'
           ? 'This item has sold. The conversation is closed.'
-          : 'This conversation is archived.'}
+          : closed === 'deleted'
+            ? 'This account was deleted. The conversation is closed.'
+            : 'This conversation is archived.'}
       </SWText>
     </View>
   ) : blocked ? (
@@ -301,15 +308,17 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
       scroll={false}
       header={
         <NavHeader
-          title={`@${handle}`}
+          title={name}
           onBack={onBack}
           banded
           trailing={
-            <IconButton
-              icon={Ellipsis}
-              label="Report or block"
-              onPress={() => setSheet('safety')}
-            />
+            gone ? undefined : (
+              <IconButton
+                icon={Ellipsis}
+                label="Report or block"
+                onPress={() => setSheet('safety')}
+              />
+            )
           }
         />
       }
@@ -326,7 +335,7 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
         <Reveal index={0}>
           <PressableScale
             accessibilityLabel={`View item, ${listing.title}, asking ${formatPeso(askingPrice)}`}
-            onPress={() => onViewItem?.(listing.key)}
+            onPress={() => (listing.key ? onViewItem?.(listing.key) : undefined)}
             haptic="select"
             depth="surface"
           >
