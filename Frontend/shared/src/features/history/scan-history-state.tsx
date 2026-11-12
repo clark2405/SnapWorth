@@ -35,7 +35,8 @@ export interface ScanHistory {
   readonly scans: readonly SavedScan[];
   /** Saves a successful estimate to History. */
   readonly save: (scan: NewScan) => Promise<SaveOutcome>;
-  readonly remove: (scanId: string) => Promise<void>;
+  /** Resolves false, with the scan back where it was, when it couldn't be deleted. */
+  readonly remove: (scanId: string) => Promise<boolean>;
   /** Notes what was paid for a scan, or forgets it with `null`. */
   readonly setPaid: (scanId: string, amount: number | null) => Promise<void>;
   /** Loads again, as pull-to-refresh does. */
@@ -44,12 +45,18 @@ export interface ScanHistory {
 
 const ScanHistoryContext = createContext<ScanHistory | null>(null);
 
+/** What to tell someone whose scan couldn't be deleted. It is back in History as it was. */
+export const scanNotRemoved = {
+  title: 'Couldn’t remove that',
+  body: 'It’s still in your History. Check your connection and try again.',
+} as const;
+
 /** Outside a provider (a screen rendered on its own, as in tests) there are no scans. */
 const none: ScanHistory = {
   status: 'ready',
   scans: [],
   save: () => Promise.resolve('failed'),
-  remove: () => Promise.resolve(),
+  remove: () => Promise.resolve(true),
   setPaid: () => Promise.resolve(),
   reload: () => Promise.resolve(),
 };
@@ -138,11 +145,23 @@ export function ScanHistoryProvider({
   );
 
   const remove = useCallback(
-    async (scanId: string) => {
+    async (scanId: string): Promise<boolean> => {
+      const was = scans.findIndex((item) => item.id === scanId);
+      const gone = scans[was];
       setScans((current) => current.filter((item) => item.id !== scanId));
-      if (place) await deleteScan(scanId, place);
+      if (!place) return true;
+      const deleted = await deleteScan(scanId, place);
+      if (!deleted && gone) {
+        // The scan is still there (here and online): put it back where it was.
+        setScans((current) =>
+          current.some((item) => item.id === scanId)
+            ? current
+            : [...current.slice(0, was), gone, ...current.slice(was)],
+        );
+      }
+      return deleted;
     },
-    [place],
+    [place, scans],
   );
 
   const setPaid = useCallback(

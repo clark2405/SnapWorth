@@ -65,6 +65,7 @@ function fakeSupabase(rows: (typeof remoteRow)[] = []) {
   });
   const ownerFilter = jest.fn();
   const deleteEq = jest.fn(async (_column: string, id: string) => {
+    if (state.offline) return { error: { message: 'offline' } };
     state.rows = state.rows.filter((row) => row.id !== id);
     return { error: null };
   });
@@ -285,6 +286,21 @@ describe('scan-history', () => {
 
     expect(await deleteScan(sampleScan.id, place)).toBe(true);
     expect(photos.remove).toHaveBeenCalledWith(`user-123/${sampleScan.id}.jpg`);
+  });
+
+  it('keeps the scan, here and in Supabase, and its photo, when Supabase can’t delete it', async () => {
+    const supabase = fakeSupabase();
+    const { photos } = fakePhotos();
+    const place = { store, client: supabase.client, owner: 'user-123', photos };
+    await saveScan(sampleScan, place);
+
+    supabase.state.offline = true;
+    expect(await deleteScan(sampleScan.id, place)).toBe(false);
+    expect(photos.remove).not.toHaveBeenCalled();
+
+    supabase.state.offline = false;
+    expect((await loadScans(place)).map((scan) => scan.id)).toEqual([sampleScan.id]);
+    expect(supabase.state.rows.map((row) => row.id)).toEqual([sampleScan.id]);
   });
 
   describe('what was paid', () => {

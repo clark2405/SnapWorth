@@ -53,7 +53,7 @@ import { CollectionsStrip } from './CollectionsStrip';
 import { flipOf, flipTotals, gainLabel, type FlipTotals } from './flips';
 import { usePaidPrices } from './paid-prices';
 import { scanToPreviewItem } from './scan-history';
-import { useScanHistory } from './scan-history-state';
+import { scanNotRemoved, useScanHistory } from './scan-history-state';
 import { ShareTagSheet, type ShareableItem } from './ShareTagSheet';
 
 export interface HistoryViewProps {
@@ -141,10 +141,21 @@ export function HistoryView({
   );
 
   const deleteItem = (item: PreviewHistoryItem) => {
-    if (showingSamples) setSamples((current) => current.filter((entry) => entry.id !== item.id));
-    else void remove(item.id);
-    onDeleteItem?.(item.id);
-    toast.show({ title: 'Removed from history', body: item.title });
+    if (showingSamples) {
+      setSamples((current) => current.filter((entry) => entry.id !== item.id));
+      onDeleteItem?.(item.id);
+      toast.show({ title: 'Removed from history', body: item.title });
+      return;
+    }
+    // The scan leaves at once; if it couldn't be deleted it comes back, and this says so.
+    void remove(item.id).then((removed) => {
+      if (!removed) {
+        toast.show(scanNotRemoved);
+        return;
+      }
+      onDeleteItem?.(item.id);
+      toast.show({ title: 'Removed from history', body: item.title });
+    });
   };
 
   const [sharing, setSharing] = useState<ShareableItem | null>(null);

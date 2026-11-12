@@ -387,24 +387,27 @@ async function withPhotoLinks(place: ScanPlace, scans: SavedScan[]): Promise<Sav
 }
 
 /**
- * Deletes a scan from the phone and from Supabase, and its photo from Storage. Resolves false if
- * Supabase kept the scan.
+ * Deletes a scan from Supabase and from the phone, and its photo from Storage. Resolves false,
+ * having changed nothing, if Supabase kept the scan (offline, or refused): the phone's copy stays
+ * too, so the scan isn't lost from view while it still exists, and its photo stays with it. A scan
+ * that was only ever on the phone (saved offline, not yet sent) deletes locally.
  */
 export async function deleteScan(scanId: string, place: ScanPlace): Promise<boolean> {
+  if (place.client) {
+    try {
+      const { error } = await place.client.from('scan_history').delete().eq('id', scanId);
+      if (error) return false;
+    } catch {
+      return false;
+    }
+  }
   const existing = await readLocal(place);
   await writeLocal(
     place,
     existing.filter((item) => item.id !== scanId),
   );
-  if (!place.client) return true;
-  try {
-    const { error } = await place.client.from('scan_history').delete().eq('id', scanId);
-    if (error) return false;
-  } catch {
-    return false;
-  }
   // The scan is gone, so its photo goes too. If that fails it's left unseen in the owner's
   // private folder.
-  await photosOf(place)?.remove(scanPhotoPath(place.owner, scanId));
+  if (place.client) await photosOf(place)?.remove(scanPhotoPath(place.owner, scanId));
   return true;
 }

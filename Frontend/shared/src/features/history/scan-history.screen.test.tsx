@@ -109,3 +109,33 @@ it('shows the sample items as a preview before the first scan', async () => {
   expect(await screen.findByText(previewHistory[0]!.title)).toBeOnTheScreen();
   expect(screen.getByText('+8.4% this month')).toBeOnTheScreen();
 });
+
+it('puts a scan back, and says so, when it couldn’t be deleted', async () => {
+  const store = memoryStore();
+  // Supabase can't be reached for a delete: the stand-in has no delete at all.
+  const { client } = fakeAuth('ana');
+  await saveScan(scan('a1', 'Ana’s camera'), { store, client: null, owner: 'ana' });
+  await saveScan(scan('a2', 'Ana’s lamp'), { store, client: null, owner: 'ana' });
+
+  const wrapper = ({ children }: { readonly children: ReactNode }) => (
+    <ScanHistoryProvider client={client} store={store}>
+      {children}
+    </ScanHistoryProvider>
+  );
+  const { result } = renderHook(() => useScanHistory(), { wrapper });
+  await waitFor(() => expect(result.current.scans).toHaveLength(2));
+  const before = result.current.scans.map((item) => item.id);
+
+  let removed: boolean | undefined;
+  await act(async () => {
+    removed = await result.current.remove(before[0]!);
+  });
+
+  expect(removed).toBe(false);
+  expect(result.current.scans.map((item) => item.id)).toEqual(before);
+  // And it is still on the phone: a reload brings it back too.
+  await act(async () => {
+    await result.current.reload();
+  });
+  expect(result.current.scans.map((item) => item.id)).toEqual(before);
+});
