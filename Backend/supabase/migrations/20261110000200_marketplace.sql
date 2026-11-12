@@ -62,7 +62,9 @@ alter table public.listings
   -- if the votes go. Never client-writable: it is in no column grant.
   add column verdict text check (verdict in ('too_high', 'just_right', 'too_low')),
   add column verdict_share integer check (verdict_share between 0 and 100),
-  add column moderation_status public.moderation_status not null default 'pending',
+  -- 'approved' only for the rows that already exist, which were public under the old rule; the
+  -- default is switched to 'pending' right after, so every new listing starts unscreened.
+  add column moderation_status public.moderation_status not null default 'approved',
   add column moderation_ref text,
   add column moderated_at timestamptz,
   add column views_count integer not null default 0 check (views_count >= 0),
@@ -73,6 +75,19 @@ alter table public.listings
       photo_path is null
       or (scan_id is not null and photo_path = seller_id::text || '/' || scan_id::text || '.jpg')
     );
+
+-- Backfill for a database that already has listings (the live project's seeded ones). Until now
+-- every listing that wasn't removed was public and could be messaged, so they carry on as
+-- approved: leaving them `pending` would hide them from the Market and from anyone not yet in a
+-- chat, and make `start_conversation` refuse them, for the app people are already using. Removed
+-- ones stay removed. A fresh database has no rows here and nothing changes.
+update public.listings
+   set moderation_status = case when status = 'removed' then 'removed'::public.moderation_status
+                                else 'approved'::public.moderation_status end,
+       moderation_ref = 'before-moderation',
+       moderated_at = now();
+
+alter table public.listings alter column moderation_status set default 'pending';
 
 create index listings_status_created_idx on public.listings (status, created_at desc);
 create index listings_scan_idx on public.listings (scan_id) where scan_id is not null;
@@ -104,8 +119,10 @@ begin
   -- New words go back to be screened, unless an admin is holding the listing: an admin's hold
   -- (see admin_review) is lifted by an admin, not by the seller changing a word. `moderated_at`
   -- is when the listing went back in line, so a long-lived listing that was just edited isn't
-  -- taken for one whose screening got stuck.
+  -- taken for one whose screening got stuck. Only a seller's edit does this: the database owner or
+  -- the service role (a seed, a fix made by hand) sets the state it means to.
   if tg_op = 'UPDATE'
+     and current_user in ('anon', 'authenticated')
      and (new.title is distinct from old.title or new.description is distinct from old.description)
      and new.moderation_status is not distinct from old.moderation_status
      and not (old.moderation_status = 'held' and old.moderation_ref like 'admin:%') then

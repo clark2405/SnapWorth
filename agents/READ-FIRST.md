@@ -155,10 +155,15 @@ Last updated 2026-11-11.
   `marketplace-seed.ts`, `feed-seed.ts`) is for a build with no Supabase project, where the app
   runs alone on the device. The web's Snap page, which only ever opened a sample estimate, says
   Snap works in the phone app when a project is configured.
-- **Needs deploying:** `npx supabase db push` for the `scan_history`, `photo_storage`,
-  `flips_and_collections`, `marketplace` and `feed_and_votes` migrations, and
-  `npx supabase functions deploy moderate-content` (it now screens listings too). None of this is
-  deployed yet. Until a moderation provider is set (see below), every new listing is held.
+- **Needs deploying:** none of this is on Supabase yet. In order: `npx supabase db push` (the
+  `scan_history`, `photo_storage`, `flips_and_collections`, `marketplace`, `feed_and_votes`,
+  `admin_role` and `admin_review` migrations, in that order, which `db push` does by itself), then
+  `npx supabase functions deploy moderate-content` and `delete-account`, then the
+  `MODERATION_PROVIDER` secret. Never use `db push --include-seed` on the live project. The
+  marketplace migration marks the listings that exist as `approved` (they were public already), so
+  the app people use now keeps working; `Backend/scripts/test-db.sh --upgrade` rehearses this on
+  rows like the live project's. Until a moderation provider is set (see below), every new listing
+  is held.
 
 ### Kept on the device only
 

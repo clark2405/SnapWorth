@@ -149,11 +149,14 @@ node --test supabase/functions/delete-account/account_test.mjs   # the handler's
 
 ```sh
 Backend/scripts/test-db.sh         # migrations, RLS, seed: a throwaway local Postgres, no Docker
+Backend/scripts/test-db.sh --upgrade  # the same migrations on top of rows like the live project's
 Backend/scripts/test-functions.sh  # Edge Function typecheck and unit tests (needs Deno)
 Backend/scripts/chat-sim/run.sh    # two phones chatting, and a third trying to get in (needs Frontend's npm deps)
 ```
 
 `test-db.sh` needs Postgres 15+ server binaries (`initdb`, `pg_ctl`, `psql`). It applies a small stand-in for Supabase's `auth` schema and roles (`supabase/tests/support/supabase_stub.sql`), then the migrations, the seed, and every `*_test.sql`, acting as anonymous visitors, different signed-in users, and the server.
+
+`test-db.sh --upgrade` rehearses a deploy. It applies the migrations the live project already has (`live_through` in the script: move it forward after each deploy), loads rows like the live project's (`supabase/tests/upgrade/01_live_data.sql`: the demo seed, plus real accounts with chats, offers, a meetup, comments, reports, Hanap and a suki), applies the newer migrations over them, and checks that the rows survived, that the backfills keep old listings public, and that what the current app does still works (`after_migrations_test.sql`). It then runs the seeds again over the result and checks that nothing real was overwritten (`after_reseed_test.sql`). Add a row to `01_live_data.sql` and a check whenever a migration changes how old data behaves.
 
 ### Chat on two devices
 
