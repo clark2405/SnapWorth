@@ -238,3 +238,8 @@ The detailed task plan lives in `agents/specs/snapworth-web/`, which git keeps l
 ## AI assistance disclosure
 
 In line with the project's academic integrity requirements, AI coding assistants were used during development: GPT 5.6 Sol (via Kiro) and Claude (via Claude Code). Commits they contributed to include a `Co-Authored-By` trailer.
+
+## License
+
+Copyright (c) 2026 the SnapWorth team. All rights reserved. The code is public to view, but not
+to use, copy or redistribute without the team's written permission. See [LICENSE](LICENSE).
