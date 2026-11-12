@@ -28,8 +28,8 @@ import { generalPhotoTips } from './photo-coach';
 
 export interface CaptureViewProps {
   /**
-   * The live camera preview. Camera access is not wired yet (capture task 5), so by default
-   * the viewfinder shows a simulated live scene.
+   * The live camera preview. Without one (the web, which can't take a photo yet) the viewfinder
+   * shows a simulated scene from the sample item, for a build with no Supabase project only.
    */
   readonly viewfinder?: ReactNode;
   readonly flashOn?: boolean;
@@ -242,14 +242,23 @@ export function CaptureView({
               onPress={onOpenGallery}
               style={styles.galleryButton}
             >
-              <Image
-                source={previewItem.photo}
-                style={styles.galleryThumb}
-                accessibilityIgnoresInvertColors
-              />
-              <View style={styles.galleryBadge}>
-                <Images size={12} strokeWidth={2.4} color={tokens.overlay.text} />
-              </View>
+              {viewfinder ? (
+                // The real camera has no photo to preview here: the button is just the gallery.
+                <View style={styles.galleryIcon}>
+                  <Images size={20} strokeWidth={2.2} color={tokens.overlay.text} />
+                </View>
+              ) : (
+                <>
+                  <Image
+                    source={previewItem.photo}
+                    style={styles.galleryThumb}
+                    accessibilityIgnoresInvertColors
+                  />
+                  <View style={styles.galleryBadge}>
+                    <Images size={12} strokeWidth={2.4} color={tokens.overlay.text} />
+                  </View>
+                </>
+              )}
             </PressableScale>
           ) : (
             <View style={styles.galleryButton} />
@@ -496,6 +505,13 @@ const styles = StyleSheet.create({
   galleryThumb: {
     width: '100%',
     height: '100%',
+  },
+  galleryIcon: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: tokens.overlay.chrome,
   },
   galleryBadge: {
     position: 'absolute',

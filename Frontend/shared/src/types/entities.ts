@@ -354,8 +354,16 @@ export interface ConversationSummary {
   readonly latestActivityAt: UtcDateTime;
   /** Messages from the other person the viewer hasn't read. */
   readonly unread: number;
-  /** Set once the conversation is over: it lists under Past and can't be replied to. */
-  readonly closed?: 'sold' | 'archived';
+  /**
+   * Set once the conversation is over: it lists under Past and can't be replied to. `sold` and
+   * `archived` are about its listing; `deleted` is that the other person deleted their account.
+   */
+  readonly closed?: 'sold' | 'archived' | 'deleted';
+  /**
+   * The other person deleted their account: `other` is then a placeholder with no id, and the
+   * screens say "Deleted account". The conversation and its messages stay for the viewer.
+   */
+  readonly otherGone?: boolean;
   readonly blockedByMe: boolean;
 }
 

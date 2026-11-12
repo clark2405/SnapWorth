@@ -1,3 +1,4 @@
+import { useIsFocused } from 'expo-router';
 import {
   createContext,
   useCallback,
@@ -38,6 +39,8 @@ interface ChatContextValue {
   /** Starts loading the list the first time something shows it. */
   readonly want: () => void;
   readonly refresh: () => Promise<void>;
+  /** The conversations a person is looking at right now, and how many views each has. */
+  readonly viewing: { readonly current: Map<string, number> };
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -65,6 +68,7 @@ export function ChatServiceProvider({
   const again = useRef(false);
   /** Moves on whenever the account changes, so a list loaded for the old one is thrown away. */
   const account = useRef(0);
+  const viewing = useRef(new Map<string, number>());
 
   // One load at a time; a change while one is running asks for one more after it.
   const refresh = useCallback((): Promise<void> => {
@@ -109,7 +113,10 @@ export function ChatServiceProvider({
   }, [refresh, service, wanted]);
 
   const want = useCallback(() => setWanted(true), []);
-  const value = useMemo(() => ({ service, list, want, refresh }), [list, refresh, service, want]);
+  const value = useMemo(
+    () => ({ service, list, want, refresh, viewing }),
+    [list, refresh, service, want],
+  );
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 }
 
@@ -117,6 +124,28 @@ function useChatContext(): ChatContextValue {
   const context = useContext(ChatContext);
   if (!context) throw new Error('Chat hooks need a ChatServiceProvider above them.');
   return context;
+}
+
+/** What the banners need: the service's live changes, and which chat is on screen. */
+export function useChatLive() {
+  const { service, list, want, refresh, viewing } = useChatContext();
+  return {
+    service,
+    status: list.status,
+    conversations: list.conversations,
+    want,
+    refresh,
+    viewing,
+  };
+}
+
+/** Screens outside a navigator (tests, web previews) are always focused. */
+function useIsFocusedSafe(): boolean {
+  try {
+    return useIsFocused();
+  } catch {
+    return true;
+  }
 }
 
 export interface ConversationListState {
@@ -160,7 +189,7 @@ export function useMessageSeller(): (listingKey: string) => Promise<Conversation
         void refresh();
         return result.value;
       }
-      toast.show(chatErrorCopy(result.error));
+      toast.show({ ...chatErrorCopy(result.error), tone: 'error' });
       return null;
     },
     [refresh, service, toast],
@@ -182,13 +211,13 @@ export function useOfferToSeller(): (
     async (listingKey, amountPhp) => {
       const started = await service.start(listingKey);
       if (!started.ok) {
-        toast.show(chatErrorCopy(started.error));
+        toast.show({ ...chatErrorCopy(started.error), tone: 'error' });
         return null;
       }
       const sent = await service.sendOffer(service.nextMessageId(), started.value, amountPhp);
       void refresh();
       if (!sent.ok) {
-        toast.show(chatErrorCopy(sent.error));
+        toast.show({ ...chatErrorCopy(sent.error), tone: 'error' });
         return null;
       }
       return started.value;
@@ -259,7 +288,8 @@ const counterOpenOffers = (messages: readonly Message[]) =>
  * answers to offers and pickups show straight away and roll back if the server refuses.
  */
 export function useConversation(conversationId: string | undefined): ConversationState {
-  const { service, refresh } = useChatContext();
+  const { service, refresh, viewing } = useChatContext();
+  const focused = useIsFocusedSafe();
   const [status, setStatus] = useState<ChatLoadStatus>('loading');
   const [error, setError] = useState<AppError | null>(null);
   const [conversation, setConversation] = useState<ConversationDetail | null>(null);
@@ -268,6 +298,19 @@ export function useConversation(conversationId: string | undefined): Conversatio
   const [attempt, setAttempt] = useState(0);
   const drafts = useRef(new Map<MessageId, Draft>());
   const id = conversationId as ConversationId | undefined;
+
+  // While this chat is on screen, its new messages need no banner: they're already in front of
+  // the person. A chat kept alive behind another tab or screen doesn't count.
+  useEffect(() => {
+    if (!id || !focused) return;
+    const open = viewing.current;
+    open.set(id, (open.get(id) ?? 0) + 1);
+    return () => {
+      const left = (open.get(id) ?? 1) - 1;
+      if (left > 0) open.set(id, left);
+      else open.delete(id);
+    };
+  }, [focused, id, viewing]);
 
   useEffect(() => {
     if (!id) return;

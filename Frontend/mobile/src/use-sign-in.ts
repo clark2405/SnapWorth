@@ -13,11 +13,16 @@ import {
 import {
   completeAuthFromUrl,
   isSupabaseConfigured,
+  missingFromAuthInput,
+  performAppleAuth,
   performAuth,
   performGoogleAuth,
+  useLeaveWhenSignedIn,
   type AuthInput,
 } from '@snapworth/shared/features/auth';
 import { useSession, type SessionUser } from '@snapworth/shared/features/session';
+
+import { appleCancelled, appleSignInAvailable, requestAppleCredential } from './apple-sign-in';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -36,6 +41,13 @@ export function useSignIn() {
   const { return: returning } = useLocalSearchParams<{ return?: string }>();
   const configured = isSupabaseConfigured();
 
+  // Someone who is already signed in has no use for these screens: back to what they were doing,
+  // or the Feed. Each way of signing in here is wrapped, so it can finish its own way out.
+  const signingIn = useLeaveWhenSignedIn(() => {
+    if (returning && router.canGoBack()) router.back();
+    else router.replace('/feed');
+  });
+
   const enter = (userData?: SessionUser | null) => {
     startSession(userData);
     if (returning && router.canGoBack()) router.back();
@@ -43,9 +55,11 @@ export function useSignIn() {
     openFromTag();
   };
 
-  const submit = async (input: AuthInput) => {
-    if (!input.email || !input.password) {
-      Alert.alert('Invalid Input', 'Please provide both an email and password.');
+  const submit = signingIn(async (input: AuthInput) => {
+    // An empty form never starts a session, with or without a Supabase project.
+    const missing = missingFromAuthInput(input);
+    if (missing) {
+      Alert.alert('Invalid Input', missing);
       return;
     }
     const closing = closeIntoTag({
@@ -87,9 +101,9 @@ export function useSignIn() {
       cancelHandoff();
       Alert.alert(failed, messageOf(failure));
     }
-  };
+  });
 
-  const google = async () => {
+  const google = signingIn(async () => {
     if (!configured) {
       await closeIntoTag({ stamp: 'WELCOME' });
       enter({
@@ -144,14 +158,36 @@ export function useSignIn() {
       cancelHandoff();
       Alert.alert('Google sign-in failed', messageOf(failure));
     }
-  };
+  });
+
+  // Only offered once Sign in with Apple is set up (see apple-sign-in.ts), and with Supabase.
+  const apple = signingIn(async () => {
+    if (!requestAppleCredential || !configured) return;
+    try {
+      const credential = await requestAppleCredential();
+      const closing = closeIntoTag({ stamp: 'WELCOME', name: firstNameOf(credential.fullName) });
+      const { data, error } = await performAppleAuth(credential);
+      if (error || !data.user) {
+        cancelHandoff();
+        Alert.alert('Apple sign-in failed', error?.message ?? 'Apple didn’t return an account.');
+        return;
+      }
+      setHandoffName(firstNameOf(data.user.user_metadata?.full_name ?? credential.fullName));
+      await closing;
+      enter(data.user);
+    } catch (failure) {
+      cancelHandoff();
+      if (appleCancelled(failure)) return;
+      Alert.alert('Apple sign-in failed', messageOf(failure));
+    }
+  });
 
   const close = returning && router.canGoBack() ? () => router.back() : undefined;
 
   return {
     submit,
     google,
-    apple: () => Alert.alert('Unavailable', 'Apple login not configured.'),
+    apple: appleSignInAvailable && configured ? apple : undefined,
     forgotPassword: () => router.push('/reset-password'),
     close,
   };

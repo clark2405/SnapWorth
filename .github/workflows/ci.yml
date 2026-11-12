@@ -97,6 +97,11 @@ jobs:
       - name: Database tests
         run: scripts/test-db.sh
 
+      # The same migrations applied on top of rows like the live project's, then the old app's
+      # calls and the seeds run again over them.
+      - name: Database upgrade test
+        run: scripts/test-db.sh --upgrade
+
       # Typecheck the Edge Functions and run their unit tests.
       - name: Edge Function tests
         run: scripts/test-functions.sh

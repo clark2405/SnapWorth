@@ -10,10 +10,14 @@ import {
 } from 'react';
 
 import type { DeviceStore } from '../history/device-store';
+import { toPreviewListing, useMarketplace } from '../marketplace/marketplace-state';
+import { previewListingWorth } from '../preview/sample-data';
+import { useBackendMode } from '../session/backend-mode';
 import {
   dailyItems,
   dayKey,
   guessPoints,
+  guessPool,
   roundsPerDay,
   sharpEyes,
   streak,
@@ -30,6 +34,11 @@ export interface GuessGame {
   readonly today: string;
   /** Today's things to guess. */
   readonly items: readonly GuessItem[];
+  /**
+   * Whether there's a game today. With a Supabase project the game is only the Market's real
+   * listings that carry an AI estimate, and needs enough of them to deal a day.
+   */
+  readonly available: boolean;
   /** Today's game so far. */
   readonly game: DayGame;
   readonly streak: number;
@@ -107,8 +116,34 @@ export function useGuessGame(now: () => Date = () => new Date()): GuessGame {
   const context = useContext(GuessContext);
   const fallback = useGuessStore(null);
   const { status, games, setGames } = context ?? fallback;
+  const { listings } = useMarketplace();
+  const mode = useBackendMode();
   const today = dayKey(now());
-  const items = useMemo(() => dailyItems(today), [today]);
+  const { items, available } = useMemo(() => {
+    // The sample listings' worths only stand in on a device with no Supabase project.
+    const worths: Record<
+      string,
+      { readonly estimate: number; readonly low: number; readonly high: number }
+    > = mode === 'device' ? { ...previewListingWorth } : {};
+    for (const listing of listings) {
+      if (
+        typeof listing.estimatePhp === 'number' &&
+        typeof listing.estimateLowPhp === 'number' &&
+        typeof listing.estimateHighPhp === 'number'
+      ) {
+        worths[listing.id] = {
+          estimate: listing.estimatePhp,
+          low: listing.estimateLowPhp,
+          high: listing.estimateHighPhp,
+        };
+      }
+    }
+    const pool = guessPool(listings.map(toPreviewListing), worths);
+    if (pool.length >= roundsPerDay) return { items: dailyItems(today, pool), available: true };
+    return mode === 'device'
+      ? { items: dailyItems(today, guessPool()), available: true }
+      : { items: [], available: false };
+  }, [listings, mode, today]);
   const game = games.find((entry) => entry.day === today) ?? { day: today, guesses: [] };
 
   const guess = useCallback(
@@ -136,6 +171,7 @@ export function useGuessGame(now: () => Date = () => new Date()): GuessGame {
     status,
     today,
     items,
+    available,
     game,
     streak: streak(games, today),
     sharpEyes: sharpEyes(games),

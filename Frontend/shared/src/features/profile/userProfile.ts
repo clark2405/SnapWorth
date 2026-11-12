@@ -1,13 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ImageSourcePropType } from 'react-native';
 
+import { fetchIsAdmin } from '../../adapters/supabase/admin-role';
+import { uploadAvatar } from '../../adapters/supabase/photo-storage';
 import { getSupabase, isSupabaseConfigured } from '../../adapters/supabaseClient';
-import {
-  previewConversations,
-  previewHistory,
-  previewProfile,
-  previewVotesCast,
-} from '../preview/sample-data';
+import { previewConversations, previewProfile, previewVotesCast } from '../preview/sample-data';
 import { useSession, type SessionUser } from '../session';
 
 export interface UserProfileDetails {
@@ -19,17 +16,22 @@ export interface UserProfileDetails {
   readonly location: string;
   readonly bio: string;
   readonly joined: string;
-  readonly rating: string;
+  /** Sellers aren't rated yet, so a real account has none; the preview profile has one. */
+  readonly rating: string | null;
   readonly isAdmin: boolean;
+  /**
+   * What the account has done, counted by the database. `null` means the count couldn't be loaded:
+   * that is not the same as none, and a screen shows it as unknown rather than as 0.
+   */
   readonly stats: {
-    readonly checked: number;
-    readonly listed: number;
-    readonly sold: number;
+    readonly checked: number | null;
+    readonly listed: number | null;
+    readonly sold: number | null;
   };
   readonly activity: {
-    readonly listings: number;
-    readonly votes: number;
-    readonly conversations: number;
+    readonly listings: number | null;
+    readonly votes: number | null;
+    readonly conversations: number | null;
   };
 }
 
@@ -41,17 +43,17 @@ export interface ProfileUpdateInput {
   readonly avatarUrl?: string | null;
 }
 
-/** Formats an ISO date into "Joined [Month] [Year]" or "Joined [Year]". */
+/** Formats an ISO date into "Joined [Month] [Year]"; nothing when the date isn't known. */
 export function formatJoinedDate(isoDate?: string | number | null): string {
-  if (!isoDate) return previewProfile.joined;
+  if (!isoDate) return '';
   try {
     const date = new Date(isoDate);
-    if (isNaN(date.getTime())) return previewProfile.joined;
+    if (isNaN(date.getTime())) return '';
     const month = date.toLocaleString('en-US', { month: 'long' });
     const year = date.getFullYear();
     return `Joined ${month} ${year}`;
   } catch {
-    return `Joined ${new Date().getFullYear()}`;
+    return '';
   }
 }
 
@@ -63,11 +65,27 @@ function textOf(...values: unknown[]): string | undefined {
   return undefined;
 }
 
-/** Returns fallback profile details when Supabase is unconfigured or user details are missing. */
+/** The id of the preview profile shown with nobody signed in. */
+export const previewProfileId = 'demo-user';
+
+/**
+ * Whether the preview owner is an admin. Only a build with no backend says so, to show the
+ * sample review queue: with one, the database decides (`fetchIsAdmin`), and the answer starts
+ * as no. Never read from the account's metadata or email, which people control.
+ */
+function deviceAdmin(): boolean {
+  return !isSupabaseConfigured() && previewProfile.isAdmin;
+}
+
+/**
+ * The profile as far as the account itself says: the sample profile when nobody is signed in (a
+ * preview), else only what the account holds, and zero for what a database has yet to count. A
+ * real account never gets the sample's bio, place, rating or numbers.
+ */
 export function buildFallbackProfile(user?: SessionUser | null): UserProfileDetails {
   if (!user) {
     return {
-      id: 'demo-user',
+      id: previewProfileId,
       email: 'member@snapworth.com',
       displayName: previewProfile.displayName,
       handle: previewProfile.user.handle,
@@ -76,7 +94,7 @@ export function buildFallbackProfile(user?: SessionUser | null): UserProfileDeta
       bio: previewProfile.bio,
       joined: previewProfile.joined,
       rating: previewProfile.rating,
-      isAdmin: previewProfile.isAdmin,
+      isAdmin: deviceAdmin(),
       stats: {
         checked: previewProfile.stats.checked,
         listed: previewProfile.stats.listed,
@@ -103,36 +121,40 @@ export function buildFallbackProfile(user?: SessionUser | null): UserProfileDeta
     displayName,
     handle,
     avatarUrl: textOf(meta.avatar_url, meta.picture) ?? null,
-    location: textOf(meta.location) ?? previewProfile.location,
-    bio: textOf(meta.bio) ?? previewProfile.bio,
+    location: textOf(meta.location) ?? '',
+    bio: textOf(meta.bio) ?? '',
     joined: formatJoinedDate(user.created_at),
-    rating: textOf(meta.rating) ?? previewProfile.rating,
-    isAdmin: Boolean(
-      meta.role === 'admin' ||
-      meta.is_admin ||
-      user.app_metadata?.role === 'admin' ||
-      user.email?.endsWith('@snapworth.com'),
-    ),
-    stats: {
-      checked: previewHistory.length,
-      listed: previewProfile.stats.listed,
-      sold: previewProfile.stats.sold,
-    },
-    activity: {
-      listings: previewProfile.stats.listed,
-      votes: previewVotesCast.length,
-      conversations: previewConversations.length,
-    },
+    rating: null,
+    isAdmin: deviceAdmin(),
+    // Counted once they've loaded: their own scans, listings, sales, votes and chats.
+    stats: { checked: 0, listed: 0, sold: 0 },
+    activity: { listings: 0, votes: 0, conversations: 0 },
   };
 }
 
 /**
  * Fetches user profile from Supabase:
  * 1. Current user metadata & auth details
- * 2. `public.profiles` row (handle, avatar_url)
- * 3. Actual activity metrics (listings count, chats count)
+ * 2. `public.profiles` row (handle, avatar_url, display_name, bio, location)
+ * 3. Actual activity metrics (scans, listings and chats counts)
  */
-export async function fetchUserProfile(authUser?: SessionUser | null): Promise<UserProfileDetails> {
+export function fetchUserProfile(authUser?: SessionUser | null): Promise<UserProfileDetails> {
+  // Several parts of a screen ask for the profile at once (the header button, the screen itself):
+  // they share one load, so the database is asked once, not once each. A save ends the sharing so
+  // nobody is handed what was loaded before it.
+  const key = authUser?.id ?? '';
+  const loading = inFlight.get(key);
+  if (loading) return loading;
+  const load = loadUserProfile(authUser).finally(() => {
+    if (inFlight.get(key) === load) inFlight.delete(key);
+  });
+  inFlight.set(key, load);
+  return load;
+}
+
+const inFlight = new Map<string, Promise<UserProfileDetails>>();
+
+async function loadUserProfile(authUser?: SessionUser | null): Promise<UserProfileDetails> {
   let user = authUser;
 
   if (isSupabaseConfigured()) {
@@ -153,26 +175,39 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
 
   const fallback = buildFallbackProfile(user);
   let handle = fallback.handle;
+  let displayName = fallback.displayName;
+  let bio = fallback.bio;
+  let location = fallback.location;
   let avatarUrl = fallback.avatarUrl;
-  let listedCount = fallback.stats.listed;
-  let soldCount = fallback.stats.sold;
-  let chatCount = fallback.activity.conversations;
+  let checkedCount: number | null = fallback.stats.checked;
+  let listedCount: number | null = fallback.stats.listed;
+  let soldCount: number | null = fallback.stats.sold;
+  let chatCount: number | null = fallback.activity.conversations;
+  let voteCount: number | null = fallback.activity.votes;
+  let isAdmin = fallback.isAdmin;
 
   if (isSupabaseConfigured()) {
     try {
       const supabase = getSupabase();
 
+      // Only the database grants the role; this is asking it, not deciding.
+      isAdmin = await fetchIsAdmin(supabase);
+
       // Query public.profiles
       try {
         const { data: profileRow } = await supabase
           .from('profiles')
-          .select('handle, avatar_url')
+          .select('handle, avatar_url, display_name, bio, location')
           .eq('id', user.id)
           .maybeSingle();
 
+        // What the profile holds is what others see, so it wins over the account's own copy.
         if (profileRow) {
           if (profileRow.handle) handle = profileRow.handle;
           if (profileRow.avatar_url) avatarUrl = profileRow.avatar_url;
+          displayName = textOf(profileRow.display_name) ?? displayName;
+          bio = textOf(profileRow.bio) ?? bio;
+          location = textOf(profileRow.location) ?? location;
         }
       } catch {
         // Table or row may not exist yet
@@ -180,11 +215,16 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
 
       // Query activity stats
       try {
-        const [listedRes, soldRes, chatRes] = await Promise.allSettled([
+        const [checkedRes, listedRes, soldRes, chatRes, voteRes] = await Promise.allSettled([
+          supabase
+            .from('scan_history')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id),
           supabase
             .from('listings')
             .select('id', { count: 'exact', head: true })
-            .eq('seller_id', user.id),
+            .eq('seller_id', user.id)
+            .neq('status', 'removed'),
           supabase
             .from('listings')
             .select('id', { count: 'exact', head: true })
@@ -194,19 +234,20 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
             .from('conversations')
             .select('id', { count: 'exact', head: true })
             .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`),
+          supabase
+            .from('votes')
+            .select('post_id', { count: 'exact', head: true })
+            .eq('user_id', user.id),
         ]);
 
-        if (listedRes.status === 'fulfilled' && typeof listedRes.value.count === 'number') {
-          listedCount = listedRes.value.count;
-        }
-        if (soldRes.status === 'fulfilled' && typeof soldRes.value.count === 'number') {
-          soldCount = soldRes.value.count;
-        }
-        if (chatRes.status === 'fulfilled' && typeof chatRes.value.count === 'number') {
-          chatCount = chatRes.value.count;
-        }
+        // A count that couldn't be loaded is unknown (null), not zero.
+        checkedCount = countOf(checkedRes);
+        listedCount = countOf(listedRes);
+        soldCount = countOf(soldRes);
+        chatCount = countOf(chatRes);
+        voteCount = countOf(voteRes);
       } catch {
-        // Keep fallback counts
+        checkedCount = listedCount = soldCount = chatCount = voteCount = null;
       }
     } catch {
       // Keep fallbacks
@@ -216,18 +257,30 @@ export async function fetchUserProfile(authUser?: SessionUser | null): Promise<U
   return {
     ...fallback,
     handle,
+    displayName,
+    bio,
+    location,
     avatarUrl,
+    isAdmin,
     stats: {
-      checked: fallback.stats.checked,
+      checked: checkedCount,
       listed: listedCount,
       sold: soldCount,
     },
     activity: {
       listings: listedCount,
-      votes: fallback.activity.votes,
+      votes: voteCount,
       conversations: chatCount,
     },
   };
+}
+
+/** A head-count query's answer: its number, or null when it failed (an error is not a zero). */
+function countOf(
+  result: PromiseSettledResult<{ readonly count: number | null; readonly error?: unknown }>,
+): number | null {
+  if (result.status !== 'fulfilled' || result.value.error) return null;
+  return typeof result.value.count === 'number' ? result.value.count : null;
 }
 
 /** What to tell someone whose new handle the database refused, by Postgres error code. */
@@ -237,10 +290,18 @@ function handleRefusal(code?: string): string {
   return 'Your handle couldn’t be saved. Try again.';
 }
 
+/** A photo on this device (picked or taken), rather than one already online. */
+function isDevicePhoto(uri: string): boolean {
+  return !/^https?:\/\//i.test(uri);
+}
+
 /**
  * Updates user profile in Supabase. The handle goes to the `public.profiles` row first, since
  * that's the one comments and chats show, and a handle someone else has is refused there before
- * anything else is saved. The rest (name, place, bio, photo) is kept on the account.
+ * anything else is saved. A new photo picked on the device is uploaded to the person's avatar
+ * folder in Storage and set on `public.profiles` too, so others see it. The name, place and bio
+ * go to `public.profiles` as well, which is what seller pages show. The account's own copy of all
+ * of them is kept in step, since it is what a signed-in person's own screens start from.
  */
 export async function updateUserProfile(
   updates: ProfileUpdateInput,
@@ -248,22 +309,66 @@ export async function updateUserProfile(
   if (!isSupabaseConfigured()) {
     return { success: true };
   }
+  // Whatever is being loaded now predates this save.
+  inFlight.clear();
 
   try {
     const supabase = getSupabase();
+    const newPhoto =
+      typeof updates.avatarUrl === 'string' && isDevicePhoto(updates.avatarUrl)
+        ? updates.avatarUrl
+        : undefined;
+    let avatarUrl = updates.avatarUrl;
 
-    if (updates.handle !== undefined) {
+    // The public details, which seller pages read from `public.profiles`.
+    const details: Record<string, string> = {};
+    if (updates.displayName !== undefined) details.display_name = updates.displayName;
+    if (updates.bio !== undefined) details.bio = updates.bio;
+    if (updates.location !== undefined) details.location = updates.location;
+
+    let userId: string | undefined;
+    if (updates.handle !== undefined || newPhoto !== undefined || Object.keys(details).length > 0) {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return { success: false, error: 'Sign in again to save your profile.' };
+      userId = user.id;
+    }
+
+    if (updates.handle !== undefined && userId) {
       const { data, error } = await supabase
         .from('profiles')
         .update({ handle: updates.handle })
-        .eq('id', user.id)
+        .eq('id', userId)
         .select('id');
       // No row back means the database let nothing change.
       if (error || !data?.length) return { success: false, error: handleRefusal(error?.code) };
+    }
+
+    if (Object.keys(details).length > 0 && userId) {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(details)
+        .eq('id', userId)
+        .select('id');
+      if (error || !data?.length) {
+        return { success: false, error: 'Your profile details couldn’t be saved. Try again.' };
+      }
+    }
+
+    if (newPhoto !== undefined && userId) {
+      const photoRefused = { success: false, error: 'Your photo couldn’t be saved. Try again.' };
+      try {
+        avatarUrl = await uploadAvatar(supabase, userId, newPhoto);
+      } catch {
+        return photoRefused;
+      }
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ avatar_url: avatarUrl })
+        .eq('id', userId)
+        .select('id');
+      if (error || !data?.length) return photoRefused;
     }
 
     const userMetaUpdates: Record<string, string | null> = {};
@@ -271,7 +376,7 @@ export async function updateUserProfile(
     if (updates.handle !== undefined) userMetaUpdates.handle = updates.handle;
     if (updates.location !== undefined) userMetaUpdates.location = updates.location;
     if (updates.bio !== undefined) userMetaUpdates.bio = updates.bio;
-    if (updates.avatarUrl !== undefined) userMetaUpdates.avatar_url = updates.avatarUrl;
+    if (avatarUrl !== undefined) userMetaUpdates.avatar_url = avatarUrl;
 
     const { error: userError } = await supabase.auth.updateUser({
       data: userMetaUpdates,
@@ -293,21 +398,44 @@ export function useUserProfile() {
   const [profile, setProfile] = useState<UserProfileDetails>(() => buildFallbackProfile(user));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Moves on with each load and each account change, so an older answer is thrown away. */
+  const generation = useRef(0);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const refresh = useCallback(async () => {
+    const mine = ++generation.current;
+    // Only the latest load, for the account still signed in, may change what's on screen, and
+    // nothing may once the screen has gone.
+    const current = () => mounted.current && mine === generation.current;
     setLoading(true);
     setError(null);
     try {
       const data = await fetchUserProfile(user);
-      setProfile(data);
+      if (current()) setProfile(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to fetch user details');
+      if (current()) setError(e instanceof Error ? e.message : 'Failed to fetch user details');
     } finally {
-      setLoading(false);
+      if (current()) setLoading(false);
     }
   }, [user]);
 
+  // A different account starts from what it holds itself, at once: the last one's profile (and
+  // counts) never show for it while its own load is on the way.
+  const shownFor = useRef<string | null>(user?.id ?? null);
   useEffect(() => {
+    const account = user?.id ?? null;
+    if (account !== shownFor.current) {
+      shownFor.current = account;
+      generation.current += 1;
+      setProfile(buildFallbackProfile(user));
+    }
     void refresh();
   }, [refresh, user, status]);
 
@@ -319,11 +447,14 @@ export function useUserProfile() {
   };
 }
 
-/** Returns the avatar image source for a profile (either remote URL or local fallback). */
+/**
+ * The avatar image source for a profile: its photo, else `fallbackSource`. With no fallback
+ * there's no picture and the screen shows the person's initial.
+ */
 export function avatarSourceFor(
   avatarUrl?: string | null,
-  fallbackSource: ImageSourcePropType = previewProfile.user.avatar,
-): ImageSourcePropType {
+  fallbackSource: ImageSourcePropType | null = null,
+): ImageSourcePropType | null {
   if (avatarUrl && typeof avatarUrl === 'string' && avatarUrl.trim().length > 0) {
     return { uri: avatarUrl };
   }

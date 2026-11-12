@@ -94,6 +94,9 @@ export const accountIntentCopy: Record<AccountIntent, { title: string; body: str
   },
 };
 
+/** How long reading the saved session may take before the app goes on as a guest. */
+const sessionReadTimeoutMs = 8000;
+
 /** Where the account screens are; the app shell owns navigation, so it supplies them. */
 export interface SessionProviderProps {
   readonly onCreateAccount: () => void;
@@ -113,8 +116,15 @@ export interface SessionUser {
   readonly app_metadata?: Record<string, unknown>;
 }
 
+/**
+ * `loading` is only the first moment of a launch with a Supabase project, until the saved session
+ * has been read: someone signed in must not be taken for a guest (and sent to the introduction)
+ * before then. The launch screen stays up until it's over (`SessionSplashView`).
+ */
+export type SessionStatus = 'loading' | 'guest' | 'member';
+
 interface SessionContextValue {
-  readonly status: 'guest' | 'member';
+  readonly status: SessionStatus;
   readonly user: SessionUser | null;
   readonly startSession: (userData?: SessionUser | null) => void;
   readonly endSession: () => void;
@@ -131,7 +141,9 @@ const SessionContext = createContext<SessionContextValue | null>(null);
  * only when they act. There is no auth service yet, so signing in or up just marks the session.
  */
 export function SessionProvider({ onCreateAccount, onSignIn, children }: SessionProviderProps) {
-  const [status, setStatus] = useState<'guest' | 'member'>('guest');
+  const [status, setStatus] = useState<SessionStatus>(() =>
+    isSupabaseConfigured() ? 'loading' : 'guest',
+  );
   const [user, setUser] = useState<SessionUser | null>(null);
   const [asking, setAsking] = useState<AccountIntent | null>(null);
 
@@ -149,18 +161,30 @@ export function SessionProvider({ onCreateAccount, onSignIn, children }: Session
         .getSession()
         .then(({ data }) => {
           if (!active) return;
-          if (data?.session?.user) {
+          // An anonymous session (left by an earlier build) is not an account: still a guest.
+          if (data?.session?.user && !data.session.user.is_anonymous) {
             setStatus('member');
             setUser(data.session.user);
+          } else {
+            // Nobody is signed in. A sign-in that landed first stays.
+            setStatus((now) => (now === 'loading' ? 'guest' : now));
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          if (active) setStatus((now) => (now === 'loading' ? 'guest' : now));
+        });
+      // Never hold the launch screen for long if reading the session stalls; a sign-in that
+      // comes later still lands.
+      const stalled = setTimeout(
+        () => setStatus((now) => (now === 'loading' ? 'guest' : now)),
+        sessionReadTimeoutMs,
+      );
 
       const {
         data: { subscription },
       } = supabase.auth.onAuthStateChange((_event, session) => {
         if (!active) return;
-        if (session?.user) {
+        if (session?.user && !session.user.is_anonymous) {
           setStatus('member');
           setUser(session.user);
         } else {
@@ -171,10 +195,12 @@ export function SessionProvider({ onCreateAccount, onSignIn, children }: Session
 
       return () => {
         active = false;
+        clearTimeout(stalled);
         subscription?.unsubscribe();
       };
     } catch {
       // Supabase is not configured or reachable, so there is nothing to clean up.
+      setStatus((now) => (now === 'loading' ? 'guest' : now));
       return undefined;
     }
   }, []);
@@ -301,7 +327,11 @@ export function useSession() {
   return {
     status,
     user,
-    isGuest: status === 'guest',
+    /** Whether the app has read the saved session yet; until then it can't say who this is. */
+    isLoading: status === 'loading',
+    /** Not a member. While `loading` this is true too, as before; screens that must not act on
+     * that guess (the launch route) check `isLoading`. */
+    isGuest: status !== 'member',
     startSession,
     endSession,
     setUser,

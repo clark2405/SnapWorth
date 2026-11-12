@@ -1,28 +1,56 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 
 import {
+  createLocalAdminRepository,
   createLocalChatRepository,
+  createLocalCollectionRepository,
   createLocalCommentRepository,
+  createLocalFeedRepository,
   createLocalHanapRepository,
+  createLocalMarketplaceRepository,
   createLocalSukiRepository,
+  createSupabaseAccountObserver,
+  createSupabaseAdminRepository,
   createSupabaseChatRepository,
+  createSupabaseCollectionRepository,
   createSupabaseCommentRepository,
+  createSupabaseFeedRepository,
   createSupabaseHanapRepository,
+  createSupabaseMarketplaceRepository,
   createSupabaseSukiRepository,
   createPhotoPricingService,
+  deviceAccount,
   screenWithRules,
   type LocalSeedComment,
   type LocalSeedConversation,
 } from '../adapters';
+import { createDeviceLocation } from '../adapters/device/location';
 import { getSupabase } from '../adapters/supabaseClient';
+import { AdminProvider } from '../features/admin/admin-state';
+import { buildPreviewReviewCases } from '../features/admin/review-seed';
 import { ChatServiceProvider } from '../features/chat/chat-state';
 import { SukiProvider } from '../features/chat/suki';
-import { CommentServiceProvider } from '../features/feed';
+import {
+  buildPreviewFeedPosts,
+  buildPreviewFeedVotes,
+  CommentServiceProvider,
+  FeedProvider,
+} from '../features/feed';
+import { BackendModeProvider } from '../features/session/backend-mode';
 import { HanapProvider } from '../features/hanap/hanap-state';
 import { GuessProvider } from '../features/guess/guess-state';
 import { CollectionsProvider } from '../features/history/collections';
+import { ScanHistoryProvider } from '../features/history/scan-history-state';
 import { PaidPricesProvider } from '../features/history/paid-prices';
+import {
+  buildPreviewMarketListings,
+  buildPreviewMyMarketListing,
+  buildPreviewSellerSeeds,
+} from '../features/marketplace/marketplace-seed';
+import { MarketplaceProvider } from '../features/marketplace/marketplace-state';
+import { ViewerLocationProvider } from '../features/marketplace/viewer-location';
 import {
   previewChatListingKey,
   previewConversation,
@@ -33,12 +61,18 @@ import {
   previewPaidPrices,
   previewPostDetail,
   previewPosts,
+  previewPriceAlerts,
   previewProfile,
   previewUsers,
   type PreviewMessage,
   type PreviewUser,
 } from '../features/preview/sample-data';
+import type { AccountObserver } from '../ports/account';
+import type { AdminRepository } from '../ports/admin';
+import type { CollectionRepository } from '../ports/collections';
+import type { FeedRepository } from '../ports/feed';
 import type { HanapRepository } from '../ports/hanap';
+import type { MarketplaceRepository } from '../ports/marketplace';
 import type { ChatService, CommentService } from '../ports/services';
 import type { SukiRepository } from '../ports/suki';
 import { createChatService, createCommentService } from '../services';
@@ -57,10 +91,19 @@ export interface AppServices {
   /** `supabase` when a project is configured; otherwise comments live on this device. */
   readonly backend: 'supabase' | 'device';
   readonly comments: CommentService;
+  readonly admin: AdminRepository;
   readonly chats: ChatService;
+  readonly feed: FeedRepository;
   readonly hanap: HanapRepository;
+  readonly marketplace: MarketplaceRepository;
   readonly suki: SukiRepository;
   readonly pricing: PhotoPricingService;
+  /** Who is signed in, for what's kept per account. */
+  readonly account: AccountObserver;
+  /** Where an account's collections are kept. */
+  readonly collectionsFor: (accountId: string) => CollectionRepository;
+  /** The Supabase connection, for the stores that take one directly (saved scans). */
+  readonly supabaseClient?: SupabaseClient;
 }
 
 const profileOf = (user: PreviewUser): PublicProfile => ({
@@ -200,15 +243,28 @@ const demoReplies = [
 export function createAppServices(config: BackendConfig): AppServices {
   if (config.supabaseUrl && config.supabaseAnonKey) {
     const client = getSupabase({ url: config.supabaseUrl, anonKey: config.supabaseAnonKey });
+    const collections = createSupabaseCollectionRepository(client, { device: AsyncStorage });
     return {
       backend: 'supabase',
       comments: createCommentService(createSupabaseCommentRepository(client)),
+      admin: createSupabaseAdminRepository(client),
       chats: createChatService(createSupabaseChatRepository(client)),
+      feed: createSupabaseFeedRepository(client),
       hanap: createSupabaseHanapRepository(client),
+      marketplace: createSupabaseMarketplaceRepository(client),
       suki: createSupabaseSukiRepository(client),
       pricing: createPhotoPricingService(client),
+      account: createSupabaseAccountObserver(client),
+      // Row-level security keeps each account to its own; collections this phone kept before
+      // move into the account that owns their things.
+      collectionsFor: () => collections,
+      supabaseClient: client,
     };
   }
+  const deviceCollections = createLocalCollectionRepository({
+    store: AsyncStorage,
+    seed: previewCollections,
+  });
   return {
     backend: 'device',
     pricing: {
@@ -226,6 +282,7 @@ export function createAppServices(config: BackendConfig): AppServices {
         screen: screenWithRules,
       }),
     ),
+    admin: createLocalAdminRepository({ seed: buildPreviewReviewCases() }),
     chats: createChatService(
       createLocalChatRepository({
         store: AsyncStorage,
@@ -244,6 +301,20 @@ export function createAppServices(config: BackendConfig): AppServices {
       })),
       screen: screenWithRules,
     }),
+    feed: createLocalFeedRepository({
+      seed: buildPreviewFeedPosts(),
+      seedVotes: buildPreviewFeedVotes(),
+      viewerHandle: previewProfile.user.handle,
+    }),
+    marketplace: createLocalMarketplaceRepository({
+      store: AsyncStorage,
+      viewer: profileOf(previewProfile.user),
+      seedListings: [...buildPreviewMarketListings(), buildPreviewMyMarketListing()],
+      seedSaved: previewPriceAlerts,
+      seedSellers: buildPreviewSellerSeeds(),
+    }),
+    account: deviceAccount,
+    collectionsFor: () => deviceCollections,
     // The windbreaker's buyer is already the preview owner's suki.
     suki: createLocalSukiRepository({
       store: AsyncStorage,
@@ -251,6 +322,8 @@ export function createAppServices(config: BackendConfig): AppServices {
     }),
   };
 }
+
+const deviceLocation = createDeviceLocation();
 
 const PhotoPricingContext = createContext<PhotoPricingService | null>(null);
 
@@ -272,23 +345,47 @@ export function AppServicesProvider({
     [config.supabaseUrl, config.supabaseAnonKey],
   );
   return (
-    <PhotoPricingContext.Provider value={services.pricing}>
-      <CommentServiceProvider service={services.comments}>
-        <ChatServiceProvider service={services.chats}>
-          <HanapProvider repository={services.hanap}>
-            <SukiProvider repository={services.suki}>
-              {/* History is still sample data, so what people paid, and their collections, stay on the
-              device for now. */}
-              <PaidPricesProvider store={AsyncStorage} seed={previewPaidPrices}>
-                <CollectionsProvider store={AsyncStorage} seed={previewCollections}>
-                  {/* Guess the worth needs no account, so its days stay on the device. */}
-                  <GuessProvider store={AsyncStorage}>{children}</GuessProvider>
-                </CollectionsProvider>
-              </PaidPricesProvider>
-            </SukiProvider>
-          </HanapProvider>
-        </ChatServiceProvider>
-      </CommentServiceProvider>
-    </PhotoPricingContext.Provider>
+    <BackendModeProvider mode={services.backend}>
+      <PhotoPricingContext.Provider value={services.pricing}>
+        <CommentServiceProvider service={services.comments}>
+          <ChatServiceProvider service={services.chats}>
+            <HanapProvider repository={services.hanap}>
+              <MarketplaceProvider repository={services.marketplace} account={services.account}>
+                <FeedProvider repository={services.feed} account={services.account}>
+                  <SukiProvider repository={services.suki}>
+                    {/* Saved scans, and what was paid for each: in Supabase with a backend, on the
+                    phone without. */}
+                    <ScanHistoryProvider
+                      client={services.supabaseClient ?? null}
+                      store={AsyncStorage}
+                    >
+                      {/* The sample items' prices: kept on the device without a backend; with one
+                      they're a preview, so they aren't kept. */}
+                      <PaidPricesProvider
+                        store={services.backend === 'device' ? AsyncStorage : undefined}
+                        seed={previewPaidPrices}
+                      >
+                        <CollectionsProvider
+                          account={services.account}
+                          repositoryFor={services.collectionsFor}
+                        >
+                          {/* Guess the worth needs no account, so its days stay on the device. */}
+                          <GuessProvider store={AsyncStorage}>
+                            {/* Where the viewer is, only when they pick "Near me"; never stored. */}
+                            <ViewerLocationProvider port={deviceLocation}>
+                              <AdminProvider repository={services.admin}>{children}</AdminProvider>
+                            </ViewerLocationProvider>
+                          </GuessProvider>
+                        </CollectionsProvider>
+                      </PaidPricesProvider>
+                    </ScanHistoryProvider>
+                  </SukiProvider>
+                </FeedProvider>
+              </MarketplaceProvider>
+            </HanapProvider>
+          </ChatServiceProvider>
+        </CommentServiceProvider>
+      </PhotoPricingContext.Provider>
+    </BackendModeProvider>
   );
 }

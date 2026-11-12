@@ -5,11 +5,13 @@ import { closeIntoTag, firstNameOf, openFromTag, useToast } from '@snapworth/sha
 
 import {
   LoginView,
-  isSupabaseConfigured,
-  performAuth,
+  submitAuth,
+  useLeaveWhenSignedIn,
   type AuthInput,
 } from '@snapworth/shared/features/auth';
 import { useSession, type SessionUser } from '@snapworth/shared/features/session';
+
+import { useGoogleSignIn } from '../../src/google-sign-in';
 
 export default function LoginRoute() {
   const router = useRouter();
@@ -21,34 +23,35 @@ export default function LoginRoute() {
   // The feed is fetched while you type, so it's ready to unfold out of the tag.
   useEffect(() => router.prefetch('/feed'), [router]);
 
-  const done = async (input?: AuthInput) => {
+  // Someone who is already signed in has no use for this screen: back to what they were doing,
+  // or the Feed. (Signing in here is wrapped, so it can finish its own way out.)
+  const signingIn = useLeaveWhenSignedIn(() =>
+    returning && router.canGoBack() ? router.back() : router.replace('/feed'),
+  );
+
+  const done = signingIn(async (input?: AuthInput) => {
     let authUser: SessionUser | null = null;
 
-    if (input?.email && input?.password && isSupabaseConfigured()) {
-      try {
-        const { data, error } = await performAuth(input);
-        if (error) {
-          toast.show({ title: 'Sign-in failed', body: error.message });
-          return;
-        }
-        authUser = data.user;
-      } catch (err) {
+    // Google's callback finishes with no form; a form must be filled in. With a Supabase project
+    // nothing here ever starts a local session.
+    if (input) {
+      const outcome = await submitAuth(input);
+      if (outcome.kind === 'invalid') {
+        toast.show({ title: 'Check your details', body: outcome.message, tone: 'error' });
+        return;
+      }
+      if (outcome.kind === 'failed') {
+        toast.show({ title: 'Sign-in failed', body: outcome.message, tone: 'error' });
+        return;
+      }
+      if (outcome.kind === 'check-email') {
         toast.show({
-          title: 'Sign-in failed',
-          body: err instanceof Error ? err.message : 'Something went wrong. Try again.',
+          title: 'Check your email',
+          body: 'We sent you a confirmation link to finish signing up.',
         });
         return;
       }
-    } else if (input) {
-      authUser = {
-        id: 'local_user',
-        email: input.email || 'user@snapworth.com',
-        user_metadata: {
-          full_name: input.fullName || (input.email ? input.email.split('@')[0] : 'User'),
-          gender: input.gender,
-        },
-        created_at: new Date().toISOString(),
-      };
+      authUser = outcome.user;
     }
 
     await closeIntoTag({
@@ -59,14 +62,14 @@ export default function LoginRoute() {
     if (returning && router.canGoBack()) router.back();
     else router.replace('/feed');
     openFromTag();
-  };
+  });
+  const google = useGoogleSignIn(() => void done());
 
   return (
     <LoginView
       onSubmit={done}
       onForgotPassword={() => router.push('/reset-password')}
-      onContinueWithApple={() => done()}
-      onContinueWithGoogle={() => done()}
+      onContinueWithGoogle={google}
       onClose={returning && router.canGoBack() ? () => router.back() : undefined}
     />
   );

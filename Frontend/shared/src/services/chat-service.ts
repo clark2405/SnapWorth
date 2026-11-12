@@ -70,6 +70,7 @@ export function createChatService(repository: ChatRepository): ChatService {
 
     respondToOffer: (messageId, accept) => repository.respondToOffer(messageId, accept),
     confirmMeetup: (messageId) => repository.confirmMeetup(messageId),
+    confirmedMeetups: (since) => repository.confirmedMeetups(since),
     markRead: (id) => repository.markRead(id),
     report: (id, reason) => repository.report(id, reason),
     setBlocked: (userId, blocked) => repository.setBlocked(userId, blocked),

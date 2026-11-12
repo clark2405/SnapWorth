@@ -84,6 +84,9 @@ export function DetailHero({
       }
     >
       <ZoomTarget>
+        {all.length === 0 ? (
+          <Photo source={null} label={label || 'This item'} radius={0} style={styles.fill} />
+        ) : null}
         <ScrollView
           horizontal
           pagingEnabled
@@ -119,15 +122,19 @@ export function DetailHero({
         ) : (
           <View />
         )}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="View photo full screen"
-          hitSlop={tokens.spacing[2]}
-          onPress={() => open(page)}
-          style={styles.expand}
-        >
-          <Expand size={16} strokeWidth={2.2} color={tokens.overlay.text} />
-        </Pressable>
+        {all.length === 0 ? (
+          <View />
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="View photo full screen"
+            hitSlop={tokens.spacing[2]}
+            onPress={() => open(page)}
+            style={styles.expand}
+          >
+            <Expand size={16} strokeWidth={2.2} color={tokens.overlay.text} />
+          </Pressable>
+        )}
       </View>
 
       <PhotoViewer

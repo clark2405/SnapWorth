@@ -136,6 +136,34 @@ function VoteChip({
   );
 }
 
+/**
+ * What a tally says: how many votes, and which choice leads with what share of them. With no votes
+ * there is no leader (and no percentage): the three choices are not a third each, they are unvoted.
+ * A tie goes to the first of Too High, Just Right, Too Low.
+ */
+export function verdictSummary(tally: VoteTally): {
+  readonly total: number;
+  readonly leader: {
+    readonly choice: VoteChoice;
+    readonly label: string;
+    readonly tone: SemanticColorName;
+    readonly share: number;
+  } | null;
+} {
+  const total = tally.too_high + tally.just_right + tally.too_low;
+  if (total === 0) return { total, leader: null };
+  const top = voteOrder.reduce((best, next) => (tally[next.key] > tally[best.key] ? next : best));
+  return {
+    total,
+    leader: {
+      choice: top.key,
+      label: top.label,
+      tone: top.tone,
+      share: Math.round((tally[top.key] / total) * 100),
+    },
+  };
+}
+
 export interface VerdictBarProps {
   readonly tally: VoteTally;
 }
@@ -146,16 +174,17 @@ export interface VerdictBarProps {
  */
 export function VerdictBar({ tally }: VerdictBarProps) {
   const styles = useThemedStyles(stylesFor);
-  const total = tally.too_high + tally.just_right + tally.too_low;
+  const { total, leader } = verdictSummary(tally);
+  // With no votes the bar rests in thirds, and says so rather than naming a leader.
   const shares = voteOrder.map((vote) => (total === 0 ? 1 / 3 : tally[vote.key] / total));
-  const leader = voteOrder[shares.indexOf(Math.max(...shares))] ?? voteOrder[1]!;
-  const leaderShare = Math.round(Math.max(...shares) * 100);
 
   return (
     <View
       style={styles.verdict}
       accessible
-      accessibilityLabel={`${leaderShare}% say ${leader.label}, ${total} votes`}
+      accessibilityLabel={
+        leader ? `${leader.share}% say ${leader.label}, ${total} votes` : 'No votes yet'
+      }
     >
       <View style={styles.verdictBar}>
         {voteOrder.map((vote, index) => (
@@ -168,12 +197,20 @@ export function VerdictBar({ tally }: VerdictBarProps) {
         ))}
       </View>
       <View style={styles.verdictLegend}>
-        <SWText variant="labelSmall" tone={leader.tone}>
-          {leaderShare}% {leader.label}
-        </SWText>
-        <SWText variant="caption" tone="textMuted">
-          {total} votes
-        </SWText>
+        {leader ? (
+          <>
+            <SWText variant="labelSmall" tone={leader.tone}>
+              {leader.share}% {leader.label}
+            </SWText>
+            <SWText variant="caption" tone="textMuted">
+              {total} votes
+            </SWText>
+          </>
+        ) : (
+          <SWText variant="caption" tone="textMuted">
+            No votes yet
+          </SWText>
+        )}
       </View>
     </View>
   );

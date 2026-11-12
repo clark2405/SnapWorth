@@ -1,11 +1,17 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, renderHook, screen, waitFor } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 
+import type { AccountObserver } from '../../ports/account';
+import type { CollectionRepository } from '../../ports/collections';
+import { err } from '../../types/result';
+
+import { createLocalCollectionRepository, deviceAccount } from '../../adapters';
 import { renderScreen } from '../../testing/render-screen';
 import {
   collectionName,
   collectionTotals,
   CollectionsProvider,
+  useCollections,
   type Collection,
 } from './collections';
 import { CollectionView } from './CollectionView';
@@ -41,7 +47,10 @@ function Providers({
 }) {
   return (
     <PaidPricesProvider store={memoryStore()} seed={{ 'nike-neon-windbreaker': 180 }}>
-      <CollectionsProvider store={store} seed={collections}>
+      <CollectionsProvider
+        account={deviceAccount}
+        repositoryFor={() => createLocalCollectionRepository({ store, seed: collections })}
+      >
         {children}
       </CollectionsProvider>
     </PaidPricesProvider>
@@ -134,4 +143,65 @@ it('makes a new collection from History and opens it', async () => {
 
   await waitFor(() => expect(onOpenCollection).toHaveBeenCalled());
   expect(await screen.findByLabelText('Lamps, 0 items, worth ₱0')).toBeOnTheScreen();
+});
+
+/** Sign-ins the test controls. */
+function fakeAccount(first: string | null) {
+  let listener: ((accountId: string | null) => void) | null = null;
+  const account: AccountObserver = {
+    observe(next) {
+      listener = next;
+      next(first);
+      return () => (listener = null);
+    },
+  };
+  return { account, signIn: (accountId: string | null) => listener?.(accountId) };
+}
+
+it('shows each account only its own collections, and nothing once signed out', async () => {
+  const { account, signIn } = fakeAccount('ana');
+  const stores: Record<string, ReturnType<typeof memoryStore>> = {
+    ana: memoryStore({ 'snapworth.collections.v1': [{ id: 'a', name: 'Ana’s', itemIds: [] }] }),
+    ben: memoryStore({ 'snapworth.collections.v1': [{ id: 'b', name: 'Ben’s', itemIds: [] }] }),
+  };
+  const wrapper = ({ children }: { readonly children: ReactNode }) => (
+    <CollectionsProvider
+      account={account}
+      repositoryFor={(accountId) => createLocalCollectionRepository({ store: stores[accountId]! })}
+    >
+      {children}
+    </CollectionsProvider>
+  );
+  const { result } = renderHook(() => useCollections(), { wrapper });
+  await waitFor(() => expect(result.current.collections.map((c) => c.name)).toEqual(['Ana’s']));
+
+  act(() => signIn('ben'));
+  // Ana's leave at once, then Ben's arrive.
+  expect(result.current.collections).toEqual([]);
+  await waitFor(() => expect(result.current.collections.map((c) => c.name)).toEqual(['Ben’s']));
+
+  act(() => signIn(null));
+  expect(result.current.collections).toEqual([]);
+  expect(await result.current.rename('b', 'Taken')).toBe(false);
+});
+
+it('undoes a change that couldn’t be kept, and says so', async () => {
+  const kept = createLocalCollectionRepository({ store: memoryStore(), seed: [] });
+  const offline: CollectionRepository = {
+    ...kept,
+    create: () =>
+      Promise.resolve(err({ kind: 'offline', operation: 'save_collection', retryable: true })),
+  };
+  renderScreen(
+    <CollectionsProvider account={deviceAccount} repositoryFor={() => offline}>
+      <CollectionsStrip items={[]} />
+    </CollectionsProvider>,
+  );
+
+  fireEvent.press(await screen.findByRole('button', { name: 'New collection' }));
+  fireEvent.changeText(screen.getByLabelText('Collection name'), 'Lamps');
+  fireEvent.press(screen.getByRole('button', { name: 'Make collection' }));
+
+  expect(await screen.findByText('Couldn’t save that')).toBeOnTheScreen();
+  await waitFor(() => expect(screen.queryByLabelText('Lamps, 0 items, worth ₱0')).toBeNull());
 });

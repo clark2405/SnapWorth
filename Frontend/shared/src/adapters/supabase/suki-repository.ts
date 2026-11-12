@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { SukiRepository } from '../../ports/suki';
 import { err, ok } from '../../types/result';
 import { toAppError } from './errors';
-import { ensureSignedIn } from './session';
+import { requireSignedIn } from './session';
 
 /**
  * Suki discounts stored in Supabase (`suki_discounts`). Row-level security decides who may see
@@ -13,8 +13,9 @@ import { ensureSignedIn } from './session';
 export function createSupabaseSukiRepository(client: SupabaseClient): SukiRepository {
   return {
     async discountWith(otherUserId, iAmSeller) {
-      const viewer = await ensureSignedIn(client);
-      if (!viewer.ok) return err(viewer.error);
+      const viewer = await requireSignedIn(client);
+      // Signed out there is no suki; asking must not sign anyone in.
+      if (!viewer.ok) return ok(null);
       const seller = iAmSeller ? viewer.value : otherUserId;
       const buyer = iAmSeller ? otherUserId : viewer.value;
       const { data, error } = await client
@@ -28,7 +29,7 @@ export function createSupabaseSukiRepository(client: SupabaseClient): SukiReposi
     },
 
     async set(buyerId, discountPct) {
-      const viewer = await ensureSignedIn(client);
+      const viewer = await requireSignedIn(client);
       if (!viewer.ok) return err(viewer.error);
       if (discountPct === null) {
         const removed = await client

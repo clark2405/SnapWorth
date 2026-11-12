@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Alert } from 'react-native';
+import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import {
@@ -27,6 +27,7 @@ import {
   useThemedStyles,
   useWideLayout,
 } from '../../design';
+import { minimumPasswordLength } from './password-reset';
 
 export type AuthMode = 'login' | 'signup';
 
@@ -38,10 +39,14 @@ export interface AuthInput {
   readonly gender?: string;
 }
 
+/** A shape check only (something, an @, a dot after it); the server decides whether it exists. */
+const looksLikeEmail = (value: string) => /^\S+@\S+\.\S+$/.test(value.trim());
+
 export interface LoginViewProps {
   readonly initialMode?: AuthMode;
   readonly onSubmit?: (input: AuthInput) => void;
   readonly onForgotPassword?: () => void;
+  /** Sign in with Apple; the button shows only when this is given. */
   readonly onContinueWithApple?: () => void;
   readonly onContinueWithGoogle?: () => void;
   readonly onClose?: () => void;
@@ -74,6 +79,23 @@ const copy = {
   },
 } as const;
 
+/** The first thing wrong with what was typed, or null when it can be sent. */
+function problemWith(
+  mode: AuthMode,
+  email: string,
+  password: string,
+  confirmPassword: string,
+): string | null {
+  if (email.trim() === '' || password === '') return 'Enter your email and password.';
+  if (mode === 'login') return null;
+  if (!looksLikeEmail(email)) return 'That doesn’t look like an email address.';
+  if (password.length < minimumPasswordLength) {
+    return `Use at least ${minimumPasswordLength} characters for your password.`;
+  }
+  if (password !== confirmPassword) return 'The two passwords don’t match.';
+  return null;
+}
+
 export function LoginView({
   initialMode = 'login',
   onSubmit,
@@ -93,6 +115,8 @@ export function LoginView({
   const [fullName, setFullName] = useState('');
   const [gender, setGender] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // What's wrong with the form, said on the screen: an alert box does nothing on the web.
+  const [problem, setProblem] = useState<string | null>(null);
 
   const text = copy[mode];
   // On a wide window the colour block and the form sit side by side, so it all fits at once.
@@ -102,11 +126,13 @@ export function LoginView({
   const submit = () => {
     if (submitting) return;
 
-    if (mode === 'signup' && password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match.');
+    const found = problemWith(mode, email, password, confirmPassword);
+    if (found) {
+      setProblem(found);
       return;
     }
 
+    setProblem(null);
     setSubmitting(true);
     setTimeout(() => {
       setSubmitting(false);
@@ -114,8 +140,12 @@ export function LoginView({
     }, 900);
   };
 
-  const continueWithApple = () =>
-    onContinueWithApple ? onContinueWithApple() : onSubmit?.({ mode, email, password });
+  /** Typing in a field clears what was said was wrong. */
+  const edit = (set: (value: string) => void) => (value: string) => {
+    set(value);
+    setProblem(null);
+  };
+
   const continueWithGoogle = () =>
     onContinueWithGoogle ? onContinueWithGoogle() : onSubmit?.({ mode, email, password });
 
@@ -172,11 +202,14 @@ export function LoginView({
           <Surface padding={tokens.spacing[5]} contentStyle={styles.card}>
             <View style={styles.quick}>
               <View style={wide ? styles.pair : styles.quick}>
-                <Button
-                  label="Continue with Apple"
-                  onPress={continueWithApple}
-                  containerStyle={half}
-                />
+                {/* Apple only where it's set up (an iPhone build that turned it on). */}
+                {onContinueWithApple ? (
+                  <Button
+                    label="Continue with Apple"
+                    onPress={onContinueWithApple}
+                    containerStyle={half}
+                  />
+                ) : null}
                 <Button
                   label="Continue with Google"
                   variant="secondary"
@@ -194,14 +227,21 @@ export function LoginView({
             </View>
 
             <View style={styles.form}>
-              <SegmentedControl options={modes} value={mode} onChange={setMode} />
+              <SegmentedControl
+                options={modes}
+                value={mode}
+                onChange={(next) => {
+                  setMode(next);
+                  setProblem(null);
+                }}
+              />
 
               <View style={[styles.fields, wide ? styles.pair : null]}>
                 <View style={half}>
                   <Field label="Email">
                     <TextField
                       value={email}
-                      onChangeText={setEmail}
+                      onChangeText={edit(setEmail)}
                       placeholder="you@example.com"
                       autoCapitalize="none"
                       autoComplete="email"
@@ -215,8 +255,12 @@ export function LoginView({
                   <Field label="Password">
                     <PasswordField
                       value={password}
-                      onChangeText={setPassword}
-                      placeholder={mode === 'login' ? 'Your password' : 'At least 8 characters'}
+                      onChangeText={edit(setPassword)}
+                      placeholder={
+                        mode === 'login'
+                          ? 'Your password'
+                          : `At least ${minimumPasswordLength} characters`
+                      }
                       autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                       textContentType={mode === 'login' ? 'password' : 'newPassword'}
                       accessibilityLabel="Password"
@@ -234,7 +278,7 @@ export function LoginView({
                       <Field label="Confirm Password">
                         <PasswordField
                           value={confirmPassword}
-                          onChangeText={setConfirmPassword}
+                          onChangeText={edit(setConfirmPassword)}
                           placeholder="Repeat your password"
                           textContentType="newPassword"
                           accessibilityLabel="Confirm Password"
@@ -285,6 +329,17 @@ export function LoginView({
                 ) : null}
               </View>
             </View>
+
+            {problem ? (
+              <SWText
+                variant="bodySmall"
+                tone="danger"
+                accessibilityRole="alert"
+                accessibilityLiveRegion="assertive"
+              >
+                {problem}
+              </SWText>
+            ) : null}
 
             <Button label={text.submit} variant="secondary" loading={submitting} onPress={submit} />
           </Surface>

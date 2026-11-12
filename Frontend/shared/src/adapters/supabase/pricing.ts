@@ -18,11 +18,12 @@ export function createPhotoPricingService(client: SupabaseClient): PhotoPricingS
     async estimate(image, signal, clues) {
       if (signal?.aborted) throw new Error('The estimate was canceled.');
       const { data, error } = await client.auth.getSession();
-      if (error) throw new Error('Could not establish an estimation session. Please try again.');
-      if (!data.session) {
-        const session = await client.auth.signInAnonymously();
-        if (session.error || !session.data.session)
-          throw new Error('Price estimation is not available yet. Please try again later.');
+      if (error) throw new Error('Could not check your account. Please try again.');
+      // An estimate is for an account (the screens gate Snap, and each account has a daily
+      // limit): never sign a device in anonymously to get one. An old anonymous session left by
+      // an earlier build counts as signed out.
+      if (!data.session || data.session.user?.is_anonymous) {
+        throw new Error('Sign in to get a price estimate.');
       }
       if (signal?.aborted) throw new Error('The estimate was canceled.');
       const response = await client.functions.invoke<unknown>('estimate-price', {

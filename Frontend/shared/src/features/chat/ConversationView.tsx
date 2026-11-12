@@ -38,7 +38,9 @@ import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../d
 import type { MeetupProposal } from '../../ports/services';
 import type { ChatReportReason, MeetupPurpose, Message } from '../../types/entities';
 import type { AppError } from '../../types/errors';
-import { formatPeso, previewPhotoByListingKey } from '../preview/sample-data';
+import { formatPeso } from '../preview/sample-data';
+import { useBackendMode } from '../session/backend-mode';
+import { chatListingPhoto } from './chat-listing-photo';
 import { MeetupCard, OfferCard } from './ChatCards';
 import { ChatActionsSheet, MeetupSheet, OfferSheet, SafetySheet, SukiSheet } from './ChatSheets';
 import { useSuki } from './suki';
@@ -83,11 +85,17 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
   const chat = useConversation(conversationId);
+  const backend = useBackendMode();
   const { conversation, messages, typing } = chat;
   const handle = conversation?.other.handle ?? 'seller';
+  // The other person deleted their account: the history stays, shown as theirs-no-longer.
+  const gone = conversation?.otherGone ?? false;
+  const name = gone ? 'Deleted account' : `@${handle}`;
   const askingPrice = conversation?.listing.askingPricePhp ?? 0;
   const iAmSeller = conversation?.iAmSeller ?? false;
-  const suki = useSuki(conversation ? { otherUserId: conversation.other.userId, iAmSeller } : null);
+  const suki = useSuki(
+    conversation && !gone ? { otherUserId: conversation.other.userId, iAmSeller } : null,
+  );
   const [draft, setDraft] = useState('');
   const [sheet, setSheet] = useState<OpenSheet>(null);
   const [counterTo, setCounterTo] = useState<number | undefined>(undefined);
@@ -116,7 +124,7 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
   // Offline sends stay in the thread, marked to retry; anything else is worth a word.
   const complain = useCallback(
     (error: AppError) => {
-      if (error.kind !== 'offline') toast.show(chatErrorCopy(error));
+      if (error.kind !== 'offline') toast.show({ ...chatErrorCopy(error), tone: 'error' });
     },
     [toast],
   );
@@ -198,7 +206,10 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
 
   if (chat.status === 'loading' && !conversation) return <ScreenSkeleton kind="detail" />;
   if (!conversation) {
-    const missing = chat.error?.kind === 'authorization';
+    // A chat that isn't there, isn't yours, or whose address isn't a chat's at all is not a
+    // connection problem: only a failed request is, and anything else gets a plainer "try again".
+    const missing = chat.error?.kind === 'authorization' || chat.error?.kind === 'validation';
+    const offline = chat.error?.kind === 'offline' || chat.error?.kind === 'timeout';
     return (
       <Screen ambient="chat" header={<NavHeader title="Chat" onBack={onBack} banded />}>
         <EmptyState
@@ -206,8 +217,10 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
           title={missing ? 'This conversation isn’t available' : 'Couldn’t load this chat'}
           body={
             missing
-              ? 'It may have been removed, or it belongs to someone else.'
-              : 'Check your connection and try again.'
+              ? 'It may have been removed, or the link is out of date.'
+              : offline
+                ? 'Check your connection and try again.'
+                : 'Something went wrong on our side. Try again in a moment.'
           }
           actionLabel={missing ? undefined : 'Try again'}
           onAction={missing ? undefined : chat.reload}
@@ -217,9 +230,7 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
   }
 
   const listing = conversation.listing;
-  const itemPhoto = listing.photoUrl
-    ? { uri: listing.photoUrl }
-    : previewPhotoByListingKey[listing.key];
+  const itemPhoto = chatListingPhoto(listing, backend);
 
   const composer = closed ? (
     <View style={styles.notice} accessibilityLiveRegion="polite">
@@ -227,7 +238,9 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
       <SWText variant="bodySmall" tone="textSecondary" style={styles.noticeText}>
         {closed === 'sold'
           ? 'This item has sold. The conversation is closed.'
-          : 'This conversation is archived.'}
+          : closed === 'deleted'
+            ? 'This account was deleted. The conversation is closed.'
+            : 'This conversation is archived.'}
       </SWText>
     </View>
   ) : blocked ? (
@@ -300,15 +313,17 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
       scroll={false}
       header={
         <NavHeader
-          title={`@${handle}`}
+          title={name}
           onBack={onBack}
           banded
           trailing={
-            <IconButton
-              icon={Ellipsis}
-              label="Report or block"
-              onPress={() => setSheet('safety')}
-            />
+            gone ? undefined : (
+              <IconButton
+                icon={Ellipsis}
+                label="Report or block"
+                onPress={() => setSheet('safety')}
+              />
+            )
           }
         />
       }
@@ -325,7 +340,7 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
         <Reveal index={0}>
           <PressableScale
             accessibilityLabel={`View item, ${listing.title}, asking ${formatPeso(askingPrice)}`}
-            onPress={() => onViewItem?.(listing.key)}
+            onPress={() => (listing.key ? onViewItem?.(listing.key) : undefined)}
             haptic="select"
             depth="surface"
           >
@@ -470,7 +485,11 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
         onSave={(pct) => {
           void suki.set(pct).then((saved) => {
             if (!saved) {
-              toast.show({ title: 'Couldn’t save that', body: 'Try again in a moment.' });
+              toast.show({
+                title: 'Couldn’t save that',
+                body: 'Try again in a moment.',
+                tone: 'error',
+              });
               return;
             }
             setSheet(null);

@@ -48,12 +48,16 @@ import {
   type PreviewItemStatus,
 } from '../preview/sample-data';
 import { ProfileButton } from '../profile/ProfileButton';
+import { useBackendMode } from '../session/backend-mode';
 import { CollectionsStrip } from './CollectionsStrip';
 import { flipOf, flipTotals, gainLabel, type FlipTotals } from './flips';
 import { usePaidPrices } from './paid-prices';
+import { scanToPreviewItem } from './scan-history';
+import { scanNotRemoved, useScanHistory } from './scan-history-state';
 import { ShareTagSheet, type ShareableItem } from './ShareTagSheet';
 
 export interface HistoryViewProps {
+  readonly items?: readonly PreviewHistoryItem[];
   readonly onOpenItem?: (itemId: string) => void;
   /** Opens a collection's page, e.g. `/collection/:id`. */
   readonly onOpenCollection?: (collectionId: string) => void;
@@ -88,6 +92,7 @@ const filters: readonly { key: FilterKey; label: string }[] = [
 ];
 
 export function HistoryView({
+  items: propItems,
   onOpenItem,
   onOpenCollection,
   onDeleteItem,
@@ -100,7 +105,14 @@ export function HistoryView({
   const styles = useThemedStyles(stylesFor);
   const { colors } = useTheme();
   const toast = useToast();
-  const [items, setItems] = useState<readonly PreviewHistoryItem[]>(previewHistory);
+  const { scans, remove, reload } = useScanHistory();
+  // Until the first scan, History shows the sample items as a preview; after it, only the
+  // person's own scans, so the two are never mixed.
+  const [samples, setSamples] = useState<readonly PreviewHistoryItem[]>(previewHistory);
+  const ownItems = useMemo(() => scans.map(scanToPreviewItem), [scans]);
+  const mode = useBackendMode();
+  const showingSamples = !propItems && ownItems.length === 0 && mode === 'device';
+  const items = propItems ?? (showingSamples ? samples : ownItems);
   const [filter, setFilter] = useState<FilterKey>('all');
   const { paid } = usePaidPrices();
   const flips = useMemo(
@@ -123,10 +135,27 @@ export function HistoryView({
     [filter, items],
   );
 
+  const portfolioTotal = useMemo(
+    () => items.reduce((sum, item) => sum + (item.estimate || 0), 0),
+    [items],
+  );
+
   const deleteItem = (item: PreviewHistoryItem) => {
-    setItems((current) => current.filter((entry) => entry.id !== item.id));
-    onDeleteItem?.(item.id);
-    toast.show({ title: 'Removed from history', body: item.title });
+    if (showingSamples) {
+      setSamples((current) => current.filter((entry) => entry.id !== item.id));
+      onDeleteItem?.(item.id);
+      toast.show({ title: 'Removed from history', body: item.title });
+      return;
+    }
+    // The scan leaves at once; if it couldn't be deleted it comes back, and this says so.
+    void remove(item.id).then((removed) => {
+      if (!removed) {
+        toast.show(scanNotRemoved);
+        return;
+      }
+      onDeleteItem?.(item.id);
+      toast.show({ title: 'Removed from history', body: item.title });
+    });
   };
 
   const [sharing, setSharing] = useState<ShareableItem | null>(null);
@@ -143,17 +172,12 @@ export function HistoryView({
   const wide = useWideLayout();
 
   return (
-    <Screen
-      clearTabBar
-      place="history"
-      ambient="history"
-      onRefresh={() => new Promise((resolve) => setTimeout(resolve, 900))}
-    >
+    <Screen clearTabBar place="history" ambient="history" onRefresh={reload}>
       <LargeTitle
         brand
         title="History"
         overlineIcon={Archive}
-        overline={`${previewHistory.length} items`}
+        overline={items.length === 1 ? '1 item' : `${items.length} items`}
         trailing={
           <View style={styles.actions}>
             {onSnap ? (
@@ -179,15 +203,24 @@ export function HistoryView({
             <Surface tone="feature" padding={tokens.spacing[5]} contentStyle={styles.heroContent}>
               <Overline icon={Wallet} label="What it's all worth" tone="onFeatureDim" />
               <CountUp
-                value={previewPortfolio.total}
+                value={portfolioTotal}
                 format={formatPeso}
                 variant="priceHero"
                 tone="onFeature"
               />
-              <View style={styles.heroMeta}>
-                <Tag label={previewPortfolio.changeLabel} tone="mint" />
-              </View>
-              <Sparkline values={previewPortfolio.series} height={56} color={colors.onFeature} />
+              {/* Real scans have no price history yet, so the trend is the preview's alone. */}
+              {showingSamples ? (
+                <>
+                  <View style={styles.heroMeta}>
+                    <Tag label={previewPortfolio.changeLabel} tone="mint" />
+                  </View>
+                  <Sparkline
+                    values={previewPortfolio.series}
+                    height={56}
+                    color={colors.onFeature}
+                  />
+                </>
+              ) : null}
               {flips ? <FlipSummary totals={flips} /> : null}
             </Surface>
           </Reveal>
@@ -213,13 +246,23 @@ export function HistoryView({
         <View style={wide ? styles.main : null}>
           {visible.length === 0 ? (
             <Animated.View entering={FadeIn} exiting={FadeOut}>
-              <EmptyState
-                icon={PackageSearch}
-                title="Nothing in this pile"
-                body="Nothing matches this filter yet. Try another, or snap something new."
-                actionLabel={filter === 'all' ? undefined : 'Show all'}
-                onAction={filter === 'all' ? undefined : () => setFilter('all')}
-              />
+              {items.length === 0 ? (
+                <EmptyState
+                  icon={PackageSearch}
+                  title="Nothing snapped yet"
+                  body="Snap something and its worth is kept here, with its photo, for every device you sign in on."
+                  actionLabel={onSnap ? 'Snap something' : undefined}
+                  onAction={onSnap}
+                />
+              ) : (
+                <EmptyState
+                  icon={PackageSearch}
+                  title="Nothing in this pile"
+                  body="Nothing matches this filter yet. Try another, or snap something new."
+                  actionLabel={filter === 'all' ? undefined : 'Show all'}
+                  onAction={filter === 'all' ? undefined : () => setFilter('all')}
+                />
+              )}
             </Animated.View>
           ) : (
             // The card eases to its new height as rows come and go, instead of snapping.

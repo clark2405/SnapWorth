@@ -8,15 +8,16 @@ import { previewListings, previewListingWorth, type PreviewListing } from '../pr
 export interface GuessItem {
   readonly id: string;
   readonly title: string;
-  readonly photo: ImageSourcePropType;
+  readonly photo: ImageSourcePropType | null;
   readonly photoLabel: string;
   /** The answer: the AI's estimate. */
   readonly worth: number;
   readonly low: number;
   readonly high: number;
   readonly askingPrice: number;
-  readonly verdict: VoteChoice;
-  readonly verdictShare: number;
+  /** What voters make of the asking price; null while nobody has voted on it. */
+  readonly verdict: VoteChoice | null;
+  readonly verdictShare: number | null;
 }
 
 /** How many things a day's game has. */

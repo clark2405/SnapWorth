@@ -30,7 +30,9 @@ export function toAppError(
   if (code === '42501' || status === 401 || status === 403) {
     return { kind: 'authorization', code: 'not_found_or_denied' };
   }
-  if (code === 'P0002' || code === 'PGRST116') {
+  // 22P02: an id that isn't a uuid (a mistyped or out-of-date link). Nothing is there, which is
+  // what the person is told, rather than an error of ours.
+  if (code === 'P0002' || code === 'PGRST116' || code === '22P02') {
     return { kind: 'authorization', code: 'not_found_or_denied' };
   }
   const conflict = code ? chatConflicts[code] : undefined;

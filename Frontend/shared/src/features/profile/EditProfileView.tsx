@@ -41,7 +41,7 @@ export function EditProfileView({ onBack, onSaved, onPickPhoto }: EditProfileVie
   const toast = useToast();
   const { profile, refresh } = useUserProfile();
 
-  const [avatar, setAvatar] = useState<ImageSourcePropType>(() =>
+  const [avatar, setAvatar] = useState<ImageSourcePropType | null>(() =>
     avatarSourceFor(profile.avatarUrl),
   );
   const [name, setName] = useState<string>(profile.displayName);
@@ -50,6 +50,9 @@ export function EditProfileView({ onBack, onSaved, onPickPhoto }: EditProfileVie
   const [bio, setBio] = useState<string>(profile.bio);
   const [saving, setSaving] = useState(false);
   const [touched, setTouched] = useState(false);
+  // Whether a new photo was picked: the current one's source is rebuilt each render, so it can't
+  // be compared.
+  const [photoPicked, setPhotoPicked] = useState(false);
 
   useEffect(() => {
     if (!touched && profile) {
@@ -62,9 +65,8 @@ export function EditProfileView({ onBack, onSaved, onPickPhoto }: EditProfileVie
   }, [profile, touched]);
 
   const handleOk = handlePattern.test(handle);
-  const initialAvatar = avatarSourceFor(profile.avatarUrl);
   const changed =
-    avatar !== initialAvatar ||
+    photoPicked ||
     name.trim() !== profile.displayName ||
     handle !== profile.handle ||
     location.trim() !== profile.location ||
@@ -77,6 +79,7 @@ export function EditProfileView({ onBack, onSaved, onPickPhoto }: EditProfileVie
       const picked = await onPickPhoto();
       if (picked) {
         setAvatar(picked);
+        setPhotoPicked(true);
         setTouched(true);
       }
     } catch {
@@ -88,8 +91,9 @@ export function EditProfileView({ onBack, onSaved, onPickPhoto }: EditProfileVie
     if (!canSave) return;
     setSaving(true);
     try {
+      // Only a newly picked photo is sent, to be uploaded; an unchanged one stays as it is.
       const avatarUrl =
-        typeof avatar === 'object' && avatar !== null && 'uri' in avatar
+        photoPicked && typeof avatar === 'object' && avatar !== null && 'uri' in avatar
           ? (avatar as { uri: string }).uri
           : undefined;
 
@@ -103,7 +107,11 @@ export function EditProfileView({ onBack, onSaved, onPickPhoto }: EditProfileVie
 
       if (!res.success) {
         setSaving(false);
-        toast.show({ title: 'Update failed', body: res.error || 'Failed to update profile' });
+        toast.show({
+          title: 'Update failed',
+          body: res.error || 'Failed to update profile',
+          tone: 'error',
+        });
         return;
       }
 
@@ -116,6 +124,7 @@ export function EditProfileView({ onBack, onSaved, onPickPhoto }: EditProfileVie
       toast.show({
         title: 'Update failed',
         body: err instanceof Error ? err.message : 'Failed to update profile',
+        tone: 'error',
       });
     }
   };
@@ -130,23 +139,28 @@ export function EditProfileView({ onBack, onSaved, onPickPhoto }: EditProfileVie
       }
       contentStyle={styles.content}
     >
-      <Reveal index={0} style={styles.photoBlock}>
+      <Reveal index={0}>
+        {/* The picture and its caption are one control: pressing either picks a photo. */}
         <PressableScale
           accessibilityRole="button"
           accessibilityLabel="Change profile photo"
           haptic="select"
           disabled={!onPickPhoto}
           onPress={() => void pickPhoto()}
-          style={styles.photoButton}
+          style={styles.photoBlock}
         >
-          <Avatar source={avatar} name={handle} size={96} ring />
-          <View style={styles.camera}>
-            <Camera size={15} strokeWidth={2.2} color={colors.onAccent} />
+          <View style={styles.photoButton}>
+            <Avatar source={avatar} name={handle} size={96} ring />
+            <View style={styles.camera}>
+              <Camera size={15} strokeWidth={2.2} color={colors.onAccent} />
+            </View>
           </View>
+          {onPickPhoto ? (
+            <SWText variant="labelSmall" tone="accent">
+              Change photo
+            </SWText>
+          ) : null}
         </PressableScale>
-        <SWText variant="labelSmall" tone="accent">
-          Change photo
-        </SWText>
       </Reveal>
 
       <Reveal index={1} style={styles.fields}>
@@ -229,6 +243,7 @@ const stylesFor = themedStyles((colors) => ({
     gap: tokens.spacing[8],
   },
   photoBlock: {
+    alignSelf: 'center',
     alignItems: 'center',
     gap: tokens.spacing[2],
   },

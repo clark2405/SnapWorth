@@ -1,4 +1,4 @@
-import { CircleCheck, type LucideIcon } from 'lucide-react-native';
+import { CircleAlert, CircleCheck, type LucideIcon } from 'lucide-react-native';
 import {
   createContext,
   useCallback,
@@ -21,6 +21,8 @@ import { SWText } from './SWText';
 export interface ToastMessage {
   readonly title: string;
   readonly body?: string;
+  /** `error` for something that didn't go through: the alert icon and the danger colour, not a tick. */
+  readonly tone?: 'success' | 'error';
   readonly icon?: LucideIcon;
   /** The big payoff moments (a listing goes live) also throw a burst of confetti. */
   readonly celebrate?: boolean;
@@ -38,7 +40,8 @@ export function useToast(): ToastApi {
 
 /**
  * Confirmation that an action landed ("Offer sent", "Alert set"): a glass pill that drops from
- * the top on a spring with a success haptic, then lifts away. It never blocks the screen.
+ * the top on a spring with a success haptic, then lifts away. It never blocks the screen. Said
+ * with `tone: 'error'` it reports a failure instead, with the alert icon and a warning haptic.
  */
 export function ToastProvider({ children }: { readonly children: ReactNode }) {
   const [current, setCurrent] = useState<(ToastMessage & { id: number }) | null>(null);
@@ -50,7 +53,7 @@ export function ToastProvider({ children }: { readonly children: ReactNode }) {
     counter.current += 1;
     setCurrent({ ...message, id: counter.current });
     if (message.celebrate) setBurst((value) => value + 1);
-    haptic('success');
+    haptic(message.tone === 'error' ? 'warning' : 'success');
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => setCurrent(null), 2400);
   }, []);
@@ -80,19 +83,20 @@ function ToastPill({ message }: { readonly message: ToastMessage }) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const themed = useThemedStyles(stylesFor);
-  const Icon = message.icon ?? CircleCheck;
+  const failed = message.tone === 'error';
+  const Icon = message.icon ?? (failed ? CircleAlert : CircleCheck);
 
   return (
     <Animated.View
       entering={SlideInUp.duration(380)}
       exiting={FadeOutUp.duration(220)}
       style={[themed.wrap, { top: insets.top + tokens.spacing[2] }]}
-      accessibilityLiveRegion="polite"
+      accessibilityLiveRegion={failed ? 'assertive' : 'polite'}
       accessibilityRole="alert"
     >
       <GlassSurface style={themed.pill}>
         <View style={themed.row}>
-          <Icon size={20} strokeWidth={2.2} color={colors.success} />
+          <Icon size={20} strokeWidth={2.2} color={failed ? colors.danger : colors.success} />
           <View style={themed.text}>
             <SWText variant="headingSmall">{message.title}</SWText>
             {message.body ? (

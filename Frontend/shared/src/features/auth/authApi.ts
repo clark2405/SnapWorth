@@ -1,3 +1,6 @@
+import type { User } from '@supabase/supabase-js';
+import { useEffect, useState } from 'react';
+
 import { getSupabase, isSupabaseConfigured } from '../../adapters/supabaseClient';
 
 export { isSupabaseConfigured };
@@ -22,6 +25,105 @@ export async function performGoogleAuth(redirectUrl: string) {
       skipBrowserRedirect: true,
     },
   });
+}
+
+/**
+ * Signs in with the identity token from Sign in with Apple on an iPhone. `rawNonce` is the
+ * nonce before hashing; Apple saw its SHA-256, and Supabase checks the token against it.
+ * A first sign-in's name, which Apple sends only once, is kept on the account.
+ */
+export async function performAppleAuth(credential: {
+  readonly idToken: string;
+  readonly rawNonce: string;
+  readonly fullName?: string;
+}) {
+  const result = await getSupabase().auth.signInWithIdToken({
+    provider: 'apple',
+    token: credential.idToken,
+    nonce: credential.rawNonce,
+  });
+  if (!result.error && credential.fullName && !result.data.user?.user_metadata?.full_name) {
+    const named = await getSupabase().auth.updateUser({ data: { full_name: credential.fullName } });
+    if (named.data.user) return { ...result, data: { ...result.data, user: named.data.user } };
+  }
+  return result;
+}
+
+/**
+ * Where Google sends people back to on the web (`/auth/callback`). It must be on Supabase's
+ * Redirect URLs list; see READ-FIRST "Sign-in setup".
+ */
+export const oauthCallbackPath = 'auth/callback';
+
+/**
+ * Starts Google sign-in on the web: asks Supabase for Google's address, then leaves for it with
+ * `open` (the page's own `location.assign`). Resolves the reason when it couldn't start.
+ */
+export async function startWebGoogleSignIn(
+  redirectTo: string,
+  open: (url: string) => void,
+): Promise<string | null> {
+  try {
+    const { data, error } = await performGoogleAuth(redirectTo);
+    if (error) return error.message;
+    if (!data?.url) return 'Google sign-in couldn’t start. Try again.';
+    open(data.url);
+    return null;
+  } catch (failure) {
+    return failure instanceof Error ? failure.message : 'Google sign-in couldn’t start. Try again.';
+  }
+}
+
+export type OAuthOutcome =
+  | { readonly kind: 'signed-in'; readonly user: User }
+  | { readonly kind: 'cancelled' }
+  | { readonly kind: 'failed'; readonly message: string };
+
+/**
+ * Finishes a sign-in Google sent back to the callback page. Turning Google down comes back as
+ * `access_denied`, which is a change of mind rather than a failure.
+ */
+export async function finishOAuthRedirect(url: string): Promise<OAuthOutcome> {
+  const params = authParamsFromUrl(url);
+  if (params.get('error') === 'access_denied') return { kind: 'cancelled' };
+  if (!params.get('error') && !params.get('code') && !params.get('access_token')) {
+    return { kind: 'failed', message: 'This page only finishes a sign-in Google started.' };
+  }
+  try {
+    const { data, error } = await completeAuthFromUrl(url);
+    if (error) return { kind: 'failed', message: error.message };
+    if (!data.user) return { kind: 'failed', message: 'Google didn’t return an account.' };
+    return { kind: 'signed-in', user: data.user };
+  } catch (failure) {
+    return {
+      kind: 'failed',
+      message: failure instanceof Error ? failure.message : 'Something went wrong. Try again.',
+    };
+  }
+}
+
+const finishing = new Map<string, Promise<OAuthOutcome>>();
+
+/**
+ * The callback page's sign-in, finished once per address even if the page mounts twice (a code
+ * can be exchanged only once). Null while it's being finished, or before the address is known.
+ */
+export function useOAuthRedirect(url: string | null | undefined): OAuthOutcome | null {
+  const [outcome, setOutcome] = useState<OAuthOutcome | null>(null);
+  useEffect(() => {
+    if (url === undefined) return;
+    let active = true;
+    const key = url ?? '';
+    const pending = finishing.get(key) ?? finishOAuthRedirect(key);
+    finishing.set(key, pending);
+    void pending.then((next) => {
+      if (active) setOutcome(next);
+    });
+    return () => {
+      active = false;
+    };
+  }, [url]);
+  return outcome;
 }
 
 /** Query or hash params from a custom-scheme redirect such as `snapworth://?code=…`. */

@@ -43,9 +43,9 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('00000000-0000-4000-f000-00000000000a', 'sela@test', '{"handle":"sela"}'),
   ('00000000-0000-4000-f000-00000000000b', 'bea@test', '{"handle":"bea_suki"}'),
   ('00000000-0000-4000-f000-00000000000c', 'cora@test', '{"handle":"cora"}');
-insert into public.listings (id, slug, seller_id, title, asking_php)
+insert into public.listings (id, slug, seller_id, title, asking_php, moderation_status)
 values ('00000000-0000-4000-f100-000000000001', 'sela-lamp',
-        '00000000-0000-4000-f000-00000000000a', 'Brass lamp', 1500);
+        '00000000-0000-4000-f000-00000000000a', 'Brass lamp', 1500, 'approved');
 insert into public.conversations (id, listing_id, buyer_id, seller_id)
 values ('00000000-0000-4000-f200-000000000001', '00000000-0000-4000-f100-000000000001',
         '00000000-0000-4000-f000-00000000000b', '00000000-0000-4000-f000-00000000000a');

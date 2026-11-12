@@ -134,22 +134,28 @@ async function main() {
   const outsider = device("Outsider phone");
 
   section("Setup");
-  // Opening Chats loads the list and starts listening at once; that must not make two accounts.
+  // A signed-out phone that opens Chats (loading the list and listening at once) must not be
+  // signed in behind its back: no account appears, and it has no chats.
   const accountsBefore = Number(asSuperuser("select count(*) from auth.users"));
   const fresh = device("Fresh phone");
   const stopFresh = fresh.listen();
-  await Promise.all([fresh.chat.list(), fresh.chat.list()]);
+  const signedOut = await Promise.all([fresh.chat.list(), fresh.chat.list()]);
   await pause(300);
   check(
-    Number(asSuperuser("select count(*) from auth.users")) - accountsBefore ===
-      1,
-    "a phone that loads its list and listens at the same time gets one account",
+    Number(asSuperuser("select count(*) from auth.users")) === accountsBefore &&
+      signedOut.every((list) => list.ok && list.value.length === 0),
+    "a signed-out phone that opens Chats gets no account and no chats",
   );
   stopFresh();
   fresh.client.realtime.disconnect();
 
-  // Opening the Chats tab signs each phone in (anonymously, until email sign-in is wired up).
+  // Each phone signs up with its own email, as people do in the app, then opens Chats.
   for (const phone of [seller, buyer, outsider]) {
+    const { error } = await phone.client.auth.signUp({
+      email: `${phone.name.toLowerCase().replace(/\W+/g, "-")}-${crypto.randomUUID().slice(0, 8)}@sim.test`,
+      password: crypto.randomUUID(),
+    });
+    check(!error, `${phone.name} signs up`, error?.message);
     const list = await phone.chat.list();
     check(
       list.ok && list.value.length === 0,
@@ -165,9 +171,9 @@ async function main() {
       3,
     "each phone is a different account",
   );
-  // The seller lists a camera (listings have no client write path yet, so this is set up directly).
+  // The seller lists a camera, already approved by moderation (set up directly).
   asSuperuser(
-    `insert into public.listings (slug, seller_id, title, asking_php) values ('sim-camera', '${sellerId}', 'Film camera', 1500)`,
+    `insert into public.listings (slug, seller_id, title, asking_php, moderation_status) values ('sim-camera', '${sellerId}', 'Film camera', 1500, 'approved')`,
   );
 
   const stopSeller = seller.listen();

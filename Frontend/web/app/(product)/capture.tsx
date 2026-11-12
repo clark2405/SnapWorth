@@ -1,8 +1,11 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 
+import { Camera } from 'lucide-react-native';
+
+import { EmptyState, NavHeader, Screen } from '@snapworth/shared/components';
 import { CaptureView } from '@snapworth/shared/features/capture';
-import { AccountGateView, useSession } from '@snapworth/shared/features/session';
+import { AccountGateView, useBackendMode, useSession } from '@snapworth/shared/features/session';
 import { useTip } from '@snapworth/shared/features/tips';
 
 export default function CaptureRoute() {
@@ -13,7 +16,25 @@ export default function CaptureRoute() {
   const snapTip = useTip('snap');
   const close = () => (router.canGoBack() ? router.back() : router.replace('/feed'));
 
+  const backend = useBackendMode();
+
   if (isGuest) return <AccountGateView title="Snap" intent="snap" onBack={close} />;
+
+  // The web has no camera yet, and its shutter only opens a sample estimate. With a real
+  // account that would be somebody else's numbers, so say where Snap works instead.
+  if (backend === 'supabase') {
+    return (
+      <Screen header={<NavHeader title="Snap" onBack={close} />}>
+        <EmptyState
+          icon={Camera}
+          title="Snap from the phone app"
+          body="The website can't take a photo yet. Open SnapWorth on your phone to snap an item; it appears in History here once it's valued."
+          actionLabel="Open your history"
+          onAction={() => router.push('/history')}
+        />
+      </Screen>
+    );
+  }
 
   return (
     <CaptureView

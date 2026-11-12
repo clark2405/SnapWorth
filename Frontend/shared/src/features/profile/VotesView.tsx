@@ -15,13 +15,8 @@ import {
 } from '../../components';
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import type { VoteChoice, VoteCounts } from '../../types';
-import {
-  formatPeso,
-  previewOlderPosts,
-  previewPosts,
-  previewVotesCast,
-  type PreviewPost,
-} from '../preview/sample-data';
+import { formatRelativeAgo, useFeed } from '../feed/feed-state';
+import { formatPeso, type PreviewPost } from '../preview/sample-data';
 
 export interface VotesViewProps {
   readonly onBack?: () => void;
@@ -53,10 +48,18 @@ function leading(tally: VoteCounts): VoteChoice {
  */
 export function VotesView({ onBack, onOpenPost, onBrowseFeed }: VotesViewProps) {
   const styles = useThemedStyles(stylesFor);
-  const posts = [...previewPosts, ...previewOlderPosts];
-  const votes = previewVotesCast.flatMap((entry) => {
-    const post = posts.find((candidate) => candidate.id === entry.postId);
-    return post ? [{ ...entry, post }] : [];
+  const { userVotes, findPreviewPost } = useFeed();
+  const votes = userVotes.flatMap((entry) => {
+    const post = findPreviewPost(entry.postSlug) ?? findPreviewPost(entry.postId);
+    if (!post) return [];
+    return [
+      {
+        postId: post.id,
+        vote: entry.choice,
+        castAgo: formatRelativeAgo(entry.castAt),
+        post,
+      },
+    ];
   });
   const agreed = votes.filter((entry) => entry.vote === leading(entry.post.votes)).length;
   const agreement = votes.length > 0 ? Math.round((agreed / votes.length) * 100) : 0;
@@ -139,7 +142,7 @@ function VoteRow({
   return (
     <ZoomLink
       href={`/post/${post.id}`}
-      label={`You voted ${look.label} on ${formatPeso(post.estimate)}, ${castAgo}. ${post.body}`}
+      label={`You voted ${look.label}${post.estimate === null ? '' : ` on ${formatPeso(post.estimate)}`}, ${castAgo}. ${post.body}`}
       onPress={onOpen}
       style={styles.row}
     >
@@ -151,7 +154,9 @@ function VoteRow({
       />
       <View style={styles.rowText}>
         <View style={styles.topLine}>
-          <SWText variant="priceSmall">{formatPeso(post.estimate)}</SWText>
+          {post.estimate === null ? null : (
+            <SWText variant="priceSmall">{formatPeso(post.estimate)}</SWText>
+          )}
           <SWText variant="caption" tone="textMuted">
             {castAgo}
           </SWText>

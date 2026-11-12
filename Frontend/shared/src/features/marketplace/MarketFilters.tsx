@@ -14,9 +14,10 @@ import {
   TextField,
 } from '../../components';
 import { held, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import { NearMeNotice } from './NearMeNotice';
+import { useViewerLocation } from './viewer-location';
 import {
   formatPeso,
-  previewListingPlaces,
   previewMarketAreas,
   previewPriceBrackets,
   type PreviewListing,
@@ -50,19 +51,22 @@ const radiusOptions: readonly { readonly key: RadiusKey; readonly label: string 
 ];
 
 /**
- * Preview-only matching against the sample listings. The real query belongs to the listing
- * service; this keeps the screen honest about what each filter would show.
+ * Whether a listing passes the price and place filters. `distanceKm` is how far it is from the
+ * viewer, worked out on their device; it is null while the viewer's position isn't known (not
+ * asked yet, or permission denied), and then "Near me" can't narrow anything, so it lets the
+ * listing through and the screen says why.
  */
 export function matchesPriceAndPlace(
-  listing: PreviewListing,
+  listing: PreviewListing & { readonly area: string; readonly distanceKm: number | null },
   filters: Pick<MarketFilters, 'minPrice' | 'maxPrice' | 'area' | 'radiusKm'>,
 ): boolean {
   if (filters.minPrice !== null && listing.askingPrice < filters.minPrice) return false;
   if (filters.maxPrice !== null && listing.askingPrice > filters.maxPrice) return false;
-  const place = previewListingPlaces[listing.id];
-  if (filters.area === 'anywhere' || !place) return true;
-  if (filters.area === 'near-me') return place.distanceKm <= Number(filters.radiusKm);
-  return place.area === filters.area;
+  if (filters.area === 'anywhere') return true;
+  if (filters.area === 'near-me') {
+    return listing.distanceKm === null || listing.distanceKm <= Number(filters.radiusKm);
+  }
+  return listing.area === filters.area;
 }
 
 export function priceLabel(min: number | null, max: number | null): string | null {
@@ -292,12 +296,21 @@ export function LocationFilterSheet({
   const styles = useThemedStyles(stylesFor);
   const [area, setArea] = useState(filters.area);
   const [radius, setRadius] = useState<RadiusKey>(filters.radiusKm);
+  const location = useViewerLocation();
+  const askForLocation = location.request;
 
   useEffect(() => {
     if (!visible) return;
     setArea(nearMeOnly ? 'near-me' : filters.area);
     setRadius(filters.radiusKm);
   }, [filters.area, filters.radiusKm, nearMeOnly, visible]);
+
+  // Choosing "Near me" is what asks where the viewer is, so a refusal can be said right here, in
+  // the sheet, instead of only once it has been closed.
+  useEffect(() => {
+    if (visible && area === 'near-me' && location.status === 'idle') void askForLocation();
+  }, [area, askForLocation, location.status, visible]);
+  const locationFailed = location.status === 'denied' || location.status === 'unavailable';
 
   return (
     <Sheet visible={visible} onClose={onClose} title={nearMeOnly ? 'Near me' : 'Location'}>
@@ -315,6 +328,13 @@ export function LocationFilterSheet({
           </SWText>
           <SegmentedControl options={radiusOptions} value={radius} onChange={setRadius} />
         </Animated.View>
+      ) : null}
+      {area === 'near-me' && locationFailed ? (
+        <NearMeNotice
+          status={location.status}
+          onTryAgain={() => void location.request()}
+          onClear={() => (nearMeOnly ? onApply('anywhere', radius) : setArea('anywhere'))}
+        />
       ) : null}
       <SheetActions
         count={countFor(area, radius)}

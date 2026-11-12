@@ -7,7 +7,7 @@ import type { CommentId, UserId } from '../../types/ids';
 import { err, ok, type Result } from '../../types/result';
 import type { UtcDateTime } from '../../types/date-time';
 import { toAppError } from './errors';
-import { ensureSignedIn } from './session';
+import { requireSignedIn } from './session';
 
 interface ThreadRow {
   readonly id: string;
@@ -43,12 +43,12 @@ function fromRow(row: ThreadRow): ThreadComment {
 
 /**
  * Comments stored in Supabase. Who may see or change what is decided by the database's
- * row-level security; this adapter only translates. Until email sign-in is wired up, a device
- * without a session signs in anonymously so its comments have an author.
+ * row-level security; this adapter only translates. Reading needs no account; commenting and
+ * reporting need a signed-in one.
  */
 export function createSupabaseCommentRepository(client: SupabaseClient): CommentRepository {
   async function ensureSession(): Promise<Result<void, ModerationError>> {
-    const signedIn = await ensureSignedIn(client);
+    const signedIn = await requireSignedIn(client);
     return signedIn.ok ? ok(undefined) : signedIn;
   }
 
@@ -70,7 +70,7 @@ export function createSupabaseCommentRepository(client: SupabaseClient): Comment
         .from('comments')
         .insert({ post_id: post.data.id, parent_id: replyTo ?? null, body })
         .select(
-          'id, parent_id, body, moderation_status, created_at, author_id, author:profiles(handle, avatar_url)',
+          'id, parent_id, body, moderation_status, created_at, author_id, author:profiles!comments_author_id_fkey(handle, avatar_url)',
         )
         .single();
       if (error) return err(toAppError(error, 'submit_comment'));

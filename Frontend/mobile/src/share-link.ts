@@ -25,7 +25,7 @@ export function useShareLink(): (path: string, message: string) => void {
         .then((result) => {
           if (result.action === Share.sharedAction) toast.show({ title: 'Link shared' });
         })
-        .catch(() => toast.show({ title: 'Couldn’t open sharing', body: url }));
+        .catch(() => toast.show({ title: 'Couldn’t open sharing', body: url, tone: 'error' }));
     },
     [toast],
   );

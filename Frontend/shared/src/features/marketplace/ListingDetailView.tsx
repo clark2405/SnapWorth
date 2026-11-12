@@ -2,9 +2,12 @@ import {
   BadgeCheck,
   ChevronRight,
   Eye,
+  PackageSearch,
   Heart,
   MessageSquare,
   PencilLine,
+  Trash2,
+  Undo2,
   Users,
 } from 'lucide-react-native';
 import { useState } from 'react';
@@ -17,6 +20,7 @@ import {
   BottomBar,
   Button,
   ChoiceChips,
+  EmptyState,
   IconButton,
   LikeButton,
   ListRow,
@@ -26,11 +30,11 @@ import {
   Reveal,
   PriceRangeBar,
   Screen,
+  ScreenSkeleton,
   Sheet,
   Surface,
   SWText,
   useToast,
-  VerdictBar,
   TextField,
   shareIcon,
   DetailHero,
@@ -39,18 +43,19 @@ import {
   Toggle,
   WorthySays,
 } from '../../components';
+import type { MarketListing } from '../../ports/marketplace';
+import type { ModerationStatus } from '../../types/entities';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
-import type { VoteCounts } from '../../types';
-import {
-  formatPeso,
-  photosOf,
-  previewListingDetail,
-  previewListingInsight,
-  previewMyListing,
-  previewMyListingInsight,
-} from '../preview/sample-data';
+import { formatPeso } from '../preview/sample-data';
 import { useAccountGate, useSession } from '../session';
 import { askingLine } from './asking-line';
+import { verdictChip, verdictLabel } from './ListingCard';
+import {
+  listingPhotoSource,
+  savedNotKept,
+  sellerAvatarSource,
+  useMarketplace,
+} from './marketplace-state';
 import { useTip } from '../tips';
 
 export interface ListingDetailViewProps {
@@ -62,28 +67,53 @@ export interface ListingDetailViewProps {
    * false when it couldn't be (the host has already said why).
    */
   readonly onSendOffer?: (amountPhp: number) => Promise<boolean>;
-  readonly onOpenSeller?: () => void;
+  readonly onOpenSeller?: (sellerHandle?: string) => void;
   /** Owner only: repost this listing to the feed so the community can vote on its price. */
   readonly onAskFeed?: () => void;
   /** Owner only: change the asking price (back through manual price confirmation). */
   readonly onEditPrice?: () => void;
-  /** Owner only: close the listing as sold. */
+  /** Owner only: called after the listing has been closed as sold. It stays on screen, as sold. */
   readonly onMarkSold?: () => void;
+  /** Owner only: delete the listing. */
+  readonly onDeleteListing?: () => void;
   /** Shares a link to this listing. */
   readonly onShare?: () => void;
 }
 
-function communityTally(justRightShare: number): VoteCounts {
-  const remainder = 100 - justRightShare;
-  return {
-    just_right: justRightShare,
-    too_high: Math.round(remainder * 0.6),
-    too_low: Math.round(remainder * 0.4),
-  };
+const categoryDisplayLabel: Readonly<Record<string, string>> = {
+  collectibles: 'Collectibles',
+  fashion: 'Fashion',
+  sneakers: 'Sneakers',
+  electronics: 'Electronics',
+  home: 'Home',
+};
+
+const roundTo50 = (value: number) => Math.max(50, Math.round(value / 50) * 50);
+
+/**
+ * A listing's page. The listing comes from the Market (Supabase's, or the device's sample ones in
+ * a build with no project); one that isn't there says so rather than showing a stand-in.
+ */
+export function ListingDetailView(props: ListingDetailViewProps) {
+  const { findListing, status } = useMarketplace();
+  const listing = findListing(props.listingId);
+  if (listing) return <ListingDetail {...props} listing={listing} />;
+  if (status === 'loading') return <ScreenSkeleton kind="detail" />;
+  return (
+    <Screen ambient="market" header={<NavHeader title="Listing" onBack={props.onBack} />}>
+      <EmptyState
+        icon={PackageSearch}
+        title="This listing isn’t available"
+        body="It may have been sold or removed, or the link is out of date."
+        actionLabel="Go back"
+        onAction={props.onBack}
+      />
+    </Screen>
+  );
 }
 
-export function ListingDetailView({
-  listingId,
+function ListingDetail({
+  listing: marketListing,
   onBack,
   onMessageSeller,
   onSendOffer,
@@ -91,43 +121,132 @@ export function ListingDetailView({
   onAskFeed,
   onEditPrice,
   onMarkSold,
+  onDeleteListing,
   onShare,
-}: ListingDetailViewProps) {
+}: ListingDetailViewProps & { readonly listing: MarketListing }) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
   const { isGuest } = useSession();
   const requireAccount = useAccountGate();
-  // The seller sees their own listing with its numbers and controls instead of buy actions.
-  const owned = !isGuest && listingId === previewMyListing.id;
-  const listing = owned ? previewMyListing : previewListingDetail;
-  const insight = owned ? previewMyListingInsight : previewListingInsight;
-  const [markingSold, setMarkingSold] = useState(false);
+  const {
+    isSaved,
+    getAlert,
+    toggleSaved: toggleSavedInMarket,
+    saveAlert,
+    updateListing,
+    removeListing,
+  } = useMarketplace();
 
-  const [saved, setSaved] = useState(false);
-  const [priceAlert, setPriceAlert] = useState(false);
+  // The seller sees their own listing with its numbers and controls instead of buy actions.
+  const owned = !isGuest && marketListing.mine;
+
+  const activeId = marketListing.id;
+  const title = marketListing.title;
+  const categoryLabel = categoryDisplayLabel[marketListing.category] ?? marketListing.category;
+  const askingPrice = marketListing.askingPrice;
+  const description = marketListing.description;
+  // What voters make of the asking price. Null until someone has voted, so nothing is shown.
+  const verdict =
+    marketListing.verdict !== null && marketListing.verdictShare !== null
+      ? { choice: marketListing.verdict, share: marketListing.verdictShare }
+      : null;
+
+  const seller = {
+    handle: marketListing.seller.handle,
+    avatar: sellerAvatarSource(marketListing.seller),
+    rating: marketListing.seller.rating,
+    sales: marketListing.seller.sales,
+  };
+
+  const photo = listingPhotoSource(marketListing);
+  const heroPhotos = photo ? [{ source: photo, label: marketListing.photoLabel }] : [];
+
+  // The AI's range, copied from the listing's scan. A listing made without one has none.
+  const aiRange =
+    marketListing.estimatePhp !== null &&
+    marketListing.estimateLowPhp !== null &&
+    marketListing.estimateHighPhp !== null
+      ? {
+          estimate: marketListing.estimatePhp,
+          low: marketListing.estimateLowPhp,
+          high: marketListing.estimateHighPhp,
+        }
+      : null;
+  const saves = marketListing.stats.saves;
+  const offerSuggestions = [
+    roundTo50(askingPrice * 0.88),
+    roundTo50(askingPrice * 0.93),
+    roundTo50(askingPrice * 0.97),
+  ];
+
+  const sold = marketListing.status === 'sold';
+  const [markingSold, setMarkingSold] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [offerOpen, setOfferOpen] = useState(false);
   const [offerText, setOfferText] = useState('');
   const [sendingOffer, setSendingOffer] = useState(false);
+
+  const saved = isSaved(activeId);
+  const priceAlert = getAlert(activeId)?.on ?? false;
 
   const saveTip = useTip('save');
   const toggleSaved = () =>
     requireAccount('save', () => {
       saveTip.done();
-      setSaved((value) => !value);
+      void toggleSavedInMarket(activeId).then((result) => {
+        if (!result.ok) toast.show(savedNotKept);
+      });
     });
-  const tally = communityTally(listing.justRightShare);
   const offerAmount = Number(offerText.replace(/,/g, '')) || 0;
 
+  // Closing a listing as sold keeps it on screen, now as sold; it can be put back on sale.
+  const changeStatus = async (next: 'active' | 'sold') => {
+    setMarkingSold(true);
+    const result = await updateListing(activeId, { status: next });
+    setMarkingSold(false);
+    if (!result.ok) {
+      toast.show({
+        title: next === 'sold' ? 'Couldn’t mark it as sold' : 'Couldn’t put it back on sale',
+        body: 'Please check your connection and try again.',
+        tone: 'error',
+      });
+      return;
+    }
+    if (next === 'sold') {
+      toast.show({ title: 'Marked as sold', celebrate: true });
+      onMarkSold?.();
+    } else {
+      toast.show({ title: 'Back on sale', body: 'Buyers can message you about it again.' });
+    }
+  };
+
+  const deleteListing = async () => {
+    setDeleting(true);
+    const result = await removeListing(activeId);
+    setDeleting(false);
+    setConfirmingDelete(false);
+    if (!result.ok) {
+      toast.show({
+        title: 'Couldn’t delete the listing',
+        body: 'Please check your connection and try again.',
+        tone: 'error',
+      });
+      return;
+    }
+    toast.show({ title: 'Listing deleted' });
+    if (onDeleteListing) onDeleteListing();
+    else onMarkSold?.();
+  };
+
   const offerNote = (() => {
+    if (!aiRange) return 'Offers go to the seller, who can accept, decline or counter.';
+    const range = `${formatPeso(aiRange.low)}–${formatPeso(aiRange.high)}`;
     if (offerAmount <= 0) return 'Enter an amount to compare it with the AI range.';
-    if (offerAmount < insight.estimateLow) {
-      return `Below the AI range of ${formatPeso(insight.estimateLow)}–${formatPeso(insight.estimateHigh)}.`;
-    }
-    if (offerAmount > insight.estimateHigh) {
-      return `Above the AI range of ${formatPeso(insight.estimateLow)}–${formatPeso(insight.estimateHigh)}.`;
-    }
-    return `Within the AI range of ${formatPeso(insight.estimateLow)}–${formatPeso(insight.estimateHigh)}.`;
+    if (offerAmount < aiRange.low) return `Below the AI range of ${range}.`;
+    if (offerAmount > aiRange.high) return `Above the AI range of ${range}.`;
+    return `Within the AI range of ${range}.`;
   })();
 
   // The offer goes into the chat with the seller, as an offer they can accept, decline or
@@ -142,7 +261,7 @@ export function ListingDetailView({
     setOfferText('');
     toast.show({
       title: 'Offer sent',
-      body: `${formatPeso(offerAmount)} to @${listing.seller.handle}. They can accept, decline or counter it.`,
+      body: `${formatPeso(offerAmount)} to @${seller.handle}. They can accept, decline or counter it.`,
     });
   };
 
@@ -179,7 +298,27 @@ export function ListingDetailView({
         />
       }
       footer={
-        owned ? (
+        owned && sold ? (
+          <BottomBar>
+            <View style={styles.footerRow}>
+              <Button
+                label="Delete listing"
+                variant="secondary"
+                icon={Trash2}
+                loading={deleting}
+                onPress={() => setConfirmingDelete(true)}
+                containerStyle={styles.footerButton}
+              />
+              <Button
+                label="Mark available"
+                icon={Undo2}
+                loading={markingSold}
+                onPress={() => void changeStatus('active')}
+                containerStyle={styles.footerButton}
+              />
+            </View>
+          </BottomBar>
+        ) : owned ? (
           <BottomBar>
             <View style={styles.footerRow}>
               <Button
@@ -212,12 +351,14 @@ export function ListingDetailView({
               <Button
                 label="Make offer"
                 variant="secondary"
+                disabled={sold}
                 onPress={() => requireAccount('offer', () => setOfferOpen(true))}
                 containerStyle={styles.footerButton}
               />
               <Button
                 label="Message"
                 icon={MessageSquare}
+                disabled={sold}
                 onPress={() => requireAccount('message', onMessageSeller)}
                 containerStyle={styles.footerButton}
               />
@@ -229,77 +370,91 @@ export function ListingDetailView({
     >
       {/* The zoom lands on the hero photo, which has no entrance of its own: a fade or slide on
           top of the zoom made opening and closing a listing stutter. */}
-      <DetailLayout hero={<DetailHero photos={photosOf(listing)} />}>
+      <DetailLayout hero={<DetailHero photos={heroPhotos} />}>
         <DetailSheet style={styles.body}>
           <Reveal index={1} style={styles.titleBlock}>
-            <Tag label={listing.category} tone="sand" />
+            <View style={styles.tagRow}>
+              <Tag label={categoryLabel} tone="sand" />
+              {sold ? <Tag label="Sold" tone="grave" icon={BadgeCheck} /> : null}
+            </View>
             <SWText variant="headingLarge" accessibilityRole="header">
-              {listing.title}
+              {title}
             </SWText>
-            <AskingPriceBadge value={formatPeso(listing.askingPrice)} />
+            <AskingPriceBadge value={formatPeso(askingPrice)} />
           </Reveal>
 
           <Reveal index={2} style={styles.sections}>
             <Surface padding={tokens.spacing[4]} contentStyle={styles.assessment}>
               <SWText variant="headingSmall">Is the price fair?</SWText>
-              <PriceRangeBar
-                low={insight.estimateLow}
-                high={insight.estimateHigh}
-                estimate={insight.estimate}
-                confidence={insight.confidence}
-                asking={listing.askingPrice}
-                format={formatPeso}
-                animate={false}
-              />
-              <VerdictBar tally={tally} />
+              {aiRange ? (
+                <PriceRangeBar
+                  low={aiRange.low}
+                  high={aiRange.high}
+                  estimate={aiRange.estimate}
+                  asking={askingPrice}
+                  format={formatPeso}
+                  animate={false}
+                />
+              ) : (
+                <SWText variant="bodySmall" tone="textSecondary">
+                  This listing has no AI estimate, so there is no range to compare the price with.
+                </SWText>
+              )}
+              {verdict ? (
+                <View style={styles.communityVerdict}>
+                  <Tag
+                    label={`${verdict.share}% ${verdictLabel[verdict.choice]}`}
+                    tone={verdictChip[verdict.choice].tone}
+                    icon={verdictChip[verdict.choice].icon}
+                  />
+                  <SWText variant="caption" tone="textMuted">
+                    of voters on the asking price
+                  </SWText>
+                </View>
+              ) : (
+                <SWText variant="caption" tone="textMuted">
+                  No votes on this price yet.
+                </SWText>
+              )}
             </Surface>
 
-            <WorthySays>
-              {askingLine(
-                {
-                  asking: listing.askingPrice,
-                  estimate: insight.estimate,
-                  low: insight.estimateLow,
-                  high: insight.estimateHigh,
-                },
-                owned,
-                formatPeso,
-              )}
-            </WorthySays>
+            {aiRange ? (
+              <WorthySays>
+                {askingLine({ asking: askingPrice, ...aiRange }, owned, formatPeso)}
+              </WorthySays>
+            ) : null}
+
+            {owned && marketListing && marketListing.moderationStatus !== 'approved' ? (
+              <ModerationNotice status={marketListing.moderationStatus} />
+            ) : null}
 
             {owned ? (
               <OwnerPanel
-                stats={previewMyListing.stats}
+                stats={marketListing.stats}
+                sold={sold}
                 marking={markingSold}
-                onMarkSold={() => {
-                  setMarkingSold(true);
-                  setTimeout(() => {
-                    setMarkingSold(false);
-                    toast.show({ title: 'Marked as sold', celebrate: true });
-                    onMarkSold?.();
-                  }, 700);
-                }}
+                deleting={deleting}
+                onMarkSold={() => void changeStatus('sold')}
+                onDeleteListing={() => setConfirmingDelete(true)}
               />
             ) : (
               <PressableScale
                 accessibilityRole="link"
-                accessibilityLabel={`Seller ${listing.seller.handle}, rated ${listing.seller.rating} from ${listing.seller.sales} sales`}
-                onPress={onOpenSeller}
+                accessibilityLabel={`Seller ${seller.handle}${seller.rating === null ? '' : `, rated ${seller.rating}`}, ${seller.sales} ${seller.sales === 1 ? 'sale' : 'sales'}`}
+                onPress={() => onOpenSeller?.(seller.handle)}
               >
                 <Surface padding={tokens.spacing[3]}>
                   <View style={styles.seller}>
-                    <Avatar
-                      source={listing.seller.avatar}
-                      name={listing.seller.handle}
-                      size={40}
-                      ring
-                    />
+                    <Avatar source={seller.avatar} name={seller.handle} size={40} ring />
                     <View style={styles.sellerText}>
-                      <SWText variant="label">@{listing.seller.handle}</SWText>
-                      <Rating
-                        value={listing.seller.rating}
-                        detail={`${listing.seller.sales} sales`}
-                      />
+                      <SWText variant="label">@{seller.handle}</SWText>
+                      {seller.rating === null ? (
+                        <SWText variant="caption" tone="textMuted">
+                          {seller.sales === 1 ? '1 sale' : `${seller.sales} sales`}
+                        </SWText>
+                      ) : (
+                        <Rating value={seller.rating} detail={`${seller.sales} sales`} />
+                      )}
                     </View>
                     <ChevronRight size={20} strokeWidth={2} color={colors.textMuted} />
                   </View>
@@ -307,14 +462,16 @@ export function ListingDetailView({
               </PressableScale>
             )}
 
-            <View style={styles.description}>
-              <SWText variant="overline" tone="textMuted" accessibilityRole="header">
-                About this item
-              </SWText>
-              <SWText variant="bodyMedium" tone="textSecondary">
-                {listing.description}
-              </SWText>
-            </View>
+            {description.length > 0 ? (
+              <View style={styles.description}>
+                <SWText variant="overline" tone="textMuted" accessibilityRole="header">
+                  About this item
+                </SWText>
+                <SWText variant="bodyMedium" tone="textSecondary">
+                  {description}
+                </SWText>
+              </View>
+            ) : null}
 
             {owned ? null : (
               <>
@@ -326,14 +483,16 @@ export function ListingDetailView({
                         value={priceAlert}
                         onValueChange={(value) =>
                           requireAccount('alert', () => {
-                            setPriceAlert(value);
-                            if (value) {
-                              haptic('select');
-                              toast.show({
-                                title: 'Alert set',
-                                body: "We'll notify you if the price drops.",
-                              });
-                            }
+                            void saveAlert(activeId, undefined, value).then((result) => {
+                              if (!result.ok) toast.show(savedNotKept);
+                              else if (value) {
+                                haptic('select');
+                                toast.show({
+                                  title: 'Alert set',
+                                  body: "We'll notify you if the price drops.",
+                                });
+                              }
+                            });
                           })
                         }
                         accessibilityLabel="Alert me if the price drops"
@@ -341,19 +500,50 @@ export function ListingDetailView({
                     }
                   />
                 </Surface>
-                <SWText variant="caption" tone="textMuted">
-                  {insight.watchers} people watching this listing
-                </SWText>
+                {saves > 0 ? (
+                  <SWText variant="caption" tone="textMuted">
+                    {saves === 1
+                      ? '1 person has saved this listing'
+                      : `${saves} people have saved this listing`}
+                  </SWText>
+                ) : null}
               </>
             )}
           </Reveal>
         </DetailSheet>
       </DetailLayout>
 
+      {/* Deleting can't be undone, so it stops to ask first. */}
+      <Sheet
+        visible={confirmingDelete}
+        onClose={() => (deleting ? undefined : setConfirmingDelete(false))}
+        title="Delete this listing?"
+      >
+        <View style={styles.deleteSheet}>
+          <SWText variant="bodyMedium" tone="textSecondary">
+            This removes “{title}” from the Market, along with any chats about it. It can’t be
+            undone.
+          </SWText>
+          <Button
+            label={deleting ? 'Deleting…' : 'Delete listing'}
+            variant="danger"
+            icon={Trash2}
+            loading={deleting}
+            onPress={() => void deleteListing()}
+          />
+          <Button
+            label="Keep listing"
+            variant="secondary"
+            disabled={deleting}
+            onPress={() => setConfirmingDelete(false)}
+          />
+        </View>
+      </Sheet>
+
       <Sheet visible={offerOpen} onClose={() => setOfferOpen(false)} title="Make an offer">
         <ChoiceChips
           kind="action"
-          options={insight.offerSuggestions.map((amount) => ({
+          options={offerSuggestions.map((amount) => ({
             key: String(amount),
             label: formatPeso(amount),
           }))}
@@ -384,15 +574,46 @@ export function ListingDetailView({
   );
 }
 
+/**
+ * Tells a seller their listing isn't public yet: still being checked, or held for review. Until
+ * moderation approves it, only they can see it, and buyers can't message them about it.
+ */
+function ModerationNotice({ status }: { readonly status: ModerationStatus }) {
+  const styles = useThemedStyles(stylesFor);
+  const held = status === 'held' || status === 'removed';
+  return (
+    <Surface padding={tokens.spacing[4]} contentStyle={styles.communityVerdict}>
+      <View accessible accessibilityRole="alert" style={styles.moderationText}>
+        <SWText variant="label">{held ? 'Held for review' : 'Being checked'}</SWText>
+        <SWText variant="bodySmall" tone="textSecondary">
+          {held
+            ? 'Only you can see this listing. Change its title or description and it will be checked again.'
+            : 'Only you can see this listing until it has been checked. Buyers can message you once it is live.'}
+        </SWText>
+      </View>
+    </Surface>
+  );
+}
+
 /** What the seller sees in place of the seller card: how the listing is doing, and closing it. */
 function OwnerPanel({
   stats,
+  sold,
   marking,
+  deleting,
   onMarkSold,
+  onDeleteListing,
 }: {
-  readonly stats: { readonly views: number; readonly saves: number; readonly chats: number };
+  readonly stats: {
+    readonly views: number;
+    readonly saves: number;
+    readonly chats: number | null;
+  };
+  readonly sold: boolean;
   readonly marking: boolean;
+  readonly deleting: boolean;
   readonly onMarkSold: () => void;
+  readonly onDeleteListing: () => void;
 }) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
@@ -411,9 +632,10 @@ function OwnerPanel({
             style={styles.ownerTile}
             contentStyle={styles.ownerTileContent}
           >
-            <View accessible accessibilityLabel={`${value} ${label.toLowerCase()}`}>
+            <View accessible accessibilityLabel={`${value ?? 'unknown'} ${label.toLowerCase()}`}>
               <Icon size={16} strokeWidth={2} color={colors.textMuted} />
-              <SWText variant="priceSmall">{String(value)}</SWText>
+              {/* A count that isn't known is a dash, not a 0. */}
+              <SWText variant="priceSmall">{value === null ? '–' : String(value)}</SWText>
               <SWText variant="caption" tone="textSecondary">
                 {label}
               </SWText>
@@ -421,13 +643,28 @@ function OwnerPanel({
           </Surface>
         ))}
       </View>
-      <Button
-        label="Mark as sold"
-        variant="secondary"
-        icon={BadgeCheck}
-        loading={marking}
-        onPress={onMarkSold}
-      />
+      {sold ? (
+        <SWText variant="bodySmall" tone="textSecondary" accessibilityRole="alert">
+          Marked as sold. Buyers can no longer make an offer or message you about it.
+        </SWText>
+      ) : (
+        <>
+          <Button
+            label="Mark as sold"
+            variant="secondary"
+            icon={BadgeCheck}
+            loading={marking}
+            onPress={onMarkSold}
+          />
+          <Button
+            label="Delete listing"
+            variant="tertiary"
+            icon={Trash2}
+            loading={deleting}
+            onPress={onDeleteListing}
+          />
+        </>
+      )}
     </View>
   );
 }
@@ -446,6 +683,14 @@ const stylesFor = themedStyles((colors) => ({
   body: {
     gap: tokens.spacing[5],
   },
+  deleteSheet: {
+    gap: tokens.spacing[3],
+  },
+  tagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing[2],
+  },
   titleBlock: {
     gap: tokens.spacing[2],
     paddingBottom: tokens.spacing[5],
@@ -454,6 +699,15 @@ const stylesFor = themedStyles((colors) => ({
   },
   sections: {
     gap: tokens.spacing[5],
+  },
+  moderationText: {
+    flex: 1,
+    gap: tokens.spacing['0.5'],
+  },
+  communityVerdict: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing[2],
   },
   assessment: {
     gap: tokens.spacing[3],

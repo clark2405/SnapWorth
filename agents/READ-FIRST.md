@@ -21,90 +21,214 @@ both apps.
 ## What's built and what isn't
 
 Keep this list current: when you finish or start something, move it here in the same change.
-Last updated 2026-11-04.
+Last updated 2026-11-12.
 
 ### Working for real
 
 - **Accounts:** sign-up and sign-in with email against Supabase, on the phone and the web. Google
   sign-in on the phone now finishes too (PR #20), but hasn't been checked on a device yet. Guests can
   look around, and an account is asked for, with the reason, only when they act.
+- **Password reset:** "Forgot password?" emails a link that opens `/new-password` (web) or
+  `snapworth://new-password` (phone) to choose a new one. The answer never says whether an email
+  has an account; expired or used links say so. Needs the Redirect URLs in "Sign-in setup".
+- **Deleting an account:** Profile → Delete account asks for the typed word DELETE (not a
+  password: Google and Apple accounts have none), then the `delete-account` Edge Function removes
+  the person's files in the `avatars` and `scan-photos` buckets and their Auth user, which every
+  table cascades from (`account_deletion_test.sql` checks each one). This device's copies go too.
+  The one exception is the other person's side of a chat: their conversation and its messages stay,
+  shown as from a "Deleted account" and closed (a chat about a deleted listing stays too, archived);
+  a chat nobody is left in goes with the last person's account. Needs the
+  `chats_survive_account_deletion` migration deployed.
 - **One sign-in:** chats, comments, Hanap and suki use the same Supabase client as sign-in, so what
   someone does belongs to the account they signed in with (PR #20).
 - **Your own profile:** name, handle, photo, location and bio come from the account, and the listed,
   sold and chat counts from Supabase (PR #20). A new handle is saved to `public.profiles` too, so
   comments and chats show it; a taken one is turned away (needs the `profile_handles` migration
-  deployed). The photo stays on the account, on that phone only, until photos are uploaded to
-  Storage.
+  deployed). A new photo is uploaded to Storage's public `avatars` bucket and set on
+  `public.profiles`, so comments and chats show it too. The database only takes a photo the person
+  uploaded to their own folder on this project's address, so locally the app must use the address
+  the Supabase CLI prints. The "checked" count is the account's own saved scans.
 - **Snap → AI estimate:** the phone's camera checks the photo and sends it to the
   `estimate-price` Edge Function (Gemini) for a real estimate.
 - **On-device AI:** the photo check and label reading on every iPhone. With Apple Intelligence,
   also a first look at the item and Worthy's answers to light questions.
 - **Feed comments:** stored in Supabase, moderated, threaded.
+- **Admin review:** Profile → Moderation (shown only to an admin, see "Making someone an admin")
+  lists what moderation holds (comments, feed posts, hanap, listings) and what people reported
+  (comments, and conversations, whose messages stay private). An admin approves, holds, removes or
+  dismisses reports. Both the list and every decision go through `admin_review_queue()` and
+  `admin_review_decide()`, which refuse anyone who isn't an admin, and each decision is logged in
+  `moderation_log` (who and when), which the app can't read. Listings join the queue when held, or
+  when still pending after ten minutes, with their title, description, seller and photo (a read
+  policy on `storage.objects` lets an admin, and only an admin, see the photo of a listing or
+  feed post that is held or pending, through `admin_may_see_photo`). Removing a listing also sets
+  its status to `removed`: its chats close, the seller sees it as removed and can delete it but not
+  edit it, and buyers stop seeing it. Holding one hides it from buyers too, including those already
+  in a chat about it (the chat returns if it is approved), and a listing an admin holds is not
+  screened again when the seller edits it. Held posts' photos show the same way. Without a backend
+  the screen shows sample cases. Needs the `admin_role` and `admin_review` migrations deployed.
 - **Chats:** real messages over Supabase Realtime, offers, and agreeing a meetup on a map. Deployed
   to Supabase on 2026-10-30. The phone's Chats tab counts unread messages.
+- **In-app banners:** while the app is open, a new message, offer or meetup proposal in a chat you
+  aren't looking at shows a tappable banner that opens it, on the web and the phone. Not for your
+  own messages, answers, blocked chats or the chat on screen; follows the Notifications switches.
+- **Meetup reminders:** once a meetup is confirmed, the phone schedules local notifications for an
+  hour before and, for a meetup at 11:00 or later, 8:00 that morning (no server or push needed).
+  They follow the meetup: replaced if it changes, withdrawn if the chat closes, the person is
+  blocked or you sign out. On the web and the phone, Chats also shows an Upcoming meetups card and
+  a banner when each reminder's time comes while the app is open. The phone asks for notification
+  permission from the Notifications screen. The meetup sheet writes only "Today, 2:00 PM" style
+  words, so the time is worked out from when it was proposed; a time that can't be read gets no
+  reminder. An exact start time on the message would be sturdier.
 - **Sharing a tag:** an item's share button makes a picture of its tag and opens the share sheet.
   Needs an app build made after 2026-10-30; older builds share text.
 - **Native pickers on iOS:** choices use the system's segmented controls and menus on iOS; Android
   and the web keep the app's own chips. Tap-to-act chips (quick replies, suggestions) stay chips.
 - **Hanap:** buyers post what they're looking for, and see the Market listings that match
-  (Market shows the count). Moderated like comments. The database table and the
-  `moderate-content` change need deploying.
+  (Market shows the count). Moderated like comments.
 - **Suki prices:** a seller gives a regular buyer a standing discount from the chat. Both see it,
-  and the buyer's offers start from it. The database table needs deploying.
+  and the buyer's offers start from it.
 - **Photo coach:** tips before a snap, and after it, the shots that matter for that kind of item.
   **Not complete:** only iPhones with Apple Intelligence know the kind of item; every other device
   gets general tips until the cloud AI exists.
 
-### Kept on the device only, until History is stored in Supabase
-
-- **Flip tracker:** what an owner paid for an item, and the gain, in History and on the item.
+- **Saving snaps (PR #24):** each successful estimate is saved to History, in Supabase's
+  `scan_history` table (private to its owner), with a copy on the phone for offline. A scan saved
+  offline is sent when the app is back online. Each account on a shared phone sees only its own.
+  History shows your own scans; with a backend it is empty until the first one (a build with no
+  Supabase project shows the sample items as a preview).
+- **Scan photos:** after a scan is saved, its photo is uploaded to Storage's private
+  `scan-photos` bucket, so History shows it on every device, through links that last 12 hours.
+  The phone's own copy shows until the upload has gone; a failed upload is tried again on the
+  next load. Listing or posting a scan will need a read policy for its photo (see the
+  `photo_storage` migration's comment).
+- **The item screen:** `/item/<scan id>` shows that scan: its estimate and range, why the AI
+  priced it so and what it assumed, its photo, date and where it lives. An id that isn't one of
+  the account's scans gets a page saying so. The sample items still open the sample preview.
+- **Flip tracker:** what an owner paid for an item, and the gain, in History and on the item. It's
+  stored on the scan (`scan_history.paid_php`), private to the owner, and set offline it's sent
+  later. The sample items' prices are a preview.
 - **Collections:** sets of History items, with their total and flip, shareable as a picture.
+  Stored in the account (`collections`, `collection_items`), private to the owner; without a
+  backend they stay on the phone. Collections and prices a phone kept before move into the
+  account that owns their things, once.
+- **Market and listings:** listings live in Supabase (`listings`), with photo, category, condition,
+  area, coordinates, description and AI worth range. Owners can list a scan from History
+  (`ConfirmPriceView` reads the real scan through `useItemDetail` and never copies `paid_php`; its
+  suggested price is the AI estimate scaled by condition, and the seller sets the real one), edit
+  their listing, mark it sold, or delete it. Market, filters, listing pages, seller profiles
+  (`profiles.display_name`, `bio`, `location`), Search, Hanap matches and Guess the worth all draw
+  from real listings. Saved listings and price-drop alerts are stored per account in
+  `saved_listings`. With a backend there is no sample fallback: an unknown listing or seller says
+  so, and a listing with no photo shows a placeholder. Rules the database enforces:
+  - **The AI estimate is the database's.** `estimate_php` / `estimate_low_php` / `estimate_high_php`
+    are copied from the linked `scan_history` row when the listing is created (null with no scan)
+    and can't be written or changed by a client; a feed post takes its estimate from the listing it
+    reposts or its scan (`feed_posts.estimate_php` is nullable).
+  - **The community verdict is null until people vote** (`verdict`, `verdict_share`): worked out by
+    `refresh_listing_verdict` from the votes on the listing's approved posts. No votes, no chip.
+  - **Listings are moderated** like Hanap and feed posts: `moderation_status` starts `pending`, only
+    the seller sees it until `moderate-content` approves it, and changing the title or description
+    sends it back to `pending`. Only approved, non-removed listings are public, can be messaged
+    (`start_conversation` takes the slug or the id) or share their scan photo (a read policy on
+    `storage.objects`). The seller sees their own with its state.
+  - **A seller can't change** a listing's id, slug, seller, scan, photo, created time, estimate,
+    verdict, moderation or counters (grants plus `guard_listing_fields`). Slugs are generated.
+  - **"Near me" is measured on the device.** No distance is stored: it's the viewer's position
+    (asked for only when they pick "Near me", never stored or sent) to the listing's coordinates,
+    which the database rounds to about 1 km, or to the centre of its area when it has none. If
+    location is denied the Market says so and shows everything. This uses `expo-location`, so
+    phone builds need a new `expo prebuild`.
+  - Sellers aren't rated: `rating` is null and "sales" is how many of their listings sold.
+- **Feed, votes and trends:** community price-check posts live in Supabase (`feed_posts`), linked
+  to a saved scan (`scan_id`) or a marketplace listing (`listing_id`), and screened through
+  `moderate-content`. A read policy on `storage.objects` lets anyone view the scan photo of an
+  approved feed post. `CreatePostView` (`/ask/<id>`) reads the real scan or listing, and
+  `ConfirmPriceView`'s "Also ask the feed" switch publishes a linked feed post alongside a new
+  listing. Votes are stored per account in `votes` (one vote per person per post), with triggers
+  keeping each post's `too_high_count`, `just_right_count` and `too_low_count` and the verdict of
+  any listing it reposts in sync. Feed, post discussion pages and Your votes (`VotesView`) draw
+  from real feed posts. Trends (the Feed's "Most listed this month" row, `TrendView`, Search's
+  Trending) are worked out on the device from the real listings' asking prices (`trends.ts`): not
+  sale prices, no editorial copy, a change only when two months have enough listings. Recent
+  searches are kept on the device under the signed-in account.
+- **With a backend, no sample content:** every screen shows real data, or says there's nothing yet
+  (`useBackendMode()` is `supabase`). The sample experience (`features/preview/sample-data.ts`,
+  `marketplace-seed.ts`, `feed-seed.ts`) is for a build with no Supabase project, where the app
+  runs alone on the device. The web's Snap page, which only ever opened a sample estimate, says
+  Snap works in the phone app when a project is configured.
+- **Deployed 2026-11-12:** every migration through `admin_review`, the `moderate-content` and
+  `delete-account` functions, and `MODERATION_PROVIDER=rules` (the built-in word rules; switch to
+  `openai` with an `OPENAI_API_KEY` before launch for real screening). A live check with a
+  throwaway account passed: existing listings and posts still public, a scan and its photo saved
+  privately, a clean hanap post approved and shown, and `delete-account` removing it all. The live
+  project had a hand-made `scan_history` (PR #24's first draft, empty, with leaky rules); the
+  scan_history migration replaced it. Never use `db push --include-seed` on the live project.
+  `Backend/scripts/test-db.sh --upgrade` rehearses future deploys on rows like the live project's.
+- **Deployed later on 2026-11-12:** `20261112000000_profile_details_backfill` (names, bios and places
+  copied from account metadata into `public.profiles`; new accounts start with them) and
+  `20261112000100_chats_survive_account_deletion`. A live check passed: after a seller deleted
+  their account, the buyer kept the chat and its history (closed, "Deleted account") and could
+  no longer send into it. The 25 empty anonymous accounts the old auto sign-in had made were
+  deleted; the one anonymous account with content was kept.
+- **Not on live:** the demo seed's newer details (categories, descriptions, AI estimates of the
+  demo listings). The old demo listings show without them unless `seed/01` and `seed/02` are run
+  in the SQL editor. Clark's account is an admin; anyone else needs the one-liner under
+  "Making someone an admin".
+
+### Kept on the device only
+
 - **Guess the worth:** a daily game on the Feed. It's five of the Market's listings, the same five
   for everyone that day. You guess each one's worth, then see the AI's estimate and what voters
   think of the asking price. Your scores, streak and Sharp eye badges stay on the device; no
-  account needed. It draws from the Market's sample listings and their sample AI estimates
-  (`previewListingWorth`) until listings are stored in Supabase.
+  account needed. It draws from the Market's real listings that carry an AI estimate; with a
+  backend it isn't offered until there are five (the sample listings fill in only with no backend).
 
 ### Screens built, but showing sample data
 
 These look finished but read from `shared/src/features/preview/sample-data.ts`, and what people do
 on them isn't saved.
 
-- **Feed:** posts and votes. Posting to the feed only opens the feed.
-- **Market:** listings, filters, listing pages, saved listings and price alerts. Listing an item
-  for sale isn't saved.
-- **History and the item screen:** History's items, and the item screen, which always shows the
-  same sample item.
-- **Profile:** seller profiles, your votes, settings, trends, search and the admin review queue.
-  Your own profile is real (see above), but its "checked" count is still sample data.
+- **With no backend only:** History's sample items before the first scan, and their sample market
+  detail (demand, condition, trend and recent sales) on the item screen. With a backend History is
+  empty until the first scan, and a real scan has no market detail yet.
 - **Worthy's cards:** price, trend and collection answers.
 
 ### Not done yet
 
 - **Sign-in:**
-  - Google sign-in on the web.
-  - Apple sign-in isn't set up.
-  - Password reset sends nothing.
-  - Deleting an account only signs out.
-- **Saving snaps:** each snap and its estimate saved to History (database tables and photo storage).
-- **The rest of the data on Supabase:** votes, posts, listings, price alerts and the admin queue.
+  - Google sign-in on the web is built (`/auth/callback`), but needs a Google OAuth client and
+    Supabase's Google provider set up first; see "Sign-in setup".
+  - Sign in with Apple is written but hidden: it needs the paid Apple Developer account. See
+    "Sign-in setup" to turn it on.
 - **Cloud AI** (a teammate owns this; see "Handoff" below):
   - Worthy's chat in the cloud.
   - Real data behind Worthy's cards.
   - Deploying the `estimate-price` update.
 - **Notifications:**
-  - Push needs the paid Apple Developer account.
-  - Meetup reminders and in-app banners aren't built yet.
+  - Push needs the paid Apple Developer account. Until then `app.config.ts` sets the
+    `expo-notifications` plugin to `enableRemoteNotifications: false`, so a prebuild doesn't add the
+    `aps-environment` entitlement a free Personal Team can't sign. Remove that option to turn push on.
+  - With the app closed, only meetup reminders and estimates reach the phone (local
+    notifications). New messages and offers need push. The web has no reminders for a closed tab.
 - **Map tiles and place search for launch:** a provider and plan for each. The defaults
   (OpenStreetMap's own tiles, and its Nominatim search behind the meetup map's search box) are
   for development only. Set `EXPO_PUBLIC_MAP_TILES_URL` and `EXPO_PUBLIC_PLACE_SEARCH_URL`.
 - **Android:** not yet checked on a phone. The Snap bar may be hidden behind the tab bar.
 - **A moderation provider:** Supabase has no `MODERATION_PROVIDER` secret set, so
-  `moderate-content` holds every feed comment and hanap post: only its author sees it. Set
+  `moderate-content` holds every feed comment, feed post, hanap post and listing: only its author sees it. Set
   `MODERATION_PROVIDER=rules` for the built-in word rules (fine while testing), or `openai` with an
   `OPENAI_API_KEY` (OpenAI's moderation is free) before launch. Set it in the dashboard under Edge
   Functions → Secrets, or with `npx supabase secrets set`.
-- **Profile photos:** uploading them to Supabase Storage, so other people can see them.
+- **Checked only against local tests:** the Market and Feed work (listing moderation, server-owned
+  estimates and verdicts, near-me, trends, no sample content with a backend) has passed the SQL
+  tests, the jest suites and `expo export` for the web and Android, but hasn't run against a live
+  Supabase project or on a device. `moderate-content`'s new handler tests were run under Node
+  with a stand-in for `Deno.test`; `Backend/scripts/test-functions.sh` (Deno) and the two-device
+  chat simulation haven't been run on it.
+- **Seller ratings and reviews:** not built, so sellers show their number of sales only.
+- **The web's Snap:** the website has no camera. With a Supabase project its Snap page points to
+  the phone app.
 - **Deployment:** EAS builds for the phones, and Vercel for the web.
 
 The detailed task lists are in `agents/specs/`. Git keeps that folder local, so ask whoever has it,
@@ -157,9 +281,9 @@ comes from a real person."
 ### What people paid, and sharing a tag
 
 - **Flip tracker:** an owner can note what they paid for an item ("What you paid" on the item
-  screen). History shows the gain on each row and in total. Only the owner ever sees it.
-  History is still sample data, so the prices are kept on the device (`paid-prices.tsx`). When
-  History moves to Supabase, they move with it, private to the owner.
+  screen). History shows the gain on each row and in total. Only the owner ever sees it: it's
+  stored on the scan (`scan_history.paid_php`), private to the owner. Never copy it into a
+  listing, a post or anything else others can read.
 - **Shared tags:** an item's share button makes a picture of its tag (`ShareTagCard.tsx`) and
   shares it. The picture is always in the light palette (`PrintedTheme`). What was paid is only on
   it if the owner switches it on.
@@ -336,6 +460,56 @@ any new artwork:
   `sb_secret_…` or service-role key in the app or in `.env.local`. If one is ever shared, roll it in
   the Supabase dashboard.
 - Without Supabase configured, sign-in starts a local session on the device. The app still runs.
+
+### Making someone an admin
+
+An admin is a row in `public.admins`. Only the database owner can write it: the app can't read or
+change the table, and nothing an account controls (its metadata, its email address) grants the
+role. In the dashboard's SQL editor, with the person's sign-up email:
+
+```sql
+insert into public.admins (user_id) select id from auth.users where email = 'them@example.com';
+-- and to take it away again:
+delete from public.admins where user_id = (select id from auth.users where email = 'them@example.com');
+```
+
+The app asks `is_admin()` and shows Profile → Moderation to a yes. Needs the `admin_role`
+migration deployed.
+
+### Sign-in setup
+
+Dashboard settings the code can't make. `<web>` is the web app's address (for example
+`https://snapworth.app`); `<ref>` is the Supabase project ref.
+
+1. **Redirect URLs** (Supabase → Authentication → URL Configuration). Site URL: `<web>`. Redirect
+   URLs: `<web>/new-password`, `<web>/auth/callback`, `http://localhost:8081/**` (the web dev
+   server), `snapworth://**` (phone builds) and `exp://**` (Expo Go). Supabase sends a link
+   anywhere else to the Site URL instead, so a missing entry looks like a link that does nothing.
+2. **Email:** Supabase's built-in mailer sends only a few emails an hour. Set up custom SMTP
+   (Authentication → Emails → SMTP Settings) before people rely on password reset.
+3. **Google** (web and phone both go through Supabase's Google provider):
+   - Google Cloud Console → APIs & Services → OAuth consent screen: app name, support email,
+     authorized domains `<ref>.supabase.co` and `<web>`'s domain, scopes `openid`, `email`,
+     `profile`. Publish it, or add testers while it's in testing.
+   - Credentials → Create credentials → OAuth client ID → Web application. Authorized JavaScript
+     origins: `<web>` and `http://localhost:8081`. Authorized redirect URI:
+     `https://<ref>.supabase.co/auth/v1/callback`.
+   - Supabase → Authentication → Sign In / Providers → Google: turn it on and paste the client
+     ID and secret.
+4. **Sign in with Apple** (iPhone only; needs the paid Apple Developer account, so it's off):
+   - Apple Developer → Certificates, Identifiers & Profiles → Identifiers → `com.snapworth.app`:
+     turn on Sign In with Apple.
+   - Supabase → Sign In / Providers → Apple: turn it on and add `com.snapworth.app` to Client
+     IDs. The secret key is only for Apple on the web, which isn't built.
+   - In `Frontend/mobile`: `npx expo install expo-apple-authentication expo-crypto`, then pin both
+     to exact versions in `package.json` (`npm run check:dependency-pins` must stay green).
+   - `app.config.ts`: add `usesAppleSignIn: true` under `ios`, and `'expo-apple-authentication'`
+     to `plugins`. This adds the entitlement that a free Personal Team can't sign.
+   - `mobile/src/apple-sign-in.ts`: import both modules and replace `requestAppleCredential`'s
+     `null` with the function in its comment.
+   - Set `EXPO_PUBLIC_APPLE_SIGN_IN=1` in `.env.local`, run `npx expo prebuild --clean` and build
+     with the paid team. The button then shows on iOS. App Review expects it whenever Google
+     sign-in is offered, so do this before submitting to the App Store.
 
 ## Before you call a change done
 

@@ -1,5 +1,5 @@
 import { FolderOpen, Pencil, Share2, Trash2, Wallet, X } from 'lucide-react-native';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import {
@@ -22,12 +22,12 @@ import {
 } from '../../components';
 import { themedStyles, tokens, useThemedStyles } from '../../design';
 import { formatPeso } from '../preview/peso';
-import { previewHistory } from '../preview/sample-data';
 import type { ChecklistItem } from './checklist';
 import { CollectionItemsSheet, CollectionNameSheet } from './CollectionSheets';
-import { collectionTotals, useCollections } from './collections';
+import { collectionNotSaved, collectionTotals, useCollections } from './collections';
 import { flipOf, gainLabel } from './flips';
 import { usePaidPrices } from './paid-prices';
+import { useHistoryItems } from './scan-history-state';
 import { ShareCollectionCard } from './ShareCollectionCard';
 import { SharePictureSheet } from './SharePictureSheet';
 
@@ -39,14 +39,21 @@ export interface CollectionViewProps {
   readonly onDeleted?: () => void;
 }
 
-/** The owner's things, as History holds them (sample data until History is stored). */
-export const historyChecklist: readonly ChecklistItem[] = previewHistory.map((item) => ({
-  id: item.id,
-  title: item.title,
-  worth: item.estimate,
-  photo: item.photo,
-  photoLabel: item.photoLabel,
-}));
+/** The owner's things, as History holds them: their scans, or the sample items before the first. */
+function useHistoryChecklist(): readonly ChecklistItem[] {
+  const { items } = useHistoryItems();
+  return useMemo(
+    () =>
+      items.map((item) => ({
+        id: item.id,
+        title: item.title,
+        worth: item.estimate,
+        photo: item.photo,
+        photoLabel: item.photoLabel,
+      })),
+    [items],
+  );
+}
 
 /**
  * One collection: what it's all worth, how the flip went across the things in it with a price
@@ -63,9 +70,15 @@ export function CollectionView({
   const toast = useToast();
   const { collections, rename, setItems, remove } = useCollections();
   const { paid } = usePaidPrices();
+  const historyChecklist = useHistoryChecklist();
   const [sheet, setSheet] = useState<'rename' | 'items' | 'share' | null>(null);
   const [showPaid, setShowPaid] = useState(false);
   const collection = collections.find((entry) => entry.id === collectionId);
+  // A change that couldn't be kept is undone; say so.
+  const keep = (saved: Promise<boolean>) =>
+    void saved.then((kept) => {
+      if (!kept) toast.show({ ...collectionNotSaved, tone: 'error' });
+    });
 
   if (!collection) {
     return (
@@ -182,9 +195,11 @@ export function CollectionView({
                       icon={X}
                       label={`Take ${item.title} out of this collection`}
                       onPress={() =>
-                        setItems(
-                          collection.id,
-                          collection.itemIds.filter((id) => id !== item.id),
+                        keep(
+                          setItems(
+                            collection.id,
+                            collection.itemIds.filter((id) => id !== item.id),
+                          ),
                         )
                       }
                     />
@@ -215,7 +230,7 @@ export function CollectionView({
           variant="tertiary"
           icon={Trash2}
           onPress={() => {
-            remove(collection.id);
+            keep(remove(collection.id));
             toast.show({ title: 'Collection deleted', body: 'Your things are still in History.' });
             onDeleted?.();
           }}
@@ -229,7 +244,7 @@ export function CollectionView({
         initialName={collection.name}
         onClose={() => setSheet(null)}
         onSave={(name) => {
-          rename(collection.id, name);
+          keep(rename(collection.id, name));
           setSheet(null);
         }}
       />
@@ -239,7 +254,7 @@ export function CollectionView({
         selected={collection.itemIds}
         onClose={() => setSheet(null)}
         onSave={(selected) => {
-          setItems(collection.id, selected);
+          keep(setItems(collection.id, selected));
           setSheet(null);
         }}
       />

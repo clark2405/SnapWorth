@@ -13,7 +13,9 @@ import type { AppError, OperationName } from '../../types/errors';
 import type { ConversationId, MessageId, UserId } from '../../types/ids';
 import { err, ok, type Result } from '../../types/result';
 import { toAppError } from './errors';
-import { ensureSignedIn } from './session';
+import { createSupabaseScanPhotos, type ScanPhotoStore } from './photo-storage';
+import { accountIdOf } from './account';
+import { requireSignedIn } from './session';
 
 interface MessageRow {
   readonly id: string;
@@ -35,13 +37,15 @@ interface MessageRow {
 
 interface ConversationRow {
   readonly id: string;
-  readonly listing_slug: string;
+  /** Null, with no photo or price, when the listing is gone (deleted by its seller). */
+  readonly listing_slug: string | null;
   readonly listing_title: string;
   readonly listing_photo_url: string | null;
-  readonly asking_php: number;
-  readonly closed: 'sold' | 'archived' | null;
-  readonly other_id: string;
-  readonly other_handle: string;
+  readonly asking_php: number | null;
+  readonly closed: 'sold' | 'archived' | 'deleted' | null;
+  /** Null when the other person deleted their account. */
+  readonly other_id: string | null;
+  readonly other_handle: string | null;
   readonly other_avatar_url: string | null;
   readonly i_am_seller: boolean;
   readonly last_kind: MessageRow['kind'] | null;
@@ -55,8 +59,20 @@ interface ConversationRow {
   readonly blocked_by_me: boolean;
 }
 
+/** The columns `confirmedMeetups` reads: a confirmed meetup always has a place and a time. */
+interface MeetupRow {
+  readonly id: string;
+  readonly conversation_id: string;
+  readonly meetup_place: string;
+  readonly meetup_when: string;
+  readonly meetup_purpose: MeetupPurpose | null;
+  readonly created_at: string;
+}
+
 const messageColumns =
   'id, conversation_id, sender_id, kind, body, offer_php, offer_status, meetup_place, meetup_when, meetup_status, meetup_purpose, meetup_spot, meetup_lat, meetup_lng, created_at';
+
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const iso = (value: string) => new Date(value).toISOString() as UtcDateTime;
 
@@ -92,19 +108,21 @@ function messageFromRow(row: MessageRow, viewer: string): Message {
 }
 
 function summaryFromRow(row: ConversationRow): ConversationSummary {
+  const otherGone = row.other_id === null;
   return {
     id: row.id as ConversationId,
     listing: {
-      key: row.listing_slug,
+      key: row.listing_slug ?? '',
       title: row.listing_title,
-      askingPricePhp: row.asking_php,
+      askingPricePhp: row.asking_php ?? 0,
       photoUrl: row.listing_photo_url ?? undefined,
     },
     other: {
-      userId: row.other_id as UserId,
-      handle: row.other_handle,
+      userId: (row.other_id ?? '') as UserId,
+      handle: row.other_handle ?? 'Deleted account',
       avatarUrl: row.other_avatar_url ?? undefined,
     },
+    otherGone,
     iAmSeller: row.i_am_seller,
     latest:
       row.last_kind === null
@@ -126,11 +144,40 @@ function summaryFromRow(row: ConversationRow): ConversationSummary {
 /**
  * Chats stored in Supabase, with new messages and answers streamed over Realtime. Who may see
  * or do what is decided by the database's row-level security and functions; this adapter only
- * translates. Until email sign-in is wired up, a device without a session signs in
- * anonymously, the same way comments do.
+ * translates. Chats belong to an account: signed out there are none (and nothing is created to
+ * hold any); sending, opening and answering need a signed-in one.
  */
-export function createSupabaseChatRepository(client: SupabaseClient): ChatRepository {
-  const viewerId = () => ensureSignedIn(client);
+export function createSupabaseChatRepository(
+  client: SupabaseClient,
+  photos: ScanPhotoStore = createSupabaseScanPhotos(client),
+): ChatRepository {
+  const viewerId = () => requireSignedIn(client);
+
+  /**
+   * Gives each row its listing's photo. A listing's photo is a private scan photo that Storage
+   * lets people see while the listing is approved, so it comes as a link that lasts a while. A
+   * listing with no photo, or one this person may no longer see, has none, and the chat shows a
+   * placeholder.
+   */
+  async function withListingPhotos(rows: ConversationRow[]): Promise<ConversationRow[]> {
+    const slugs = [
+      ...new Set(rows.flatMap((row) => (row.listing_slug === null ? [] : [row.listing_slug]))),
+    ];
+    if (slugs.length === 0) return rows;
+    const { data } = await client.from('listings').select('slug, photo_path').in('slug', slugs);
+    const pathBySlug = new Map(
+      ((data ?? []) as { slug: string; photo_path: string | null }[]).flatMap((listing) =>
+        listing.photo_path ? [[listing.slug, listing.photo_path] as const] : [],
+      ),
+    );
+    if (pathBySlug.size === 0) return rows;
+    const links = await photos.links([...new Set(pathBySlug.values())]);
+    return rows.map((row) => {
+      const path = row.listing_slug === null ? undefined : pathBySlug.get(row.listing_slug);
+      const link = path ? links[path] : undefined;
+      return link ? { ...row, listing_photo_url: link } : row;
+    });
+  }
 
   async function conversationRows(
     target: string | null,
@@ -140,7 +187,7 @@ export function createSupabaseChatRepository(client: SupabaseClient): ChatReposi
     if (!viewer.ok) return viewer;
     const { data, error } = await client.rpc('conversation_list', { target });
     if (error) return err(toAppError(error, operation));
-    return ok(data as ConversationRow[]);
+    return ok(await withListingPhotos(data as ConversationRow[]));
   }
 
   // One Realtime channel per device, shared by every screen that listens: supabase-js keeps one
@@ -183,7 +230,7 @@ export function createSupabaseChatRepository(client: SupabaseClient): ChatReposi
   // is the session the app started with, which isn't a change.
   let account: string | null | undefined;
   client.auth.onAuthStateChange((_event, session) => {
-    const next = session?.user.id ?? null;
+    const next = accountIdOf(session);
     const known = account;
     account = next;
     if (known === undefined || known === next) return;
@@ -205,11 +252,18 @@ export function createSupabaseChatRepository(client: SupabaseClient): ChatReposi
     },
 
     async list() {
+      // Signed out there are no chats to load, and asking must not sign anyone in.
+      if (!(await viewerId()).ok) return ok([]);
       const rows = await conversationRows(null, 'load_conversations');
       return rows.ok ? ok(rows.value.map(summaryFromRow)) : rows;
     },
 
     async get(id) {
+      // A link with something other than a conversation's id in it: nothing is there, and there
+      // is no point asking the database (which would only say the same, as an error).
+      if (!uuidPattern.test(id)) {
+        return err({ kind: 'authorization', code: 'not_found_or_denied' });
+      }
       const rows = await conversationRows(id, 'load_messages');
       if (!rows.ok) return rows;
       const row = rows.value[0];
@@ -277,6 +331,32 @@ export function createSupabaseChatRepository(client: SupabaseClient): ChatReposi
     async confirmMeetup(messageId) {
       const { error } = await client.rpc('confirm_meetup', { target: messageId });
       return error ? err(toAppError(error, 'send_message')) : ok(undefined);
+    },
+
+    async confirmedMeetups(since) {
+      const viewer = await viewerId();
+      // Signed out there are none, and asking must not sign anyone in.
+      if (!viewer.ok) return ok([]);
+      // Row-level security keeps this to the viewer's own conversations.
+      const { data, error } = await client
+        .from('messages')
+        .select('id, conversation_id, meetup_place, meetup_when, meetup_purpose, created_at')
+        .eq('kind', 'meetup')
+        .eq('meetup_status', 'confirmed')
+        .gte('created_at', since)
+        .order('created_at', { ascending: true })
+        .limit(100);
+      if (error) return err(toAppError(error, 'load_messages'));
+      return ok(
+        (data as MeetupRow[]).map((row) => ({
+          messageId: row.id as MessageId,
+          conversationId: row.conversation_id as ConversationId,
+          place: row.meetup_place,
+          when: row.meetup_when,
+          purpose: row.meetup_purpose ?? ('pickup' as const),
+          proposedAt: row.created_at as UtcDateTime,
+        })),
+      );
     },
 
     async markRead(id) {

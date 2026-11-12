@@ -1,4 +1,5 @@
 import { Flag, UserX } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -12,11 +13,17 @@ import {
   Rating,
   Reveal,
   Screen,
+  ScreenSkeleton,
   SWText,
 } from '../../components';
 import { themedStyles, tokens, useThemedStyles } from '../../design';
+import type { SellerProfile } from '../../ports/marketplace';
 import { ListingCard } from '../marketplace/ListingCard';
-import { previewListings, previewSellers } from '../preview/sample-data';
+import {
+  sellerAvatarSource,
+  toPreviewListing,
+  useMarketplace,
+} from '../marketplace/marketplace-state';
 import { useAccountGate } from '../session';
 
 export interface SellerProfileViewProps {
@@ -35,8 +42,27 @@ export function SellerProfileView({
 }: SellerProfileViewProps) {
   const styles = useThemedStyles(stylesFor);
   const requireAccount = useAccountGate();
-  const seller = handle ? previewSellers[handle] : undefined;
+  const { loadSeller } = useMarketplace();
+  const normalized = handle?.trim().toLowerCase().replace(/^@/, '');
 
+  // `undefined` while the seller is being looked up; `null` once they're known not to exist.
+  const [seller, setSeller] = useState<SellerProfile | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (!normalized) {
+      setSeller(null);
+      return;
+    }
+    let active = true;
+    void loadSeller(normalized).then((loaded) => {
+      if (active) setSeller(loaded);
+    });
+    return () => {
+      active = false;
+    };
+  }, [loadSeller, normalized]);
+
+  if (seller === undefined) return <ScreenSkeleton kind="page" />;
   if (!seller) {
     return (
       <Screen ambient="market" header={<NavHeader title="Seller" onBack={onBack} />}>
@@ -51,14 +77,15 @@ export function SellerProfileView({
     );
   }
 
-  const listings = previewListings.filter((listing) => seller.listingIds.includes(listing.id));
+  const listings = seller.listings.map(toPreviewListing);
+  const avatar = sellerAvatarSource(seller);
 
   return (
     <Screen
       ambient="market"
       header={
         <NavHeader
-          title={`@${seller.user.handle}`}
+          title={`@${seller.handle}`}
           onBack={onBack}
           trailing={
             <IconButton
@@ -72,28 +99,36 @@ export function SellerProfileView({
       contentStyle={styles.content}
     >
       <Reveal index={0} style={styles.identity}>
-        <Avatar source={seller.user.avatar} name={seller.user.handle} size={72} ring />
+        <Avatar source={avatar} name={seller.handle} size={72} ring />
         <View style={styles.identityText}>
           <SWText variant="displayMedium" accessibilityRole="header">
             {seller.displayName}
           </SWText>
-          <Rating
-            value={seller.rating}
-            detail={`${seller.sales} sales`}
-            variant="bodySmall"
-            tone="textSecondary"
-          />
+          {seller.rating === null ? (
+            <SWText variant="bodySmall" tone="textSecondary">
+              {seller.sales === 1 ? '1 sale' : `${seller.sales} sales`}
+            </SWText>
+          ) : (
+            <Rating
+              value={seller.rating}
+              detail={`${seller.sales} sales`}
+              variant="bodySmall"
+              tone="textSecondary"
+            />
+          )}
           <SWText variant="caption" tone="textMuted">
             {seller.joined}
           </SWText>
         </View>
       </Reveal>
 
-      <Reveal index={1}>
-        <SWText variant="bodyMedium" tone="textSecondary">
-          {seller.bio}
-        </SWText>
-      </Reveal>
+      {seller.bio.length > 0 ? (
+        <Reveal index={1}>
+          <SWText variant="bodyMedium" tone="textSecondary">
+            {seller.bio}
+          </SWText>
+        </Reveal>
+      ) : null}
 
       <Reveal index={2} style={styles.section}>
         <SWText variant="overline" tone="textMuted" accessibilityRole="header">

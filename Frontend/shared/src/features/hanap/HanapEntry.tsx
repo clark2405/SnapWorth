@@ -3,6 +3,7 @@ import { View } from 'react-native';
 
 import { PressableScale, Surface, SWText, Tag } from '../../components';
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import { useMarketplace } from '../marketplace/marketplace-state';
 import { useHanap } from './hanap-state';
 import { hanapMatches } from './HanapView';
 
@@ -14,10 +15,11 @@ export function HanapEntry({ onOpen }: { readonly onOpen?: () => void }) {
   const styles = useThemedStyles(stylesFor);
   const { colors } = useTheme();
   const { mine } = useHanap();
+  const { previewListings: marketListings } = useMarketplace();
   const matches = new Set(
     mine
       .filter((post) => post.status === 'open')
-      .flatMap((post) => hanapMatches(post).map((listing) => listing.id)),
+      .flatMap((post) => hanapMatches(post, marketListings).map((listing) => listing.id)),
   ).size;
 
   return (

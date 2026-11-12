@@ -8,8 +8,11 @@
 | -------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
 | Feed discussion      | `supabase/migrations/20261005000000_feed_comments.sql` | Profiles, feed posts, comments with one level of replies, reports, and the RLS policies that decide who sees what. |
 | Chats                | `supabase/migrations/20261029*_chat*.sql`              | Listings (the minimum a chat needs), conversations, messages, offers, pickups, blocks, reports, and their RLS.     |
+| Photos               | `supabase/migrations/20261110000000_photo_storage.sql` | Storage buckets for scan photos (private, signed links) and profile photos (public), and who may write where.       |
+| Flips, collections   | `supabase/migrations/20261110000100_flips_and_collections.sql` | What an owner paid for each scan (`scan_history.paid_php`), and their collections of scans. Owner-only. |
 | Moderation           | `supabase/functions/moderate-content/`                 | Screens each new comment and approves or holds it. Fail-closed: nothing is public until it has been screened.      |
 | Moderation providers | `supabase/functions/_shared/providers/moderation.ts`   | `openai` (OpenAI's free moderation endpoint) for real use; `rules` (a fixed word list) for local development.      |
+| Deleting accounts    | `supabase/functions/delete-account/`                   | Deletes the caller's account for good: their Storage files, then their Auth user, which every table cascades from. |
 | Development data     | `supabase/seed/`                                       | The demo accounts, the two feed posts the app ships with and their comments, and the market listings.              |
 | Tests                | `supabase/tests/`, `scripts/`                          | Database behaviour tests and Edge Function tests, run in CI on every push.                                         |
 
@@ -37,6 +40,12 @@
 
 The client's errors map from the database's codes: `SWCLO` (closed), `SWBLK` (blocked) and `SWOLD` (offer no longer open).
 
+### How photos work
+
+- **Scan photos** (`scan-photos`, private): after a scan is saved, the app uploads its photo to `<user id>/<scan id>.jpg` and records it in `scan_history.photo_path`. Only the owner can read it, through signed links that last 12 hours. A photo can only be uploaded for a scan its owner has saved, so the scan limit (60 an hour) limits photos too. Listing or posting a scan will add a read policy for its photo (see the migration's comment).
+- **Profile photos** (`avatars`, public): one per person, `<user id>/avatar.<jpg|png|webp>`. The owner sets `profiles.avatar_url` to its public URL; the database refuses any other URL, including the same path on another host (it compares with the sign-in token's issuer, so locally the app must use the address the CLI prints).
+- **Writing:** each person adds, replaces and deletes only in their own folder.
+
 ## Setting up a Supabase project
 
 You need the [Supabase CLI](https://supabase.com/docs/guides/cli) (`npx supabase` works) and a project from [supabase.com](https://supabase.com).
@@ -48,7 +57,7 @@ You need the [Supabase CLI](https://supabase.com/docs/guides/cli) (`npx supabase
    npx supabase db push --include-seed   # leave out --include-seed for production
    ```
 
-2. **Allow anonymous sign-ins** (Dashboard → Authentication → Sign In / Providers → Anonymous). Until email sign-in is wired into the app, each device comments under its own anonymous account with a generated handle.
+2. **Anonymous sign-ins are not used.** The app never signs a device in anonymously: looking around works signed out, and posting, voting, saving, messaging and snapping need a real (email or Google) account. The setting can stay off.
 
 3. **Deploy moderation** and choose its provider:
 
@@ -68,7 +77,8 @@ Without step 4 the apps still work: comments are kept on the device, under the s
 `supabase/functions/estimate-price/` implements the camera-only Gemini prototype. It validates
 the caller's Supabase session, accepts a JPEG/PNG/WebP up to 4 MiB, sends image bytes to Gemini,
 and validates a PHP estimate/range/explanation or an explicit unable-to-estimate result. The
-key is never sent to the app. There is no upload to permanent Storage or saved scan History yet.
+key is never sent to the app. The function keeps nothing: the app saves a successful estimate to
+`scan_history` and uploads its photo to Storage afterwards (see "How photos work").
 
 The function uses the existing `AI_PROVIDER=gemini` and `AI_API_KEY` Edge Function secrets.
 `AI_MODEL` optionally overrides the default `gemini-3.6-flash`; use a model available on your
@@ -89,8 +99,8 @@ free-tier quota can block estimates until its applicable limit resets. The five-
 [3.6 comparison](../docs/benchmarks/gemini-3.6-comparison.md) records provider errors and
 timings for low and medium reasoning. These tests do not establish pricing accuracy.
 
-Enable Anonymous Sign-Ins in the project's Authentication settings. This is a backend session
-for the camera; the existing app login screen remains visible and is still a demo UI session.
+The camera needs a signed-in account (the app asks for one before Snap); it no longer makes an
+anonymous session for it, so Anonymous Sign-Ins can stay off.
 
 After signing into the Supabase CLI with `supabase login`, deploy from `Backend/`:
 
@@ -119,15 +129,34 @@ This smoke test exercises pricing logic and the Gemini API; it does not test dep
 Supabase authentication. Actual private photos should not be used in development because
 Google's unpaid API terms permit product-improvement use of inputs and outputs.
 
+## Deleting an account
+
+`supabase/functions/delete-account/` is what Profile → Delete account calls. It checks the
+caller's session with Supabase Auth (gateway JWT verification is off, as for `estimate-price`),
+requires `{ "confirm": "DELETE" }`, removes everything under the caller's folder (`<user id>/…`)
+in the `avatars` and `scan-photos` buckets (a bucket that doesn't exist yet is skipped), then
+deletes the Auth user with the service role. Every table that refers to a person cascades from
+that; `supabase/tests/account_deletion_test.sql` fails if a table is added that doesn't, or that
+would block the delete. A bucket that keeps people's files under another name must be added to
+`accountBuckets` in `account.ts`. Deploy it from `Backend/`:
+
+```sh
+npx supabase functions deploy delete-account
+node --test supabase/functions/delete-account/account_test.mjs   # the handler's tests, without Deno
+```
+
 ## Running the tests
 
 ```sh
 Backend/scripts/test-db.sh         # migrations, RLS, seed: a throwaway local Postgres, no Docker
+Backend/scripts/test-db.sh --upgrade  # the same migrations on top of rows like the live project's
 Backend/scripts/test-functions.sh  # Edge Function typecheck and unit tests (needs Deno)
 Backend/scripts/chat-sim/run.sh    # two phones chatting, and a third trying to get in (needs Frontend's npm deps)
 ```
 
 `test-db.sh` needs Postgres 15+ server binaries (`initdb`, `pg_ctl`, `psql`). It applies a small stand-in for Supabase's `auth` schema and roles (`supabase/tests/support/supabase_stub.sql`), then the migrations, the seed, and every `*_test.sql`, acting as anonymous visitors, different signed-in users, and the server.
+
+`test-db.sh --upgrade` rehearses a deploy. It applies the migrations the live project already has (`live_through` in the script: move it forward after each deploy), loads rows like the live project's (`supabase/tests/upgrade/01_live_data.sql`: the demo seed, plus real accounts with chats, offers, a meetup, comments, reports, Hanap and a suki), applies the newer migrations over them, and checks that the rows survived, that the backfills keep old listings public, and that what the current app does still works (`after_migrations_test.sql`). It then runs the seeds again over the result and checks that nothing real was overwritten (`after_reseed_test.sql`). Add a row to `01_live_data.sql` and a check whenever a migration changes how old data behaves.
 
 ### Chat on two devices
 

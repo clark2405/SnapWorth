@@ -1,9 +1,9 @@
-import { Flame } from 'lucide-react-native';
-import { useState } from 'react';
+import { Flame, WifiOff } from 'lucide-react-native';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import {
   Button,
+  EmptyState,
   LargeTitle,
   Photo,
   Sign,
@@ -13,18 +13,21 @@ import {
   ZoomSource,
   Reveal,
   Screen,
+  ScreenSkeleton,
   SearchButton,
   SWText,
   useGridColumns,
+  useToast,
   type SearchOrigin,
 } from '../../components';
 import { held, themedStyles, tokens, useThemedStyles, useWideLayout } from '../../design';
-import type { VoteChoice } from '../../types';
 import { GuessEntry } from '../guess/GuessEntry';
-import { previewOlderPosts, previewPosts, previewTrending } from '../preview/sample-data';
 import { ProfileButton } from '../profile/ProfileButton';
+import type { Trend } from '../trends/trends';
+import { useTrends } from '../trends/use-trends';
 import { useAccountGate } from '../session';
 import { Tip, useTip } from '../tips';
+import { useFeed, voteNotSaved } from './feed-state';
 import { PostCard } from './PostCard';
 
 export interface FeedViewProps {
@@ -44,11 +47,6 @@ export interface FeedViewProps {
   readonly onOpenGuess?: () => void;
 }
 
-type PreviewTrend = (typeof previewTrending)[number];
-
-/** Newest first, the older ones further down, as the feed reads once it has history. */
-const feedPosts = [...previewPosts, ...previewOlderPosts];
-
 /**
  * The community's front page: what is trending this month, then every open question, newest
  * first. Nothing here is a hard card; posts are set apart by air, not rules.
@@ -63,9 +61,10 @@ export function FeedView({
   onOpenGuess,
 }: FeedViewProps) {
   const styles = useThemedStyles(stylesFor);
-  // Local until VoteService exists: tapping the same vote again withdraws it.
-  const [votes, setVotes] = useState<Record<string, VoteChoice | null>>({});
+  const { previewPosts: feedPosts, voteFor, toggleVote, refresh, status } = useFeed();
+  const { heading, trends } = useTrends();
   const requireAccount = useAccountGate();
+  const toast = useToast();
   const voteTip = useTip('vote');
   // One column of posts on a phone; on a wide window as many as fit, up to three.
   const grid = useGridColumns(feedPosts.length, {
@@ -76,13 +75,13 @@ export function FeedView({
   const gridded = grid.columns > 1;
   const wide = useWideLayout();
 
+  // The first load is not an empty Feed, and neither is one that failed.
+  if (status === 'loading' && feedPosts.length === 0) {
+    return <ScreenSkeleton kind="tab" place="feed" />;
+  }
+
   return (
-    <Screen
-      clearTabBar
-      place="feed"
-      ambient="feed"
-      onRefresh={() => new Promise<void>((resolve) => setTimeout(resolve, 900))}
-    >
+    <Screen clearTabBar place="feed" ambient="feed" onRefresh={refresh}>
       <LargeTitle
         brand
         title="Feed"
@@ -105,29 +104,44 @@ export function FeedView({
       />
       <Tip id="snap" style={styles.tip} />
 
-      <Reveal index={0} style={styles.trending}>
-        <Sign icon={Flame} label="Hot this month" />
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.trendingBleed}
-          contentContainerStyle={styles.trendingRow}
-        >
-          {previewTrending.map((trend) => (
-            <TrendingTile
-              key={trend.key}
-              trend={trend}
-              size={wide ? wideTile : tile}
-              onOpen={() => onOpenTrend?.(trend.key)}
-            />
-          ))}
-        </ScrollView>
-      </Reveal>
+      {/* Only what's really trending: with a Supabase project, categories people have listed in
+          this month; with nothing listed, no row. */}
+      {trends.length > 0 ? (
+        <Reveal index={0} style={styles.trending}>
+          <Sign icon={Flame} label={heading} />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.trendingBleed}
+            contentContainerStyle={styles.trendingRow}
+          >
+            {trends.map((trend) => (
+              <TrendingTile
+                key={trend.key}
+                trend={trend}
+                size={wide ? wideTile : tile}
+                onOpen={() => onOpenTrend?.(trend.key)}
+              />
+            ))}
+          </ScrollView>
+        </Reveal>
+      ) : null}
 
       {onOpenGuess ? (
         <Reveal index={0} style={styles.guess}>
           <GuessEntry onOpen={onOpenGuess} />
         </Reveal>
+      ) : null}
+
+      {status === 'failed' && feedPosts.length === 0 ? (
+        <EmptyState
+          icon={WifiOff}
+          tone="error"
+          title="Couldn’t load the feed"
+          body="Check your connection and try again."
+          actionLabel="Retry"
+          onAction={() => void refresh()}
+        />
       ) : null}
 
       <View style={gridded ? styles.grid : styles.list} onLayout={grid.onLayout}>
@@ -139,14 +153,13 @@ export function FeedView({
           >
             <PostCard
               post={post}
-              vote={votes[post.id] ?? null}
+              vote={voteFor(post.id)}
               onVote={(choice) =>
                 requireAccount('vote', () => {
                   voteTip.done();
-                  setVotes((current) => ({
-                    ...current,
-                    [post.id]: current[post.id] === choice ? null : choice,
-                  }));
+                  void toggleVote(post.id, choice).then((result) => {
+                    if (!result.ok) toast.show(voteNotSaved);
+                  });
                 })
               }
               onOpen={() => onOpenPost?.(post.id)}
@@ -170,18 +183,18 @@ function TrendingTile({
   size,
   onOpen,
 }: {
-  readonly trend: PreviewTrend;
+  readonly trend: Trend;
   readonly size: number;
   readonly onOpen: () => void;
 }) {
   const styles = useThemedStyles(stylesFor);
-  const rising = trend.change.trim().startsWith('+');
+  const rising = trend.change !== null && trend.change.trim().startsWith('+');
 
   // Zooms open into the trend's own screen on iOS, the photo carrying straight across.
   return (
     <ZoomLink
       href={`/trend/${trend.key}`}
-      label={`${trend.label}, ${trend.change} this month. See what's selling`}
+      label={`${trend.label}${trend.change === null ? '' : `, ${trend.change} this month`}. See what's selling`}
       onPress={onOpen}
       zoomFromSource
       style={[styles.tile, { width: size + 4 }]}
@@ -196,11 +209,13 @@ function TrendingTile({
           />
         </ZoomSource>
         {/* The month's move, slapped on like a market sticker. */}
-        <Sticker
-          label={trend.change}
-          tone={rising ? 'marigold' : 'cobalt'}
-          style={styles.tileSticker}
-        />
+        {trend.change === null ? null : (
+          <Sticker
+            label={trend.change}
+            tone={rising ? 'marigold' : 'cobalt'}
+            style={styles.tileSticker}
+          />
+        )}
       </View>
       <SWText variant="labelSmall" numberOfLines={1}>
         {trend.label}

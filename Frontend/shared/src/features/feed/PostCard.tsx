@@ -140,7 +140,7 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
           ) : null}
           <GestureDetector gesture={doubleTap}>
             <Animated.View style={styles.badgeOverlay}>
-              <EstimateBadge value={formatPeso(post.estimate)} />
+              {post.estimate === null ? null : <EstimateBadge value={formatPeso(post.estimate)} />}
             </Animated.View>
           </GestureDetector>
         </View>
@@ -148,7 +148,11 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
 
       <SWText variant="bodyMedium">{post.body}</SWText>
 
-      <VoteChips tally={post.votes} selected={vote} onVote={onVote} />
+      <VoteChips
+        tally={vote ? { ...post.votes, [vote]: Math.max(0, post.votes[vote] - 1) } : post.votes}
+        selected={vote}
+        onVote={onVote}
+      />
 
       <View style={styles.meta}>
         <VerdictBar tally={post.votes} />

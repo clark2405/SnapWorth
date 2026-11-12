@@ -78,13 +78,14 @@ export function photosOf(entry: {
 
 export interface PreviewPost {
   readonly id: string;
-  readonly author: PreviewUser;
+  readonly author: { readonly handle: string; readonly avatar: ImageSourcePropType | null };
   readonly postedAgo: string;
   readonly body: string;
-  readonly photo: ImageSourcePropType;
+  /** Null when the post has no photo: the card shows a placeholder. */
+  readonly photo: ImageSourcePropType | null;
   readonly photoLabel: string;
-  /** The AI estimate the author is asking the community to judge. */
-  readonly estimate: number;
+  /** The AI estimate the author is asking the community to judge; none when the post has no scan. */
+  readonly estimate: number | null;
   readonly votes: VoteCounts;
   readonly comments: readonly PreviewComment[];
   /** Set when the post is a marketplace listing reposted to ask whether its price is fair. */
@@ -223,10 +224,12 @@ export interface PreviewListing {
   readonly id: string;
   readonly title: string;
   readonly askingPrice: number;
-  readonly photo: ImageSourcePropType;
+  /** Null when the listing has no photo: the card shows a placeholder. */
+  readonly photo: ImageSourcePropType | null;
   readonly photoLabel: string;
-  readonly verdict: VoteChoice;
-  readonly verdictShare: number;
+  /** The community's verdict on the asking price; null while nobody has voted. */
+  readonly verdict: VoteChoice | null;
+  readonly verdictShare: number | null;
 }
 
 export const previewListings: readonly PreviewListing[] = [
@@ -952,18 +955,24 @@ export const previewSellers: Readonly<Record<string, PreviewSeller>> = {
   },
 };
 
-export type PreviewHeldKind = 'post' | 'comment';
+export type PreviewHeldKind = 'post' | 'comment' | 'hanap' | 'listing' | 'conversation';
 
+/** Content the review queue shows on a device with no backend. */
 export interface PreviewHeldContent {
   readonly id: string;
   readonly kind: PreviewHeldKind;
   readonly author: PreviewUser;
+  /** A listing's title. */
+  readonly title?: string;
   readonly body: string;
-  readonly reason: string;
+  /** How moderation held it, as `moderate-content` records it; none if it was only reported. */
+  readonly flagRef?: string;
+  /** What the people who reported it gave as the reason. */
+  readonly reportReasons?: readonly string[];
+  /** A line on what a case is about, when the text alone doesn't say. */
+  readonly context?: string;
   readonly heldAgo: string;
   readonly reports: number;
-  readonly photo?: ImageSourcePropType;
-  readonly photoLabel?: string;
 }
 
 // Ordered most urgent first: most reports, then oldest.
@@ -973,20 +982,49 @@ export const previewHeldContent: readonly PreviewHeldContent[] = [
     kind: 'comment',
     author: previewUsers.justinV,
     body: 'This is obviously fake, the seller is scamming everyone here.',
-    reason: 'Reported for harassment',
+    flagRef: 'community-reports',
+    reportReasons: ['harassment'],
     heldAgo: '3h ago',
     reports: 4,
   },
   {
     id: 'held-2',
+    kind: 'conversation',
+    author: previewUsers.justinV,
+    body: '',
+    reportReasons: ['scam'],
+    context: 'About "Retro Nike Teal Windbreaker", reported by @mariacruz',
+    heldAgo: '2h ago',
+    reports: 1,
+  },
+  {
+    id: 'held-3',
     kind: 'post',
     author: previewUsers.sugboHype,
     body: 'DM me for cheaper prices, selling outside the app.',
-    reason: 'Flagged by moderation: off-platform sale',
+    flagRef: 'rules (off-platform contact)',
     heldAgo: '1h ago',
-    reports: 2,
-    photo: image.keyboard,
-    photoLabel: 'Mechanical keyboard with RGB lighting on a desk',
+    reports: 0,
+  },
+  {
+    id: 'held-4',
+    kind: 'hanap',
+    author: previewUsers.mariaCruz,
+    body: 'Looking for a PS5, text me on Viber',
+    flagRef: 'rules (off-platform contact)',
+    heldAgo: '25m ago',
+    reports: 0,
+  },
+  {
+    id: 'held-5',
+    kind: 'listing',
+    author: previewUsers.sugboHype,
+    title: 'Vintage Seiko diver',
+    body: 'Works great. Message me on Viber for a cheaper price, no fees.',
+    context: 'Asking ₱6,500 · collectibles · good · mandaue',
+    flagRef: 'rules (off-platform contact)',
+    heldAgo: '10m ago',
+    reports: 0,
   },
 ];
 
@@ -996,10 +1034,10 @@ export interface PreviewSearchResult {
   readonly id: string;
   readonly kind: 'listing' | 'post' | 'item';
   readonly title: string;
-  readonly photo: ImageSourcePropType;
+  readonly photo: ImageSourcePropType | null;
   readonly photoLabel: string;
-  /** Asking price for listings; AI estimate for posts and history items. */
-  readonly amount: number;
+  /** Asking price for listings; AI estimate for posts and history items, when there is one. */
+  readonly amount: number | null;
 }
 
 export const previewSearchIndex: readonly PreviewSearchResult[] = [
@@ -1108,11 +1146,12 @@ export const previewValuation = {
 
 /** The user's collection: everything they have valued and still own. */
 export const previewPortfolio = {
-  total: 15250,
-  itemCount: 4,
-  change: 1180,
+  total: 50200,
+  itemCount: 14,
+  // Up ₱3,890 from ₱46,310 at the start of the month: +8.4%.
+  change: 3890,
   changeLabel: '+8.4% this month',
-  series: [12400, 12650, 12900, 12800, 13300, 13550, 13400, 13900, 14300, 14650, 14900, 15250],
+  series: [40800, 41650, 42450, 42150, 43800, 44600, 44100, 45750, 47050, 48250, 49050, 50200],
   topMover: { title: 'Vintage Polaroid Sun 600', change: '+₱400' },
 } as const;
 
@@ -1212,18 +1251,17 @@ export const previewMarketCategories: readonly { readonly key: string; readonly 
     { key: 'home', label: 'Home' },
   ];
 
-/** Where each preview listing is, for the location filter, until listings carry a place. */
-export const previewListingPlaces: Readonly<Record<string, { area: string; distanceKm: number }>> =
-  {
-    'polaroid-sun-600': { area: 'cebu-city', distanceKm: 2 },
-    'air-jordan-1-bred': { area: 'lapu-lapu', distanceKm: 11 },
-    'retro-walkman': { area: 'mandaue', distanceKm: 6 },
-    'keychron-keyboard': { area: 'metro-manila', distanceKm: 570 },
-    'nike-teal-windbreaker': { area: 'lapu-lapu', distanceKm: 9 },
-    'colour-block-windbreaker': { area: 'mandaue', distanceKm: 5 },
-    'black-puffer-jacket': { area: 'cebu-city', distanceKm: 3 },
-    'polaroid-film-bundle': { area: 'cebu-city', distanceKm: 4 },
-  };
+/** Where each preview listing is, for the local sample listings' area (the app measures distance from the area's centre). */
+export const previewListingPlaces: Readonly<Record<string, { area: string }>> = {
+  'polaroid-sun-600': { area: 'cebu-city' },
+  'air-jordan-1-bred': { area: 'lapu-lapu' },
+  'retro-walkman': { area: 'mandaue' },
+  'keychron-keyboard': { area: 'metro-manila' },
+  'nike-teal-windbreaker': { area: 'lapu-lapu' },
+  'colour-block-windbreaker': { area: 'mandaue' },
+  'black-puffer-jacket': { area: 'cebu-city' },
+  'polaroid-film-bundle': { area: 'cebu-city' },
+};
 
 export const previewMarketAreas: readonly { readonly key: string; readonly label: string }[] = [
   { key: 'anywhere', label: 'Anywhere' },
@@ -1312,7 +1350,9 @@ export const previewChatListingKey = (itemTitle: string): string =>
 /** Bundled photos by listing key, for listings that have no uploaded photo yet. */
 export const previewPhotoByListingKey: Readonly<Record<string, ImageSourcePropType>> =
   Object.fromEntries([
-    ...previewListings.map((listing) => [listing.id, listing.photo] as const),
+    ...previewListings.flatMap((listing) =>
+      listing.photo ? [[listing.id, listing.photo] as const] : [],
+    ),
     [previewMyListing.id, previewMyListing.photo] as const,
     ...previewConversations.map(
       (conversation) =>

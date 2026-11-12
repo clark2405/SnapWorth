@@ -36,6 +36,7 @@ import {
   Surface,
   SWText,
   Tag,
+  TextField,
 } from '../../components';
 import {
   themedStyles,
@@ -44,8 +45,17 @@ import {
   useThemedStyles,
   type ThemePreference,
 } from '../../design';
-import { formatPeso, previewHeldContent, previewPortfolio } from '../preview/sample-data';
-import { avatarSourceFor, useUserProfile } from './userProfile';
+import {
+  confirmsDeletion,
+  deleteConfirmationWord,
+  type DeleteAccountOutcome,
+} from '../auth/account-deletion';
+import { useReviewCount } from '../admin/admin-state';
+import { formatPeso, previewPortfolio } from '../preview/sample-data';
+import { useFeed } from '../feed/feed-state';
+import { useScanHistory } from '../history/scan-history-state';
+import { useBackendMode } from '../session/backend-mode';
+import { avatarSourceFor, previewProfileId, useUserProfile } from './userProfile';
 
 export type ProfileDestination =
   | 'edit-profile'
@@ -65,10 +75,11 @@ export interface ProfileViewProps {
   readonly onOpen?: (destination: ProfileDestination) => void;
   readonly onLogOut?: () => void;
   /**
-   * Permanently deletes the account and its data. Apple requires apps that create accounts to
-   * offer deletion in the app, not just deactivation.
+   * Permanently deletes the account and its data, once the person has typed the confirmation
+   * word (see `deleteAccount`). Apple requires apps that create accounts to offer deletion in
+   * the app, not just deactivation.
    */
-  readonly onDeleteAccount?: () => void;
+  readonly onDeleteAccount?: (typed: string) => Promise<DeleteAccountOutcome> | void;
 }
 
 const appearanceOptions: readonly { readonly key: ThemePreference; readonly label: string }[] = [
@@ -77,17 +88,76 @@ const appearanceOptions: readonly { readonly key: ThemePreference; readonly labe
   { key: 'dark', label: 'Dark' },
 ];
 
+/** The way into the review queue, with how many cases wait once the database has said. */
+function ModerationRow({ onPress }: { readonly onPress: () => void }) {
+  const waiting = useReviewCount();
+  return (
+    <ListRow
+      label="Moderation"
+      icon={ShieldAlert}
+      value={waiting === null ? undefined : String(waiting)}
+      onPress={onPress}
+    />
+  );
+}
+
+/** A count for a row, or a dash when it couldn't be loaded. */
+const countText = (count: number | null) => (count === null ? '–' : String(count));
+
 export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: ProfileViewProps) {
   const { colors, preference, setPreference } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const { profile } = useUserProfile();
+  const scanHistory = useScanHistory();
+  const feed = useFeed();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [typed, setTyped] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteProblem, setDeleteProblem] = useState<string | null>(null);
+  // What they've checked is their saved scans, including ones still on their way to Supabase;
+  // the preview profile keeps its sample count.
+  const checked =
+    profile.id !== previewProfileId && scanHistory.status === 'ready'
+      ? scanHistory.scans.length
+      : profile.stats.checked;
+  // The collection is worth what the AI said of the account's own scans. The sample total and its
+  // trend stand in only on a device with no Supabase project and no scans yet.
+  const mode = useBackendMode();
+  const collectionIsSample = mode === 'device' && scanHistory.scans.length === 0;
+  const collectionTotal = scanHistory.scans.reduce((sum, scan) => sum + scan.estimate, 0);
+  const votesCount =
+    profile.id !== previewProfileId && !feed.loading
+      ? feed.userVotes.length
+      : profile.activity.votes;
+
+  const closeDelete = () => {
+    if (deleting) return;
+    setConfirmingDelete(false);
+    setTyped('');
+    setDeleteProblem(null);
+  };
+  const deleteAccount = async () => {
+    if (deleting || !confirmsDeletion(typed)) return;
+    setDeleting(true);
+    setDeleteProblem(null);
+    const outcome = await onDeleteAccount?.(typed);
+    setDeleting(false);
+    if (outcome?.kind === 'failed') {
+      setDeleteProblem(outcome.message);
+      return;
+    }
+    setConfirmingDelete(false);
+    setTyped('');
+  };
 
   const stats = [
-    { label: 'Checked', value: profile.stats.checked },
+    { label: 'Checked', value: checked },
     { label: 'Listed', value: profile.stats.listed },
     { label: 'Sold', value: profile.stats.sold },
   ];
+
+  // Where they are and since when: only what is there, with no stray separators for what isn't.
+  const meta = [profile.location, profile.joined].filter((part) => part.trim() !== '');
 
   return (
     <Screen header={<NavHeader title="Profile" onBack={onBack} />} contentStyle={styles.content}>
@@ -116,28 +186,28 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
               </SWText>
               {profile.email ? (
                 <SWText variant="bodySmall" tone="textSecondary">
-                  · {profile.email} ·
+                  · {profile.email}
                 </SWText>
-              ) : (
-                <SWText variant="bodySmall" tone="textSecondary">
-                  ·
-                </SWText>
+              ) : null}
+              {profile.rating === null ? null : (
+                <>
+                  <SWText variant="bodySmall" tone="textSecondary">
+                    ·
+                  </SWText>
+                  <Rating value={profile.rating} variant="bodySmall" tone="textSecondary" />
+                </>
               )}
-              <Rating value={profile.rating} variant="bodySmall" tone="textSecondary" />
             </View>
             {profile.bio ? (
               <SWText variant="bodySmall" tone="textSecondary" numberOfLines={2}>
                 {profile.bio}
               </SWText>
             ) : null}
-            <View style={styles.metaRow}>
+            {meta.length > 0 ? (
               <SWText variant="caption" tone="textMuted">
-                {profile.location}
+                {meta.join(' · ')}
               </SWText>
-              <SWText variant="caption" tone="textMuted">
-                · {profile.joined}
-              </SWText>
-            </View>
+            ) : null}
           </View>
           <ChevronRight size={18} strokeWidth={2} color={colors.textMuted} />
         </PressableScale>
@@ -151,12 +221,20 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
             style={styles.statTile}
             contentStyle={styles.stat}
           >
-            <View accessible accessibilityLabel={`${stat.value} ${stat.label.toLowerCase()}`}>
-              <CountUp
-                value={stat.value}
-                format={(value) => String(Math.round(value))}
-                variant="priceMedium"
-              />
+            <View
+              accessible
+              accessibilityLabel={`${stat.value ?? 'unknown'} ${stat.label.toLowerCase()}`}
+            >
+              {/* A count that couldn't be loaded is shown as unknown, never as 0. */}
+              {stat.value === null ? (
+                <SWText variant="priceMedium">–</SWText>
+              ) : (
+                <CountUp
+                  value={stat.value}
+                  format={(value) => String(Math.round(value))}
+                  variant="priceMedium"
+                />
+              )}
               <SWText variant="labelSmall" tone="textSecondary">
                 {stat.label}
               </SWText>
@@ -165,38 +243,44 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
         ))}
       </Reveal>
 
-      <Reveal index={2}>
-        <Surface tone="feature" padding={tokens.spacing[5]} contentStyle={styles.collectionCard}>
-          <Overline icon={Wallet} label="Collection value" tone="onFeatureDim" />
-          <CountUp
-            value={previewPortfolio.total}
-            format={formatPeso}
-            variant="priceLarge"
-            tone="onFeature"
-          />
-          <Tag label={previewPortfolio.changeLabel} tone="mint" />
-          <Sparkline values={previewPortfolio.series} height={56} color={colors.onFeature} />
-        </Surface>
-      </Reveal>
+      {collectionIsSample || collectionTotal > 0 ? (
+        <Reveal index={2}>
+          <Surface tone="feature" padding={tokens.spacing[5]} contentStyle={styles.collectionCard}>
+            <Overline icon={Wallet} label="Collection value" tone="onFeatureDim" />
+            <CountUp
+              value={collectionIsSample ? previewPortfolio.total : collectionTotal}
+              format={formatPeso}
+              variant="priceLarge"
+              tone="onFeature"
+            />
+            {collectionIsSample ? (
+              <>
+                <Tag label={previewPortfolio.changeLabel} tone="mint" />
+                <Sparkline values={previewPortfolio.series} height={56} color={colors.onFeature} />
+              </>
+            ) : null}
+          </Surface>
+        </Reveal>
+      ) : null}
 
       <Reveal index={3} style={styles.sections}>
         <ListGroup title="Your activity" icon={History}>
           <ListRow
             label="Your listings"
             icon={PriceTagIcon}
-            value={String(profile.activity.listings)}
+            value={countText(profile.activity.listings)}
             onPress={() => onOpen?.('listings')}
           />
           <ListRow
             label="Votes cast"
             icon={Vote}
-            value={String(profile.activity.votes)}
+            value={countText(votesCount)}
             onPress={() => onOpen?.('votes')}
           />
           <ListRow
             label="Conversations"
             icon={MessagesSquare}
-            value={String(profile.activity.conversations)}
+            value={countText(profile.activity.conversations)}
             onPress={() => onOpen?.('conversations')}
           />
         </ListGroup>
@@ -218,14 +302,7 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
             icon={TrendingDown}
             onPress={() => onOpen?.('price-alerts')}
           />
-          {profile.isAdmin ? (
-            <ListRow
-              label="Moderation"
-              icon={ShieldAlert}
-              value={String(previewHeldContent.length)}
-              onPress={() => onOpen?.('moderation')}
-            />
-          ) : null}
+          {profile.isAdmin ? <ModerationRow onPress={() => onOpen?.('moderation')} /> : null}
           <ListRow label="Help" icon={CircleHelp} onPress={() => onOpen?.('help')} />
           <ListRow
             label="Replay introduction"
@@ -245,31 +322,48 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
         </ListGroup>
       </Reveal>
 
-      {/* Deleting can't be undone, so this is the one place the app stops to confirm. */}
-      <Sheet
-        visible={confirmingDelete}
-        onClose={() => setConfirmingDelete(false)}
-        title="Delete your account?"
-      >
+      {/* Deleting can't be undone, so this is the one place the app stops to confirm, and asks
+          for a typed word: everyone has one, even accounts with no password (Google, Apple). */}
+      <Sheet visible={confirmingDelete} onClose={closeDelete} title="Delete your account?">
         <View style={styles.deleteSheet}>
           <SWText variant="bodyMedium" tone="textSecondary">
             This permanently removes your profile, items, listings, votes, comments and chats. It
             can&apos;t be undone. You can still look around SnapWorth without an account.
           </SWText>
+          <View style={styles.deleteConfirm}>
+            <SWText variant="labelSmall" tone="textSecondary">
+              {`Type ${deleteConfirmationWord} to confirm`}
+            </SWText>
+            <TextField
+              value={typed}
+              onChangeText={(value) => {
+                setTyped(value);
+                setDeleteProblem(null);
+              }}
+              onSubmitEditing={deleteAccount}
+              placeholder={deleteConfirmationWord}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              autoComplete="off"
+              returnKeyType="done"
+              editable={!deleting}
+              accessibilityLabel={`Type ${deleteConfirmationWord} to confirm`}
+            />
+            {deleteProblem ? (
+              <SWText variant="bodySmall" tone="danger" accessibilityLiveRegion="assertive">
+                {deleteProblem}
+              </SWText>
+            ) : null}
+          </View>
           <View style={styles.deleteActions}>
             <Button
-              label="Delete account"
+              label={deleting ? 'Deleting…' : 'Delete account'}
               variant="danger"
-              onPress={() => {
-                setConfirmingDelete(false);
-                onDeleteAccount?.();
-              }}
+              loading={deleting}
+              disabled={!confirmsDeletion(typed)}
+              onPress={deleteAccount}
             />
-            <Button
-              label="Keep my account"
-              variant="secondary"
-              onPress={() => setConfirmingDelete(false)}
-            />
+            <Button label="Keep my account" variant="secondary" onPress={closeDelete} />
           </View>
         </View>
       </Sheet>
@@ -297,11 +391,6 @@ const stylesFor = themedStyles(() => ({
     gap: tokens.spacing[1],
     flexWrap: 'wrap',
   },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.spacing[1],
-  },
   stats: {
     flexDirection: 'row',
     gap: tokens.spacing[3],
@@ -324,6 +413,9 @@ const stylesFor = themedStyles(() => ({
   },
   deleteSheet: {
     gap: tokens.spacing[5],
+  },
+  deleteConfirm: {
+    gap: tokens.spacing[2],
   },
   deleteActions: {
     gap: tokens.spacing[2],

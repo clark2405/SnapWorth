@@ -9,16 +9,12 @@ import {
   type ReactNode,
 } from 'react';
 
-import type { DeviceStore } from './device-store';
+import type { AccountObserver } from '../../ports/account';
+import type { Collection, CollectionRepository } from '../../ports/collections';
+import { newUuid } from '../../types/ids';
 import { flipTotals, type FlipTotals } from './flips';
 
-/** A set of the owner's things, like "Film cameras" or "Ukay jackets". */
-export interface Collection {
-  readonly id: string;
-  readonly name: string;
-  /** History item ids, in the order they were added. */
-  readonly itemIds: readonly string[];
-}
+export type { Collection } from '../../ports/collections';
 
 /** The longest a collection's name can be. */
 export const maximumCollectionName = 40;
@@ -51,99 +47,129 @@ export function collectionTotals(
   };
 }
 
-const storageKey = 'snapworth.collections.v1';
-
 interface Collections {
   readonly collections: readonly Collection[];
-  /** Makes a collection and returns its id. */
-  readonly create: (name: string, itemIds?: readonly string[]) => string;
-  readonly rename: (id: string, name: string) => void;
-  readonly setItems: (id: string, itemIds: readonly string[]) => void;
-  readonly remove: (id: string) => void;
+  /**
+   * Makes a collection. Its id comes back at once, so it can be opened straight away; `saved`
+   * says whether it was kept.
+   */
+  readonly create: (
+    name: string,
+    itemIds?: readonly string[],
+  ) => { readonly id: string; readonly saved: Promise<boolean> };
+  /** Each change shows at once, and resolves false if it couldn't be kept (and was undone). */
+  readonly rename: (id: string, name: string) => Promise<boolean>;
+  readonly setItems: (id: string, itemIds: readonly string[]) => Promise<boolean>;
+  readonly remove: (id: string) => Promise<boolean>;
 }
 
 const CollectionsContext = createContext<Collections | null>(null);
 
-const newId = () => `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+/** What to tell the owner when a change to their collections couldn't be kept. */
+export const collectionNotSaved = {
+  title: 'Couldn’t save that',
+  body: 'Your collections are as they were. Check your connection and try again.',
+} as const;
 
-function useCollectionsState(): {
-  readonly collections: readonly Collection[];
-  readonly actions: Collections;
-  /** Replaces them all, as loading does; not counted as the owner's change. */
-  readonly load: (all: readonly Collection[]) => void;
-  /** True once the owner has changed something. */
-  readonly touched: { readonly current: boolean };
-} {
-  const [collections, setCollections] = useState<readonly Collection[]>([]);
-  const touched = useRef(false);
-  const edit = useCallback((change: (current: readonly Collection[]) => readonly Collection[]) => {
-    touched.current = true;
-    setCollections(change);
-  }, []);
-  const load = useCallback((all: readonly Collection[]) => {
-    if (!touched.current) setCollections(all);
-  }, []);
-  const actions = useMemo<Collections>(
-    () => ({
-      collections,
-      create: (name, itemIds = []) => {
-        const id = newId();
-        edit((current) => [...current, { id, name, itemIds: [...new Set(itemIds)] }]);
-        return id;
-      },
-      rename: (id, name) =>
-        edit((current) => current.map((entry) => (entry.id === id ? { ...entry, name } : entry))),
-      setItems: (id, itemIds) =>
-        edit((current) =>
-          current.map((entry) =>
-            entry.id === id ? { ...entry, itemIds: [...new Set(itemIds)] } : entry,
-          ),
-        ),
-      remove: (id) => edit((current) => current.filter((entry) => entry.id !== id)),
-    }),
-    [collections, edit],
-  );
-  return { collections, actions, load, touched };
+type Change = (current: readonly Collection[]) => readonly Collection[];
+
+/** The actions, as changes to the list on screen plus how each is kept. */
+function collectionActions(
+  collections: readonly Collection[],
+  apply: (
+    change: Change,
+    keep: (repository: CollectionRepository) => Promise<boolean>,
+  ) => Promise<boolean>,
+): Collections {
+  return {
+    collections,
+    create: (name, itemIds = []) => {
+      const collection: Collection = { id: newUuid(), name, itemIds: [...new Set(itemIds)] };
+      const saved = apply(
+        (current) => [...current, collection],
+        async (repository) => (await repository.create(collection)).ok,
+      );
+      return { id: collection.id, saved };
+    },
+    rename: (id, name) =>
+      apply(
+        (current) => current.map((entry) => (entry.id === id ? { ...entry, name } : entry)),
+        async (repository) => (await repository.rename(id, name)).ok,
+      ),
+    setItems: (id, itemIds) => {
+      const unique = [...new Set(itemIds)];
+      return apply(
+        (current) =>
+          current.map((entry) => (entry.id === id ? { ...entry, itemIds: unique } : entry)),
+        async (repository) => (await repository.setItems(id, unique)).ok,
+      );
+    },
+    remove: (id) =>
+      apply(
+        (current) => current.filter((entry) => entry.id !== id),
+        async (repository) => (await repository.remove(id)).ok,
+      ),
+  };
 }
 
 /**
- * The owner's collections. History is still sample data, so they stay on this device for now,
- * like what was paid; when History is stored in Supabase they move with it. The seed fills a
- * fresh install.
+ * The owner's collections, kept where the composition root says: in the signed-in account on
+ * Supabase, or on this device without a backend. They follow whoever is signed in: signing in as
+ * someone else, or out, never shows the last person's. A change shows at once; one that can't
+ * be kept is undone by loading the account's collections again.
  */
 export function CollectionsProvider({
-  store,
-  seed = [],
+  account,
+  repositoryFor,
   children,
 }: {
-  readonly store: DeviceStore;
-  readonly seed?: readonly Collection[];
+  readonly account: AccountObserver;
+  /** Where an account's collections are kept. */
+  readonly repositoryFor: (accountId: string) => CollectionRepository;
   readonly children: ReactNode;
 }) {
-  const { collections, actions, load, touched } = useCollectionsState();
+  // Whose collections: the signed-in account, nobody (null), or not known yet (undefined).
+  const [owner, setOwner] = useState<string | null | undefined>(undefined);
+  const [collections, setCollections] = useState<readonly Collection[]>([]);
+  /** Moves on with each account change and load, so a slower, older load is thrown away. */
+  const generation = useRef(0);
 
+  useEffect(() => account.observe(setOwner), [account]);
+
+  const repository = useMemo(
+    () => (owner ? repositoryFor(owner) : null),
+    // A new function from the same composition root is the same place.
+    [owner],
+  );
+
+  const reload = useCallback(async () => {
+    const mine = ++generation.current;
+    if (!repository) return;
+    const loaded = await repository.list();
+    if (loaded.ok && mine === generation.current) setCollections(loaded.value);
+  }, [repository]);
+
+  // A new account starts empty at once, then loads its own.
   useEffect(() => {
-    let active = true;
-    void store
-      .getItem(storageKey)
-      .then((saved) => {
-        if (active) load(saved ? (JSON.parse(saved) as Collection[]) : seed);
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-    // The seed only matters on the first load, so a new seed object doesn't load again.
-  }, [load, store]);
+    generation.current += 1;
+    setCollections([]);
+    void reload();
+  }, [reload]);
 
-  // Only the owner's own changes are saved; loading or seeding writes nothing.
-  useEffect(() => {
-    if (touched.current) {
-      void store.setItem(storageKey, JSON.stringify(collections)).catch(() => undefined);
-    }
-  }, [collections, store, touched]);
+  const apply = useCallback(
+    async (change: Change, keep: (repository: CollectionRepository) => Promise<boolean>) => {
+      if (!repository) return false;
+      generation.current += 1;
+      setCollections(change);
+      const kept = await keep(repository).catch(() => false);
+      if (!kept) await reload();
+      return kept;
+    },
+    [reload, repository],
+  );
 
-  return <CollectionsContext.Provider value={actions}>{children}</CollectionsContext.Provider>;
+  const value = useMemo(() => collectionActions(collections, apply), [apply, collections]);
+  return <CollectionsContext.Provider value={value}>{children}</CollectionsContext.Provider>;
 }
 
 /**
@@ -152,6 +178,11 @@ export function CollectionsProvider({
  */
 export function useCollections(): Collections {
   const context = useContext(CollectionsContext);
-  const { actions: fallback } = useCollectionsState();
+  const [local, setLocal] = useState<readonly Collection[]>([]);
+  const applyLocally = useCallback(async (change: Change) => {
+    setLocal(change);
+    return true;
+  }, []);
+  const fallback = useMemo(() => collectionActions(local, applyLocally), [applyLocally, local]);
   return context ?? fallback;
 }

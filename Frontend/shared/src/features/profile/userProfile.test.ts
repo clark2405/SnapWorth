@@ -51,6 +51,8 @@ describe('userProfile', () => {
     expect(profile.location).toBe('Metropolis');
     expect(profile.bio).toBe('Reporter and collector');
     expect(profile.joined).toBe('Joined May 2026');
+    // A real account's count is its own scans, never the sample figure.
+    expect(profile.stats.checked).toBe(0);
   });
 
   it('resolves avatar source correctly for remote and fallback images', () => {
@@ -62,6 +64,12 @@ describe('userProfile', () => {
     expect(local).toBe(fallbackImage);
   });
 
+  it('offers the sample review queue on a device with no backend', () => {
+    // Nothing real is at stake there; with a backend the database decides (userProfile.admin).
+    expect(buildFallbackProfile(null).isAdmin).toBe(true);
+    expect(buildFallbackProfile({ id: 'usr_1', email: 'a@example.com' }).isAdmin).toBe(true);
+  });
+
   it('fetches user profile safely and resolves complete profile', async () => {
     const mockUser = {
       id: 'usr_456',
@@ -70,7 +78,6 @@ describe('userProfile', () => {
       user_metadata: {
         full_name: 'Bruce Wayne',
         handle: 'brucewayne',
-        role: 'admin',
       },
     };
 
@@ -78,7 +85,6 @@ describe('userProfile', () => {
     expect(profile.id).toBe('usr_456');
     expect(profile.displayName).toBe('Bruce Wayne');
     expect(profile.handle).toBe('brucewayne');
-    expect(profile.isAdmin).toBe(true);
     expect(profile.joined).toBe('Joined January 2026');
   });
 });

@@ -1,11 +1,12 @@
 import { Stack, usePathname, useRouter, type Href } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import {
+  BannerProvider,
   Companion,
   RevealGate,
   SignInHandoff,
@@ -23,10 +24,13 @@ import {
 import { companionConfigFor } from '@snapworth/shared/features/companion';
 import { AppServicesProvider, type BackendConfig } from '@snapworth/shared/composition';
 import { useSnapWorthFonts } from '@snapworth/shared/design/font-assets';
-import { SplashView } from '@snapworth/shared/features/launch';
+import { ChatBannerHost, MeetupRemindersHost } from '@snapworth/shared/features/chat';
+import { SessionSplashView } from '@snapworth/shared/features/launch';
+import { wantsNotification, type NotificationKey } from '@snapworth/shared/features/profile';
 import { SessionProvider, useAccountGate } from '@snapworth/shared/features/session';
 import { TipsProvider } from '@snapworth/shared/features/tips';
 
+import { loadNotificationPreferences } from '../src/notifications';
 import { browserTipStore } from '../src/tip-store';
 
 const appearanceKey = 'snapworth.appearance';
@@ -54,6 +58,10 @@ const browserThemeStore: ThemePreferenceStore = {
 
 // A Supabase project's URL and public anon key, from EXPO_PUBLIC_* environment variables
 // (see Backend/README.md). Without them, comments are kept on this device instead.
+/** Whether the person wants to hear about this kind of thing, as they last chose. */
+const wantsToHear = (kind: NotificationKey) =>
+  wantsNotification(loadNotificationPreferences(), kind);
+
 const backend: BackendConfig = {
   supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
   supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
@@ -66,7 +74,9 @@ export default function RootLayout() {
         <AppServicesProvider config={backend}>
           <ThemeProvider store={browserThemeStore}>
             <ToastProvider>
-              <Shell />
+              <BannerProvider>
+                <Shell />
+              </BannerProvider>
             </ToastProvider>
           </ThemeProvider>
         </AppServicesProvider>
@@ -82,6 +92,7 @@ function Shell() {
   const [revealOpen, setRevealOpen] = useState(false);
   const [launched, setLaunched] = useState(false);
   const fontsReady = useSnapWorthFonts();
+  const openChat = useCallback((id: string) => router.push(`/chat/${id}`), [router]);
 
   // Hold on the bare canvas for the moment the bundled faces take to load, so no text ever
   // renders in a fallback face and then jumps.
@@ -104,11 +115,15 @@ function Shell() {
             }}
           />
           <WebCompanion ready={launched} />
+          {/* A new message, offer or meetup in a chat that isn't open: a banner that opens it. */}
+          <ChatBannerHost onOpenConversation={openChat} wants={wantsToHear} />
+          {/* Agreed meetups: a banner here when it's time. A browser can't wake a closed tab. */}
+          <MeetupRemindersHost onOpenConversation={openChat} wants={wantsToHear} />
           {/* Signing in closes the screen into Worthy's tag and opens it onto the app. */}
           <SignInHandoff />
         </RevealGate>
         {launched ? null : (
-          <SplashView ready onExit={() => setRevealOpen(true)} onDone={() => setLaunched(true)} />
+          <SessionSplashView onExit={() => setRevealOpen(true)} onDone={() => setLaunched(true)} />
         )}
       </TipsProvider>
     </SessionProvider>

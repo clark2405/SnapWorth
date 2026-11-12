@@ -372,6 +372,30 @@ export function createLocalChatRepository(options: LocalChatRepositoryOptions): 
       return ok(undefined);
     },
 
+    async confirmedMeetups(since) {
+      const all = await load();
+      return ok(
+        all
+          .flatMap((conversation) =>
+            conversation.messages.flatMap((message) =>
+              message.meetup?.status === 'confirmed' && message.createdAt >= since
+                ? [
+                    {
+                      messageId: message.id as MessageId,
+                      conversationId: conversation.id as ConversationId,
+                      place: message.meetup.place,
+                      when: message.meetup.when,
+                      purpose: message.meetup.purpose,
+                      proposedAt: message.createdAt,
+                    },
+                  ]
+                : [],
+            ),
+          )
+          .sort((a, b) => a.proposedAt.localeCompare(b.proposedAt)),
+      );
+    },
+
     async markRead(id) {
       const changed = await update(id, (conversation) => ({
         ...conversation,

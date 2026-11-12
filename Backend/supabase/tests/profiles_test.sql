@@ -1,4 +1,4 @@
--- Behaviour tests for profiles: people change their own handle and nothing else. Run with
+-- Behaviour tests for profiles: people change their own handle and photo, and nothing else. Run with
 -- Backend/scripts/test-db.sh (local Postgres + auth stub). Each check raises on failure.
 
 \set ON_ERROR_STOP on
@@ -89,11 +89,13 @@ select profile_tests.check(
     where id = '00000000-0000-4000-f000-0000000000a2'$$) = 0,
   'someone else''s handle can''t be changed'
 );
+-- The photo can be set now, but only to one uploaded to the owner's own folder (see
+-- photo_storage_test.sql for the rest).
 select profile_tests.check_rejected(
   $$update public.profiles set avatar_url = 'https://example.com/me.png'
     where id = '00000000-0000-4000-f000-0000000000a1'$$,
-  array['42501'],
-  'the photo can''t be set from the app yet'
+  array['23514'],
+  'a photo that isn''t the person''s own upload is refused'
 );
 select profile_tests.check_rejected(
   $$update public.profiles set id = '00000000-0000-4000-f000-0000000000ff'

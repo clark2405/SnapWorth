@@ -1,5 +1,5 @@
-import { BadgePercent, LayoutGrid, PackageSearch } from 'lucide-react-native';
-import { useState } from 'react';
+import { BadgePercent, LayoutGrid, PackageSearch, WifiOff } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -16,6 +16,7 @@ import {
   Photo,
   Reveal,
   Screen,
+  ScreenSkeleton,
   Sign,
   SnapIcon,
   Sticker,
@@ -26,7 +27,6 @@ import {
 import { held, themedStyles, tokens, useThemedStyles, useWideLayout } from '../../design';
 import {
   formatPeso,
-  previewListings,
   previewMarketAreas,
   previewMarketCategories,
   previewPriceBrackets,
@@ -47,6 +47,10 @@ import {
   priceLabel,
   type MarketFilters,
 } from './MarketFilters';
+import { toPreviewListing, useMarketplace } from './marketplace-state';
+import { NearMeNotice } from './NearMeNotice';
+import { distanceKm, listingCoordinates } from './places';
+import { useViewerLocation } from './viewer-location';
 
 export interface MarketplaceViewProps {
   readonly onOpenListing?: (listingId: string) => void;
@@ -85,6 +89,8 @@ export function MarketplaceView({
   onOpenHanap,
 }: MarketplaceViewProps) {
   const styles = useThemedStyles(stylesFor);
+  const { listings, refresh, status } = useMarketplace();
+  const location = useViewerLocation();
   const [filters, setFilters] = useState<MarketFilters>(defaultMarketFilters);
   const [openSheet, setOpenSheet] = useState<'price' | 'location' | null>(null);
   const ios = Platform.OS === 'ios';
@@ -95,12 +101,25 @@ export function MarketplaceView({
     onFiltersChange?.(next);
   };
 
+  // "Near me" asks where the viewer is the first time it's picked, never at launch.
+  const nearMe = filters.area === 'near-me';
+  const askForLocation = location.request;
+  useEffect(() => {
+    if (nearMe && location.status === 'idle') void askForLocation();
+  }, [askForLocation, location.status, nearMe]);
+
   const matching = (candidate: MarketFilters) =>
-    previewListings.filter(
-      (listing) =>
-        (candidate.category === 'all' || categoryByListing[listing.id] === candidate.category) &&
-        matchesPriceAndPlace(listing, candidate),
-    );
+    listings.filter((listing) => {
+      const category = listing.category ?? categoryByListing[listing.id];
+      const preview = toPreviewListing(listing);
+      const distance = location.position
+        ? distanceKm(location.position, listingCoordinates(listing))
+        : null;
+      return (
+        (candidate.category === 'all' || category === candidate.category) &&
+        matchesPriceAndPlace({ ...preview, area: listing.area, distanceKm: distance }, candidate)
+      );
+    });
 
   const filtered = matching(filters);
   // Two listings a row on a phone; on a wide window as many as fit, up to four.
@@ -116,15 +135,18 @@ export function MarketplaceView({
   // Steals sit above the grid only while browsing everything; once narrowed, the grid is the answer.
   const underEstimate = narrowed
     ? []
-    : previewListings.filter((listing) => listing.verdict === 'too_low').slice(0, 2);
+    : listings
+        .filter((listing) => listing.verdict === 'too_low')
+        .slice(0, 2)
+        .map(toPreviewListing);
+
+  // The first load is not an empty Market, and neither is one that failed.
+  if (status === 'loading' && listings.length === 0) {
+    return <ScreenSkeleton kind="tab" place="market" />;
+  }
 
   return (
-    <Screen
-      clearTabBar
-      place="market"
-      ambient="market"
-      onRefresh={() => new Promise<void>((resolve) => setTimeout(resolve, 900))}
-    >
+    <Screen clearTabBar place="market" ambient="market" onRefresh={() => refresh()}>
       <LargeTitle
         brand
         title="Market"
@@ -225,6 +247,16 @@ export function MarketplaceView({
         <HanapEntry onOpen={onOpenHanap} />
       </Reveal>
 
+      {nearMe && location.position === null ? (
+        <Reveal index={1}>
+          <NearMeNotice
+            status={location.status}
+            onTryAgain={() => void location.request()}
+            onClear={() => update({ area: 'anywhere' })}
+          />
+        </Reveal>
+      ) : null}
+
       {underEstimate.length > 0 ? (
         <Reveal index={1} style={styles.highlightSection}>
           <Sign icon={BadgePercent} label="Steals · Under estimate" tone="cobalt" />
@@ -241,7 +273,16 @@ export function MarketplaceView({
         </Reveal>
       ) : null}
 
-      {filtered.length === 0 ? (
+      {status === 'failed' && listings.length === 0 ? (
+        <EmptyState
+          icon={WifiOff}
+          tone="error"
+          title="Couldn’t load the market"
+          body="Check your connection and try again."
+          actionLabel="Retry"
+          onAction={() => void refresh()}
+        />
+      ) : filtered.length === 0 ? (
         <EmptyState
           icon={PackageSearch}
           title="Nothing here yet"
@@ -267,7 +308,10 @@ export function MarketplaceView({
               layout={paperLayout}
               style={wide ? { width: grid.cellWidth } : styles.cell}
             >
-              <ListingCard listing={listing} onOpen={() => onOpenListing?.(listing.id)} />
+              <ListingCard
+                listing={toPreviewListing(listing)}
+                onOpen={() => onOpenListing?.(listing.id)}
+              />
             </Animated.View>
           ))}
           {/* An odd count keeps its last card at half width instead of stretching. */}

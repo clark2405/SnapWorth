@@ -3,10 +3,30 @@
 # schema and roles, then every migration, the seed, and each *_test.sql file. Needs Postgres
 # 15+ server binaries (initdb, pg_ctl, psql); no Docker or Supabase project required.
 #
-#   Backend/scripts/test-db.sh
+#   Backend/scripts/test-db.sh            # everything from scratch, then every *_test.sql
+#   Backend/scripts/test-db.sh --upgrade  # the live project's upgrade: see below
+#
+# `--upgrade` rehearses deploying the newer migrations onto a database that already has data. It
+# applies the migrations the live project already has (up to `live_through`, below), loads
+# representative live rows (supabase/tests/upgrade/01_live_data.sql), applies the rest, checks the
+# rows survived and that the old app's calls still work (after_migrations_test.sql), re-runs the
+# seeds over it the way the deploy checklist suggests, and checks again (after_reseed_test.sql).
+# The live project is now at 20261111000100 (deployed 2026-11-12). `live_through` stays at the
+# point the live rows below were written for, so CI keeps checking that deploy. Before rehearsing
+# the next one, move it to 20261111000100 and rewrite 01_live_data.sql for that schema.
 #
 # Postgres refuses to run as root, so under root the cluster runs as the `postgres` user.
 set -euo pipefail
+
+# The schema 01_live_data.sql's rows are written for (see above).
+live_through="20261031000200"
+
+mode="scratch"
+case "${1:-}" in
+  "") ;;
+  --upgrade) mode="upgrade" ;;
+  *) echo "Usage: test-db.sh [--upgrade]" >&2; exit 2 ;;
+esac
 
 backend="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 supabase="$backend/supabase"
@@ -49,6 +69,31 @@ run_sql() {
 
 echo "Applying the Supabase stand-in…"
 run_sql "$supabase/tests/support/supabase_stub.sql"
+
+if [[ "$mode" == "upgrade" ]]; then
+  loaded=0
+  for migration in "$supabase"/migrations/*.sql; do
+    # The first newer migration comes after the live rows are in.
+    if [[ "$loaded" == 0 && "$(basename "$migration" | cut -d_ -f1)" > "$live_through" ]]; then
+      echo "Loading the live project's rows…"
+      run_sql "$supabase/tests/upgrade/01_live_data.sql"
+      loaded=1
+    fi
+    echo "Applying $(basename "$migration")…"
+    run_sql "$migration"
+  done
+  [[ "$loaded" == 1 ]] || { echo "No migration newer than $live_through to upgrade to." >&2; exit 1; }
+  echo "Running after_migrations_test.sql…"
+  run_sql "$supabase/tests/upgrade/after_migrations_test.sql"
+  for seed in "$supabase"/seed/*.sql; do
+    echo "Seeding $(basename "$seed") over the upgraded data…"
+    run_sql "$seed"
+  done
+  echo "Running after_reseed_test.sql…"
+  run_sql "$supabase/tests/upgrade/after_reseed_test.sql"
+  exit 0
+fi
+
 for migration in "$supabase"/migrations/*.sql; do
   echo "Applying $(basename "$migration")…"
   run_sql "$migration"
