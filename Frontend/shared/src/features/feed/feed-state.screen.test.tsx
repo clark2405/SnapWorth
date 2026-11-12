@@ -1,9 +1,11 @@
+import { jest } from '@jest/globals';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { createLocalFeedRepository } from '../../adapters/local/feed-repository';
-import type { FeedRepository } from '../../ports/feed';
+import type { AccountObserver } from '../../ports/account';
+import type { FeedPost, FeedRepository } from '../../ports/feed';
 import { err, ok } from '../../types/result';
 import { renderScreen } from '../../testing/render-screen';
 import { useSession } from '../session';
@@ -193,5 +195,158 @@ describe('FeedView while the Feed loads', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(screen.queryByText('Couldn’t load the feed')).toBeNull());
     expect(await screen.findByText(/windbreaker/i)).toBeOnTheScreen();
+  });
+});
+
+/** Sign-ins the test controls, the way Supabase's observer announces them. */
+function fakeAccount(first: string | null) {
+  let listener: ((accountId: string | null) => void) | null = null;
+  const account: AccountObserver = {
+    observe(next) {
+      listener = next;
+      next(first);
+      return () => (listener = null);
+    },
+  };
+  return { account, signIn: (accountId: string | null) => listener?.(accountId) };
+}
+
+/** One post, mine and voted on only for Ana; for anyone else it is just a post. */
+function phoneFeed(
+  whoIsSignedIn: () => string | null,
+  delay?: (accountId: string | null) => Promise<void>,
+) {
+  const post = (mine: boolean): FeedPost => ({
+    ...buildPreviewFeedPosts()[0]!,
+    id: 'p1',
+    slug: 'p1',
+    isMine: mine,
+  });
+  const repository: FeedRepository = {
+    ...localRepository(),
+    list: async () => {
+      const asked = whoIsSignedIn();
+      await delay?.(asked);
+      return ok([post(asked === 'ana')]);
+    },
+    listVotes: async () =>
+      ok(
+        whoIsSignedIn() === 'ana'
+          ? [
+              {
+                postId: 'p1',
+                postSlug: 'p1',
+                choice: 'too_high' as const,
+                castAt: new Date().toISOString() as never,
+              },
+            ]
+          : [],
+      ),
+  };
+  return repository;
+}
+
+describe('FeedProvider following the account', () => {
+  function mountFor(repository: FeedRepository, account: AccountObserver) {
+    const result: { current: FeedContextValue } = { current: undefined as never };
+    function Probe() {
+      result.current = useFeed();
+      return null;
+    }
+    renderScreen(
+      <SignedIn>
+        <FeedProvider repository={repository} account={account}>
+          <Probe />
+        </FeedProvider>
+      </SignedIn>,
+    );
+    return { result };
+  }
+
+  it('drops the last person’s votes and mine flags at once, then loads the next person’s', async () => {
+    let who: string | null = 'ana';
+    const { account, signIn } = fakeAccount('ana');
+    const { result } = mountFor(
+      phoneFeed(() => who),
+      account,
+    );
+    await waitFor(() => expect(result.current.voteFor('p1')).toBe('too_high'));
+    expect(result.current.posts[0]?.isMine).toBe(true);
+
+    who = 'ben';
+    act(() => signIn('ben'));
+    // Straight away, before anything has loaded: nothing of Ana's is left.
+    expect(result.current.posts).toEqual([]);
+    expect(result.current.userVotes).toEqual([]);
+    expect(result.current.status).toBe('loading');
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.posts[0]?.isMine).toBe(false);
+    expect(result.current.voteFor('p1')).toBeNull();
+
+    who = 'ana';
+    act(() => signIn('ana'));
+    await waitFor(() => expect(result.current.voteFor('p1')).toBe('too_high'));
+    expect(result.current.posts[0]?.isMine).toBe(true);
+  });
+
+  it('shows no votes after signing out, and Ana’s again on signing back in', async () => {
+    let who: string | null = 'ana';
+    const { account, signIn } = fakeAccount('ana');
+    const { result } = mountFor(
+      phoneFeed(() => who),
+      account,
+    );
+    await waitFor(() => expect(result.current.voteFor('p1')).toBe('too_high'));
+
+    who = null;
+    act(() => signIn(null));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.userVotes).toEqual([]);
+    expect(result.current.posts[0]?.isMine).toBe(false);
+  });
+
+  it('drops a load still on its way for the last person', async () => {
+    let who: string | null = 'ana';
+    let releaseAna: () => void = () => undefined;
+    const anaGate = new Promise<void>((resolve) => (releaseAna = resolve));
+    const { account, signIn } = fakeAccount('ana');
+    const { result } = mountFor(
+      phoneFeed(
+        () => who,
+        async (asked) => {
+          if (asked === 'ana') await anaGate;
+        },
+      ),
+      account,
+    );
+    // Ana's load is held; Ben signs in and his arrives first.
+    who = 'ben';
+    act(() => signIn('ben'));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.posts[0]?.isMine).toBe(false);
+
+    // Ana's slow load now finishes: it must not overwrite Ben's Feed.
+    await act(async () => {
+      releaseAna();
+      await anaGate;
+    });
+    expect(result.current.posts[0]?.isMine).toBe(false);
+    expect(result.current.voteFor('p1')).toBeNull();
+  });
+
+  it('does not load until it knows who is signed in', async () => {
+    const list = jest.fn(async () => ok([] as FeedPost[]));
+    let announce: (accountId: string | null) => void = () => undefined;
+    const account: AccountObserver = {
+      observe(next) {
+        announce = next;
+        return () => undefined;
+      },
+    };
+    mountFor({ ...localRepository(), list }, account);
+    expect(list).not.toHaveBeenCalled();
+    act(() => announce(null));
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(1));
   });
 });

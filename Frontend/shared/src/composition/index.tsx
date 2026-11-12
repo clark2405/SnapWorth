@@ -350,8 +350,8 @@ export function AppServicesProvider({
         <CommentServiceProvider service={services.comments}>
           <ChatServiceProvider service={services.chats}>
             <HanapProvider repository={services.hanap}>
-              <MarketplaceProvider repository={services.marketplace}>
-                <FeedProvider repository={services.feed}>
+              <MarketplaceProvider repository={services.marketplace} account={services.account}>
+                <FeedProvider repository={services.feed} account={services.account}>
                   <SukiProvider repository={services.suki}>
                     {/* Saved scans, and what was paid for each: in Supabase with a backend, on the
                     phone without. */}

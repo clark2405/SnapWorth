@@ -4,11 +4,13 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
 import type { ImageSourcePropType } from 'react-native';
 
+import type { AccountObserver } from '../../ports/account';
 import type {
   MarketListing,
   MarketplaceRepository,
@@ -125,7 +127,10 @@ export const savedNotKept = {
  * repository's sample ones), and starts empty until it has loaded. Without one (a standalone
  * screen in a unit test) it's an in-memory copy of the sample listings.
  */
-function useMarketplaceStateInternal(repository: MarketplaceRepository | null): MarketplaceState {
+function useMarketplaceStateInternal(
+  repository: MarketplaceRepository | null,
+  account?: AccountObserver,
+): MarketplaceState {
   const [status, setStatus] = useState<MarketplaceLoadStatus>(repository ? 'loading' : 'ready');
   const [allListings, setAllListings] = useState<readonly MarketListing[]>(() =>
     repository ? [] : buildPreviewMarketListings(),
@@ -137,11 +142,22 @@ function useMarketplaceStateInternal(repository: MarketplaceRepository | null): 
     repository ? [] : previewPriceAlerts.map((entry) => ({ ...entry })),
   );
 
+  // Whose Market: the signed-in account, nobody (null), or not known yet (undefined).
+  const [owner, setOwner] = useState<string | null | undefined>(account ? undefined : null);
+  /** Moves on with each load, so a slower, older load is thrown away. */
+  const loadGeneration = useRef(0);
+  /** Moves on with each account change, so a change in flight for the last person is ignored. */
+  const accountEpoch = useRef(0);
+  const lastOwner = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => (account ? account.observe(setOwner) : undefined), [account]);
+
   const refresh = useCallback(async () => {
     if (!repository) {
       setStatus('ready');
       return;
     }
+    const mine = ++loadGeneration.current;
     // A retry after a failure shows loading again; a refresh of a Market already on screen
     // doesn't blank it.
     setStatus((current) => (current === 'ready' ? 'ready' : 'loading'));
@@ -149,6 +165,7 @@ function useMarketplaceStateInternal(repository: MarketplaceRepository | null): 
       repository.list(),
       repository.listSaved(),
     ]);
+    if (mine !== loadGeneration.current) return;
     if (listingsResult.ok) {
       setAllListings(listingsResult.value);
       setStatus('ready');
@@ -161,8 +178,20 @@ function useMarketplaceStateInternal(repository: MarketplaceRepository | null): 
   }, [repository]);
 
   useEffect(() => {
+    // Wait until we know who is signed in, so the first load is the right person's.
+    if (owner === undefined) return;
+    if (lastOwner.current !== undefined && lastOwner.current !== owner) {
+      // A different person (or none): the last one's saved alerts, own listings and "mine"
+      // flags go at once, and any load or change still on its way for them is dropped.
+      accountEpoch.current += 1;
+      loadGeneration.current += 1;
+      setAllListings([]);
+      setSavedAlerts([]);
+      setStatus(repository ? 'loading' : 'ready');
+    }
+    lastOwner.current = owner;
     void refresh();
-  }, [refresh]);
+  }, [owner, refresh, repository]);
 
   // Public: approved and active. The seller's own waiting or held listings stay out of the
   // Market (the database hides them from everyone else too) but are in `myListings`.
@@ -251,8 +280,9 @@ function useMarketplaceStateInternal(repository: MarketplaceRepository | null): 
   const publishListing = useCallback(
     async (input: NewListingInput): Promise<Result<MarketListing, AppError>> => {
       if (repository) {
+        const epoch = accountEpoch.current;
         const result = await repository.publish(input);
-        if (result.ok) {
+        if (result.ok && epoch === accountEpoch.current) {
           setAllListings((current) => [
             result.value,
             ...current.filter((entry) => entry.rowId !== result.value.rowId),
@@ -312,8 +342,9 @@ function useMarketplaceStateInternal(repository: MarketplaceRepository | null): 
       change: UpdateListingInput,
     ): Promise<Result<MarketListing, AppError>> => {
       if (repository) {
+        const epoch = accountEpoch.current;
         const result = await repository.update(idOrSlug, change);
-        if (result.ok) {
+        if (result.ok && epoch === accountEpoch.current) {
           setAllListings((current) =>
             current.map((entry) =>
               entry.rowId === result.value.rowId || entry.id === idOrSlug ? result.value : entry,
@@ -354,8 +385,9 @@ function useMarketplaceStateInternal(repository: MarketplaceRepository | null): 
   const removeListing = useCallback(
     async (idOrSlug: string): Promise<Result<void, AppError>> => {
       if (repository) {
+        const epoch = accountEpoch.current;
         const result = await repository.remove(idOrSlug);
-        if (result.ok) {
+        if (result.ok && epoch === accountEpoch.current) {
           setAllListings((current) =>
             current.filter(
               (entry) =>
@@ -406,7 +438,10 @@ function useMarketplaceStateInternal(repository: MarketplaceRepository | null): 
       });
 
       if (repository) {
+        const epoch = accountEpoch.current;
         const result = await repository.saveListing(idOrSlug, computedAlertBelow, on);
+        // Someone else signed in meanwhile: what is on screen is theirs now.
+        if (epoch !== accountEpoch.current) return result;
         if (!result.ok) {
           // Put back what was there: the earlier alert, or nothing.
           setSavedAlerts((current) =>
@@ -435,7 +470,9 @@ function useMarketplaceStateInternal(repository: MarketplaceRepository | null): 
         current.filter((entry) => entry.listingId !== listingKey && entry.listingId !== idOrSlug),
       );
       if (repository) {
+        const epoch = accountEpoch.current;
         const result = await repository.unsaveListing(idOrSlug);
+        if (epoch !== accountEpoch.current) return result;
         if (!result.ok) {
           // It's still saved: bring it back.
           if (previous) {
@@ -512,12 +549,19 @@ function useMarketplaceStateInternal(repository: MarketplaceRepository | null): 
 /** Supplied by the composition root so every Market screen shares the same repository and state. */
 export function MarketplaceProvider({
   repository,
+  account,
   children,
 }: {
   readonly repository: MarketplaceRepository;
+  /**
+   * Who is signed in. The Market follows them: on every sign-in, sign-out or switch it drops the
+   * last person's saved alerts, own listings and "mine" flags at once and loads again. This
+   * provider sits above the session, so it can't ask the session; without this it loads once.
+   */
+  readonly account?: AccountObserver;
   readonly children: ReactNode;
 }) {
-  const state = useMarketplaceStateInternal(repository);
+  const state = useMarketplaceStateInternal(repository, account);
   return (
     <MarketplaceRepositoryContext.Provider value={repository}>
       <MarketplaceStateContext.Provider value={state}>{children}</MarketplaceStateContext.Provider>

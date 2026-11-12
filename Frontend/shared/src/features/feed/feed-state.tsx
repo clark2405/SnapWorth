@@ -11,6 +11,7 @@ import {
 import type { ImageSourcePropType } from 'react-native';
 
 import { createLocalFeedRepository } from '../../adapters/local/feed-repository';
+import type { AccountObserver } from '../../ports/account';
 import type {
   FeedPost,
   FeedRepository,
@@ -149,15 +150,21 @@ export const voteNotSaved = {
 
 export interface FeedProviderProps {
   readonly repository?: FeedRepository;
+  /**
+   * Who is signed in. The Feed follows them: on every sign-in, sign-out or switch it drops the
+   * last person's votes and "mine" flags at once and loads again. Without it the Feed loads once.
+   */
+  readonly account?: AccountObserver;
   readonly children: ReactNode;
 }
 
 /**
  * The Feed's posts and the viewer's votes. It sits with the other services above the session (the
- * shells mount `AppServicesProvider` outside `SessionProvider`), so it knows nothing of who is
- * signed in: `useFeed` hides a guest's votes.
+ * shells mount `AppServicesProvider` outside `SessionProvider`), so it can't ask the session who
+ * is signed in; it follows the account through the `AccountObserver` instead. `useFeed` also
+ * hides a guest's votes.
  */
-export function FeedProvider({ repository, children }: FeedProviderProps) {
+export function FeedProvider({ repository, account, children }: FeedProviderProps) {
   const fallbackRepoRef = useRef<FeedRepository | null>(null);
   if (!fallbackRepoRef.current) {
     fallbackRepoRef.current = createLocalFeedRepository({
@@ -176,8 +183,18 @@ export function FeedProvider({ repository, children }: FeedProviderProps) {
     repository ? [] : buildPreviewFeedVotes(),
   );
   const [status, setStatus] = useState<FeedLoadStatus>(repository ? 'loading' : 'ready');
+  // Whose Feed: the signed-in account, nobody (null), or not known yet (undefined).
+  const [owner, setOwner] = useState<string | null | undefined>(account ? undefined : null);
+  /** Moves on with each load, so a slower, older load is thrown away. */
+  const loadGeneration = useRef(0);
+  /** Moves on with each account change, so a vote or post in flight for the last person is ignored. */
+  const accountEpoch = useRef(0);
+  const lastOwner = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => (account ? account.observe(setOwner) : undefined), [account]);
 
   const refresh = useCallback(async () => {
+    const mine = ++loadGeneration.current;
     // A retry after a failure shows loading again; a refresh of a Feed already on screen doesn't
     // blank it.
     setStatus((current) => (current === 'ready' ? 'ready' : 'loading'));
@@ -185,6 +202,7 @@ export function FeedProvider({ repository, children }: FeedProviderProps) {
       activeRepo.list(),
       activeRepo.listVotes(),
     ]);
+    if (mine !== loadGeneration.current) return;
     if (postsResult.ok) {
       setPosts(postsResult.value);
       setStatus('ready');
@@ -197,8 +215,20 @@ export function FeedProvider({ repository, children }: FeedProviderProps) {
 
   useEffect(() => {
     if (!repository) return;
+    // Wait until we know who is signed in, so the first load is the right person's.
+    if (owner === undefined) return;
+    if (lastOwner.current !== undefined && lastOwner.current !== owner) {
+      // A different person (or none): the last one's votes and "mine" flags go at once, and any
+      // load or vote still on its way for them is dropped.
+      accountEpoch.current += 1;
+      loadGeneration.current += 1;
+      setPosts([]);
+      setUserVotes([]);
+      setStatus('loading');
+    }
+    lastOwner.current = owner;
     void refresh();
-  }, [refresh, repository]);
+  }, [owner, refresh, repository]);
 
   const previewPostsList = useMemo(() => posts.map(toPreviewPost), [posts]);
 
@@ -223,9 +253,12 @@ export function FeedProvider({ repository, children }: FeedProviderProps) {
 
   const loadPost = useCallback(
     async (idOrSlug: string): Promise<FeedPost | null> => {
+      const epoch = accountEpoch.current;
       const result = await activeRepo.getByIdOrSlug(idOrSlug);
       if (!result.ok || !result.value) return findPost(idOrSlug) ?? null;
       const loaded = result.value;
+      // Someone else signed in meanwhile: it is theirs to ask for again.
+      if (epoch !== accountEpoch.current) return loaded;
       setPosts((current) => {
         const exists = current.some(
           (entry) => entry.id === loaded.id || entry.slug === loaded.slug,
@@ -299,7 +332,11 @@ export function FeedProvider({ repository, children }: FeedProviderProps) {
         ];
       });
 
+      const epoch = accountEpoch.current;
       const result = await activeRepo.setVote(target?.slug ?? postIdOrSlug, nextChoice);
+      // Someone else signed in while the vote was on its way: it was the last person's, and what
+      // is on screen is not theirs to change.
+      if (epoch !== accountEpoch.current) return result.ok ? ok(nextChoice) : err(result.error);
       if (!result.ok) {
         // The vote didn't go through: put the tally and the person's choice back as they were.
         if (target) {
@@ -331,8 +368,9 @@ export function FeedProvider({ repository, children }: FeedProviderProps) {
 
   const publishPost = useCallback(
     async (input: PublishFeedPostInput): Promise<Result<FeedPost, AppError>> => {
+      const epoch = accountEpoch.current;
       const result = await activeRepo.publish(input);
-      if (result.ok) {
+      if (result.ok && epoch === accountEpoch.current) {
         setPosts((current) => [
           result.value,
           ...current.filter(
@@ -347,8 +385,9 @@ export function FeedProvider({ repository, children }: FeedProviderProps) {
 
   const removePost = useCallback(
     async (idOrSlug: string): Promise<Result<void, AppError>> => {
+      const epoch = accountEpoch.current;
       const result = await activeRepo.remove(idOrSlug);
-      if (result.ok) {
+      if (result.ok && epoch === accountEpoch.current) {
         setPosts((current) =>
           current.filter((entry) => entry.id !== idOrSlug && entry.slug !== idOrSlug),
         );

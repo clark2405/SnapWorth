@@ -1,9 +1,10 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import { createLocalMarketplaceRepository } from '../../adapters/local/marketplace-repository';
+import type { AccountObserver } from '../../ports/account';
 import type { MarketListing, MarketplaceRepository } from '../../ports/marketplace';
 import { renderScreen } from '../../testing/render-screen';
-import { err } from '../../types/result';
+import { err, ok } from '../../types/result';
 import { buildPreviewMarketListings } from './marketplace-seed';
 import { MarketplaceView } from './MarketplaceView';
 import { MarketplaceProvider, useMarketplace, type MarketplaceState } from './marketplace-state';
@@ -186,5 +187,160 @@ describe('MarketplaceView while the Market loads', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(screen.queryByText('Couldn’t load the market')).toBeNull());
     expect(screen.queryByText('Nothing here yet')).toBeNull();
+  });
+});
+
+/** Sign-ins the test controls, the way Supabase's observer announces them. */
+function fakeAccount(first: string | null) {
+  let listener: ((accountId: string | null) => void) | null = null;
+  const account: AccountObserver = {
+    observe(next) {
+      listener = next;
+      next(first);
+      return () => (listener = null);
+    },
+  };
+  return { account, signIn: (accountId: string | null) => listener?.(accountId) };
+}
+
+describe('MarketplaceProvider following the account', () => {
+  const [first] = buildPreviewMarketListings();
+
+  /** One listing that is Ana's (with her alert on it); to anyone else it is just a listing. */
+  function phone(
+    whoIsSignedIn: () => string | null,
+    hold?: (asked: string | null) => Promise<void>,
+  ) {
+    const { repository } = localRepository();
+    const listing = (mine: boolean): MarketListing => ({ ...first!, mine });
+    const phoneRepository: MarketplaceRepository = {
+      ...repository,
+      list: async () => {
+        const asked = whoIsSignedIn();
+        await hold?.(asked);
+        return ok([listing(asked === 'ana')]);
+      },
+      listSaved: async () =>
+        ok(whoIsSignedIn() === 'ana' ? [{ listingId: first!.id, alertBelow: 900, on: true }] : []),
+    };
+    return phoneRepository;
+  }
+
+  function mountFor(repository: MarketplaceRepository, account: AccountObserver) {
+    const result: { current: MarketplaceState } = { current: undefined as never };
+    function Probe() {
+      result.current = useMarketplace();
+      return null;
+    }
+    renderScreen(
+      <MarketplaceProvider repository={repository} account={account}>
+        <Probe />
+      </MarketplaceProvider>,
+    );
+    return { result };
+  }
+
+  it('drops the last person’s alerts and own listings at once, then loads the next person’s', async () => {
+    let who: string | null = 'ana';
+    const { account, signIn } = fakeAccount('ana');
+    const { result } = mountFor(
+      phone(() => who),
+      account,
+    );
+    await waitFor(() => expect(result.current.isSaved(first!.id)).toBe(true));
+    expect(result.current.myListings).toHaveLength(1);
+
+    who = 'ben';
+    act(() => signIn('ben'));
+    // Straight away, before anything has loaded: nothing of Ana's is left.
+    expect(result.current.savedAlerts).toEqual([]);
+    expect(result.current.myListings).toEqual([]);
+    expect(result.current.listings).toEqual([]);
+    expect(result.current.status).toBe('loading');
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.isSaved(first!.id)).toBe(false);
+    expect(result.current.myListings).toEqual([]);
+    expect(result.current.listings).toHaveLength(1);
+
+    who = 'ana';
+    act(() => signIn('ana'));
+    await waitFor(() => expect(result.current.isSaved(first!.id)).toBe(true));
+    expect(result.current.myListings).toHaveLength(1);
+  });
+
+  it('shows nothing of the account after signing out', async () => {
+    let who: string | null = 'ana';
+    const { account, signIn } = fakeAccount('ana');
+    const { result } = mountFor(
+      phone(() => who),
+      account,
+    );
+    await waitFor(() => expect(result.current.isSaved(first!.id)).toBe(true));
+
+    who = null;
+    act(() => signIn(null));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.savedAlerts).toEqual([]);
+    expect(result.current.myListings).toEqual([]);
+  });
+
+  it('drops a load still on its way for the last person', async () => {
+    let who: string | null = 'ana';
+    let releaseAna: () => void = () => undefined;
+    const anaGate = new Promise<void>((resolve) => (releaseAna = resolve));
+    const { account, signIn } = fakeAccount('ana');
+    const { result } = mountFor(
+      phone(
+        () => who,
+        async (asked) => {
+          if (asked === 'ana') await anaGate;
+        },
+      ),
+      account,
+    );
+    who = 'ben';
+    act(() => signIn('ben'));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    await act(async () => {
+      releaseAna();
+      await anaGate;
+    });
+    expect(result.current.myListings).toEqual([]);
+    expect(result.current.isSaved(first!.id)).toBe(false);
+  });
+
+  it('does not undo or redo a save for the last person on the next person’s screen', async () => {
+    let who: string | null = 'ana';
+    let releaseSave: () => void = () => undefined;
+    const saveGate = new Promise<void>((resolve) => (releaseSave = resolve));
+    const { account, signIn } = fakeAccount('ana');
+    const base = phone(() => who);
+    const slowFailing: MarketplaceRepository = {
+      ...base,
+      saveListing: async () => {
+        await saveGate;
+        return err(offline);
+      },
+    };
+    const { result } = mountFor(slowFailing, account);
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    let pending: Promise<unknown> = Promise.resolve();
+    act(() => {
+      pending = result.current.saveAlert(first!.id, 500, true);
+    });
+    who = 'ben';
+    act(() => signIn('ben'));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.savedAlerts).toEqual([]);
+
+    await act(async () => {
+      releaseSave();
+      await pending;
+    });
+    // Ana's failed save must not put her old alert back for Ben.
+    expect(result.current.savedAlerts).toEqual([]);
   });
 });
