@@ -70,6 +70,8 @@ interface MeetupRow {
 const messageColumns =
   'id, conversation_id, sender_id, kind, body, offer_php, offer_status, meetup_place, meetup_when, meetup_status, meetup_purpose, meetup_spot, meetup_lat, meetup_lng, created_at';
 
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const iso = (value: string) => new Date(value).toISOString() as UtcDateTime;
 
 function messageFromRow(row: MessageRow, viewer: string): Message {
@@ -251,6 +253,11 @@ export function createSupabaseChatRepository(
     },
 
     async get(id) {
+      // A link with something other than a conversation's id in it: nothing is there, and there
+      // is no point asking the database (which would only say the same, as an error).
+      if (!uuidPattern.test(id)) {
+        return err({ kind: 'authorization', code: 'not_found_or_denied' });
+      }
       const rows = await conversationRows(id, 'load_messages');
       if (!rows.ok) return rows;
       const row = rows.value[0];
