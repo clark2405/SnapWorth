@@ -1,4 +1,4 @@
-import { BadgePercent, LayoutGrid, PackageSearch } from 'lucide-react-native';
+import { BadgePercent, LayoutGrid, PackageSearch, WifiOff } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -16,6 +16,7 @@ import {
   Photo,
   Reveal,
   Screen,
+  ScreenSkeleton,
   Sign,
   SnapIcon,
   Sticker,
@@ -88,7 +89,7 @@ export function MarketplaceView({
   onOpenHanap,
 }: MarketplaceViewProps) {
   const styles = useThemedStyles(stylesFor);
-  const { listings, refresh } = useMarketplace();
+  const { listings, refresh, status } = useMarketplace();
   const location = useViewerLocation();
   const [filters, setFilters] = useState<MarketFilters>(defaultMarketFilters);
   const [openSheet, setOpenSheet] = useState<'price' | 'location' | null>(null);
@@ -138,6 +139,11 @@ export function MarketplaceView({
         .filter((listing) => listing.verdict === 'too_low')
         .slice(0, 2)
         .map(toPreviewListing);
+
+  // The first load is not an empty Market, and neither is one that failed.
+  if (status === 'loading' && listings.length === 0) {
+    return <ScreenSkeleton kind="tab" place="market" />;
+  }
 
   return (
     <Screen clearTabBar place="market" ambient="market" onRefresh={() => refresh()}>
@@ -267,7 +273,16 @@ export function MarketplaceView({
         </Reveal>
       ) : null}
 
-      {filtered.length === 0 ? (
+      {status === 'failed' && listings.length === 0 ? (
+        <EmptyState
+          icon={WifiOff}
+          tone="error"
+          title="Couldn’t load the market"
+          body="Check your connection and try again."
+          actionLabel="Retry"
+          onAction={() => void refresh()}
+        />
+      ) : filtered.length === 0 ? (
         <EmptyState
           icon={PackageSearch}
           title="Nothing here yet"

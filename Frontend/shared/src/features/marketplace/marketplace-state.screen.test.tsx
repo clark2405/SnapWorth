@@ -1,10 +1,11 @@
-import { act, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import { createLocalMarketplaceRepository } from '../../adapters/local/marketplace-repository';
 import type { MarketListing, MarketplaceRepository } from '../../ports/marketplace';
 import { renderScreen } from '../../testing/render-screen';
 import { err } from '../../types/result';
 import { buildPreviewMarketListings } from './marketplace-seed';
+import { MarketplaceView } from './MarketplaceView';
 import { MarketplaceProvider, useMarketplace, type MarketplaceState } from './marketplace-state';
 
 const viewer = { userId: 'usr_viewer' as never, handle: 'viewer' };
@@ -121,5 +122,69 @@ describe('MarketplaceProvider saving', () => {
     });
     expect(saved).toEqual({ ok: true, value: false });
     expect(result.current.isSaved(id)).toBe(false);
+  });
+});
+
+describe('MarketplaceProvider loading', () => {
+  it('says failed, not empty, when the listings cannot be loaded, and recovers on a retry', async () => {
+    let failing = true;
+    const { repository } = localRepository();
+    const flaky: MarketplaceRepository = {
+      ...repository,
+      list: async () => (failing ? err(offline) : repository.list()),
+    };
+    const { result } = mountMarket(flaky);
+    expect(result.current.status).toBe('loading');
+    await waitFor(() => expect(result.current.status).toBe('failed'));
+    expect(result.current.listings).toEqual([]);
+
+    failing = false;
+    await act(async () => {
+      await result.current.refresh();
+    });
+    expect(result.current.status).toBe('ready');
+    expect(result.current.listings.length).toBeGreaterThan(0);
+  });
+
+  it('keeps the listings on screen when a later refresh fails', async () => {
+    let failing = false;
+    const { repository } = localRepository();
+    const flaky: MarketplaceRepository = {
+      ...repository,
+      list: async () => (failing ? err(offline) : repository.list()),
+    };
+    const { result } = mountMarket(flaky);
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    const count = result.current.listings.length;
+
+    failing = true;
+    await act(async () => {
+      await result.current.refresh();
+    });
+    expect(result.current.status).toBe('ready');
+    expect(result.current.listings).toHaveLength(count);
+  });
+});
+
+describe('MarketplaceView while the Market loads', () => {
+  it('offers a retry when the Market could not be loaded, instead of "Nothing here yet"', async () => {
+    let failing = true;
+    const { repository } = localRepository();
+    const flaky: MarketplaceRepository = {
+      ...repository,
+      list: async () => (failing ? err(offline) : repository.list()),
+    };
+    renderScreen(
+      <MarketplaceProvider repository={flaky}>
+        <MarketplaceView />
+      </MarketplaceProvider>,
+    );
+
+    expect(await screen.findByText('Couldn’t load the market')).toBeOnTheScreen();
+    expect(screen.queryByText('Nothing here yet')).toBeNull();
+    failing = false;
+    fireEvent.press(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(screen.queryByText('Couldn’t load the market')).toBeNull());
+    expect(screen.queryByText('Nothing here yet')).toBeNull();
   });
 });

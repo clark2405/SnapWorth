@@ -1,8 +1,9 @@
-import { Flame } from 'lucide-react-native';
+import { Flame, WifiOff } from 'lucide-react-native';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import {
   Button,
+  EmptyState,
   LargeTitle,
   Photo,
   Sign,
@@ -12,6 +13,7 @@ import {
   ZoomSource,
   Reveal,
   Screen,
+  ScreenSkeleton,
   SearchButton,
   SWText,
   useGridColumns,
@@ -59,7 +61,7 @@ export function FeedView({
   onOpenGuess,
 }: FeedViewProps) {
   const styles = useThemedStyles(stylesFor);
-  const { previewPosts: feedPosts, voteFor, toggleVote, refresh } = useFeed();
+  const { previewPosts: feedPosts, voteFor, toggleVote, refresh, status } = useFeed();
   const { heading, trends } = useTrends();
   const requireAccount = useAccountGate();
   const toast = useToast();
@@ -72,6 +74,11 @@ export function FeedView({
   });
   const gridded = grid.columns > 1;
   const wide = useWideLayout();
+
+  // The first load is not an empty Feed, and neither is one that failed.
+  if (status === 'loading' && feedPosts.length === 0) {
+    return <ScreenSkeleton kind="tab" place="feed" />;
+  }
 
   return (
     <Screen clearTabBar place="feed" ambient="feed" onRefresh={refresh}>
@@ -124,6 +131,17 @@ export function FeedView({
         <Reveal index={0} style={styles.guess}>
           <GuessEntry onOpen={onOpenGuess} />
         </Reveal>
+      ) : null}
+
+      {status === 'failed' && feedPosts.length === 0 ? (
+        <EmptyState
+          icon={WifiOff}
+          tone="error"
+          title="Couldn’t load the feed"
+          body="Check your connection and try again."
+          actionLabel="Retry"
+          onAction={() => void refresh()}
+        />
       ) : null}
 
       <View style={gridded ? styles.grid : styles.list} onLayout={grid.onLayout}>

@@ -142,6 +142,9 @@ function useMarketplaceStateInternal(repository: MarketplaceRepository | null): 
       setStatus('ready');
       return;
     }
+    // A retry after a failure shows loading again; a refresh of a Market already on screen
+    // doesn't blank it.
+    setStatus((current) => (current === 'ready' ? 'ready' : 'loading'));
     const [listingsResult, savedResult] = await Promise.all([
       repository.list(),
       repository.listSaved(),

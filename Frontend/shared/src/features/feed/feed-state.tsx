@@ -115,10 +115,15 @@ function adjustTally(
   };
 }
 
+/** Whether the Feed has loaded: `failed` means the posts couldn't be fetched, not that there are none. */
+export type FeedLoadStatus = 'loading' | 'ready' | 'failed';
+
 export interface FeedContextValue {
+  readonly status: FeedLoadStatus;
   readonly posts: readonly FeedPost[];
   readonly previewPosts: readonly PreviewPost[];
   readonly userVotes: readonly UserVoteRecord[];
+  /** True while the first load, or a retry after a failed one, is under way. */
   readonly loading: boolean;
   readonly refresh: () => Promise<void>;
   readonly findPost: (idOrSlug?: string) => FeedPost | undefined;
@@ -170,17 +175,24 @@ export function FeedProvider({ repository, children }: FeedProviderProps) {
   const [userVotes, setUserVotes] = useState<readonly UserVoteRecord[]>(() =>
     repository ? [] : buildPreviewFeedVotes(),
   );
-  const [loading, setLoading] = useState(Boolean(repository));
+  const [status, setStatus] = useState<FeedLoadStatus>(repository ? 'loading' : 'ready');
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    // A retry after a failure shows loading again; a refresh of a Feed already on screen doesn't
+    // blank it.
+    setStatus((current) => (current === 'ready' ? 'ready' : 'loading'));
     const [postsResult, votesResult] = await Promise.all([
       activeRepo.list(),
       activeRepo.listVotes(),
     ]);
-    if (postsResult.ok) setPosts(postsResult.value);
+    if (postsResult.ok) {
+      setPosts(postsResult.value);
+      setStatus('ready');
+    } else {
+      // Posts already on screen stay (the refresh failed); with none, say it failed.
+      setStatus((current) => (current === 'ready' ? 'ready' : 'failed'));
+    }
     if (votesResult.ok) setUserVotes(votesResult.value);
-    setLoading(false);
   }, [activeRepo]);
 
   useEffect(() => {
@@ -357,10 +369,11 @@ export function FeedProvider({ repository, children }: FeedProviderProps) {
 
   const value = useMemo<FeedContextValue>(
     () => ({
+      status,
       posts,
       previewPosts: previewPostsList,
       userVotes,
-      loading,
+      loading: status === 'loading',
       refresh,
       findPost,
       findPreviewPost,
@@ -376,12 +389,12 @@ export function FeedProvider({ repository, children }: FeedProviderProps) {
       findPostForScan,
       findPreviewPost,
       loadPost,
-      loading,
       posts,
       previewPostsList,
       publishPost,
       refresh,
       removePost,
+      status,
       toggleVote,
       userVotes,
       voteFor,
@@ -427,6 +440,7 @@ export function useFeed(): FeedContextValue {
       );
     };
     return {
+      status: 'ready',
       posts: fallbackPosts,
       previewPosts: fallbackPosts.map(toPreviewPost),
       userVotes: isGuest ? [] : fallbackVotes,
