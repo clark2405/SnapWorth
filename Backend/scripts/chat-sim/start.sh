@@ -13,6 +13,8 @@ supabase="$here/../../supabase"
 bin="${PG_BIN:-$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | sort -rV | head -1)}"
 port="${PG_PORT:-54329}"
 workdir="$(mktemp -d)"
+# Empty unless root. Written `${as_db_user[@]+...}` below, since macOS's bash 3.2 treats an empty
+# array as unset under `set -u`.
 as_db_user=()
 if [[ "$(id -u)" == "0" ]]; then
   chown postgres "$workdir"
@@ -21,13 +23,13 @@ fi
 
 cleanup() {
   [[ -n "${gateway_pid:-}" ]] && kill "$gateway_pid" 2>/dev/null || true
-  "${as_db_user[@]}" "$bin/pg_ctl" -D "$workdir/data" -m immediate stop >/dev/null 2>&1 || true
+  ${as_db_user[@]+"${as_db_user[@]}"} "$bin/pg_ctl" -D "$workdir/data" -m immediate stop >/dev/null 2>&1 || true
   rm -rf "$workdir"
 }
 trap cleanup EXIT INT TERM
 
-"${as_db_user[@]}" "$bin/initdb" -D "$workdir/data" -U postgres --auth=trust >/dev/null
-"${as_db_user[@]}" "$bin/pg_ctl" -D "$workdir/data" -l "$workdir/server.log" -w \
+${as_db_user[@]+"${as_db_user[@]}"} "$bin/initdb" -D "$workdir/data" -U postgres --auth=trust >/dev/null
+${as_db_user[@]+"${as_db_user[@]}"} "$bin/pg_ctl" -D "$workdir/data" -l "$workdir/server.log" -w \
   -o "-p $port -k $workdir -c listen_addresses='' -c wal_level=logical" start >/dev/null
 
 run_sql() {

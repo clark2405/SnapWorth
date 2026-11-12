@@ -294,18 +294,22 @@ async function rest(req, claims, url, body) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Auth: anonymous sign-up and refresh, which is all the chat adapter uses.
+// Auth: email sign-up (confirmed at once, as with confirmations off), anonymous sign-up, refresh.
 // ---------------------------------------------------------------------------------------------
 
 const refreshTokens = new Map();
+/** Who signed up with an email rather than anonymously, so their sessions say so. */
+const emailAccounts = new Map();
 
 function sessionFor(userId) {
+  const email = emailAccounts.get(userId);
+  const anonymous = email === undefined;
   const now = Math.floor(Date.now() / 1000);
   const claims = {
     sub: userId,
     role: "authenticated",
     aud: "authenticated",
-    is_anonymous: true,
+    is_anonymous: anonymous,
     iat: now,
     exp: now + 3600,
   };
@@ -321,8 +325,11 @@ function sessionFor(userId) {
       id: userId,
       aud: "authenticated",
       role: "authenticated",
-      is_anonymous: true,
-      app_metadata: { provider: "anonymous", providers: [] },
+      ...(anonymous ? {} : { email }),
+      is_anonymous: anonymous,
+      app_metadata: anonymous
+        ? { provider: "anonymous", providers: [] }
+        : { provider: "email", providers: ["email"] },
       user_metadata: {},
       identities: [],
       created_at: new Date().toISOString(),
@@ -333,13 +340,19 @@ function sessionFor(userId) {
 async function auth(req, url, body) {
   const route = url.pathname.replace("/auth/v1/", "");
   if (route === "signup" && req.method === "POST") {
-    if (body?.email || body?.phone) {
-      return {
-        status: 422,
-        body: { msg: "Only anonymous sign-up is simulated." },
-      };
+    if (body?.phone) {
+      return { status: 422, body: { msg: "Phone sign-up is not simulated." } };
     }
     const id = crypto.randomUUID();
+    if (body?.email) {
+      const result = await psql(
+        "insert into auth.users (id, aud, role, email, is_anonymous, raw_user_meta_data, created_at) values (:'id', 'authenticated', 'authenticated', :'email', false, '{}', now())",
+        { id, email: String(body.email) },
+      );
+      if (!result.ok) return { status: 500, body: { msg: result.message } };
+      emailAccounts.set(id, String(body.email));
+      return { status: 200, body: sessionFor(id) };
+    }
     const result = await psql(
       "insert into auth.users (id, aud, role, is_anonymous, raw_user_meta_data, created_at) values (:'id', 'authenticated', 'authenticated', true, '{}', now())",
       { id },
