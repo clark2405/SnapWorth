@@ -343,9 +343,10 @@ select market_tests.check(
 update public.listings set title = 'Pentax K1000 35mm Film Camera'
  where id = '00000000-0000-4000-fc00-000000000001';
 select market_tests.check(
-  (select moderation_status = 'pending' and moderation_ref is null and moderated_at is null
+  (select moderation_status = 'pending' and moderation_ref is null
+          and moderated_at > now() - interval '1 minute'
      from public.listings where id = '00000000-0000-4000-fc00-000000000001'),
-  'changing the title sends a listing back to pending'
+  'changing the title sends a listing back to pending, stamped with when it went back in line'
 );
 reset role;
 

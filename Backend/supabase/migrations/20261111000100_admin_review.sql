@@ -9,9 +9,18 @@
 -- until the target's latest approve, remove or dismiss, so a fresh report after one starts a new
 -- case. Holding content leaves its reports open.
 --
--- Sources today: comments, feed posts, hanap posts and reported conversations. Listings join when
--- they have moderation columns: add a select for them to `admin_review_queue`, a branch for them
--- to `admin_review_decide`, and to its `tbl` case. Nothing else needs to change.
+-- Sources today: comments, feed posts, hanap posts, listings and reported conversations. To add
+-- another source that has moderation columns, add a select for it to `admin_review_queue`, and
+-- its table to `admin_review_decide`'s `tbl` case. Nothing else needs to change.
+--
+-- Listings are the one source whose decision also touches something other than moderation:
+-- removing one sets its `status` to 'removed' as well, which is what closes its chats (see
+-- `admin_review_decide`). The queue and the decision run as the function's owner, so the listing
+-- triggers (`guard_listing_fields`, which only judges the `anon` and `authenticated` roles, and
+-- `prepare_listing`, which only acts when a listing's words change) don't stand in their way.
+--
+-- A held or pending listing's photo is in the private `scan-photos` bucket, so the end of this
+-- file lets an admin, and only an admin, read the photos of listings and posts that wait here.
 
 -- ---------------------------------------------------------------------------------------------
 -- The record of every decision.
@@ -19,7 +28,7 @@
 
 create table public.moderation_log (
   id uuid primary key default gen_random_uuid(),
-  -- 'comment', 'post', 'hanap' or 'conversation'; `admin_review_decide` is what checks it.
+  -- 'comment', 'post', 'hanap', 'listing' or 'conversation'; `admin_review_decide` checks it.
   kind text not null,
   target_id uuid not null,
   decision text not null check (decision in ('approve', 'hold', 'remove', 'dismiss')),
@@ -86,7 +95,9 @@ $$;
 
 -- Everything an admin should look at, most reported first, then oldest. A case is content that is
 -- held, content still pending after ten minutes (moderation never finished), content with open
--- reports, or a conversation with open reports. Removed content is out of the queue.
+-- reports, or a conversation with open reports. Removed content is out of the queue, and so is a
+-- listing its seller took down. `title` is a listing's, and `photo_path` the photo of a listing or
+-- a post in the private `scan-photos` bucket (the app signs a link for it as the admin).
 create function public.admin_review_queue()
 returns table (
   kind text,
@@ -99,7 +110,9 @@ returns table (
   report_count integer,
   report_reasons text[],
   flagged_at timestamptz,
-  context text
+  context text,
+  title text,
+  photo_path text
 )
 language plpgsql
 stable
@@ -125,7 +138,9 @@ begin
              rep.n::integer as report_count,
              rep.reasons as report_reasons,
              coalesce(c.moderated_at, c.created_at) as flagged_at,
-             null::text as context
+             null::text as context,
+             null::text as title,
+             null::text as photo_path
         from public.comments c
         join public.profiles pr on pr.id = c.author_id
        cross join lateral (
@@ -155,7 +170,9 @@ begin
              0,
              '{}'::text[],
              coalesce(p.moderated_at, p.created_at),
-             null::text
+             null::text,
+             null::text,
+             p.photo_path
         from public.feed_posts p
         join public.profiles pr on pr.id = p.owner_id
        where p.moderation_status = 'held'
@@ -173,11 +190,44 @@ begin
              0,
              '{}'::text[],
              coalesce(h.moderated_at, h.created_at),
+             null::text,
+             null::text,
              null::text
         from public.hanap_posts h
         join public.profiles pr on pr.id = h.author_id
        where h.moderation_status = 'held'
           or (h.moderation_status = 'pending' and h.created_at < now() - interval '10 minutes')
+
+      union all
+
+      -- A listing's words are its title and description. `flagged_at` is when it was held or went
+      -- back to be screened (`prepare_listing` stamps that on an edit), else when it was made.
+      select 'listing'::text,
+             l.id,
+             l.moderation_status,
+             l.description,
+             pr.handle,
+             pr.avatar_url,
+             l.moderation_ref,
+             0,
+             '{}'::text[],
+             coalesce(l.moderated_at, l.created_at),
+             'Asking ₱' || to_char(l.asking_php, 'FM999,999,999')
+               || ' · ' || replace(l.category, '_', ' ')
+               || ' · ' || replace(l.condition, '_', ' ')
+               || ' · ' || replace(l.area, '-', ' '),
+             l.title,
+             l.photo_path
+        from public.listings l
+        join public.profiles pr on pr.id = l.seller_id
+       where l.status <> 'removed'
+         and (
+           l.moderation_status = 'held'
+           or (
+             l.moderation_status = 'pending'
+             and coalesce(l.moderated_at, l.created_at) < now() - interval '10 minutes'
+           )
+         )
 
       union all
 
@@ -193,7 +243,9 @@ begin
              rep.n::integer,
              rep.reasons,
              rep.first_at,
-             'About "' || l.title || '", reported by @' || reporter.handle
+             'About "' || l.title || '", reported by @' || reporter.handle,
+             null::text,
+             null::text
         from public.conversations cv
         join public.listings l on l.id = cv.listing_id
        cross join lateral (
@@ -225,10 +277,15 @@ grant execute on function public.admin_review_queue() to authenticated;
 -- Decides one case, as the signed-in admin:
 --   approve: makes content public, and closes its reports;
 --   hold:    hides content for a closer look, leaving its reports open;
---   remove:  takes content down for good, and closes its reports;
+--   remove:  takes content down for good, and closes its reports. A listing is also set to
+--            'removed': its chats close (nobody can message into them), the seller sees it as
+--            removed and can delete it but not edit it, and buyers stop seeing it and its chats;
 --   dismiss: closes the open reports and leaves the content as it is (the only decision for a
 --            conversation, whose messages stay private).
--- Content already removed is out of reach, and so is dismissing when nothing is reported.
+-- Content already removed is out of reach, and so is dismissing when nothing is reported. Holding
+-- a listing hides it from buyers too, including those already in a chat about it (their chat
+-- reappears if it is approved); the seller still sees it, marked held, and a held listing is not
+-- screened again when its words change.
 create function public.admin_review_decide(item_kind text, item_id uuid, decision text)
 returns void
 language plpgsql
@@ -266,6 +323,7 @@ begin
       when 'comment' then 'comments'
       when 'post' then 'feed_posts'
       when 'hanap' then 'hanap_posts'
+      when 'listing' then 'listings'
     end;
     if tbl is null then
       raise exception 'That is not something to review.' using errcode = '22023';
@@ -274,7 +332,12 @@ begin
     execute format(
       'select moderation_status from public.%I where id = $1%s for update',
       tbl,
-      case when item_kind = 'comment' then ' and deleted_at is null' else '' end
+      case item_kind
+        when 'comment' then ' and deleted_at is null'
+        -- A listing its seller removed is not a case either.
+        when 'listing' then ' and status <> ''removed'''
+        else ''
+      end
     ) into was using item_id;
     if was is null or was = 'removed' then
       raise exception 'That case is not available.' using errcode = 'P0002';
@@ -300,6 +363,9 @@ begin
       case decision when 'approve' then 'approved' when 'hold' then 'held' else 'removed' end,
       'admin:' || caller::text,
       item_id;
+    if item_kind = 'listing' and decision = 'remove' then
+      update public.listings set status = 'removed' where id = item_id;
+    end if;
   end if;
 
   insert into public.moderation_log (kind, target_id, decision, decided_by)
@@ -309,3 +375,52 @@ $$;
 
 revoke all on function public.admin_review_decide(text, uuid, text) from public, anon;
 grant execute on function public.admin_review_decide(text, uuid, text) to authenticated;
+
+-- ---------------------------------------------------------------------------------------------
+-- Photos of what waits for review.
+-- ---------------------------------------------------------------------------------------------
+
+-- A photo on a listing or a feed post sits in the private `scan-photos` bucket, readable only by
+-- its owner until the content is approved, so an admin deciding on held content would be judging
+-- the words of a post without seeing what it shows. This lets an admin, and only an admin, read
+-- the photo of a listing or post that is held or still pending: the content people have put up to
+-- be public. It reaches no other scan photo, and nothing once content is removed. Policies are
+-- OR'd with the owner's and the public ones, so those stay as they are.
+--
+-- The check is a function because a policy's own subqueries run as the reader, and the reader's
+-- row-level security hides a held listing or post from everyone but its author, an admin included.
+create function public.admin_may_see_photo(photo text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.is_admin()
+     and (
+       exists (
+         select 1
+           from public.listings l
+          where l.photo_path = photo
+            and l.status <> 'removed'
+            and l.moderation_status in ('pending', 'held')
+       )
+       or exists (
+         select 1
+           from public.feed_posts p
+          where p.photo_path = photo
+            and p.moderation_status in ('pending', 'held')
+       )
+     );
+$$;
+
+revoke all on function public.admin_may_see_photo(text) from public, anon;
+grant execute on function public.admin_may_see_photo(text) to authenticated;
+
+create policy "Admins see photos of listings and posts waiting for review"
+  on storage.objects for select
+  to authenticated
+  using (
+    bucket_id = 'scan-photos'
+    and public.admin_may_see_photo(storage.objects.name)
+  );

@@ -955,13 +955,15 @@ export const previewSellers: Readonly<Record<string, PreviewSeller>> = {
   },
 };
 
-export type PreviewHeldKind = 'post' | 'comment' | 'hanap' | 'conversation';
+export type PreviewHeldKind = 'post' | 'comment' | 'hanap' | 'listing' | 'conversation';
 
 /** Content the review queue shows on a device with no backend. */
 export interface PreviewHeldContent {
   readonly id: string;
   readonly kind: PreviewHeldKind;
   readonly author: PreviewUser;
+  /** A listing's title. */
+  readonly title?: string;
   readonly body: string;
   /** How moderation held it, as `moderate-content` records it; none if it was only reported. */
   readonly flagRef?: string;
@@ -1011,6 +1013,17 @@ export const previewHeldContent: readonly PreviewHeldContent[] = [
     body: 'Looking for a PS5, text me on Viber',
     flagRef: 'rules (off-platform contact)',
     heldAgo: '25m ago',
+    reports: 0,
+  },
+  {
+    id: 'held-5',
+    kind: 'listing',
+    author: previewUsers.sugboHype,
+    title: 'Vintage Seiko diver',
+    body: 'Works great. Message me on Viber for a cheaper price, no fees.',
+    context: 'Asking ₱6,500 · collectibles · good · mandaue',
+    flagRef: 'rules (off-platform contact)',
+    heldAgo: '10m ago',
     reports: 0,
   },
 ];

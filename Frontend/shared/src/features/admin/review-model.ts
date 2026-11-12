@@ -5,6 +5,7 @@ const kindLabels: Readonly<Record<ReviewKind, string>> = {
   comment: 'Comment',
   post: 'Feed post',
   hanap: 'Hanap',
+  listing: 'Listing',
   conversation: 'Chat report',
 };
 
@@ -84,7 +85,13 @@ export function decisionToast(
     case 'hold':
       return { title: 'Held', body: `${what} is hidden until you decide.` };
     case 'remove':
-      return { title: 'Removed', body: `${what} was removed.` };
+      return {
+        title: 'Removed',
+        body:
+          item.kind === 'listing'
+            ? `${what} was removed, and its chats are closed.`
+            : `${what} was removed.`,
+      };
     case 'dismiss':
       return { title: 'Reports dismissed', body: `${what} stays as it is.` };
   }

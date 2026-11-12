@@ -450,4 +450,368 @@ select review_tests.check(
 );
 reset role;
 
+-- 12. Listings. Fay sells; Cy is a buyer in a chat about one of her listings; Ada is the admin.
+--     Held and stale pending listings are cases, with their title, words, seller and photo.
+-- Set up as the database owner, with nobody signed in (a signed-in caller's slugs are generated).
+select set_config('request.jwt.claim.sub', '', false);
+insert into public.scan_history (id, user_id, item_name, amount_php, low_php, high_php) values
+  ('00000000-0000-4000-a270-000000000001', '00000000-0000-4000-a200-00000000000f',
+   'Film camera', 2500, 2000, 3000);
+insert into storage.objects (bucket_id, name) values
+  ('scan-photos', '00000000-0000-4000-a200-00000000000f/00000000-0000-4000-a270-000000000001.jpg');
+update public.scan_history
+   set photo_path = '00000000-0000-4000-a200-00000000000f/00000000-0000-4000-a270-000000000001.jpg'
+ where id = '00000000-0000-4000-a270-000000000001';
+
+insert into public.listings (id, slug, seller_id, scan_id, photo_path, title, description, asking_php,
+                             category, condition, area, status, moderation_status, moderation_ref,
+                             moderated_at, created_at) values
+  -- Held by the word rules, with a photo.
+  ('00000000-0000-4000-a260-000000000001', 'review-held-camera',
+   '00000000-0000-4000-a200-00000000000f', '00000000-0000-4000-a270-000000000001',
+   '00000000-0000-4000-a200-00000000000f/00000000-0000-4000-a270-000000000001.jpg',
+   'Film camera', 'Text me on Viber for a cheaper price.', 3200,
+   'collectibles', 'like_new', 'cebu-city', 'active', 'held', 'rules (off-platform contact)',
+   now() - interval '2 hours', now() - interval '3 hours'),
+  -- Pending for an hour: moderation never finished.
+  ('00000000-0000-4000-a260-000000000002', 'review-stale-lens', '00000000-0000-4000-a200-00000000000f',
+   null, null, 'Spare lens', 'Fits the camera.', 800,
+   'electronics', 'good', 'mandaue', 'active', 'pending', null, null, now() - interval '1 hour'),
+  -- Pending for a minute, approved, and held but taken down by its seller: none of these are cases.
+  ('00000000-0000-4000-a260-000000000003', 'review-new-strap', '00000000-0000-4000-a200-00000000000f',
+   null, null, 'Camera strap', '', 300,
+   'fashion', 'good', 'cebu-city', 'active', 'pending', null, null, now() - interval '1 minute'),
+  ('00000000-0000-4000-a260-000000000004', 'review-fine-tripod', '00000000-0000-4000-a200-00000000000f',
+   null, null, 'Tripod', 'Sturdy.', 900,
+   'electronics', 'good', 'cebu-city', 'active', 'approved', 'rules', now() - interval '1 day',
+   now() - interval '1 day'),
+  ('00000000-0000-4000-a260-000000000005', 'review-gone-flash', '00000000-0000-4000-a200-00000000000f',
+   null, null, 'Flash unit', 'Gone.', 500,
+   'electronics', 'good', 'cebu-city', 'removed', 'held', 'rules', now() - interval '2 hours',
+   now() - interval '3 hours'),
+  -- A long-listed approved one with a chat about it.
+  ('00000000-0000-4000-a260-000000000006', 'review-old-bag', '00000000-0000-4000-a200-00000000000f',
+   null, null, 'Camera bag', 'Padded, two pockets.', 1200,
+   'fashion', 'good', 'cebu-city', 'active', 'approved', 'rules', now() - interval '2 days',
+   now() - interval '2 days');
+insert into public.conversations (id, listing_id, buyer_id, seller_id) values
+  ('00000000-0000-4000-a250-000000000002', '00000000-0000-4000-a260-000000000006',
+   '00000000-0000-4000-a200-00000000000c', '00000000-0000-4000-a200-00000000000f');
+insert into public.conversation_members (conversation_id, user_id) values
+  ('00000000-0000-4000-a250-000000000002', '00000000-0000-4000-a200-00000000000c'),
+  ('00000000-0000-4000-a250-000000000002', '00000000-0000-4000-a200-00000000000f');
+insert into public.messages (conversation_id, sender_id, body) values
+  ('00000000-0000-4000-a250-000000000002', '00000000-0000-4000-a200-00000000000c',
+   'Is the bag still available?');
+
+-- 12a. Nobody but an admin reads or decides them, not even the seller or a buyer in a chat.
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select review_tests.check_rejected(
+  $$select public.admin_review_decide('listing', '00000000-0000-4000-a260-000000000001', 'approve')$$,
+  array['42501'],
+  'signed-out visitors cannot approve a held listing'
+);
+select review_tests.check(
+  (select count(*) from storage.objects where bucket_id = 'scan-photos'
+    and name like '%a270-000000000001.jpg') = 0,
+  'and cannot see the photo of a held listing'
+);
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-a200-00000000000f', false);
+select review_tests.check_rejected(
+  $$select public.admin_review_decide('listing', '00000000-0000-4000-a260-000000000001', 'approve')$$,
+  array['42501'],
+  'a seller cannot approve their own held listing'
+);
+select review_tests.check_rejected(
+  $$select public.admin_review_decide('listing', '00000000-0000-4000-a260-000000000002', 'remove')$$,
+  array['42501'],
+  'nor remove one'
+);
+select review_tests.check_rejected(
+  $$select * from public.admin_review_queue()$$,
+  array['42501'],
+  'nor read the queue they would be in'
+);
+select review_tests.check_rejected(
+  $$update public.listings set moderation_status = 'approved'
+     where id = '00000000-0000-4000-a260-000000000001'$$,
+  array['42501', 'SWIMM'],
+  'nor approve it by updating the row'
+);
+select review_tests.check(
+  (select count(*) from storage.objects where bucket_id = 'scan-photos'
+    and name like '%a270-000000000001.jpg') = 1,
+  'the seller still sees their own photo'
+);
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-a200-00000000000c', false);
+select review_tests.check_rejected(
+  $$select public.admin_review_decide('listing', '00000000-0000-4000-a260-000000000006', 'remove')$$,
+  array['42501'],
+  'a buyer in a chat cannot remove the listing'
+);
+select review_tests.check(
+  (select count(*) from storage.objects where bucket_id = 'scan-photos'
+    and name like '%a270-000000000001.jpg') = 0,
+  'a buyer cannot see the photo of a held listing'
+);
+select review_tests.check(
+  (select count(*) from public.listings
+    where id = '00000000-0000-4000-a260-000000000001') = 0,
+  'nor the held listing'
+);
+reset role;
+select review_tests.check(
+  (select moderation_status from public.listings
+    where id = '00000000-0000-4000-a260-000000000001') = 'held'
+  and (select status from public.listings
+        where id = '00000000-0000-4000-a260-000000000006') = 'active',
+  'none of those refused attempts changed anything'
+);
+
+-- 12b. The admin sees the two cases, with what they need to judge them.
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-a200-00000000000a', false);
+select review_tests.check(
+  (select array_agg(target_id::text order by target_id) from public.admin_review_queue()
+    where kind = 'listing')
+  = array['00000000-0000-4000-a260-000000000001', '00000000-0000-4000-a260-000000000002'],
+  'the queue has the held listing and the stale pending one, and not a new, approved or '
+  'seller-removed one'
+);
+select review_tests.check(
+  (select title || '|' || body || '|' || author_handle || '|' || status || '|' || flag_ref
+          || '|' || photo_path || '|' || report_count
+     from public.admin_review_queue()
+    where target_id = '00000000-0000-4000-a260-000000000001')
+  = 'Film camera|Text me on Viber for a cheaper price.|fay_review|held|rules (off-platform contact)|'
+    '00000000-0000-4000-a200-00000000000f/00000000-0000-4000-a270-000000000001.jpg|0',
+  'a held listing shows its title, description, seller, why it was held and its photo'
+);
+select review_tests.check(
+  (select context from public.admin_review_queue()
+    where target_id = '00000000-0000-4000-a260-000000000001')
+  = 'Asking ₱3,200 · collectibles · like new · cebu city',
+  'and what it asks, and where'
+);
+select review_tests.check(
+  (select status || '|' || coalesce(photo_path, 'none') from public.admin_review_queue()
+    where target_id = '00000000-0000-4000-a260-000000000002') = 'pending|none',
+  'a stale pending listing shows as pending, with no photo when it has none'
+);
+select review_tests.check(
+  (select count(*) from public.admin_review_queue() where photo_path is not null) = 1
+  and (select count(*) from public.admin_review_queue()
+        where kind in ('comment', 'hanap', 'conversation') and (title is not null or photo_path is not null)) = 0,
+  'only listings and posts can carry a photo, and only listings a title'
+);
+select review_tests.check(
+  (select count(*) from storage.objects where bucket_id = 'scan-photos'
+    and name like '%a270-000000000001.jpg') = 1,
+  'the admin can read the held listing''s photo'
+);
+select review_tests.check(
+  (select count(*) from storage.objects where bucket_id = 'scan-photos') = 1,
+  'and that is the only scan photo they can read: the policy is for what waits for review'
+);
+
+-- 12c. Approving publishes it, its photo and its chat; the decision is logged.
+select public.admin_review_decide('listing', '00000000-0000-4000-a260-000000000001', 'approve');
+select review_tests.check(
+  not exists (select 1 from public.admin_review_queue()
+               where target_id = '00000000-0000-4000-a260-000000000001'),
+  'an approved listing leaves the queue'
+);
+reset role;
+select review_tests.check(
+  (select moderation_status || '|' || moderation_ref || '|' || status from public.listings
+    where id = '00000000-0000-4000-a260-000000000001')
+  = 'approved|admin:00000000-0000-4000-a200-00000000000a|active'
+  and (select count(*) from public.moderation_log
+        where kind = 'listing' and decision = 'approve'
+          and target_id = '00000000-0000-4000-a260-000000000001'
+          and decided_by = '00000000-0000-4000-a200-00000000000a') = 1,
+  'approving a listing publishes it, with the admin on it, and logs who and when'
+);
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select review_tests.check(
+  (select count(*) from public.listings where slug = 'review-held-camera') = 1
+  and (select count(*) from storage.objects where bucket_id = 'scan-photos'
+        and name like '%a270-000000000001.jpg') = 1,
+  'the approved listing and its photo are public');
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-a200-00000000000d', false);
+select review_tests.check(
+  public.start_conversation('review-held-camera') is not null,
+  'and a buyer can message about it');
+reset role;
+
+-- 12d. Holding hides it from buyers, including those in a chat about it; the seller still sees
+--      it. Their words are not screened again while an admin holds it.
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-a200-00000000000a', false);
+select public.admin_review_decide('listing', '00000000-0000-4000-a260-000000000006', 'hold');
+select review_tests.check(
+  (select status || '|' || title from public.admin_review_queue()
+    where target_id = '00000000-0000-4000-a260-000000000006') = 'held|Camera bag',
+  'a held listing is in the queue'
+);
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-a200-00000000000c', false);
+select review_tests.check(
+  (select count(*) from public.listings where id = '00000000-0000-4000-a260-000000000006') = 0
+  and (select count(*) from public.conversation_list()
+        where id = '00000000-0000-4000-a250-000000000002') = 0,
+  'a buyer in a chat no longer sees the held listing, and the chat leaves their list'
+);
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-a200-00000000000f', false);
+select review_tests.check(
+  (select moderation_status || '|' || status from public.listings
+    where id = '00000000-0000-4000-a260-000000000006') = 'held|active',
+  'the seller sees their own listing, marked held'
+);
+update public.listings set title = 'Camera bag, padded'
+ where id = '00000000-0000-4000-a260-000000000006';
+select review_tests.check(
+  (select moderation_status || '|' || moderation_ref from public.listings
+    where id = '00000000-0000-4000-a260-000000000006')
+  = 'held|admin:00000000-0000-4000-a200-00000000000a',
+  'editing a listing an admin held does not send it back for automatic screening'
+);
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-a200-00000000000a', false);
+select review_tests.check(
+  (select title from public.admin_review_queue()
+    where target_id = '00000000-0000-4000-a260-000000000006') = 'Camera bag, padded',
+  'the admin sees the new words'
+);
+select public.admin_review_decide('listing', '00000000-0000-4000-a260-000000000006', 'approve');
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-a200-00000000000c', false);
+select review_tests.check(
+  (select count(*) from public.conversation_list()
+    where id = '00000000-0000-4000-a250-000000000002') = 1,
+  'approving it again brings the buyer''s chat back'
+);
+reset role;
+
+-- A listing moderation (not an admin) held goes back to be screened when its words change, and
+-- one that was approved a long time ago isn't taken for one whose screening got stuck.
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-a200-00000000000f', false);
+update public.listings set title = 'Tripod, carbon'
+ where id = '00000000-0000-4000-a260-000000000004';
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-a200-00000000000a', false);
+select review_tests.check(
+  not exists (select 1 from public.admin_review_queue()
+               where target_id = '00000000-0000-4000-a260-000000000004'),
+  'an old approved listing just edited goes back to pending but is not in the queue yet'
+);
+reset role;
+select review_tests.check(
+  (select moderation_status from public.listings
+    where id = '00000000-0000-4000-a260-000000000004') = 'pending',
+  'it is pending, waiting for moderation'
+);
+
+-- 12e. Removing takes a listing down for good: its status too, so its chats close.
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-a200-00000000000a', false);
+select public.admin_review_decide('listing', '00000000-0000-4000-a260-000000000006', 'remove');
+select review_tests.check(
+  not exists (select 1 from public.admin_review_queue()
+               where target_id = '00000000-0000-4000-a260-000000000006'),
+  'a removed listing leaves the queue'
+);
+reset role;
+select review_tests.check(
+  (select moderation_status || '|' || status from public.listings
+    where id = '00000000-0000-4000-a260-000000000006') = 'removed|removed'
+  and (select count(*) from public.moderation_log
+        where kind = 'listing' and decision = 'remove'
+          and target_id = '00000000-0000-4000-a260-000000000006') = 1,
+  'removing a listing sets its moderation and its status, and is logged'
+);
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-a200-00000000000c', false);
+select review_tests.check(
+  (select count(*) from public.listings where id = '00000000-0000-4000-a260-000000000006') = 0
+  and (select count(*) from public.conversation_list()
+        where id = '00000000-0000-4000-a250-000000000002') = 0,
+  'the buyer no longer sees the listing or the chat'
+);
+select review_tests.check_rejected(
+  $$insert into public.messages (conversation_id, body)
+    values ('00000000-0000-4000-a250-000000000002', 'Hello?')$$,
+  array['SWCLO'],
+  'and cannot send into it: the chat is closed'
+);
+select review_tests.check_rejected(
+  $$select public.start_conversation('review-old-bag')$$,
+  array['P0002'],
+  'nor open a new one'
+);
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-a200-00000000000f', false);
+select review_tests.check(
+  (select count(*) from public.conversation_list()
+    where id = '00000000-0000-4000-a250-000000000002' and closed = 'archived') = 1
+  and (select moderation_status || '|' || status from public.listings
+        where id = '00000000-0000-4000-a260-000000000006') = 'removed|removed',
+  'the seller still sees the listing as removed, and its chat archived'
+);
+select review_tests.check_rejected(
+  $$update public.listings set title = 'Camera bag again'
+     where id = '00000000-0000-4000-a260-000000000006'$$,
+  array['SWIMM'],
+  'but cannot edit it back to life'
+);
+select review_tests.check_rejected(
+  $$update public.listings set status = 'active'
+     where id = '00000000-0000-4000-a260-000000000006'$$,
+  array['SWIMM'],
+  'nor reactivate it'
+);
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-a200-00000000000a', false);
+select review_tests.check_rejected(
+  $$select public.admin_review_decide('listing', '00000000-0000-4000-a260-000000000006', 'approve')$$,
+  array['P0002'],
+  'removed listings cannot be brought back through the queue'
+);
+select review_tests.check_rejected(
+  $$select public.admin_review_decide('listing', '00000000-0000-4000-a260-000000000005', 'approve')$$,
+  array['P0002'],
+  'a listing its seller took down is not a case'
+);
+select review_tests.check_rejected(
+  $$select public.admin_review_decide('listing', '00000000-0000-4000-a260-000000000002', 'dismiss')$$,
+  array['22023'],
+  'a listing has no reports to dismiss'
+);
+-- Taking the stale pending one down too: the photo of a removed listing is out of reach.
+select public.admin_review_decide('listing', '00000000-0000-4000-a260-000000000002', 'remove');
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-a200-00000000000f', false);
+delete from public.listings where id = '00000000-0000-4000-a260-000000000006';
+reset role;
+select review_tests.check(
+  not exists (select 1 from public.listings where id = '00000000-0000-4000-a260-000000000006'),
+  'a seller can still delete a listing an admin removed'
+);
+
+-- Held again, then removed: the photo of a removed listing is no longer the admin's to read.
+update public.listings set moderation_status = 'held', moderation_ref = 'rules (test)'
+ where id = '00000000-0000-4000-a260-000000000001';
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-a200-00000000000a', false);
+select review_tests.check(
+  (select count(*) from storage.objects where bucket_id = 'scan-photos') = 1,
+  'the admin reads the photo of a listing held again'
+);
+select public.admin_review_decide('listing', '00000000-0000-4000-a260-000000000001', 'remove');
+select review_tests.check(
+  (select count(*) from storage.objects where bucket_id = 'scan-photos') = 0,
+  'but not once it is removed'
+);
+reset role;
+
 \echo 'All admin review tests passed.'

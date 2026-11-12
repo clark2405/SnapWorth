@@ -9,6 +9,7 @@ import {
   Button,
   EmptyState,
   NavHeader,
+  Photo,
   Reveal,
   Screen,
   Surface,
@@ -154,6 +155,19 @@ function CaseCard({
         )}
         <SWText variant="labelSmall">@{item.authorHandle}</SWText>
       </View>
+      {item.title ? (
+        <SWText variant="headingSmall" accessibilityRole="header">
+          {item.title}
+        </SWText>
+      ) : null}
+      {item.photoUrl ? (
+        <Photo
+          source={{ uri: item.photoUrl }}
+          label={`Photo on the ${kindLabel(item.kind).toLowerCase()} by @${item.authorHandle}`}
+          aspectRatio={4 / 3}
+          style={styles.photo}
+        />
+      ) : null}
       {item.body ? <SWText variant="bodyMedium">{item.body}</SWText> : null}
       {item.context ? (
         <SWText variant="bodySmall" tone="textSecondary">
@@ -198,6 +212,10 @@ const stylesFor = themedStyles((colors) => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing[2],
+  },
+  photo: {
+    alignSelf: 'stretch',
+    maxHeight: 280,
   },
   initial: {
     width: 28,

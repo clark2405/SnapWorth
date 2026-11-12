@@ -14,7 +14,9 @@ const reviewCase = (
 ): ReviewCase => ({
   id: `${over.kind}:${over.targetId}`,
   status: 'held',
+  title: null,
   body: 'Some words',
+  photoUrl: null,
   authorHandle: 'bo',
   authorAvatarUrl: null,
   flagRef: null,
@@ -133,6 +135,8 @@ describe('createSupabaseAdminRepository', () => {
           report_reasons: ['spam', 'harassment'],
           flagged_at: '2026-11-11T09:00:00.000Z',
           context: null,
+          title: null,
+          photo_path: null,
         },
         {
           kind: 'conversation',
@@ -146,6 +150,8 @@ describe('createSupabaseAdminRepository', () => {
           report_reasons: null,
           flagged_at: '2026-11-11T10:00:00.000Z',
           context: 'About "Brass lamp", reported by @fay',
+          title: null,
+          photo_path: null,
         },
       ],
     });
@@ -161,7 +167,9 @@ describe('createSupabaseAdminRepository', () => {
           kind: 'comment',
           targetId: 'c-1',
           status: 'held',
+          title: null,
           body: 'Scam!',
+          photoUrl: null,
           authorHandle: 'bo',
           authorAvatarUrl: null,
           flagRef: 'rules (scam accusation)',
@@ -178,6 +186,95 @@ describe('createSupabaseAdminRepository', () => {
         }),
       ],
     });
+  });
+
+  it('shows a listing with its title, words, seller and a link to its photo', async () => {
+    const { client } = clientAnswering({
+      data: [
+        {
+          kind: 'listing',
+          target_id: 'l-1',
+          status: 'held',
+          body: 'Text me on Viber for a cheaper price.',
+          author_handle: 'fay',
+          author_avatar_url: null,
+          flag_ref: 'rules (off-platform contact)',
+          report_count: 0,
+          report_reasons: [],
+          flagged_at: '2026-11-11T09:00:00.000Z',
+          context: 'Asking ₱3,200 · collectibles · like new · cebu city',
+          title: 'Film camera',
+          photo_path: 'fay-id/scan-1.jpg',
+        },
+        {
+          kind: 'listing',
+          target_id: 'l-2',
+          status: 'pending',
+          body: '',
+          author_handle: 'fay',
+          author_avatar_url: null,
+          flag_ref: null,
+          report_count: 0,
+          report_reasons: [],
+          flagged_at: '2026-11-11T08:00:00.000Z',
+          context: null,
+          title: 'Spare lens',
+          photo_path: null,
+        },
+      ],
+    });
+    const links = jest.fn((_paths: readonly string[]) =>
+      Promise.resolve({ 'fay-id/scan-1.jpg': 'https://signed.example/scan-1.jpg' } as Record<
+        string,
+        string
+      >),
+    );
+    const photos = { links, upload: jest.fn(), remove: jest.fn() };
+
+    const result = await createSupabaseAdminRepository(client, photos).queue();
+
+    expect(links).toHaveBeenCalledWith(['fay-id/scan-1.jpg']);
+    expect(result).toMatchObject({
+      ok: true,
+      value: [
+        {
+          id: 'listing:l-1',
+          kind: 'listing',
+          title: 'Film camera',
+          body: 'Text me on Viber for a cheaper price.',
+          authorHandle: 'fay',
+          photoUrl: 'https://signed.example/scan-1.jpg',
+        },
+        { id: 'listing:l-2', title: 'Spare lens', photoUrl: null },
+      ],
+    });
+  });
+
+  it('still lists a case whose photo link could not be made, just without the photo', async () => {
+    const { client } = clientAnswering({
+      data: [
+        {
+          kind: 'post',
+          target_id: 'p-1',
+          status: 'held',
+          body: 'Words',
+          author_handle: 'fay',
+          author_avatar_url: null,
+          flag_ref: null,
+          report_count: 0,
+          report_reasons: [],
+          flagged_at: '2026-11-11T09:00:00.000Z',
+          context: null,
+          title: null,
+          photo_path: 'fay-id/scan-2.jpg',
+        },
+      ],
+    });
+    const photos = { links: () => Promise.resolve({}), upload: jest.fn(), remove: jest.fn() };
+
+    const result = await createSupabaseAdminRepository(client, photos).queue();
+
+    expect(result).toMatchObject({ ok: true, value: [{ id: 'post:p-1', photoUrl: null }] });
   });
 
   it('turns the database’s refusal of a non-admin into an authorization error', async () => {

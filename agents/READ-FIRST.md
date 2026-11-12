@@ -51,14 +51,19 @@ Last updated 2026-11-11.
   also a first look at the item and Worthy's answers to light questions.
 - **Feed comments:** stored in Supabase, moderated, threaded.
 - **Admin review:** Profile → Moderation (shown only to an admin, see "Making someone an admin")
-  lists what moderation holds (comments, feed posts, hanap) and what people reported (comments,
-  and conversations, whose messages stay private). An admin approves, holds, removes or dismisses
-  reports. Both the list and every decision go through `admin_review_queue()` and
+  lists what moderation holds (comments, feed posts, hanap, listings) and what people reported
+  (comments, and conversations, whose messages stay private). An admin approves, holds, removes or
+  dismisses reports. Both the list and every decision go through `admin_review_queue()` and
   `admin_review_decide()`, which refuse anyone who isn't an admin, and each decision is logged in
-  `moderation_log` (who and when), which the app can't read. Listings aren't in the queue yet: they
-  need moderation columns first, then one select in the queue function and one branch in the
-  decide function. Held and reported content shows no photos. Without a backend the screen shows
-  sample cases. Needs the `admin_role` and `admin_review` migrations deployed.
+  `moderation_log` (who and when), which the app can't read. Listings join the queue when held, or
+  when still pending after ten minutes, with their title, description, seller and photo (a read
+  policy on `storage.objects` lets an admin, and only an admin, see the photo of a listing or
+  feed post that is held or pending, through `admin_may_see_photo`). Removing a listing also sets
+  its status to `removed`: its chats close, the seller sees it as removed and can delete it but not
+  edit it, and buyers stop seeing it. Holding one hides it from buyers too, including those already
+  in a chat about it (the chat returns if it is approved), and a listing an admin holds is not
+  screened again when the seller edits it. Held posts' photos show the same way. Without a backend
+  the screen shows sample cases. Needs the `admin_role` and `admin_review` migrations deployed.
 - **Chats:** real messages over Supabase Realtime, offers, and agreeing a meetup on a map. Deployed
   to Supabase on 2026-10-30. The phone's Chats tab counts unread messages.
 - **In-app banners:** while the app is open, a new message, offer or meetup proposal in a chat you

@@ -17,6 +17,8 @@ const seed: readonly ReviewCase[] = [
     kind: 'comment',
     targetId: 'c1',
     status: 'held',
+    title: null,
+    photoUrl: null,
     body: 'This is a scam, do not buy.',
     authorHandle: 'bo',
     authorAvatarUrl: null,
@@ -31,6 +33,8 @@ const seed: readonly ReviewCase[] = [
     kind: 'comment',
     targetId: 'c2',
     status: 'approved',
+    title: null,
+    photoUrl: null,
     body: 'You are all idiots.',
     authorHandle: 'cy',
     authorAvatarUrl: null,
@@ -45,6 +49,8 @@ const seed: readonly ReviewCase[] = [
     kind: 'conversation',
     targetId: 'v1',
     status: null,
+    title: null,
+    photoUrl: null,
     body: '',
     authorHandle: 'dee',
     authorAvatarUrl: null,
@@ -74,6 +80,57 @@ it('lists what is held and reported, with why, most reported first', async () =>
   // A conversation's messages are private: only who and why.
   expect(screen.getByText('About "Brass lamp", reported by @fay')).toBeOnTheScreen();
   expect(screen.getByText('Chat report · 1 report')).toBeOnTheScreen();
+});
+
+const heldListing: ReviewCase = {
+  id: 'listing:l1',
+  kind: 'listing',
+  targetId: 'l1',
+  status: 'held',
+  title: 'Film camera',
+  photoUrl: 'https://signed.example/camera.jpg',
+  body: 'Text me on Viber for a cheaper price.',
+  authorHandle: 'fay',
+  authorAvatarUrl: null,
+  flagRef: 'rules (off-platform contact)',
+  reportCount: 0,
+  reportReasons: [],
+  flaggedAt: at(1),
+  context: 'Asking ₱3,200 · collectibles · like new · cebu city',
+};
+
+it('shows a held listing with its title, description, seller, price and photo', async () => {
+  showing(createLocalAdminRepository({ seed: [heldListing] }));
+
+  expect(await screen.findByText('Film camera')).toBeOnTheScreen();
+  expect(screen.getByText('Text me on Viber for a cheaper price.')).toBeOnTheScreen();
+  expect(screen.getByText('@fay')).toBeOnTheScreen();
+  expect(screen.getByText('Listing')).toBeOnTheScreen();
+  expect(screen.getByText('Flagged by the word rules: off-platform contact')).toBeOnTheScreen();
+  expect(screen.getByText('Asking ₱3,200 · collectibles · like new · cebu city')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Photo on the listing by @fay')).toBeOnTheScreen();
+});
+
+it('shows a listing with no photo without one, and offers approve or remove', async () => {
+  showing(createLocalAdminRepository({ seed: [{ ...heldListing, photoUrl: null }] }));
+
+  await screen.findByText('Film camera');
+
+  expect(screen.queryByLabelText('Photo on the listing by @fay')).toBeNull();
+  expect(screen.getByRole('button', { name: 'Approve' })).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: 'Remove' })).toBeOnTheScreen();
+  expect(screen.queryByRole('button', { name: 'Hold' })).toBeNull();
+});
+
+it('removes a listing and says its chats are closed', async () => {
+  showing(createLocalAdminRepository({ seed: [heldListing] }));
+
+  fireEvent.press(await screen.findByRole('button', { name: 'Remove' }));
+
+  expect(
+    await screen.findByText('Listing by @fay was removed, and its chats are closed.'),
+  ).toBeOnTheScreen();
+  expect(await screen.findByText('All clear.')).toBeOnTheScreen();
 });
 
 it('offers each case the decisions that fit it', async () => {

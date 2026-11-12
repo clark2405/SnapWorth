@@ -3,12 +3,13 @@ import type { ModerationStatus } from '../types/entities';
 import type { AppError } from '../types/errors';
 import type { Result } from '../types/result';
 
-/** What can land in the review queue. Listings join once they have moderation columns. */
-export type ReviewKind = 'comment' | 'post' | 'hanap' | 'conversation';
+/** What can land in the review queue. */
+export type ReviewKind = 'comment' | 'post' | 'hanap' | 'listing' | 'conversation';
 
 /**
  * What an admin can decide about a case. Approve makes content public; hold hides it for a closer
- * look; remove takes it down; dismiss closes its reports and leaves it as it is.
+ * look; remove takes it down (a listing's chats close with it); dismiss closes its reports and
+ * leaves it as it is.
  */
 export type ReviewDecision = 'approve' | 'hold' | 'remove' | 'dismiss';
 
@@ -20,8 +21,15 @@ export interface ReviewCase {
   readonly targetId: string;
   /** Where moderation has got to; a conversation has none. */
   readonly status: ModerationStatus | null;
-  /** The text itself. A conversation's messages are private, so it has none. */
+  /** A listing's title; the other kinds have none. */
+  readonly title: string | null;
+  /** The text itself (a listing's description). A conversation's messages are private, so it has none. */
   readonly body: string;
+  /**
+   * A link that shows the photo of a listing or post for a while, when it has one the admin may
+   * see (the database lets an admin read the photo of what is held or pending, and no other).
+   */
+  readonly photoUrl: string | null;
   /** Who wrote it, or for a conversation who the report is about. */
   readonly authorHandle: string;
   readonly authorAvatarUrl: string | null;

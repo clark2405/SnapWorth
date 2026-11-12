@@ -50,6 +50,8 @@ const waiting = createLocalAdminRepository({
     reportReasons: [],
     flaggedAt: '2026-11-11T09:00:00.000Z' as UtcDateTime,
     context: null,
+    title: null,
+    photoUrl: null,
   })),
 });
 

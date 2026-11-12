@@ -101,12 +101,17 @@ begin
   new.lat := round(new.lat::numeric, 2)::double precision;
   new.lng := round(new.lng::numeric, 2)::double precision;
 
+  -- New words go back to be screened, unless an admin is holding the listing: an admin's hold
+  -- (see admin_review) is lifted by an admin, not by the seller changing a word. `moderated_at`
+  -- is when the listing went back in line, so a long-lived listing that was just edited isn't
+  -- taken for one whose screening got stuck.
   if tg_op = 'UPDATE'
      and (new.title is distinct from old.title or new.description is distinct from old.description)
-     and new.moderation_status is not distinct from old.moderation_status then
+     and new.moderation_status is not distinct from old.moderation_status
+     and not (old.moderation_status = 'held' and old.moderation_ref like 'admin:%') then
     new.moderation_status := 'pending';
     new.moderation_ref := null;
-    new.moderated_at := null;
+    new.moderated_at := now();
   end if;
 
   if tg_op = 'INSERT'
@@ -168,6 +173,11 @@ language plpgsql
 set search_path = ''
 as $$
 begin
+  -- A listing an admin removed stays removed: the seller can delete it but not edit it back to
+  -- life (changing its words or its status would otherwise send it to be screened again).
+  if current_user in ('anon', 'authenticated') and old.moderation_status = 'removed' then
+    raise exception 'This listing was removed and can''t be changed.' using errcode = 'SWIMM';
+  end if;
   if current_user in ('anon', 'authenticated') and (
     new.id is distinct from old.id
     or new.slug is distinct from old.slug

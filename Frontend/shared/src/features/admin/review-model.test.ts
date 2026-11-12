@@ -14,7 +14,9 @@ const reviewCase = (over: Partial<ReviewCase> = {}): ReviewCase => ({
   kind: 'comment',
   targetId: 'c1',
   status: 'held',
+  title: null,
   body: 'Words',
+  photoUrl: null,
   authorHandle: 'bo',
   authorAvatarUrl: null,
   flagRef: null,
@@ -36,6 +38,17 @@ describe('reviewActions', () => {
       'remove',
       'hold',
       'dismiss',
+    ]);
+  });
+
+  it('lets a listing that is held or never screened be approved or removed', () => {
+    expect(reviewActions(reviewCase({ kind: 'listing', status: 'held' }))).toEqual([
+      'remove',
+      'approve',
+    ]);
+    expect(reviewActions(reviewCase({ kind: 'listing', status: 'pending' }))).toEqual([
+      'remove',
+      'approve',
     ]);
   });
 
@@ -132,6 +145,18 @@ describe('copy', () => {
       'Reports dismissed',
     );
     expect(kindLabel('post')).toBe('Feed post');
+    expect(kindLabel('listing')).toBe('Listing');
+  });
+
+  it('says a removed listing closes its chats, and a listing is public once approved', () => {
+    const listing = reviewCase({ kind: 'listing', title: 'Film camera' });
+
+    expect(decisionToast(listing, 'remove')).toEqual({
+      title: 'Removed',
+      body: 'Listing by @bo was removed, and its chats are closed.',
+    });
+    expect(decisionToast(listing, 'approve').body).toBe('Listing by @bo is now public.');
+    expect(decisionToast(listing, 'hold').body).toBe('Listing by @bo is hidden until you decide.');
   });
 
   it('explains a decision the database turned down', () => {
