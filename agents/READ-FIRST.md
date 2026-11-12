@@ -21,7 +21,7 @@ both apps.
 ## What's built and what isn't
 
 Keep this list current: when you finish or start something, move it here in the same change.
-Last updated 2026-11-11.
+Last updated 2026-11-12.
 
 ### Working for real
 
@@ -35,7 +35,6 @@ Last updated 2026-11-11.
   password: Google and Apple accounts have none), then the `delete-account` Edge Function removes
   the person's files in the `avatars` and `scan-photos` buckets and their Auth user, which every
   table cascades from (`account_deletion_test.sql` checks each one). This device's copies go too.
-  Needs `npx supabase functions deploy delete-account`.
 - **One sign-in:** chats, comments, Hanap and suki use the same Supabase client as sign-in, so what
   someone does belongs to the account they signed in with (PR #20).
 - **Your own profile:** name, handle, photo, location and bio come from the account, and the listed,
@@ -82,10 +81,9 @@ Last updated 2026-11-11.
 - **Native pickers on iOS:** choices use the system's segmented controls and menus on iOS; Android
   and the web keep the app's own chips. Tap-to-act chips (quick replies, suggestions) stay chips.
 - **Hanap:** buyers post what they're looking for, and see the Market listings that match
-  (Market shows the count). Moderated like comments. The database table and the
-  `moderate-content` change need deploying.
+  (Market shows the count). Moderated like comments.
 - **Suki prices:** a seller gives a regular buyer a standing discount from the chat. Both see it,
-  and the buyer's offers start from it. The database table needs deploying.
+  and the buyer's offers start from it.
 - **Photo coach:** tips before a snap, and after it, the shots that matter for that kind of item.
   **Not complete:** only iPhones with Apple Intelligence know the kind of item; every other device
   gets general tips until the cloud AI exists.
@@ -155,15 +153,18 @@ Last updated 2026-11-11.
   `marketplace-seed.ts`, `feed-seed.ts`) is for a build with no Supabase project, where the app
   runs alone on the device. The web's Snap page, which only ever opened a sample estimate, says
   Snap works in the phone app when a project is configured.
-- **Needs deploying:** none of this is on Supabase yet. In order: `npx supabase db push` (the
-  `scan_history`, `photo_storage`, `flips_and_collections`, `marketplace`, `feed_and_votes`,
-  `admin_role` and `admin_review` migrations, in that order, which `db push` does by itself), then
-  `npx supabase functions deploy moderate-content` and `delete-account`, then the
-  `MODERATION_PROVIDER` secret. Never use `db push --include-seed` on the live project. The
-  marketplace migration marks the listings that exist as `approved` (they were public already), so
-  the app people use now keeps working; `Backend/scripts/test-db.sh --upgrade` rehearses this on
-  rows like the live project's. Until a moderation provider is set (see below), every new listing
-  is held.
+- **Deployed 2026-11-12:** every migration through `admin_review`, the `moderate-content` and
+  `delete-account` functions, and `MODERATION_PROVIDER=rules` (the built-in word rules; switch to
+  `openai` with an `OPENAI_API_KEY` before launch for real screening). A live check with a
+  throwaway account passed: existing listings and posts still public, a scan and its photo saved
+  privately, a clean hanap post approved and shown, and `delete-account` removing it all. The live
+  project had a hand-made `scan_history` (PR #24's first draft, empty, with leaky rules); the
+  scan_history migration replaced it. Never use `db push --include-seed` on the live project.
+  `Backend/scripts/test-db.sh --upgrade` rehearses future deploys on rows like the live project's.
+- **Not on live:** the demo seed's newer details (categories, descriptions, AI estimates of the
+  demo listings). The old demo listings show without them unless `seed/01` and `seed/02` are run
+  in the SQL editor. Nobody is an admin until someone runs the one-liner under "Making someone an
+  admin".
 
 ### Kept on the device only
 

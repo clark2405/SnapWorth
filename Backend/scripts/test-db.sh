@@ -11,12 +11,14 @@
 # representative live rows (supabase/tests/upgrade/01_live_data.sql), applies the rest, checks the
 # rows survived and that the old app's calls still work (after_migrations_test.sql), re-runs the
 # seeds over it the way the deploy checklist suggests, and checks again (after_reseed_test.sql).
-# Move `live_through` forward once a newer migration is deployed.
+# The live project is now at 20261111000100 (deployed 2026-11-12). `live_through` stays at the
+# point the live rows below were written for, so CI keeps checking that deploy. Before rehearsing
+# the next one, move it to 20261111000100 and rewrite 01_live_data.sql for that schema.
 #
 # Postgres refuses to run as root, so under root the cluster runs as the `postgres` user.
 set -euo pipefail
 
-# The newest migration the live project has applied.
+# The schema 01_live_data.sql's rows are written for (see above).
 live_through="20261031000200"
 
 mode="scratch"
