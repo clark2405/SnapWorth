@@ -139,23 +139,28 @@ export function EditProfileView({ onBack, onSaved, onPickPhoto }: EditProfileVie
       }
       contentStyle={styles.content}
     >
-      <Reveal index={0} style={styles.photoBlock}>
+      <Reveal index={0}>
+        {/* The picture and its caption are one control: pressing either picks a photo. */}
         <PressableScale
           accessibilityRole="button"
           accessibilityLabel="Change profile photo"
           haptic="select"
           disabled={!onPickPhoto}
           onPress={() => void pickPhoto()}
-          style={styles.photoButton}
+          style={styles.photoBlock}
         >
-          <Avatar source={avatar} name={handle} size={96} ring />
-          <View style={styles.camera}>
-            <Camera size={15} strokeWidth={2.2} color={colors.onAccent} />
+          <View style={styles.photoButton}>
+            <Avatar source={avatar} name={handle} size={96} ring />
+            <View style={styles.camera}>
+              <Camera size={15} strokeWidth={2.2} color={colors.onAccent} />
+            </View>
           </View>
+          {onPickPhoto ? (
+            <SWText variant="labelSmall" tone="accent">
+              Change photo
+            </SWText>
+          ) : null}
         </PressableScale>
-        <SWText variant="labelSmall" tone="accent">
-          Change photo
-        </SWText>
       </Reveal>
 
       <Reveal index={1} style={styles.fields}>
@@ -238,6 +243,7 @@ const stylesFor = themedStyles((colors) => ({
     gap: tokens.spacing[8],
   },
   photoBlock: {
+    alignSelf: 'center',
     alignItems: 'center',
     gap: tokens.spacing[2],
   },
