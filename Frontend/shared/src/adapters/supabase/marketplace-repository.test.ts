@@ -524,3 +524,111 @@ describe('saving a listing in the Supabase repository', () => {
     });
   });
 });
+
+describe('how many chats a listing has', () => {
+  const rowFor = (id: string, sellerId: string) => ({
+    id,
+    slug: `slug-${id}`,
+    seller_id: sellerId,
+    scan_id: null,
+    title: `Item ${id}`,
+    asking_php: 1000,
+    photo_url: null,
+    photo_path: null,
+    category: 'collectibles',
+    condition: 'good',
+    area: 'cebu-city',
+    lat: null,
+    lng: null,
+    description: '',
+    estimate_php: null,
+    estimate_low_php: null,
+    estimate_high_php: null,
+    verdict: null,
+    verdict_share: null,
+    views_count: 0,
+    saves_count: 0,
+    status: 'active',
+    moderation_status: 'approved',
+    created_at: '2026-11-10T10:00:00.000Z',
+    seller: { id: sellerId, handle: 'someone', display_name: '', avatar_url: null },
+  });
+
+  /** `mine` is the viewer's; `theirs` is someone else's. Conversations answer as the viewer sees them. */
+  function clientWith(conversations: { data: unknown; error: unknown } | 'throws') {
+    const rows = [rowFor('mine-1', 'usr_me'), rowFor('theirs-1', 'usr_other')];
+    return {
+      auth: { getSession: async () => ({ data: { session: { user: { id: 'usr_me' } } } }) },
+      from: (table: string) => {
+        if (table === 'conversations') {
+          return {
+            select: () => ({
+              in: async () => {
+                if (conversations === 'throws') throw new Error('offline');
+                return conversations;
+              },
+              eq: () => ({
+                eq: async () => ({ count: 0, error: null }),
+              }),
+            }),
+          };
+        }
+        return {
+          select: () => ({
+            neq: () => ({
+              order: () => ({ limit: async () => ({ data: rows, error: null }) }),
+              maybeSingle: async () => ({ data: rows[0], error: null }),
+            }),
+            eq: () => ({
+              neq: () => ({ maybeSingle: async () => ({ data: rows[0], error: null }) }),
+              in: async () => ({ data: [], error: null }),
+            }),
+            in: async () => ({ data: [], error: null }),
+          }),
+        };
+      },
+    };
+  }
+  const photos = { upload: async () => null, links: async () => ({}), remove: async () => true };
+
+  it('counts the owner’s chats in the list, and leaves other people’s listings unknown', async () => {
+    const repo = createSupabaseMarketplaceRepository(
+      clientWith({
+        data: [{ listing_id: 'mine-1' }, { listing_id: 'mine-1' }, { listing_id: 'mine-1' }],
+        error: null,
+      }) as never,
+      photos,
+    );
+    const listed = await repo.list();
+    expect(listed.ok).toBe(true);
+    if (!listed.ok) return;
+    const byId = Object.fromEntries(listed.value.map((entry) => [entry.rowId, entry.stats.chats]));
+    expect(byId).toEqual({ 'mine-1': 3, 'theirs-1': null });
+  });
+
+  it('says 0 for the owner’s listing with no chats, and the same in the list as on its own page', async () => {
+    const repo = createSupabaseMarketplaceRepository(
+      clientWith({ data: [], error: null }) as never,
+      photos,
+    );
+    const listed = await repo.list();
+    const found = await repo.findById('mine-1');
+    expect(listed.ok && found.ok).toBe(true);
+    if (!listed.ok || !found.ok) return;
+    expect(listed.value.find((entry) => entry.rowId === 'mine-1')?.stats.chats).toBe(0);
+    expect(found.value?.stats.chats).toBe(0);
+  });
+
+  it('is unknown, not 0, when the chats could not be counted', async () => {
+    for (const failing of [
+      { data: null, error: { code: '57014', message: 'timeout' } },
+      'throws' as const,
+    ]) {
+      const repo = createSupabaseMarketplaceRepository(clientWith(failing) as never, photos);
+      const listed = await repo.list();
+      expect(listed.ok).toBe(true);
+      if (!listed.ok) return;
+      expect(listed.value.find((entry) => entry.rowId === 'mine-1')?.stats.chats).toBeNull();
+    }
+  });
+});

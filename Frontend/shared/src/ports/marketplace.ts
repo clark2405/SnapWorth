@@ -57,7 +57,11 @@ export interface MarketListing {
   readonly stats: {
     readonly views: number;
     readonly saves: number;
-    readonly chats: number;
+    /**
+     * How many chats the listing has: known only to its seller, so `null` for anyone else's
+     * listing, and when it couldn't be counted. Never a 0 that only means "not known".
+     */
+    readonly chats: number | null;
   };
   readonly createdAt: UtcDateTime;
   readonly mine: boolean;

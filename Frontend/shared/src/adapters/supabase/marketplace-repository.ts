@@ -110,7 +110,7 @@ function toMarketListing(
   row: ListingRow,
   viewerId: string | null,
   signedUrls: Readonly<Record<string, string>>,
-  chatsCount = 0,
+  chatsCount: number | null = null,
   sales = 0,
 ): MarketListing {
   const seller = unwrapSeller(row.seller);
@@ -188,6 +188,38 @@ export function createSupabaseMarketplaceRepository(
     return counts;
   }
 
+  /**
+   * How many chats each of the viewer's own listings has (row-level security shows a seller their
+   * own conversations only). Listings that aren't the viewer's, or whose count couldn't be loaded,
+   * are left out: their count is unknown, not zero.
+   */
+  async function chatCounts(
+    viewer: string | null,
+    rows: readonly ListingRow[],
+  ): Promise<Readonly<Record<string, number>>> {
+    const mine = rows.filter((row) => viewer !== null && row.seller_id === viewer);
+    if (mine.length === 0) return {};
+    let answer;
+    try {
+      answer = await client
+        .from('conversations')
+        .select('listing_id')
+        .in(
+          'listing_id',
+          mine.map((row) => row.id),
+        );
+    } catch {
+      return {};
+    }
+    const { data, error } = answer;
+    if (error) return {};
+    const counts: Record<string, number> = Object.fromEntries(mine.map((row) => [row.id, 0]));
+    for (const row of (data ?? []) as { listing_id: string | null }[]) {
+      if (row.listing_id && row.listing_id in counts) counts[row.listing_id]! += 1;
+    }
+    return counts;
+  }
+
   async function signRows(rows: readonly ListingRow[]): Promise<Readonly<Record<string, string>>> {
     const paths = rows.flatMap((row) => (row.photo_path ? [row.photo_path] : []));
     return paths.length > 0 ? photos.links(paths) : {};
@@ -234,25 +266,27 @@ export function createSupabaseMarketplaceRepository(
       ]);
       if (error) return err(toAppError(error, 'load_marketplace', 'listing'));
       const rows = (data ?? []) as unknown as ListingRow[];
-      const [signed, sold] = await Promise.all([
+      const [signed, sold, chats] = await Promise.all([
         signRows(rows),
         soldCounts(rows.map((row) => row.seller_id)),
+        chatCounts(viewer, rows),
       ]);
-      return ok(rows.map((row) => toMarketListing(row, viewer, signed, 0, sold[row.seller_id])));
+      return ok(
+        rows.map((row) =>
+          toMarketListing(row, viewer, signed, chats[row.id] ?? null, sold[row.seller_id]),
+        ),
+      );
     },
 
     async findById(idOrSlug) {
       const [row, viewer] = await Promise.all([findRow(idOrSlug), viewerId()]);
       if (!row) return ok(null);
-      const [signed, sold] = await Promise.all([signRows([row]), soldCounts([row.seller_id])]);
-      let chatsCount = 0;
-      if (viewer && row.seller_id === viewer) {
-        const { count } = await client
-          .from('conversations')
-          .select('id', { count: 'exact', head: true })
-          .eq('listing_id', row.id);
-        chatsCount = count ?? 0;
-      }
+      const [signed, sold, chats] = await Promise.all([
+        signRows([row]),
+        soldCounts([row.seller_id]),
+        chatCounts(viewer, [row]),
+      ]);
+      const chatsCount = chats[row.id] ?? null;
       return ok(toMarketListing(row, viewer, signed, chatsCount, sold[row.seller_id]));
     },
 
@@ -285,10 +319,10 @@ export function createSupabaseMarketplaceRepository(
       if (listingError) return err(toAppError(listingError, 'load_marketplace', 'listing'));
 
       const rows = (listingData ?? []) as unknown as ListingRow[];
-      const signed = await signRows(rows);
+      const [signed, chats] = await Promise.all([signRows(rows), chatCounts(viewer, rows)]);
       const sales = soldCount ?? 0;
       const listings = rows.map((row) => ({
-        ...toMarketListing(row, viewer, signed),
+        ...toMarketListing(row, viewer, signed, chats[row.id] ?? null),
         seller: {
           id: profile.id,
           handle: profile.handle,

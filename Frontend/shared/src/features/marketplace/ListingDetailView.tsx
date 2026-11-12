@@ -521,7 +521,11 @@ function OwnerPanel({
   onMarkSold,
   onDeleteListing,
 }: {
-  readonly stats: { readonly views: number; readonly saves: number; readonly chats: number };
+  readonly stats: {
+    readonly views: number;
+    readonly saves: number;
+    readonly chats: number | null;
+  };
   readonly marking: boolean;
   readonly deleting: boolean;
   readonly onMarkSold: () => void;
@@ -544,9 +548,10 @@ function OwnerPanel({
             style={styles.ownerTile}
             contentStyle={styles.ownerTileContent}
           >
-            <View accessible accessibilityLabel={`${value} ${label.toLowerCase()}`}>
+            <View accessible accessibilityLabel={`${value ?? 'unknown'} ${label.toLowerCase()}`}>
               <Icon size={16} strokeWidth={2} color={colors.textMuted} />
-              <SWText variant="priceSmall">{String(value)}</SWText>
+              {/* A count that isn't known is a dash, not a 0. */}
+              <SWText variant="priceSmall">{value === null ? '–' : String(value)}</SWText>
               <SWText variant="caption" tone="textSecondary">
                 {label}
               </SWText>
