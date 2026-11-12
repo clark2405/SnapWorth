@@ -3,7 +3,10 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import type { DeviceLocationPort, DeviceLocationResult } from '../../ports/location';
 import { renderScreen } from '../../testing/render-screen';
+import { Platform } from 'react-native';
+
 import { MarketplaceView } from './MarketplaceView';
+import { NearMeNotice, nearMeCopy } from './NearMeNotice';
 import { MarketplaceProvider } from './marketplace-state';
 import { ViewerLocationProvider } from './viewer-location';
 import { createLocalMarketplaceRepository } from '../../adapters/local/marketplace-repository';
@@ -75,5 +78,60 @@ describe('Near me', () => {
       expect(screen.getByText('Location is off for SnapWorth')).toBeOnTheScreen(),
     );
     expect(screen.getByText('Mechanical Keychron Keyboard')).toBeOnTheScreen();
+  });
+
+  it('says so in the Location sheet itself, before it is closed', async () => {
+    renderMarket({ status: 'denied' });
+    await screen.findByText('Mechanical Keychron Keyboard');
+    const menus = screen.UNSAFE_getAllByType(MenuView);
+    act(() => {
+      menus[menus.length - 1]!.props.onPressAction({ nativeEvent: { event: '__more__' } });
+    });
+
+    // Only the sheet is open: nothing has been applied, so the Market's own notice is not up.
+    expect(await screen.findByText('Location is off for SnapWorth')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Clear Near me' })).toBeOnTheScreen();
+    expect(screen.getAllByText('Location is off for SnapWorth')).toHaveLength(1);
+  });
+});
+
+describe('the Near me notice, worded for where it runs', () => {
+  it('talks about Settings and the phone on a phone', () => {
+    const { title, body } = nearMeCopy('denied', 'ios');
+
+    expect(title).toBe('Location is off for SnapWorth');
+    expect(body).toMatch(/Settings/);
+    expect(body).toMatch(/stays on your phone/);
+  });
+
+  it('talks about the browser and this site on the web', () => {
+    const { title, body } = nearMeCopy('denied', 'web');
+
+    expect(title).toBe('Location is blocked for this site');
+    expect(body).toMatch(/browser/);
+    expect(body).not.toMatch(/phone/);
+  });
+
+  it('shows the web wording and offers Try again, since a blocked site can be allowed again', () => {
+    jest.replaceProperty(Platform, 'OS', 'web');
+    renderScreen(<NearMeNotice status="denied" onTryAgain={jest.fn()} onClear={jest.fn()} />);
+
+    expect(screen.getByText('Location is blocked for this site')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
+    jest.restoreAllMocks();
+  });
+
+  it('keeps Try again away on a phone, where only Settings can change the answer', () => {
+    renderScreen(<NearMeNotice status="denied" onTryAgain={jest.fn()} onClear={jest.fn()} />);
+
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Clear Near me' })).toBeOnTheScreen();
+  });
+
+  it('offers Try again when the position just could not be found', () => {
+    renderScreen(<NearMeNotice status="unavailable" onTryAgain={jest.fn()} onClear={jest.fn()} />);
+
+    expect(screen.getByText('Couldn’t find where you are')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
   });
 });
