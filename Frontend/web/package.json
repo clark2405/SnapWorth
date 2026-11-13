@@ -6,7 +6,7 @@
   "type": "module",
   "main": "expo-router/entry",
   "scripts": {
-    "build": "expo export --platform web --output-dir dist",
+    "build": "expo export --platform web --output-dir dist && node -e \"require('fs').copyFileSync('dist/+not-found.html','dist/404.html')\"",
     "dev": "expo start --web",
     "typecheck": "tsc --project ./tsconfig.json --noEmit"
   },
