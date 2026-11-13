@@ -1,12 +1,12 @@
 import { ArrowUp, X, type LucideIcon } from 'lucide-react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Keyboard,
   Pressable,
   StyleSheet,
   TextInput,
   View,
-  useWindowDimensions,
+  type LayoutRectangle,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -24,8 +24,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../design';
+import { haptic, themedStyles, tokens, useTheme, useThemedStyles, useWindowSize } from '../design';
 import { Worthy, type CompanionMood } from './Worthy';
+import { GenieCanvas, genieSupported, pictureOf, type GeniePicture } from './GenieCanvas';
+import type { GenieGeometry } from './genie-mesh';
 import { GlassSurface } from './GlassSurface';
 import { PressableScale } from './PressableScale';
 import { contentScrolling, tabBarFolded } from './scroll-signal';
@@ -95,11 +97,13 @@ export function Companion({
   foldedBottomOffset,
   hidden = false,
 }: CompanionProps) {
-  const { width, height } = useWindowDimensions();
+  const { width, height } = useWindowSize();
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const styles = useThemedStyles(stylesFor);
   const [open, setOpen] = useState(false);
+  /** The panel stays on screen while it pours back into Worthy, after `open` goes false. */
+  const [panelShown, setPanelShown] = useState(false);
   const [mood, setMood] = useState<CompanionMood>('idle');
   const [side, setSide] = useState<'left' | 'right'>('right');
   const [showHint, setShowHint] = useState(false);
@@ -120,6 +124,8 @@ export function Companion({
   const y = useSharedValue(restY);
   const lift = useSharedValue(hidden ? 0 : 1);
   const charge = useSharedValue(0);
+  /** A quick swell as the panel pours back into Worthy. */
+  const gulp = useSharedValue(0);
   /** 1 while Worthy is tucked into its edge after a few untouched seconds. */
   const idle = useSharedValue(0);
   const [dragY, setDragY] = useState(0);
@@ -189,6 +195,7 @@ export function Companion({
     setShowHint(false);
     setMood('attentive');
     setOpen(true);
+    setPanelShown(true);
   }, []);
 
   const requestOpen = useCallback(() => {
@@ -296,7 +303,14 @@ export function Companion({
         { translateX: x.value + tuck * tuckDirection * (orbSize * tuckShift + edgeGap) },
         { translateY: y.value + (1 - lift.value) * 80 },
         { rotate: `${tuck * tuckDirection * -10}deg` },
-        { scale: 0.4 + lift.value * 0.6 - charge.value * 0.08 - tuck * (1 - tuckedScale) },
+        {
+          scale:
+            0.4 +
+            lift.value * 0.6 -
+            charge.value * 0.08 +
+            gulp.value * 0.14 -
+            tuck * (1 - tuckedScale),
+        },
       ],
     };
   });
@@ -311,8 +325,18 @@ export function Companion({
 
   return (
     <View style={styles.host} pointerEvents={hidden ? 'none' : 'box-none'}>
-      {open ? (
+      {panelShown ? (
         <CompanionPanel
+          open={open}
+          onClosed={() => {
+            setPanelShown(false);
+            if (!reduceMotion)
+              gulp.value = withSequence(
+                withTiming(1, { duration: 90 }),
+                withSpring(0, tokens.motion.spring.playful),
+              );
+          }}
+          target={{ x: edgeX(side) + orbSize / 2, y: restY + dragY + orbSize / 2 }}
           greeting={greeting}
           actions={actions}
           side={side}
@@ -380,7 +404,14 @@ function glassEntering() {
   };
 }
 
+/** How long the panel takes to pour back into Worthy. */
+const genieCloseMs = 480;
+const genieEasing = Easing.bezier(0.45, 0, 0.35, 1);
+
 function CompanionPanel({
+  open,
+  onClosed,
+  target,
   greeting,
   actions,
   side,
@@ -389,6 +420,11 @@ function CompanionPanel({
   onAction,
   onAsk,
 }: {
+  readonly open: boolean;
+  /** Called once the panel has gone back into Worthy, so it can leave the screen. */
+  readonly onClosed: () => void;
+  /** Worthy's centre, which the panel pours back into. */
+  readonly target: { readonly x: number; readonly y: number };
   readonly greeting: string;
   readonly actions: readonly CompanionAction[];
   readonly side: 'left' | 'right';
@@ -411,6 +447,68 @@ function CompanionPanel({
       : withSequence(withSpring(1, { damping: 16, stiffness: 240, mass: 0.8 }));
   }, [bloom, reduceMotion]);
 
+  // Closing pours the panel back into Worthy like a genie into its lamp: a picture of the panel,
+  // drawn on a bending mesh (see genie-mesh.ts), stands in for it while the panel itself steps
+  // out of sight. Without Skia (the web) or with reduced motion, it shrinks back instead.
+  const genie = genieSupported && !reduceMotion;
+  const panelRef = useRef<View>(null);
+  const [frame, setFrame] = useState<LayoutRectangle | null>(null);
+  const [picture, setPicture] = useState<GeniePicture | null>(null);
+  const [offstage, setOffstage] = useState(false);
+  /** 0 with the panel open, 1 with it inside Worthy. */
+  const progress = useSharedValue(0);
+  const onClosedRef = useRef(onClosed);
+  onClosedRef.current = onClosed;
+
+  useEffect(() => {
+    if (open) return;
+    let cancelled = false;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const leaveAfter = (ms: number) => timers.push(setTimeout(() => onClosedRef.current(), ms));
+    const shrink = () => {
+      const duration = reduceMotion ? 120 : 220;
+      bloom.value = withTiming(0, { duration, easing: genieEasing });
+      leaveAfter(duration + 30);
+    };
+    if (!genie || !frame) {
+      shrink();
+    } else {
+      void (async () => {
+        const shot = await pictureOf(panelRef);
+        if (cancelled) return;
+        if (!shot) return shrink();
+        progress.value = 0;
+        setPicture(shot);
+        // Two frames for the picture to be drawn before the panel steps out from under it.
+        await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+        if (cancelled) return;
+        setOffstage(true);
+        progress.value = withTiming(1, { duration: genieCloseMs, easing: genieEasing });
+        leaveAfter(genieCloseMs + 40);
+      })();
+    }
+    return () => {
+      cancelled = true;
+      timers.forEach(clearTimeout);
+    };
+  }, [bloom, frame, genie, open, progress, reduceMotion]);
+
+  const geometry = useMemo<GenieGeometry | null>(
+    () =>
+      frame
+        ? {
+            x: frame.x,
+            y: frame.y,
+            width: frame.width,
+            height: frame.height,
+            targetX: target.x,
+            targetY: target.y,
+            targetWidth: orbSize * 0.4,
+          }
+        : null,
+    [frame, target.x, target.y],
+  );
+
   // Worthy "speaks": the greeting types itself out, a few characters per frame.
   useEffect(() => {
     if (reduceMotion) return;
@@ -428,7 +526,7 @@ function CompanionPanel({
   const panelStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: (1 - bloom.value) * 40 }, { scale: 0.25 + bloom.value * 0.75 }],
   }));
-  const scrimStyle = useAnimatedStyle(() => ({ opacity: bloom.value }));
+  const scrimStyle = useAnimatedStyle(() => ({ opacity: bloom.value * (1 - progress.value) }));
 
   const submit = () => {
     const trimmed = question.trim();
@@ -439,102 +537,132 @@ function CompanionPanel({
 
   return (
     <>
-      <Animated.View style={[StyleSheet.absoluteFill, styles.scrim, scrimStyle]}>
+      <Animated.View
+        pointerEvents={open ? 'auto' : 'none'}
+        style={[StyleSheet.absoluteFill, styles.scrim, scrimStyle]}
+      >
         <Pressable
           accessibilityLabel="Close Worthy"
           style={StyleSheet.absoluteFill}
           onPress={onClose}
         />
       </Animated.View>
-      <Animated.View
-        style={[
-          styles.panelWrap,
-          { bottom, transformOrigin: side === 'right' ? 'bottom right' : 'bottom left' },
-          panelStyle,
-        ]}
+      {/* Out of sight while the genie's picture stands in for it. */}
+      <View
+        pointerEvents={open ? 'box-none' : 'none'}
+        style={[StyleSheet.absoluteFill, offstage ? styles.offstage : null]}
       >
-        <GlassSurface style={styles.panel}>
-          <View style={styles.panelHeader}>
-            <Worthy size={30} mood="attentive" />
-            <View style={styles.flex}>
-              <SWText variant="companion">Worthy</SWText>
+        <Animated.View
+          ref={panelRef}
+          testID="companion-panel"
+          collapsable={false}
+          onLayout={(event) => {
+            const next = event.nativeEvent.layout;
+            setFrame((was) =>
+              was &&
+              was.x === next.x &&
+              was.y === next.y &&
+              was.width === next.width &&
+              was.height === next.height
+                ? was
+                : next,
+            );
+          }}
+          style={[
+            styles.panelWrap,
+            { bottom, transformOrigin: side === 'right' ? 'bottom right' : 'bottom left' },
+            panelStyle,
+          ]}
+        >
+          <GlassSurface style={styles.panel}>
+            <View style={styles.panelHeader}>
+              <Worthy size={30} mood="attentive" />
+              <View style={styles.flex}>
+                <SWText variant="companion">Worthy</SWText>
+              </View>
+              <PressableScale accessibilityLabel="Close" onPress={onClose} style={styles.close}>
+                <X size={16} strokeWidth={2.4} color={colors.textSecondary} />
+              </PressableScale>
             </View>
-            <PressableScale accessibilityLabel="Close" onPress={onClose} style={styles.close}>
-              <X size={16} strokeWidth={2.4} color={colors.textSecondary} />
-            </PressableScale>
-          </View>
 
-          <SWText variant="bodyLarge" style={styles.greeting} accessibilityLabel={greeting}>
-            {typed}
-            {typed.length < greeting.length ? (
-              <SWText variant="bodyLarge" tone="textMuted">
-                ▍
-              </SWText>
-            ) : null}
-          </SWText>
+            <SWText variant="bodyLarge" style={styles.greeting} accessibilityLabel={greeting}>
+              {typed}
+              {typed.length < greeting.length ? (
+                <SWText variant="bodyLarge" tone="textMuted">
+                  ▍
+                </SWText>
+              ) : null}
+            </SWText>
 
-          <View style={styles.actions}>
-            {actions.slice(0, 4).map((action, index) => {
-              const Icon = action.icon;
-              return (
-                <Animated.View
-                  key={action.key}
-                  entering={reduceMotion ? FadeIn : paperIn(120 + index * 55)}
-                >
-                  <PressableScale
-                    accessibilityLabel={action.label}
-                    accessibilityHint={action.detail}
-                    haptic="none"
-                    depth="surface"
-                    onPress={() => onAction(action.onPress)}
-                    style={({ pressed }) => [styles.action, pressed ? styles.actionPressed : null]}
+            <View style={styles.actions}>
+              {actions.slice(0, 4).map((action, index) => {
+                const Icon = action.icon;
+                return (
+                  <Animated.View
+                    key={action.key}
+                    entering={reduceMotion ? FadeIn : paperIn(120 + index * 55)}
                   >
-                    <View style={styles.actionIcon}>
-                      <Icon size={16} strokeWidth={1.75} color={colors.textPrimary} />
-                    </View>
-                    <View style={styles.flex}>
-                      <SWText variant="headingSmall">{action.label}</SWText>
-                      {action.detail ? (
-                        <SWText variant="caption" tone="textMuted" numberOfLines={1}>
-                          {action.detail}
-                        </SWText>
-                      ) : null}
-                    </View>
-                  </PressableScale>
-                </Animated.View>
-              );
-            })}
-          </View>
+                    <PressableScale
+                      accessibilityLabel={action.label}
+                      accessibilityHint={action.detail}
+                      haptic="none"
+                      depth="surface"
+                      onPress={() => onAction(action.onPress)}
+                      style={({ pressed }) => [
+                        styles.action,
+                        pressed ? styles.actionPressed : null,
+                      ]}
+                    >
+                      <View style={styles.actionIcon}>
+                        <Icon size={16} strokeWidth={1.75} color={colors.textPrimary} />
+                      </View>
+                      <View style={styles.flex}>
+                        <SWText variant="headingSmall">{action.label}</SWText>
+                        {action.detail ? (
+                          <SWText variant="caption" tone="textMuted" numberOfLines={1}>
+                            {action.detail}
+                          </SWText>
+                        ) : null}
+                      </View>
+                    </PressableScale>
+                  </Animated.View>
+                );
+              })}
+            </View>
 
-          <Animated.View entering={FadeIn.delay(320)} style={styles.ask}>
-            <TextInput
-              ref={input}
-              value={question}
-              onChangeText={setQuestion}
-              placeholder="Ask Worthy anything…"
-              placeholderTextColor={colors.textMuted}
-              selectionColor={colors.accent}
-              returnKeyType="send"
-              onSubmitEditing={submit}
-              style={[
-                styles.askInput,
-                typeStyle('bodyMedium'),
-                { color: colors.textPrimary, lineHeight: undefined },
-                hideWebFocusOutline,
-              ]}
-            />
-            <PressableScale
-              accessibilityLabel="Ask"
-              disabled={!question.trim()}
-              haptic="pop"
-              onPress={submit}
-              style={[styles.send, question.trim() ? null : styles.sendIdle]}
-            >
-              <ArrowUp size={17} strokeWidth={2.6} color={colors.onInverse} />
-            </PressableScale>
-          </Animated.View>
-        </GlassSurface>
-      </Animated.View>
+            <Animated.View entering={FadeIn.delay(320)} style={styles.ask}>
+              <TextInput
+                ref={input}
+                value={question}
+                onChangeText={setQuestion}
+                placeholder="Ask Worthy anything…"
+                placeholderTextColor={colors.textMuted}
+                selectionColor={colors.accent}
+                returnKeyType="send"
+                onSubmitEditing={submit}
+                style={[
+                  styles.askInput,
+                  typeStyle('bodyMedium'),
+                  { color: colors.textPrimary, lineHeight: undefined },
+                  hideWebFocusOutline,
+                ]}
+              />
+              <PressableScale
+                accessibilityLabel="Ask"
+                disabled={!question.trim()}
+                haptic="pop"
+                onPress={submit}
+                style={[styles.send, question.trim() ? null : styles.sendIdle]}
+              >
+                <ArrowUp size={17} strokeWidth={2.6} color={colors.onInverse} />
+              </PressableScale>
+            </Animated.View>
+          </GlassSurface>
+        </Animated.View>
+      </View>
+      {picture && geometry ? (
+        <GenieCanvas picture={picture} geometry={geometry} progress={progress} />
+      ) : null}
     </>
   );
 }
@@ -569,6 +697,9 @@ const stylesFor = themedStyles((colors, name) => ({
   },
   scrim: {
     backgroundColor: tokens.overlay.scrim,
+  },
+  offstage: {
+    transform: [{ translateX: -100000 }],
   },
   panelWrap: {
     position: 'absolute',

@@ -24,6 +24,21 @@ jest.mock('expo-blur', () => {
   return { BlurView: View };
 });
 
+// Skia draws Worthy's closing genie on phones. Under test there is no picture to take, so the
+// panel shrinks away instead.
+jest.mock('@shopify/react-native-skia', () => {
+  const { View } = require('react-native');
+  const Nothing = () => null;
+  return {
+    Canvas: View,
+    Vertices: Nothing,
+    ImageShader: Nothing,
+    FilterMode: { Nearest: 0, Linear: 1 },
+    MipmapMode: { None: 0, Nearest: 1, Linear: 2 },
+    makeImageFromView: () => Promise.resolve(null),
+  };
+});
+
 jest.mock('@react-native-masked-view/masked-view', () => {
   const { View } = require('react-native');
   return { __esModule: true, default: View };
