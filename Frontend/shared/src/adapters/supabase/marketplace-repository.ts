@@ -13,7 +13,7 @@ import type { UtcDateTime } from '../../types/date-time';
 import type { ModerationStatus, VoteChoice } from '../../types/entities';
 import { err, ok } from '../../types/result';
 import { toAppError } from './errors';
-import { createSupabaseScanPhotos, type ScanPhotoStore } from './photo-storage';
+import { createSupabaseScanPhotos, scanPhotoPath, type ScanPhotoStore } from './photo-storage';
 import { accountIdOf } from './account';
 import { requireSignedIn } from './session';
 
@@ -363,7 +363,9 @@ export function createSupabaseMarketplaceRepository(
           scan_id: input.scanId ?? null,
           title: input.title,
           asking_php: Math.round(input.askingPrice),
-          photo_path: input.scanId ? (input.photoPath ?? null) : null,
+          photo_path: input.scanId
+            ? (input.photoPath ?? scanPhotoPath(signedIn.value, input.scanId))
+            : null,
           category: input.category,
           condition: input.condition,
           area: input.area,

@@ -106,7 +106,7 @@ function CreatePost({
   readonly foundItem?: ItemDetail;
   readonly foundListing?: MarketListing;
 }) {
-  const { scans, reload: reloadScans } = useScanHistory();
+  const { scans, ensurePhotoUploaded, reload: reloadScans } = useScanHistory();
   const { publishPost } = useFeed();
 
   const savedScan = itemId ? scans.find((entry) => entry.id === itemId) : undefined;
@@ -160,6 +160,12 @@ function CreatePost({
       return;
     }
 
+    const uploadedPhotoPath = savedScan
+      ? savedScan.photoPath && !savedScan.photoPending
+        ? savedScan.photoPath
+        : await ensurePhotoUploaded(savedScan.id)
+      : null;
+
     const result = await publishPost({
       title,
       body: trimmed,
@@ -168,7 +174,7 @@ function CreatePost({
       scanId: savedScan?.id ?? foundListing?.scanId ?? null,
       listingId: source === 'listing' ? (foundListing?.rowId ?? foundListing?.id ?? itemId) : null,
       listingAskingPrice: asking,
-      photoPath: savedScan?.photoPath ?? foundListing?.photoPath ?? null,
+      photoPath: uploadedPhotoPath ?? savedScan?.photoPath ?? foundListing?.photoPath ?? null,
       photoUrl: savedScan
         ? (savedScan.photoUrl ?? savedScan.photoUri)
         : (foundListing?.photoUrl ?? null),

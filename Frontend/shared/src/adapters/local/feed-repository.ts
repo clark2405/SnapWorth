@@ -135,7 +135,7 @@ export function createLocalFeedRepository(
 
     async setVote(postIdOrSlug, choice) {
       const target = findPost(postIdOrSlug);
-      if (!target) {
+      if (!target || target.isMine) {
         return err({ kind: 'authorization', code: 'not_found_or_denied' });
       }
       const existing = votes.find(

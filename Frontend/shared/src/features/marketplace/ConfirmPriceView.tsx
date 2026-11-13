@@ -142,7 +142,7 @@ function ConfirmPrice({
   const toast = useToast();
   const { publishListing, updateListing } = useMarketplace();
   const { publishPost } = useFeed();
-  const { scans, reload: reloadScans } = useScanHistory();
+  const { scans, ensurePhotoUploaded, reload: reloadScans } = useScanHistory();
 
   const savedScan = itemId ? scans.find((entry) => entry.id === itemId) : undefined;
 
@@ -247,12 +247,18 @@ function ConfirmPrice({
       return;
     }
 
+    const uploadedPhotoPath = savedScan
+      ? savedScan.photoPath && !savedScan.photoPending
+        ? savedScan.photoPath
+        : await ensurePhotoUploaded(savedScan.id)
+      : null;
+
     const published = await publishListing({
       scanId: savedScan?.id ?? null,
       title,
       askingPrice: enteredPrice,
       photoUrl: savedScan ? (savedScan.photoUrl ?? savedScan.photoUri) : null,
-      photoPath: savedScan?.photoPath ?? null,
+      photoPath: uploadedPhotoPath ?? savedScan?.photoPath ?? null,
       category,
       condition,
       area,
@@ -292,7 +298,7 @@ function ConfirmPrice({
         scanId: savedScan?.id ?? null,
         listingId: published.value.rowId ?? published.value.id,
         listingAskingPrice: enteredPrice,
-        photoPath: savedScan?.photoPath ?? null,
+        photoPath: uploadedPhotoPath ?? published.value.photoPath ?? savedScan?.photoPath ?? null,
         photoUrl: savedScan ? (savedScan.photoUrl ?? savedScan.photoUri) : null,
       });
     }

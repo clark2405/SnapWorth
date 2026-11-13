@@ -7,6 +7,7 @@ import type { MarketCategory } from './marketplace';
 export interface FeedPostAuthor {
   readonly userId?: string;
   readonly handle: string;
+  readonly displayName?: string;
   readonly avatarUrl?: string | null;
 }
 

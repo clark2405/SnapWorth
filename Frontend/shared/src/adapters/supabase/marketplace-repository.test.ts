@@ -631,4 +631,80 @@ describe('how many chats a listing has', () => {
       expect(listed.value.find((entry) => entry.rowId === 'mine-1')?.stats.chats).toBeNull();
     }
   });
+
+  it('derives photo_path from scanId when publish omits photoPath', async () => {
+    const inserted: Record<string, unknown>[] = [];
+    const sampleRow = {
+      id: '00000000-0000-4000-fc00-000000000099',
+      slug: 'camera-00000099',
+      seller_id: 'usr_1',
+      scan_id: 'scan_99',
+      title: 'Camera',
+      asking_php: 2500,
+      photo_path: 'usr_1/scan_99.jpg',
+      category: 'electronics',
+      condition: 'good',
+      area: 'cebu-city',
+      lat: null,
+      lng: null,
+      description: 'Clean body.',
+      estimate_php: 2600,
+      estimate_low_php: 2200,
+      estimate_high_php: 3000,
+      verdict: null,
+      verdict_share: null,
+      status: 'active',
+      moderation_status: 'approved',
+      views_count: 0,
+      saves_count: 0,
+      created_at: '2026-11-10T10:00:00.000Z',
+      seller: { id: 'usr_1', handle: 'maya', display_name: 'Maya Reyes', avatar_url: null },
+    };
+    const client = {
+      auth: { getSession: async () => ({ data: { session: { user: { id: 'usr_1' } } } }) },
+      from: (table: string) => {
+        if (table === 'listings') {
+          return {
+            insert: (payload: Record<string, unknown>) => {
+              inserted.push(payload);
+              return { select: () => ({ single: async () => ({ data: sampleRow, error: null }) }) };
+            },
+            select: () => ({
+              eq: () => ({ in: async () => ({ data: [], error: null }) }),
+            }),
+          };
+        }
+        if (table === 'scan_history') {
+          return { update: () => ({ eq: async () => ({ error: null }) }) };
+        }
+        return {};
+      },
+      functions: {
+        invoke: async () => ({ data: { status: 'approved' }, error: null }),
+      },
+    };
+    const photoStore = {
+      upload: async () => null,
+      links: async (paths: readonly string[]) =>
+        Object.fromEntries(paths.map((path) => [path, `https://signed.test/${path}`])),
+      remove: async () => true,
+    };
+
+    const repo = createSupabaseMarketplaceRepository(client as never, photoStore);
+    const published = await repo.publish({
+      scanId: 'scan_99',
+      title: 'Camera',
+      askingPrice: 2500,
+      category: 'electronics',
+      condition: 'good',
+      area: 'cebu-city',
+      description: 'Clean body.',
+    });
+
+    expect(inserted[0]?.photo_path).toBe('usr_1/scan_99.jpg');
+    expect(published.ok).toBe(true);
+    if (published.ok) {
+      expect(published.value.photoUrl).toBe('https://signed.test/usr_1/scan_99.jpg');
+    }
+  });
 });

@@ -26,7 +26,7 @@ import { ProfileButton } from '../profile/ProfileButton';
 import { CategoryArt } from '../trends/CategoryArt';
 import type { Trend } from '../trends/trends';
 import { useTrends } from '../trends/use-trends';
-import { useAccountGate } from '../session';
+import { useAccountGate, useSession } from '../session';
 import { Tip, useTip } from '../tips';
 import { useFeed, voteNotSaved } from './feed-state';
 import { PostCard } from './PostCard';
@@ -64,6 +64,7 @@ export function FeedView({
   const styles = useThemedStyles(stylesFor);
   const { previewPosts: feedPosts, voteFor, toggleVote, refresh, status } = useFeed();
   const { heading, trends } = useTrends();
+  const { isGuest } = useSession();
   const requireAccount = useAccountGate();
   const toast = useToast();
   const voteTip = useTip('vote');
@@ -155,13 +156,16 @@ export function FeedView({
             <PostCard
               post={post}
               vote={voteFor(post.id)}
-              onVote={(choice) =>
-                requireAccount('vote', () => {
-                  voteTip.done();
-                  void toggleVote(post.id, choice).then((result) => {
-                    if (!result.ok) toast.show(voteNotSaved);
-                  });
-                })
+              onVote={
+                isGuest || !post.isMine
+                  ? (choice) =>
+                      requireAccount('vote', () => {
+                        voteTip.done();
+                        void toggleVote(post.id, choice).then((result) => {
+                          if (!result.ok) toast.show(voteNotSaved);
+                        });
+                      })
+                  : undefined
               }
               onOpen={() => onOpenPost?.(post.id)}
               onShare={onSharePost ? () => onSharePost(post.id) : undefined}

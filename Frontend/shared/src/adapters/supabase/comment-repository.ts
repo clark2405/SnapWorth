@@ -18,12 +18,14 @@ interface ThreadRow {
   readonly created_at: string;
   readonly author_id: string;
   readonly author_handle: string;
+  readonly author_display_name?: string | null;
   readonly author_avatar_url: string | null;
   readonly is_mine: boolean;
   readonly reported_by_me: boolean;
 }
 
 function fromRow(row: ThreadRow): ThreadComment {
+  const displayName = row.author_display_name?.trim();
   return {
     id: row.id as CommentId,
     parentId: (row.parent_id as CommentId | null) ?? null,
@@ -34,6 +36,7 @@ function fromRow(row: ThreadRow): ThreadComment {
     author: {
       userId: row.author_id as UserId,
       handle: row.author_handle,
+      ...(displayName ? { displayName } : {}),
       avatarUrl: row.author_avatar_url ?? undefined,
     },
     isMine: row.is_mine,
@@ -70,18 +73,19 @@ export function createSupabaseCommentRepository(client: SupabaseClient): Comment
         .from('comments')
         .insert({ post_id: post.data.id, parent_id: replyTo ?? null, body })
         .select(
-          'id, parent_id, body, moderation_status, created_at, author_id, author:profiles!comments_author_id_fkey(handle, avatar_url)',
+          'id, parent_id, body, moderation_status, created_at, author_id, author:profiles!comments_author_id_fkey(handle, display_name, avatar_url)',
         )
         .single();
       if (error) return err(toAppError(error, 'submit_comment'));
 
       const author = (Array.isArray(data.author) ? data.author[0] : data.author) as
-        { handle: string; avatar_url: string | null } | undefined;
+        { handle: string; display_name?: string | null; avatar_url: string | null } | undefined;
       return ok(
         fromRow({
           ...data,
           parent_hidden: false,
           author_handle: author?.handle ?? 'you',
+          author_display_name: author?.display_name ?? null,
           author_avatar_url: author?.avatar_url ?? null,
           is_mine: true,
           reported_by_me: false,

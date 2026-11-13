@@ -274,6 +274,12 @@ select feed_tests.check_raises(
   '42501',
   'a seller cannot write a community verdict afterwards'
 );
+select feed_tests.check_raises(
+  $$insert into public.votes (post_id, choice)
+    values ('00000000-0000-4000-ff00-000000000002', 'just_right')$$,
+  '42501',
+  'a post author cannot vote on their own feed post'
+);
 
 -- Voter B votes 'too_high'
 set role authenticated;

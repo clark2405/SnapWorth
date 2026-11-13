@@ -78,7 +78,11 @@ export function photosOf(entry: {
 
 export interface PreviewPost {
   readonly id: string;
-  readonly author: { readonly handle: string; readonly avatar: ImageSourcePropType | null };
+  readonly author: {
+    readonly handle: string;
+    readonly displayName?: string;
+    readonly avatar: ImageSourcePropType | null;
+  };
   readonly postedAgo: string;
   readonly body: string;
   /** Null when the post has no photo: the card shows a placeholder. */
@@ -90,6 +94,8 @@ export interface PreviewPost {
   readonly comments: readonly PreviewComment[];
   /** Set when the post is a marketplace listing reposted to ask whether its price is fair. */
   readonly listing?: { readonly id: string; readonly askingPrice: number };
+  /** True when the signed-in viewer owns this post. */
+  readonly isMine?: boolean;
 }
 
 export const previewPosts: readonly PreviewPost[] = [

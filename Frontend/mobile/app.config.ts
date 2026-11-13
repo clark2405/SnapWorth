@@ -61,6 +61,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // it's off. With the paid account and a backend to send from, remove this option.
     ['expo-notifications', { enableRemoteNotifications: false }],
     'expo-status-bar',
+    ['expo-navigation-bar', { hidden: true }],
     'expo-system-ui',
     [
       'expo-camera',

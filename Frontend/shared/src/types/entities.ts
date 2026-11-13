@@ -167,6 +167,7 @@ export interface VoteSnapshot {
 export interface PublicProfile {
   readonly userId: UserId;
   readonly handle: string;
+  readonly displayName?: string;
   readonly avatarUrl?: string;
 }
 

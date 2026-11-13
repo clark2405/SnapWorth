@@ -4,9 +4,11 @@ import type { ScanPhotoStore } from '../../adapters/supabase/photo-storage';
 import {
   DEVICE_PAID_PRICES_KEY,
   deleteScan,
+  ensureScanPhoto,
   loadScans,
   newScanId,
   saveScan,
+  saveScanWithResult,
   scanToPreviewItem,
   setScanPaid,
   type KeyValueStore,
@@ -412,6 +414,37 @@ describe('scan-history', () => {
       expect((await loadScans(onDevice()))[0]!.paidPhp).toBe(75);
       expect((await loadScans(onDevice()))[0]!.paidPhp).toBe(75);
       expect(JSON.parse((await store.getItem(DEVICE_PAID_PRICES_KEY))!)).toEqual({});
+    });
+  });
+
+  describe('publishing photo sync', () => {
+    it('returns the uploaded photoPath from saveScanWithResult and retries pending uploads via ensureScanPhoto', async () => {
+      const supabase = fakeSupabase();
+      let allowUpload = false;
+      const photos: ScanPhotoStore = {
+        upload: jest.fn(async (owner, scanId) => (allowUpload ? `${owner}/${scanId}.jpg` : null)),
+        links: jest.fn(async () => ({})),
+        remove: jest.fn(async () => true),
+      };
+      const place: ScanPlace = { store, client: supabase.client, owner: 'user-123', photos };
+
+      const first = await saveScanWithResult(sampleScan, place);
+      expect(first.outcome).toBe('saved');
+      expect(first.scan.photoPending).toBe(true);
+      expect(first.scan.photoPath).toBeUndefined();
+
+      allowUpload = true;
+      const ensured = await ensureScanPhoto(sampleScan.id, place);
+      expect(ensured?.photoPending).toBe(false);
+      expect(ensured?.photoPath).toBe(`user-123/${sampleScan.id}.jpg`);
+      expect(supabase.state.rows[0]!.photo_path).toBe(`user-123/${sampleScan.id}.jpg`);
+
+      const second = await saveScanWithResult(
+        { ...sampleScan, id: '6f1c2a9e-4b7d-4c3e-9a1f-2d8e5b7c4a11' },
+        place,
+      );
+      expect(second.scan.photoPending).toBe(false);
+      expect(second.scan.photoPath).toBe('user-123/6f1c2a9e-4b7d-4c3e-9a1f-2d8e5b7c4a11.jpg');
     });
   });
 });
