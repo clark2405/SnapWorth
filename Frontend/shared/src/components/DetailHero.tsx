@@ -4,7 +4,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  useWindowDimensions,
   View,
   type ImageSourcePropType,
   type NativeScrollEvent,
@@ -12,7 +11,15 @@ import {
   type ViewProps,
 } from 'react-native';
 
-import { haptic, held, themedStyles, tokens, useThemedStyles, useWideLayout } from '../design';
+import {
+  haptic,
+  held,
+  themedStyles,
+  tokens,
+  useThemedStyles,
+  useWideLayout,
+  useWindowSize,
+} from '../design';
 import { ZoomTarget } from './NavLink';
 import { Photo } from './Photo';
 import { PhotoViewer, type ItemPhoto } from './PhotoViewer';
@@ -43,7 +50,7 @@ export function DetailHero({
   children,
 }: DetailHeroProps) {
   const styles = useThemedStyles(stylesFor);
-  const window = useWindowDimensions();
+  const window = useWindowSize();
   const wide = useWideLayout();
   // The photos page across the hero's own width: the window's on a phone, a column's on a wide
   // window, where the hero is a framed square beside the details rather than a full-bleed band.
@@ -83,31 +90,37 @@ export function DetailHero({
           : undefined
       }
     >
+      {/* One child only: iOS's zoom target renders nothing at all when given more than one (and
+          React counts an empty `null` slot as one). */}
       <ZoomTarget>
-        {all.length === 0 ? (
-          <Photo source={null} label={label || 'This item'} radius={0} style={styles.fill} />
-        ) : null}
-        <ScrollView
-          horizontal
-          pagingEnabled
-          scrollEnabled={all.length > 1}
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={onPage}
-          style={StyleSheet.absoluteFill}
-        >
-          {all.map((photo, index) => (
-            <Pressable
-              key={index}
-              accessibilityRole="imagebutton"
-              accessibilityLabel={`${photo.label}. Opens the photo full screen`}
-              accessibilityHint={all.length > 1 ? `Photo ${index + 1} of ${all.length}` : undefined}
-              onPress={() => open(index)}
-              style={{ width, height: heroHeight }}
-            >
-              <Photo source={photo.source} label={photo.label} radius={0} style={styles.fill} />
-            </Pressable>
-          ))}
-        </ScrollView>
+        <View style={StyleSheet.absoluteFill}>
+          {all.length === 0 ? (
+            <Photo source={null} label={label || 'This item'} radius={0} style={styles.fill} />
+          ) : null}
+          <ScrollView
+            horizontal
+            pagingEnabled
+            scrollEnabled={all.length > 1}
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={onPage}
+            style={StyleSheet.absoluteFill}
+          >
+            {all.map((photo, index) => (
+              <Pressable
+                key={index}
+                accessibilityRole="imagebutton"
+                accessibilityLabel={`${photo.label}. Opens the photo full screen`}
+                accessibilityHint={
+                  all.length > 1 ? `Photo ${index + 1} of ${all.length}` : undefined
+                }
+                onPress={() => open(index)}
+                style={{ width, height: heroHeight }}
+              >
+                <Photo source={photo.source} label={photo.label} radius={0} style={styles.fill} />
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
       </ZoomTarget>
       {children}
 
