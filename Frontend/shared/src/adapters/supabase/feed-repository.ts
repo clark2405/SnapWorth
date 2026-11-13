@@ -22,6 +22,7 @@ interface ListingJoin {
   readonly slug: string;
   readonly asking_php: number;
   readonly photo_path?: string | null;
+  readonly scan_id?: string | null;
 }
 
 interface FeedPostRow {
@@ -55,7 +56,7 @@ interface VoteRow {
 }
 
 const postColumns =
-  'id, slug, owner_id, title, category, body, estimate_php, scan_id, listing_id, photo_path, too_high_count, just_right_count, too_low_count, moderation_status, created_at, author:profiles!feed_posts_owner_id_fkey(id, handle, display_name, avatar_url), listing:listings!feed_posts_listing_id_fkey(id, slug, asking_php, photo_path)';
+  'id, slug, owner_id, title, category, body, estimate_php, scan_id, listing_id, photo_path, too_high_count, just_right_count, too_low_count, moderation_status, created_at, author:profiles!feed_posts_owner_id_fkey(id, handle, display_name, avatar_url), listing:listings!feed_posts_listing_id_fkey(id, slug, asking_php, photo_path, scan_id)';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -66,19 +67,23 @@ function unwrapJoin<T>(joined: T | readonly T[] | null | undefined): T | null {
 
 function effectivePhotoPath(row: FeedPostRow): string | null {
   if (row.photo_path) return row.photo_path;
+  if (row.scan_id) return `${row.owner_id}/${row.scan_id}.jpg`;
   const listing = unwrapJoin(row.listing);
-  return listing?.photo_path ?? null;
+  if (listing?.photo_path) return listing.photo_path;
+  if (listing?.scan_id) return `${row.owner_id}/${listing.scan_id}.jpg`;
+  return null;
 }
 
 function toFeedPost(
   row: FeedPostRow,
   viewerId: string | null,
   photoUrls: Readonly<Record<string, string>>,
+  fallbackPhotoUrl?: string | null,
 ): FeedPost {
   const author = unwrapJoin(row.author);
   const listing = unwrapJoin(row.listing);
   const path = effectivePhotoPath(row);
-  const resolvedPhotoUrl = path ? (photoUrls[path] ?? null) : null;
+  const resolvedPhotoUrl = (path ? photoUrls[path] : null) ?? fallbackPhotoUrl ?? null;
   const title = row.title?.trim() || row.body;
 
   return {
@@ -187,22 +192,32 @@ export function createSupabaseFeedRepository(
       if (body.length === 0) return err({ kind: 'validation', code: 'empty_body' });
       if (body.length > 280) return err({ kind: 'validation', code: 'too_long' });
 
-      const scanId = input.scanId && uuidPattern.test(input.scanId) ? input.scanId : null;
-      const photoPath = input.photoPath ?? (scanId ? `${userId}/${scanId}.jpg` : null);
-
       let listingUuid: string | null = null;
+      let listingScanId: string | null = null;
+      let listingPhotoPath: string | null = null;
       if (input.listingId) {
         if (uuidPattern.test(input.listingId)) {
           listingUuid = input.listingId;
         } else {
           const { data: listingData } = await client
             .from('listings')
-            .select('id')
+            .select('id, scan_id, photo_path')
             .eq('slug', input.listingId)
             .maybeSingle();
-          listingUuid = (listingData as { id?: string } | null)?.id ?? null;
+          const found = listingData as {
+            id?: string;
+            scan_id?: string;
+            photo_path?: string;
+          } | null;
+          listingUuid = found?.id ?? null;
+          listingScanId = found?.scan_id ?? null;
+          listingPhotoPath = found?.photo_path ?? null;
         }
       }
+
+      const scanId = input.scanId && uuidPattern.test(input.scanId) ? input.scanId : listingScanId;
+      const photoPath =
+        input.photoPath ?? listingPhotoPath ?? (scanId ? `${userId}/${scanId}.jpg` : null);
 
       const { data, error } = await client
         .from('feed_posts')
@@ -228,7 +243,7 @@ export function createSupabaseFeedRepository(
         moderation_status: screened.data?.status ?? row.moderation_status,
       };
       const photoUrls = await resolvePhotoUrls([updatedRow]);
-      return ok(toFeedPost(updatedRow, userId, photoUrls));
+      return ok(toFeedPost(updatedRow, userId, photoUrls, input.photoUrl));
     },
 
     async remove(idOrSlug) {

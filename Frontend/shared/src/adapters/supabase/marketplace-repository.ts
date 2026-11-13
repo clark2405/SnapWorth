@@ -106,6 +106,12 @@ function unwrapSeller(seller: ListingRow['seller']): ProfileJoin | null {
   return (Array.isArray(seller) ? seller[0] : seller) ?? null;
 }
 
+function listingPhotoPath(row: ListingRow): string | null {
+  if (row.photo_path) return row.photo_path;
+  if (row.scan_id) return `${row.seller_id}/${row.scan_id}.jpg`;
+  return null;
+}
+
 function toMarketListing(
   row: ListingRow,
   viewerId: string | null,
@@ -117,7 +123,8 @@ function toMarketListing(
   const handle = seller?.handle ?? 'seller';
   const displayName =
     seller?.display_name && seller.display_name.trim().length > 0 ? seller.display_name : handle;
-  const signedPhoto = row.photo_path ? signedUrls[row.photo_path] : undefined;
+  const photoPath = listingPhotoPath(row);
+  const signedPhoto = photoPath ? signedUrls[photoPath] : undefined;
 
   return {
     id: row.slug,
@@ -127,7 +134,7 @@ function toMarketListing(
     title: row.title,
     askingPrice: row.asking_php,
     photoUrl: signedPhoto ?? row.photo_url ?? null,
-    photoPath: row.photo_path,
+    photoPath: row.photo_path ?? photoPath,
     photoLabel: row.title,
     category: row.category,
     condition: row.condition,
@@ -221,7 +228,10 @@ export function createSupabaseMarketplaceRepository(
   }
 
   async function signRows(rows: readonly ListingRow[]): Promise<Readonly<Record<string, string>>> {
-    const paths = rows.flatMap((row) => (row.photo_path ? [row.photo_path] : []));
+    const paths = rows.flatMap((row) => {
+      const path = listingPhotoPath(row);
+      return path ? [path] : [];
+    });
     return paths.length > 0 ? photos.links(paths) : {};
   }
 

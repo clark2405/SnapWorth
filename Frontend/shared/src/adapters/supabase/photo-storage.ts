@@ -17,10 +17,36 @@ export type ReadPhoto = (uri: string) => Promise<ArrayBuffer>;
  * needed.
  */
 export const readPhotoBytes: ReadPhoto = async (uri) => {
-  const response = await fetch(uri);
-  // A local file answers 0 on some platforms and 200 on others.
-  if (response.status >= 400) throw new Error(`The photo couldn't be read (${response.status}).`);
-  return response.arrayBuffer();
+  try {
+    const response = await fetch(uri);
+    // A local file answers 0 on some platforms and 200 on others.
+    if (response.status < 400) {
+      return await response.arrayBuffer();
+    }
+  } catch {
+    // Fall back to XMLHttpRequest for local file:// URIs where fetch fails
+  }
+
+  if (typeof XMLHttpRequest !== 'undefined') {
+    return new Promise<ArrayBuffer>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.onload = () => {
+        if (xhr.response instanceof ArrayBuffer) {
+          resolve(xhr.response);
+        } else if (xhr.response) {
+          resolve(xhr.response as ArrayBuffer);
+        } else {
+          reject(new Error("The photo couldn't be read."));
+        }
+      };
+      xhr.onerror = () => reject(new Error("The photo couldn't be read."));
+      xhr.responseType = 'arraybuffer';
+      xhr.open('GET', uri, true);
+      xhr.send(null);
+    });
+  }
+
+  throw new Error("The photo couldn't be read.");
 };
 
 export type PhotoType = 'image/jpeg' | 'image/png' | 'image/webp';
