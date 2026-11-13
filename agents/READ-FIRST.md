@@ -192,7 +192,11 @@ on them isn't saved.
 - **With no backend only:** History's sample items before the first scan, and their sample market
   detail (demand, condition, trend and recent sales) on the item screen. With a backend History is
   empty until the first scan, and a real scan has no market detail yet.
-- **Worthy's cards:** price, trend and collection answers.
+- **Worthy's cards:** price, trend and collection answers. Real accounts see these today, so a
+  "fair price" answer quotes "14 similar sales" and a range whatever the item. Without Apple
+  Intelligence (the web, Android, older iPhones) every chat reply is canned. Worthy's panel on a
+  listing offers "Alert me if it drops" and on an item "Share a valuation card": both only show a
+  toast, setting and saving nothing. All of this is the cloud AI owner's (see "Handoff" below).
 
 ### Not done yet
 
@@ -215,21 +219,19 @@ on them isn't saved.
   (OpenStreetMap's own tiles, and its Nominatim search behind the meetup map's search box) are
   for development only. Set `EXPO_PUBLIC_MAP_TILES_URL` and `EXPO_PUBLIC_PLACE_SEARCH_URL`.
 - **Android:** not yet checked on a phone. The Snap bar may be hidden behind the tab bar.
-- **A moderation provider:** Supabase has no `MODERATION_PROVIDER` secret set, so
-  `moderate-content` holds every feed comment, feed post, hanap post and listing: only its author sees it. Set
-  `MODERATION_PROVIDER=rules` for the built-in word rules (fine while testing), or `openai` with an
-  `OPENAI_API_KEY` (OpenAI's moderation is free) before launch. Set it in the dashboard under Edge
-  Functions → Secrets, or with `npx supabase secrets set`.
-- **Checked only against local tests:** the Market and Feed work (listing moderation, server-owned
-  estimates and verdicts, near-me, trends, no sample content with a backend) has passed the SQL
-  tests, the jest suites and `expo export` for the web and Android, but hasn't run against a live
-  Supabase project or on a device. `moderate-content`'s new handler tests were run under Node
-  with a stand-in for `Deno.test`; `Backend/scripts/test-functions.sh` (Deno) and the two-device
-  chat simulation haven't been run on it.
+- **A moderation provider for launch:** the live project runs `MODERATION_PROVIDER=rules`, the
+  built-in word rules, which are fine while testing. Before launch switch to `openai` with an
+  `OPENAI_API_KEY` (OpenAI's moderation is free), in the dashboard under Edge Functions → Secrets
+  or with `npx supabase secrets set`.
 - **Seller ratings and reviews:** not built, so sellers show their number of sales only.
 - **The web's Snap:** the website has no camera. With a Supabase project its Snap page points to
   the phone app.
-- **Deployment:** EAS builds for the phones, and Vercel for the web.
+- **Deployment:** EAS builds for the phones, and Vercel for the web. For Vercel, the project's
+  root is `Frontend/web`, the build is `npm run build` (it also writes `dist/404.html`) and the
+  output is `dist`. `Frontend/web/vercel.json` rewrites the pages with a parameter in their path
+  (`/listing/polaroid-sun-600` to `listing/[id].html`); without it a shared link opens on "Not
+  Found". `web/hosting.test.ts` fails if a new `[param]` page has no rewrite. Not yet tried on
+  Vercel itself, only on a local static server with the same rules.
 
 The detailed task lists are in `agents/specs/`. Git keeps that folder local, so ask whoever has it,
 or update this list instead.
@@ -358,6 +360,17 @@ contributors (people or agents) shouldn't build these parts; leave them to the o
    windbreaker's range.
 3. **Deploying `estimate-price`** with the clues change.
 
+**What the live `estimate-price` does today** (checked 2026-11-13, signed in as test accounts):
+
+- It's deployed (version 9, 2026-10-18) with `AI_PROVIDER=gemini`, `AI_MODEL=gemini-3.6-flash` and
+  `AI_THINKING_LEVEL=medium`. Its answers are good: it named a Walkman WM-24, a North Face puffer
+  and a Quechua jacket (not the Nike its listing claimed), and declined to price a Jordan 1
+  without its tag.
+- It's often too slow. Of 17 requests, 7 hit the 60-second limit and came back `timeout`, and one
+  `provider_unavailable`; the rest took 6 to 21 seconds. A person who snaps waits a minute for an
+  error. Worth trying `AI_THINKING_LEVEL=low`, and a retry in the app.
+- The demo listings' estimates on live came from it (see `docs/test-accounts.md`).
+
 **Keep these when you change it:**
 
 - Prices only come from the cloud.
@@ -443,6 +456,15 @@ any new artwork:
   native tab draws its own backdrop. On web, one shared backdrop sits behind all the tabs
   (`BackdropHostContext`).
 - **Metro:** restart with `--clear` after adding a `.web.tsx` file, or it keeps serving the old one.
+- **The website's first render:** its pages are rendered ahead of time, with no window and nobody
+  signed in, and the browser's first pass must draw exactly the same, or React throws the page
+  away and logs error #418. Size things with `useWindowSize` from the design module, never React
+  Native's `useWindowDimensions` (lint stops it); it reports no window until the page has been
+  taken over. Anything else only a browser knows waits for `useHydrated()`. To see the full
+  message, `npx expo export -p web --dev` and serve `dist` (Expo's dev server doesn't prerender).
+- **iOS zoom transitions:** `Link.AppleZoomTarget` (wrapped as `ZoomTarget`) takes one child and
+  renders nothing at all when given more, counting an empty `null` slot as one. Wrap the contents
+  in a single `View` (see `DetailHero.tsx`).
 - **Platform files import themselves:** inside `Thing.ios.tsx`, `import … from './Thing'` resolves
   back to `Thing.ios.tsx` on iOS. Put what both versions share in a third file (see `ChipRow.tsx`
   and `checklist.ts`).
@@ -460,6 +482,16 @@ any new artwork:
   `sb_secret_…` or service-role key in the app or in `.env.local`. If one is ever shared, roll it in
   the Supabase dashboard.
 - Without Supabase configured, sign-in starts a local session on the device. The app still runs.
+
+### Test accounts on the live project
+
+The four demo sellers (@retro_curator, @mariacruz, @manila_hype, @justin_v) are real accounts you
+can sign in to, to see chats, offers and listings from the other side. Their items are real scans
+with photos (free Unsplash photos, cropped so no face shows) and the cloud AI's own estimates.
+Their emails end in `.test`, so password reset can't reach them: change a password in Supabase →
+Authentication → Users. The passwords are in `docs/test-accounts.md`, which git ignores because
+the repository is public: ask Clark for it. Before real users join, label these accounts or remove
+them so nobody takes them for real sellers.
 
 ### Making someone an admin
 
