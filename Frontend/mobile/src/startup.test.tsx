@@ -21,7 +21,7 @@ jest.mock('@snapworth/shared/components', () => ({
   openFromTag: () => mockOpenFromTag(),
 }));
 
-jest.mock('expo-router/unstable-native-tabs', () => {
+jest.mock('expo-router/native-tabs', () => {
   const { Text } = jest.requireActual<typeof ReactNative>('react-native');
   const NativeTabs = () => <Text>App tabs</Text>;
   const Trigger = () => null;

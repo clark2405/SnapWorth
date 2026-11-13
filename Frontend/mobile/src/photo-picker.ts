@@ -3,9 +3,20 @@ import * as ImagePicker from 'expo-image-picker';
 
 import type { ItemPhoto } from '@snapworth/shared/components';
 
+async function ensureJpegUri(uri: string): Promise<string> {
+  try {
+    const image = await ImageManipulator.manipulate(uri).renderAsync();
+    const saved = await image.saveAsync({ format: SaveFormat.JPEG, compress: 0.85 });
+    return saved.uri;
+  } catch {
+    return uri;
+  }
+}
+
 /**
  * Opens the photo library for one photo. Backing out picks nothing. The system picker needs no
- * library permission.
+ * library permission. Gallery picks can be PNG or WebP, so re-encoding to JPEG ensures Supabase
+ * scan-photo uploads accept them.
  */
 export async function pickPhoto(): Promise<ItemPhoto | null> {
   const result = await ImagePicker.launchImageLibraryAsync({
@@ -14,7 +25,9 @@ export async function pickPhoto(): Promise<ItemPhoto | null> {
     quality: 0.85,
   });
   const asset = result.canceled ? undefined : result.assets[0];
-  return asset ? { source: { uri: asset.uri }, label: 'Your photo' } : null;
+  if (!asset) return null;
+  const uri = await ensureJpegUri(asset.uri);
+  return { source: { uri }, label: 'Your photo' };
 }
 
 /** Profile photos are shown at most a few hundred points wide; this is plenty, and small. */

@@ -54,7 +54,6 @@ declare
   short_id text;
   scan_amount integer;
   listing_estimate integer;
-  listing_scan_id uuid;
 begin
   if new.id is null then
     new.id := gen_random_uuid();
@@ -77,21 +76,6 @@ begin
   end if;
 
   if (select auth.uid()) is not null then
-    if new.listing_id is not null then
-      select l.estimate_php, l.scan_id
-        into listing_estimate, listing_scan_id
-        from public.listings l
-       where l.id = new.listing_id
-         and l.seller_id = new.owner_id;
-      if not found then
-        raise exception 'A feed post can only repost one of your own listings.'
-          using errcode = '23514';
-      end if;
-      if new.scan_id is null and listing_scan_id is not null then
-        new.scan_id := listing_scan_id;
-      end if;
-    end if;
-
     if new.scan_id is not null then
       select s.amount_php
         into scan_amount
@@ -102,8 +86,17 @@ begin
         raise exception 'A feed post can only point at one of your own saved scans.'
           using errcode = '23514';
       end if;
-      if new.photo_path is null then
-        new.photo_path := new.owner_id::text || '/' || new.scan_id::text || '.jpg';
+    end if;
+
+    if new.listing_id is not null then
+      select l.estimate_php
+        into listing_estimate
+        from public.listings l
+       where l.id = new.listing_id
+         and l.seller_id = new.owner_id;
+      if not found then
+        raise exception 'A feed post can only repost one of your own listings.'
+          using errcode = '23514';
       end if;
     end if;
 
@@ -236,10 +229,7 @@ create policy "People see scan photos of approved feed posts"
     and exists (
       select 1
         from public.feed_posts p
-       where (
-         p.photo_path = storage.objects.name
-         or (p.scan_id is not null and storage.objects.name = p.owner_id::text || '/' || p.scan_id::text || '.jpg')
-       )
+       where p.photo_path = storage.objects.name
          and p.moderation_status = 'approved'
     )
   );

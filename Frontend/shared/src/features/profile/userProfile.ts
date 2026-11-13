@@ -434,7 +434,7 @@ export function useUserProfile() {
     if (account !== shownFor.current) {
       shownFor.current = account;
       generation.current += 1;
-      setProfile(buildFallbackProfile(user));
+      setProfile((prev) => (prev.id === account ? prev : buildFallbackProfile(user)));
     }
     void refresh();
   }, [refresh, user, status]);

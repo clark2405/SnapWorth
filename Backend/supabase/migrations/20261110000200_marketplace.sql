@@ -157,9 +157,6 @@ begin
         new.estimate_php := scan.amount_php;
         new.estimate_low_php := scan.low_php;
         new.estimate_high_php := scan.high_php;
-        if new.photo_path is null then
-          new.photo_path := new.seller_id::text || '/' || new.scan_id::text || '.jpg';
-        end if;
       else
         new.estimate_php := null;
         new.estimate_low_php := null;
@@ -352,10 +349,7 @@ create policy "People see scan photos of public listings"
     and exists (
       select 1
         from public.listings l
-       where (
-         l.photo_path = storage.objects.name
-         or (l.scan_id is not null and storage.objects.name = l.seller_id::text || '/' || l.scan_id::text || '.jpg')
-       )
+       where l.photo_path = storage.objects.name
          and l.moderation_status = 'approved'
          and l.status <> 'removed'
     )

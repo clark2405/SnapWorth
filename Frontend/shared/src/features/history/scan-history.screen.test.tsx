@@ -139,3 +139,66 @@ it('puts a scan back, and says so, when it couldn’t be deleted', async () => {
   });
   expect(result.current.scans.map((item) => item.id)).toEqual(before);
 });
+
+it('updates in-memory scans with photoPath on save and resolves ensurePhotoUploaded', async () => {
+  const store = memoryStore();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = jest.fn(async () => ({
+    status: 200,
+    arrayBuffer: async () => new Uint8Array([0xff, 0xd8, 0xff, 0xe0]).buffer,
+  })) as never;
+
+  const client = {
+    auth: {
+      getSession: () => Promise.resolve({ data: { session: { user: { id: 'ana' } } } }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => undefined } } }),
+    },
+    from: () => ({
+      select: () => ({
+        eq: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
+      }),
+      insert: () => Promise.resolve({ error: null }),
+      update: () => ({ eq: () => Promise.resolve({ error: null }) }),
+    }),
+    storage: {
+      from: () => ({
+        upload: async () => ({ error: null }),
+        createSignedUrls: async () => ({ data: [], error: null }),
+      }),
+    },
+  } as unknown as SupabaseClient;
+
+  try {
+    const wrapper = ({ children }: { readonly children: ReactNode }) => (
+      <ScanHistoryProvider client={client} store={store}>
+        {children}
+      </ScanHistoryProvider>
+    );
+    const { result } = renderHook(() => useScanHistory(), { wrapper });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    await act(async () => {
+      await result.current.save({
+        title: 'Polaroid SX-70',
+        estimate: 4200,
+        lowPhp: 3800,
+        highPhp: 4600,
+        explanation: 'Clean folding body.',
+        assumptions: [],
+        photoUri: 'file:///polaroid.jpg',
+      });
+    });
+
+    const saved = result.current.scans[0];
+    expect(saved?.photoPath).toBe(`ana/${saved?.id}.jpg`);
+    expect(saved?.photoPending).toBe(false);
+
+    let ensured: string | null = null;
+    await act(async () => {
+      ensured = await result.current.ensurePhotoUploaded(saved!.id);
+    });
+    expect(ensured).toBe(`ana/${saved?.id}.jpg`);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

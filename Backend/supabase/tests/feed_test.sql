@@ -274,6 +274,12 @@ select feed_tests.check_raises(
   '42501',
   'a seller cannot write a community verdict afterwards'
 );
+select feed_tests.check_raises(
+  $$insert into public.votes (post_id, choice)
+    values ('00000000-0000-4000-ff00-000000000002', 'just_right')$$,
+  '42501',
+  'a post author cannot vote on their own feed post'
+);
 
 -- Voter B votes 'too_high'
 set role authenticated;
@@ -450,8 +456,26 @@ select feed_tests.check_raises(
   'flood limit stops a user from publishing more than 10 feed posts in an hour'
 );
 
--- Author A deletes their posts, which makes their scan photo private again
+-- Author A deletes their posts. A listing made from a scan shows the scan's photo too
+-- (20261114000000_feed_scan_photo_reflection), so the photo stays public while A's listing of
+-- the same scan is up, and is private again once that goes as well.
 delete from public.feed_posts where owner_id = '00000000-0000-4000-fd00-00000000000a';
+
+set role anon;
+select feed_tests.sign_out();
+select feed_tests.check(
+  exists (
+    select 1
+      from storage.objects
+     where bucket_id = 'scan-photos'
+       and name = '00000000-0000-4000-fd00-00000000000a/00000000-0000-4000-fe00-000000000001.jpg'
+  ),
+  'a scan photo stays public while a listing made from the scan shows it'
+);
+
+set role authenticated;
+select feed_tests.sign_in('00000000-0000-4000-fd00-00000000000a');
+delete from public.listings where id = '00000000-0000-4000-fe00-000000000002';
 
 set role anon;
 select feed_tests.sign_out();
@@ -462,7 +486,7 @@ select feed_tests.check(
      where bucket_id = 'scan-photos'
        and name = '00000000-0000-4000-fd00-00000000000a/00000000-0000-4000-fe00-000000000001.jpg'
   ),
-  'deleting a feed post makes its scan photo private again'
+  'deleting the posts and the listing makes the scan photo private again'
 );
 
 reset role;

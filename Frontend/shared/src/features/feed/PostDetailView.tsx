@@ -267,7 +267,8 @@ function PostDiscussion({
                 numberOfLines={1}
                 style={styles.replyingLabel}
               >
-                Replying to @{replyingTo.author.handle}
+                Replying to{' '}
+                {replyingTo.author.displayName?.trim() || `@${replyingTo.author.handle}`}
               </SWText>
               <PressableScale
                 accessibilityLabel="Cancel reply"
@@ -318,7 +319,7 @@ function PostDiscussion({
                 }}
                 placeholder={
                   replyingTo
-                    ? `Reply to @${replyingTo.author.handle}`
+                    ? `Reply to ${replyingTo.author.displayName?.trim() || `@${replyingTo.author.handle}`}`
                     : 'Add your take on the price'
                 }
                 placeholderTextColor={colors.textMuted}
@@ -366,9 +367,15 @@ function PostDiscussion({
           }}
         >
           <Reveal index={0} style={styles.author}>
-            <Avatar source={post.author.avatar} name={post.author.handle} size={40} />
+            <Avatar
+              source={post.author.avatar}
+              name={post.author.displayName?.trim() || post.author.handle}
+              size={40}
+            />
             <View>
-              <SWText variant="label">@{post.author.handle}</SWText>
+              <SWText variant="label">
+                {post.author.displayName?.trim() || `@${post.author.handle}`}
+              </SWText>
               <SWText variant="caption" tone="textMuted">
                 {post.postedAgo}
               </SWText>
@@ -398,13 +405,16 @@ function PostDiscussion({
                 vote ? { ...post.votes, [vote]: Math.max(0, post.votes[vote] - 1) } : post.votes
               }
               selected={vote}
-              onVote={(choice) =>
-                requireAccount('vote', () => {
-                  voteTip.done();
-                  void toggleVote(post.id, choice).then((result) => {
-                    if (!result.ok) toast.show(voteNotSaved);
-                  });
-                })
+              onVote={
+                isGuest || !isMine
+                  ? (choice) =>
+                      requireAccount('vote', () => {
+                        voteTip.done();
+                        void toggleVote(post.id, choice).then((result) => {
+                          if (!result.ok) toast.show(voteNotSaved);
+                        });
+                      })
+                  : undefined
               }
             />
           </Reveal>

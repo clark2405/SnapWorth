@@ -91,17 +91,17 @@ describe('Feed, PostDetailView, CreatePostView, VotesView, and TrendView on real
       <SignedInMember>
         <CommentServiceProvider service={stubCommentService}>
           <FeedProvider repository={repo}>
-            <PostDetailView postId="retro-windbreaker" />
+            <PostDetailView postId="polaroid-sun-600" />
           </FeedProvider>
         </CommentServiceProvider>
       </SignedInMember>,
     );
 
-    const justRightButton = await screen.findByLabelText(/Just Right, 38 votes/i);
+    const justRightButton = await screen.findByLabelText(/Just Right, 12 votes/i);
     fireEvent.press(justRightButton);
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/Just Right, 39 votes/i)).toBeTruthy();
+      expect(screen.getByLabelText(/Just Right, 13 votes/i)).toBeTruthy();
     });
     unmount();
 
@@ -115,6 +115,61 @@ describe('Feed, PostDetailView, CreatePostView, VotesView, and TrendView on real
 
     await waitFor(() => {
       expect(screen.getByText('You said Just Right')).toBeTruthy();
+    });
+  });
+
+  it('keeps vote chips read-only on the author’s own post while still allowing comments', async () => {
+    const repo = createLocalFeedRepository({
+      seed: buildPreviewFeedPosts(),
+      seedVotes: [],
+      viewerHandle: 'retro_curator',
+    });
+    const submitComment = jest.fn(async () =>
+      ok({
+        comment: {
+          id: 'c-own-1',
+          postId: 'retro-windbreaker',
+          parentId: null,
+          parentHidden: false,
+          authorId: 'member-1',
+          authorHandle: 'retro_curator',
+          authorAvatarUrl: null,
+          body: 'Adding inner tag photo details!',
+          moderationStatus: 'approved' as const,
+          createdAt: new Date().toISOString(),
+          isMine: true,
+          reportedByMe: false,
+        },
+        moderationStatus: 'approved' as const,
+      }),
+    );
+
+    renderScreen(
+      <SignedInMember>
+        <CommentServiceProvider service={{ ...stubCommentService, submit: submitComment }}>
+          <FeedProvider repository={repo}>
+            <PostDetailView postId="retro-windbreaker" />
+          </FeedProvider>
+        </CommentServiceProvider>
+      </SignedInMember>,
+    );
+
+    const ownChip = await screen.findByLabelText(/Just Right, 38 votes/i);
+    expect(ownChip.props.accessibilityRole).toBe('text');
+    expect(ownChip.props.accessibilityState?.disabled).toBe(true);
+    fireEvent.press(ownChip);
+    expect(screen.getByLabelText(/Just Right, 38 votes/i)).toBeTruthy();
+    expect(screen.queryByLabelText(/Just Right, 39 votes/i)).toBeNull();
+
+    const commentInput = screen.getByLabelText('Write a comment');
+    fireEvent.changeText(commentInput, 'Adding inner tag photo details!');
+    fireEvent.press(screen.getByLabelText('Post comment'));
+    await waitFor(() => {
+      expect(submitComment).toHaveBeenCalledWith(
+        'retro-windbreaker',
+        'Adding inner tag photo details!',
+        undefined,
+      );
     });
   });
 

@@ -66,12 +66,13 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
   const doubleTap = useMemo(
     () =>
       Gesture.Tap()
+        .enabled(Boolean(onVote))
         .numberOfTaps(2)
         .maxDuration(280)
         .onEnd((_event, success) => {
           if (success) runOnJS(castJustRight)();
         }),
-    [castJustRight],
+    [castJustRight, onVote],
   );
 
   // Share is only offered where the shell can make a link, and the shell reports how it went.
@@ -102,9 +103,15 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
   return (
     <View style={styles.post}>
       <View style={styles.header}>
-        <Avatar source={post.author.avatar} name={post.author.handle} size={32} />
+        <Avatar
+          source={post.author.avatar}
+          name={post.author.displayName?.trim() || post.author.handle}
+          size={32}
+        />
         <View style={styles.byline}>
-          <SWText variant="labelSmall">@{post.author.handle}</SWText>
+          <SWText variant="labelSmall">
+            {post.author.displayName?.trim() || `@${post.author.handle}`}
+          </SWText>
           <SWText variant="caption" tone="textMuted">
             {post.postedAgo}
           </SWText>

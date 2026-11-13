@@ -15,10 +15,11 @@ import { previewHistory, type PreviewHistoryItem } from '../preview/sample-data'
 import { useBackendMode } from '../session/backend-mode';
 import {
   deleteScan,
+  ensureScanPhoto,
   formatCapturedDate,
   loadScans,
   newScanId,
-  saveScan,
+  saveScanWithResult,
   scanToPreviewItem,
   setScanPaid,
   withoutPrice,
@@ -39,6 +40,8 @@ export interface ScanHistory {
   readonly remove: (scanId: string) => Promise<boolean>;
   /** Notes what was paid for a scan, or forgets it with `null`. */
   readonly setPaid: (scanId: string, amount: number | null) => Promise<void>;
+  /** Waits for any in-flight upload or retries uploading the scan's photo before publishing. */
+  readonly ensurePhotoUploaded: (scanId: string) => Promise<string | null>;
   /** Loads again, as pull-to-refresh does. */
   readonly reload: () => Promise<void>;
 }
@@ -58,6 +61,7 @@ const none: ScanHistory = {
   save: () => Promise.resolve('failed'),
   remove: () => Promise.resolve(true),
   setPaid: () => Promise.resolve(),
+  ensurePhotoUploaded: () => Promise.resolve(null),
   reload: () => Promise.resolve(),
 };
 
@@ -126,6 +130,8 @@ export function ScanHistoryProvider({
     void reload();
   }, [reload]);
 
+  const pendingSaves = useRef(new Map<string, Promise<SavedScan | null>>());
+
   const save = useCallback(
     async (draft: NewScan): Promise<SaveOutcome> => {
       if (!place) return 'failed';
@@ -136,20 +142,63 @@ export function ScanHistoryProvider({
         status: 'private',
       };
       setScans((current) => [scan, ...current]);
-      const outcome = await saveScan(scan, place);
-      if (outcome === 'failed') {
-        setScans((current) => current.filter((item) => item.id !== scan.id));
-      } else {
-        const path = `${place.owner}/${scan.id}.jpg`;
-        setScans((current) =>
-          current.map((item) =>
-            item.id === scan.id
-              ? { ...item, synced: true, photoPath: path, photoPending: false }
-              : item,
-          ),
-        );
+      const task = saveScanWithResult(scan, place);
+      pendingSaves.current.set(
+        scan.id,
+        task.then(
+          (result) => (result.outcome === 'failed' ? null : result.scan),
+          () => null,
+        ),
+      );
+      try {
+        const result = await task;
+        if (result.outcome === 'failed') {
+          setScans((current) => current.filter((item) => item.id !== scan.id));
+        } else {
+          setScans((current) =>
+            current.map((item) =>
+              item.id === scan.id
+                ? {
+                    ...item,
+                    synced: result.scan.synced,
+                    photoPath: result.scan.photoPath ?? item.photoPath,
+                    photoPending: result.scan.photoPending,
+                  }
+                : item,
+            ),
+          );
+        }
+        return result.outcome;
+      } finally {
+        pendingSaves.current.delete(scan.id);
       }
-      return outcome;
+    },
+    [place],
+  );
+
+  const ensurePhotoUploaded = useCallback(
+    async (scanId: string): Promise<string | null> => {
+      const inFlight = pendingSaves.current.get(scanId);
+      if (inFlight) {
+        const settled = await inFlight;
+        if (settled?.photoPath && !settled.photoPending) return settled.photoPath;
+      }
+      if (!place) return null;
+      const updated = await ensureScanPhoto(scanId, place);
+      if (!updated) return null;
+      setScans((current) =>
+        current.map((item) =>
+          item.id === scanId
+            ? {
+                ...item,
+                synced: updated.synced,
+                photoPath: updated.photoPath ?? item.photoPath,
+                photoPending: updated.photoPending,
+              }
+            : item,
+        ),
+      );
+      return updated.photoPath ?? null;
     },
     [place],
   );
@@ -189,8 +238,8 @@ export function ScanHistoryProvider({
   );
 
   const value = useMemo<ScanHistory>(
-    () => ({ status, scans, save, remove, setPaid, reload }),
-    [reload, remove, save, scans, setPaid, status],
+    () => ({ status, scans, save, remove, setPaid, ensurePhotoUploaded, reload }),
+    [ensurePhotoUploaded, reload, remove, save, scans, setPaid, status],
   );
   return <ScanHistoryContext.Provider value={value}>{children}</ScanHistoryContext.Provider>;
 }
