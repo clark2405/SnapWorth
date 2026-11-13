@@ -5,7 +5,6 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
-  useWindowDimensions,
   View,
   type ImageSourcePropType,
   type NativeScrollEvent,
@@ -23,7 +22,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { haptic, tokens } from '../design';
+import { haptic, tokens, useWindowSize } from '../design';
 import { IconButton } from './IconButton';
 import { clampOffset, doubleTapZoom, offsetAround, pinchZoom, settledZoom } from './photo-zoom';
 import { SWText } from './SWText';
@@ -51,7 +50,7 @@ const settle = { damping: 22, stiffness: 220 };
  * look closer, drag a photo around once zoomed, and swipe down (or tap close) to put them away.
  */
 export function PhotoViewer({ photos, index = 0, visible, onClose }: PhotoViewerProps) {
-  const { width } = useWindowDimensions();
+  const { width } = useWindowSize();
   const insets = useSafeAreaInsets();
   const [current, setCurrent] = useState(index);
   const [zoomed, setZoomed] = useState(false);
@@ -148,7 +147,7 @@ function ZoomablePhoto({
   readonly onZoomChange: (zoomed: boolean) => void;
   readonly onDismiss: () => void;
 }) {
-  const { width, height } = useWindowDimensions();
+  const { width, height } = useWindowSize();
   const [zoomed, setZoomed] = useState(false);
   const scale = useSharedValue(1);
   const startScale = useSharedValue(1);

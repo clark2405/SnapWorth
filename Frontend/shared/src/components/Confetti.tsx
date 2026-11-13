@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -8,7 +8,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { tokens, useTheme, type SemanticColorName } from '../design';
+import { tokens, useTheme, type SemanticColorName, useWindowSize } from '../design';
 
 const pieceCount = 36;
 const flightMs = 1600;
@@ -42,7 +42,7 @@ interface Piece {
  */
 export function Confetti({ burst }: { readonly burst: number }) {
   const reduceMotion = useReducedMotion();
-  const { width, height } = useWindowDimensions();
+  const { width, height } = useWindowSize();
 
   const pieces = useMemo<readonly Piece[]>(
     () =>

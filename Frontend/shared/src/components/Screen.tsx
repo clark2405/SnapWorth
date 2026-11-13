@@ -17,7 +17,6 @@ import {
   RefreshControl,
   StatusBar,
   StyleSheet,
-  useWindowDimensions,
   View,
   type StyleProp,
   type ViewStyle,
@@ -48,6 +47,7 @@ import {
   useThemedStyles,
   useWideLayout,
   type Place,
+  useWindowSize,
 } from '../design';
 import { AmbientBackdrop, useBackdropClaim, type AmbientBackdropProps } from './AmbientBackdrop';
 import { BackdropHostContext, ScreenPresenceContext } from './backdrop-host';
@@ -517,7 +517,7 @@ function PinnedBackdrop({
   readonly base: SharedValue<number>;
 }) {
   const styles = useThemedStyles(stylesFor);
-  const { height } = useWindowDimensions();
+  const { height } = useWindowSize();
   const pinned = useAnimatedStyle(() => ({
     transform: [{ translateY: scrollY.value - base.value }],
   }));

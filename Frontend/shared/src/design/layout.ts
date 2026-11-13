@@ -1,11 +1,12 @@
-import { Platform, useWindowDimensions } from 'react-native';
+import { Platform } from 'react-native';
 
+import { useWindowSize } from './window-size';
 import { layoutClassFor, type LayoutClass } from './layout-class';
 
 export * from './layout-class';
 
 export function useLayoutClass(): LayoutClass {
-  const { width } = useWindowDimensions();
+  const { width } = useWindowSize();
   return layoutClassFor(width, Platform.OS);
 }
 

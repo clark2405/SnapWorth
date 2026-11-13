@@ -1,6 +1,6 @@
 import { ChevronLeft, type LucideIcon } from 'lucide-react-native';
 import { useMemo, type ReactNode } from 'react';
-import { useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
+import { View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -27,6 +27,7 @@ import {
   useThemedStyles,
   useWideLayout,
   type PlaceColors,
+  useWindowSize,
 } from '../design';
 import { Wordmark } from './Brand';
 import { IconButton } from './IconButton';
@@ -209,7 +210,7 @@ function PlaceBlock({
   readonly reachUp?: boolean;
 }) {
   const styles = useThemedStyles(stylesFor);
-  const { width } = useWindowDimensions();
+  const { width } = useWindowSize();
   // On a phone the content's gutter is all there is to cover; on a wide window the content is
   // a column in the middle, so the band runs on past it to both edges, as a page's header would.
   const bleed = useWideLayout() ? width : tokens.layout.pageGutterCompact;
@@ -239,7 +240,7 @@ export function ScallopEdge({
   readonly span?: number;
 }) {
   const styles = useThemedStyles(stylesFor);
-  const window = useWindowDimensions();
+  const window = useWindowSize();
   const width = span ?? window.width;
   const count = Math.ceil(width / scallop) + 1;
   return (

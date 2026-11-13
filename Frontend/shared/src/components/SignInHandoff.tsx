@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   interpolate,
@@ -16,7 +16,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
-import { themedStyles, tokens, useTheme, useThemedStyles } from '../design';
+import { themedStyles, tokens, useTheme, useThemedStyles, useWindowSize } from '../design';
 import {
   endHandoff,
   markClosed,
@@ -75,7 +75,7 @@ export function SignInHandoff() {
 function Handoff({ state }: { readonly state: HandoffState }) {
   const styles = useThemedStyles(stylesFor);
   const { colors } = useTheme();
-  const { width, height } = useWindowDimensions();
+  const { width, height } = useWindowSize();
   const frame = useMemo(() => tagFrameFor(width, height), [width, height]);
   const screen = useMemo(() => screenPoints(width, height), [width, height]);
   const tag = useMemo(() => tagPoints(frame), [frame]);

@@ -1,13 +1,6 @@
 import { useIsFocused } from 'expo-router';
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import {
-  Dimensions,
-  Image,
-  StyleSheet,
-  View,
-  useWindowDimensions,
-  type ViewStyle,
-} from 'react-native';
+import { Dimensions, Image, StyleSheet, View, type ViewStyle } from 'react-native';
 import Animated, {
   Easing,
   cancelAnimation,
@@ -25,7 +18,7 @@ import Animated, {
 
 import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
 
-import { placeColors, tokens, useTheme } from '../design';
+import { placeColors, tokens, useTheme, useWindowSize } from '../design';
 import blobImage from './backdrop/blob.png';
 import {
   PrintLayer,
@@ -305,7 +298,7 @@ export function AmbientBackdrop({ mood = 'calm', print = 'edges' }: AmbientBackd
 
 function Backdrop({ mood, print }: { readonly mood: AmbientArea; readonly print: PrintCoverage }) {
   const { colors, name } = useTheme();
-  const { width, height } = useWindowDimensions();
+  const { width, height } = useWindowSize();
   const reduceMotion = useReducedMotion();
   paperOf = (area) => paperFor(colors, area);
   const focused = useIsFocused();

@@ -7,3 +7,4 @@ export { snapWorthNativeWindPreset } from './nativewind-preset';
 export * from './theme';
 export * from './theme-context';
 export * from './tokens';
+export * from './window-size';
