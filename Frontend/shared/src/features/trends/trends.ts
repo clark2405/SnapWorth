@@ -9,6 +9,12 @@ export interface Trend {
   /** How the typical asking price moved this month, e.g. "+9%". Null when it can't be told. */
   readonly change: string | null;
   readonly photo: ImageSourcePropType | null;
+  /**
+   * The category a trend is, when it's a whole one (every real trend): it's drawn with the
+   * category's own artwork (`CategoryArt`) rather than one listing's photo. Null for the on-device
+   * sample's themes, which keep their photos.
+   */
+  readonly category: MarketCategory | null;
   /** What tapping the tile searches for in Search. */
   readonly query: string;
 }
@@ -133,6 +139,7 @@ export function buildTrends(
             earlier.map((listing) => listing.askingPrice),
           ),
           photo: newest.map(photoOf).find((photo) => photo !== null) ?? null,
+          category,
           query: label,
         },
         detail: {

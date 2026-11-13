@@ -65,6 +65,7 @@ export function useTrends(): Trends {
         label: entry.label,
         change: entry.change,
         photo: entry.photo,
+        category: null,
         query: sampleQuery[entry.key] ?? entry.label,
       })),
       detailFor: (key) => {

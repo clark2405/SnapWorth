@@ -74,6 +74,11 @@ describe('buildTrends', () => {
     expect(trends.map((entry) => entry.trend.key)).toEqual(['fashion', 'sneakers']);
   });
 
+  it('names the category, so the tile is drawn with its artwork rather than a listing photo', () => {
+    const [shoes] = buildTrends([at(1000, 2, 'sneakers')], noPhoto, now);
+    expect(shoes?.trend.category).toBe('sneakers');
+  });
+
   it('reports what listings are asking: the middle and the middle half', () => {
     const [fashion] = buildTrends(
       [at(1000, 1), at(2000, 2), at(3000, 3), at(4000, 4)],
