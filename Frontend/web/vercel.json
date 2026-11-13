@@ -1,0 +1,43 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/ask/:id",
+      "destination": "/ask/[id].html"
+    },
+    {
+      "source": "/chat/:id",
+      "destination": "/chat/[id].html"
+    },
+    {
+      "source": "/collection/:id",
+      "destination": "/collection/[id].html"
+    },
+    {
+      "source": "/item/:id",
+      "destination": "/item/[id].html"
+    },
+    {
+      "source": "/list/:id",
+      "destination": "/list/[id].html"
+    },
+    {
+      "source": "/listing/:id",
+      "destination": "/listing/[id].html"
+    },
+    {
+      "source": "/post/:id",
+      "destination": "/post/[id].html"
+    },
+    {
+      "source": "/seller/:handle",
+      "destination": "/seller/[handle].html"
+    },
+    {
+      "source": "/trend/:key",
+      "destination": "/trend/[key].html"
+    }
+  ]
+}

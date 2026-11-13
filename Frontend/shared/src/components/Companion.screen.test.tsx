@@ -126,3 +126,27 @@ it('asks the host before opening, and opens only when told to', () => {
   });
   expect(screen.getByPlaceholderText('Ask Worthy anything…')).toBeTruthy();
 });
+
+it('pours the panel back into Worthy before it leaves the screen', async () => {
+  renderScreen(<Companion actions={[]} greeting="Hello" onAsk={jest.fn()} />);
+  const orb = screen.getByRole('button', { name: 'Worthy, your pricing companion' });
+  fireEvent(orb, 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
+  // Laid out, as on a phone: the panel opens once it knows where it is.
+  fireEvent(screen.getByTestId('companion-panel'), 'layout', {
+    nativeEvent: { layout: { x: 16, y: 200, width: 360, height: 420 } },
+  });
+  await act(async () => {
+    jest.advanceTimersByTime(1000);
+  });
+  fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+  // Still there while it closes, so the close can be seen.
+  expect(screen.getByPlaceholderText('Ask Worthy anything…')).toBeTruthy();
+  // The picture is asked for first; then the close plays out.
+  await act(async () => {
+    await Promise.resolve();
+  });
+  await act(async () => {
+    jest.advanceTimersByTime(1000);
+  });
+  expect(screen.queryByPlaceholderText('Ask Worthy anything…')).toBeNull();
+});

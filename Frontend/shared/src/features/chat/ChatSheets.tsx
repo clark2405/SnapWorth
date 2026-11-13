@@ -1,6 +1,6 @@
 import { Ban, Eye, Flag, HandCoins, HeartHandshake, MapPin } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { View } from 'react-native';
 
 import {
   Button,
@@ -13,7 +13,7 @@ import {
   Tag,
   TextField,
 } from '../../components';
-import { themedStyles, tokens, useThemedStyles } from '../../design';
+import { themedStyles, tokens, useThemedStyles, useWindowSize } from '../../design';
 import {
   formatPeso,
   previewMeetupDays,
@@ -243,7 +243,7 @@ export function MeetupSheet({
   readonly onSend: (proposal: MeetupProposal) => void;
 }) {
   const styles = useThemedStyles(stylesFor);
-  const { height: screenHeight } = useWindowDimensions();
+  const { height: screenHeight } = useWindowSize();
   const [purpose, setPurpose] = useState<MeetupPurpose>(initialPurpose);
   const [camera, setCamera] = useState<Camera>(overview);
   const [spotKey, setSpotKey] = useState<string | null>(null);

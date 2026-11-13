@@ -1,5 +1,5 @@
 import { ChevronRight, Flame } from 'lucide-react-native';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import {
@@ -21,11 +21,20 @@ import {
   SWText,
   ZoomTarget,
 } from '../../components';
-import { held, themedStyles, tokens, useTheme, useThemedStyles, useWideLayout } from '../../design';
+import {
+  held,
+  themedStyles,
+  tokens,
+  useTheme,
+  useThemedStyles,
+  useWideLayout,
+  useWindowSize,
+} from '../../design';
 import { toPreviewPost } from '../feed/feed-state';
 import { ListingCard } from '../marketplace/ListingCard';
 import { toPreviewListing } from '../marketplace/marketplace-state';
 import { formatPeso } from '../preview/sample-data';
+import { CategoryArt } from './CategoryArt';
 import { useTrends } from './use-trends';
 
 export interface TrendViewProps {
@@ -53,7 +62,7 @@ export function TrendView({
 }: TrendViewProps) {
   const styles = useThemedStyles(stylesFor);
   const { colors } = useTheme();
-  const { height } = useWindowDimensions();
+  const { height } = useWindowSize();
   const { trends, detailFor, listingsFor, postsFor } = useTrends();
   // Every hook runs before the not-found return below: the trends arrive after the first render,
   // and a hook that only runs once they are here changes the hook order and crashes the screen.
@@ -113,12 +122,23 @@ export function TrendView({
       {wide ? null : (
         <View style={[styles.hero, { height: heroHeight }]}>
           <ZoomTarget>
-            <Photo
-              source={trend.photo}
-              label={trend.label}
-              radius={0}
-              style={StyleSheet.absoluteFill}
-            />
+            {trend.category ? (
+              <View
+                accessible
+                accessibilityRole="image"
+                accessibilityLabel={trend.label}
+                style={StyleSheet.absoluteFill}
+              >
+                <CategoryArt category={trend.category} width="100%" height="100%" />
+              </View>
+            ) : (
+              <Photo
+                source={trend.photo}
+                label={trend.label}
+                radius={0}
+                style={StyleSheet.absoluteFill}
+              />
+            )}
           </ZoomTarget>
           {/* The photo melts into the page so the title can sit across both. A web SVG needs its
               size spelled out, or it takes the browser's default 300 × 150 box. */}
@@ -136,7 +156,19 @@ export function TrendView({
       )}
 
       <DetailLayout
-        hero={wide ? <DetailHero source={trend.photo ?? undefined} label={trend.label} /> : null}
+        hero={
+          wide ? (
+            trend.category ? (
+              <DetailHero label={trend.label}>
+                <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                  <CategoryArt category={trend.category} width="100%" height="100%" />
+                </View>
+              </DetailHero>
+            ) : (
+              <DetailHero source={trend.photo ?? undefined} label={trend.label} />
+            )
+          ) : null
+        }
       >
         {/* The photo fades into the page colour, and the body carries that same colour all the way
           down, so there is no step between the hero and the content. */}
@@ -158,9 +190,12 @@ export function TrendView({
                 {formatPeso(detail.typicalPrice)}
               </SWText>
               <SWText variant="bodySmall" color={colors.onMarigold}>
-                {detail.soldThisMonth === null
-                  ? `Most are asking between ${formatPeso(detail.low)} and ${formatPeso(detail.high)}`
-                  : `Most sell between ${formatPeso(detail.low)} and ${formatPeso(detail.high)}`}
+                {detail.low === detail.high
+                  ? // One price (often one listing) is no range.
+                    `${detail.soldThisMonth === null ? 'Asking' : 'Selling for'} ${formatPeso(detail.low)}`
+                  : detail.soldThisMonth === null
+                    ? `Most are asking between ${formatPeso(detail.low)} and ${formatPeso(detail.high)}`
+                    : `Most sell between ${formatPeso(detail.low)} and ${formatPeso(detail.high)}`}
               </SWText>
               {detail.series.length > 0 ? (
                 <Sparkline values={detail.series} height={72} color={colors.onMarigold} />

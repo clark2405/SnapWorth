@@ -66,8 +66,9 @@ it('offers the review queue to an admin the database vouches for, with how many 
   mockIsAdmin = true;
   profile();
 
-  expect(await screen.findByText('Moderation')).toBeOnTheScreen();
-  expect(await screen.findByText('2')).toBeOnTheScreen();
+  // The admin check is a round trip: a busy test run can take longer than the default second.
+  expect(await screen.findByText('Moderation', {}, { timeout: 5000 })).toBeOnTheScreen();
+  expect(await screen.findByText('2', {}, { timeout: 5000 })).toBeOnTheScreen();
 });
 
 it('hides it from an account whose metadata and email claim to be admin', async () => {

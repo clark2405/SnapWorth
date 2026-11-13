@@ -1,6 +1,6 @@
 import { useIsFocused } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   cancelAnimation,
@@ -20,6 +20,7 @@ import {
   useThemedStyles,
   useWideLayout,
   type Place,
+  useWindowSize,
 } from '../design';
 import { ScreenPresenceContext } from './backdrop-host';
 
@@ -70,7 +71,7 @@ function Skeleton({ kind, place }: ScreenSkeletonProps) {
   const styles = useThemedStyles(stylesFor);
   const { colors } = useTheme();
   const wide = useWideLayout();
-  const { width } = useWindowDimensions();
+  const { width } = useWindowSize();
   const reduceMotion = useReducedMotion();
   const shown = useSharedValue(0);
 

@@ -185,8 +185,9 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
                 @{profile.handle}
               </SWText>
               {profile.email ? (
+                // A no-break space keeps the dot with the address when the row wraps.
                 <SWText variant="bodySmall" tone="textSecondary">
-                  · {profile.email}
+                  {`·\u00a0${profile.email}`}
                 </SWText>
               ) : null}
               {profile.rating === null ? null : (

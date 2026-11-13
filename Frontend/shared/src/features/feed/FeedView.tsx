@@ -23,6 +23,7 @@ import {
 import { held, themedStyles, tokens, useThemedStyles, useWideLayout } from '../../design';
 import { GuessEntry } from '../guess/GuessEntry';
 import { ProfileButton } from '../profile/ProfileButton';
+import { CategoryArt } from '../trends/CategoryArt';
 import type { Trend } from '../trends/trends';
 import { useTrends } from '../trends/use-trends';
 import { useAccountGate } from '../session';
@@ -201,12 +202,25 @@ function TrendingTile({
     >
       <View style={styles.tileFrame}>
         <ZoomSource>
-          <Photo
-            source={trend.photo}
-            label={trend.label}
-            radius={tokens.radius.large - 2}
-            style={{ width: size, height: size }}
-          />
+          {/* A whole category is drawn as one; a sample theme shows its photo. */}
+          {trend.category ? (
+            <View
+              accessible
+              accessibilityRole="image"
+              accessibilityLabel={trend.label}
+              // The zoom source passes its child's style on as one object: an array is refused.
+              style={StyleSheet.flatten([styles.tileArt, { width: size, height: size }])}
+            >
+              <CategoryArt category={trend.category} width={size} />
+            </View>
+          ) : (
+            <Photo
+              source={trend.photo}
+              label={trend.label}
+              radius={tokens.radius.large - 2}
+              style={{ width: size, height: size }}
+            />
+          )}
         </ZoomSource>
         {/* The month's move, slapped on like a market sticker. */}
         {trend.change === null ? null : (
@@ -233,6 +247,10 @@ const stylesFor = themedStyles((colors) => ({
   trending: {
     gap: tokens.spacing[4],
     marginBottom: tokens.spacing[10],
+  },
+  tileArt: {
+    borderRadius: tokens.radius.large - 2,
+    overflow: 'hidden',
   },
   trendingBleed: {
     marginHorizontal: -tokens.layout.pageGutterCompact,
