@@ -151,6 +151,22 @@ export default tseslint.config(
     },
   },
   {
+    // The website's pages are rendered ahead of time, with no window. Sizing from React Native's
+    // hook makes a browser's first pass differ from the page, and React throws the page away.
+    files: ['web/**/*.{ts,tsx}', 'shared/src/**/*.{ts,tsx}'],
+    ignores: ['shared/src/design/window-size.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "ImportSpecifier[imported.name='useWindowDimensions']",
+          message:
+            'Use useWindowSize from the design module: it matches the prerendered web page on the first pass.',
+        },
+      ],
+    },
+  },
+  {
     files: ['**/*.test.{ts,tsx}', '**/*.property.test.{ts,tsx}', 'test/**/*.cjs'],
     languageOptions: {
       globals: globals.jest,
