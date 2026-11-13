@@ -150,7 +150,8 @@ export function EditProfileView({ onBack, onSaved, onPickPhoto }: EditProfileVie
           style={styles.photoBlock}
         >
           <View style={styles.photoButton}>
-            <Avatar source={avatar} name={handle} size={96} ring />
+            {/* The initial stands in for a photo, as on the profile: their name's, not the handle's. */}
+            <Avatar source={avatar} name={name.trim() || handle} size={96} ring />
             <View style={styles.camera}>
               <Camera size={15} strokeWidth={2.2} color={colors.onAccent} />
             </View>
