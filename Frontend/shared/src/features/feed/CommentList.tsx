@@ -147,6 +147,7 @@ function CommentRow({
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const { author } = comment;
+  const authorLabel = author.displayName?.trim() || `@${author.handle}`;
   // Only approved comments can be answered: anything else is invisible to everyone else.
   const canReply = comment.moderationStatus === 'approved';
 
@@ -154,13 +155,14 @@ function CommentRow({
     <View style={styles.row}>
       <AuthorAvatar
         handle={author.handle}
+        displayName={author.displayName}
         avatarUrl={author.avatarUrl}
         size={compact ? replyAvatar : commentAvatar}
       />
       <View style={styles.body}>
         <View style={styles.header}>
           <SWText variant="labelSmall" numberOfLines={1} style={styles.handle}>
-            @{author.handle}
+            {authorLabel}
           </SWText>
           <SWText variant="caption" tone="textMuted">
             {relativeTime(comment.createdAt)}
@@ -179,7 +181,7 @@ function CommentRow({
         <View style={styles.actions}>
           {canReply ? (
             <PressableScale
-              accessibilityLabel={`Reply to @${author.handle}`}
+              accessibilityLabel={`Reply to ${authorLabel}`}
               haptic="select"
               hitSlop={tokens.spacing[2]}
               onPress={() => onReply(comment)}
@@ -210,7 +212,7 @@ function CommentRow({
           ) : (
             <IconButton
               icon={Flag}
-              label={`Report comment by ${author.handle}`}
+              label={`Report comment by ${author.displayName?.trim() || author.handle}`}
               tone="textMuted"
               size={16}
               onPress={() => onReport(comment)}
@@ -225,22 +227,25 @@ function CommentRow({
 /** The author's photo; demo accounts use their bundled photo, anyone else their initial. */
 export function AuthorAvatar({
   handle,
+  displayName,
   avatarUrl,
   size,
 }: {
   readonly handle: string;
+  readonly displayName?: string;
   readonly avatarUrl?: string;
   readonly size: number;
 }) {
   const styles = useThemedStyles(stylesFor);
   const device = useBackendMode() === 'device';
+  const label = displayName?.trim() || handle;
   // Their own photo, else (only with no Supabase project) the sample person's, else their initial.
   const source = avatarUrl
     ? { uri: avatarUrl }
     : device
       ? previewAvatarByHandle[handle]
       : undefined;
-  if (source) return <Avatar source={source} name={handle} size={size} />;
+  if (source) return <Avatar source={source} name={label} size={size} />;
   return (
     <View
       accessibilityElementsHidden
@@ -248,7 +253,7 @@ export function AuthorAvatar({
       style={[styles.initial, { width: size, height: size, borderRadius: size / 2 }]}
     >
       <SWText variant="labelSmall" tone="textSecondary">
-        {handle.charAt(0).toUpperCase()}
+        {label.charAt(0).toUpperCase()}
       </SWText>
     </View>
   );

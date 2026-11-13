@@ -186,23 +186,80 @@ async function updateLocal(place: ScanPlace, scanId: string, change: Partial<Sav
   );
 }
 
+export interface SaveScanResult {
+  readonly outcome: SaveOutcome;
+  readonly scan: SavedScan;
+}
+
+/**
+ * Saves a scan on the phone, then in Supabase when there's a backend, and uploads its photo
+ * there so every device can show it. Returns both the outcome and the latest scan state
+ * (including `photoPath` once uploaded) so callers keep in-memory state in sync.
+ */
+export async function saveScanWithResult(
+  scan: SavedScan,
+  place: ScanPlace,
+): Promise<SaveScanResult> {
+  const existing = await readLocal(place);
+  let latest: SavedScan = place.client
+    ? { ...scan, synced: false, photoPending: true }
+    : { ...scan, synced: false };
+  const savedHere = await writeLocal(place, [
+    latest,
+    ...existing.filter((item) => item.id !== scan.id),
+  ]);
+  if (!place.client) return { outcome: savedHere ? 'saved' : 'failed', scan: latest };
+
+  if (!(await insertRemote(place.client, scan))) {
+    return { outcome: savedHere ? 'pending' : 'failed', scan: latest };
+  }
+  latest = { ...latest, synced: true };
+  await updateLocal(place, scan.id, { synced: true });
+  const path = await sendPhoto(place, scan);
+  if (path) {
+    latest = { ...latest, photoPath: path, photoPending: false };
+    await updateLocal(place, scan.id, { photoPath: path, photoPending: false });
+  }
+  return { outcome: 'saved', scan: latest };
+}
+
 /**
  * Saves a scan on the phone, then in Supabase when there's a backend, and uploads its photo
  * there so every device can show it. A photo that can't go yet doesn't hold the scan back.
  */
 export async function saveScan(scan: SavedScan, place: ScanPlace): Promise<SaveOutcome> {
-  const existing = await readLocal(place);
-  const savedHere = await writeLocal(place, [
-    place.client ? { ...scan, synced: false, photoPending: true } : { ...scan, synced: false },
-    ...existing.filter((item) => item.id !== scan.id),
-  ]);
-  if (!place.client) return savedHere ? 'saved' : 'failed';
+  const { outcome } = await saveScanWithResult(scan, place);
+  return outcome;
+}
 
-  if (!(await insertRemote(place.client, scan))) return savedHere ? 'pending' : 'failed';
-  await updateLocal(place, scan.id, { synced: true });
-  const path = await sendPhoto(place, scan);
-  if (path) await updateLocal(place, scan.id, { photoPath: path, photoPending: false });
-  return 'saved';
+/**
+ * Ensures a saved scan's photo is uploaded to Supabase Storage before creating a public listing or
+ * feed post from it. Retries syncing the scan row and uploading its photo if still pending.
+ */
+export async function ensureScanPhoto(scanId: string, place: ScanPlace): Promise<SavedScan | null> {
+  if (!place.client) return null;
+  const local = await readLocal(place);
+  const current = local.find((item) => item.id === scanId);
+  if (!current) return null;
+  if (current.photoPath && !current.photoPending) return current;
+
+  let synced = Boolean(current.synced);
+  if (!synced) {
+    synced = await insertRemote(place.client, current);
+    if (!synced) return null;
+    await updateLocal(place, scanId, { synced: true });
+  }
+
+  const path = await sendPhoto(place, current);
+  if (!path) return { ...current, synced };
+  const updated: SavedScan = {
+    ...current,
+    synced,
+    photoPath: path,
+    photoPending: false,
+  };
+  await updateLocal(place, scanId, { photoPath: path, photoPending: false });
+  return updated;
 }
 
 interface ScanRow {

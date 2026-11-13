@@ -60,7 +60,7 @@ describe('FeedProvider voting', () => {
     const { result } = mountFeed(repository);
     await waitFor(() => expect(result.current.posts.length).toBeGreaterThan(0));
 
-    const post = result.current.posts[0]!;
+    const post = result.current.posts.find((entry) => !entry.isMine)!;
     const before = post.votes;
     let outcome: Awaited<ReturnType<typeof result.current.toggleVote>> | undefined;
     await act(async () => {
@@ -103,13 +103,30 @@ describe('FeedProvider voting', () => {
   it('keeps a vote that goes through', async () => {
     const { result } = mountFeed(localRepository());
     await waitFor(() => expect(result.current.posts.length).toBeGreaterThan(0));
-    const post = result.current.posts[0]!;
+    const post = result.current.posts.find((entry) => !entry.isMine)!;
     let outcome: Awaited<ReturnType<typeof result.current.toggleVote>> | undefined;
     await act(async () => {
       outcome = await result.current.toggleVote(post.id, 'just_right');
     });
     expect(outcome).toEqual({ ok: true, value: 'just_right' });
     expect(result.current.findPost(post.id)?.votes.just_right).toBe(post.votes.just_right + 1);
+  });
+
+  it('refuses voting on the signed-in user’s own post', async () => {
+    const { result } = mountFeed(localRepository());
+    await waitFor(() => expect(result.current.posts.length).toBeGreaterThan(0));
+    const mine = result.current.posts.find((entry) => entry.isMine)!;
+    const before = mine.votes;
+    let outcome: Awaited<ReturnType<typeof result.current.toggleVote>> | undefined;
+    await act(async () => {
+      outcome = await result.current.toggleVote(mine.id, 'just_right');
+    });
+    expect(outcome).toEqual({
+      ok: false,
+      error: { kind: 'authorization', code: 'not_found_or_denied' },
+    });
+    expect(result.current.findPost(mine.id)?.votes).toEqual(before);
+    expect(result.current.voteFor(mine.id)).toBeNull();
   });
 });
 

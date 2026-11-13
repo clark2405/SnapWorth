@@ -74,6 +74,7 @@ export function toPreviewPost(post: FeedPost): PreviewPost {
     id: post.slug || post.id,
     author: {
       handle: post.author.handle,
+      ...(post.author.displayName ? { displayName: post.author.displayName } : {}),
       avatar: feedAuthorAvatarSource(post.author, post),
     },
     postedAgo: sample?.postedAgo ?? formatRelativeAgo(post.createdAt),
@@ -89,6 +90,7 @@ export function toPreviewPost(post: FeedPost): PreviewPost {
           askingPrice: post.listing.askingPrice,
         }
       : undefined,
+    isMine: post.isMine,
   };
 }
 
@@ -295,6 +297,9 @@ export function FeedProvider({ repository, account, children }: FeedProviderProp
       choice: VoteChoice,
     ): Promise<Result<VoteChoice | null, AppError>> => {
       const target = findPost(postIdOrSlug);
+      if (target?.isMine) {
+        return err({ kind: 'authorization', code: 'not_found_or_denied' });
+      }
       const currentChoice = voteFor(postIdOrSlug);
       const nextChoice: VoteChoice | null = currentChoice === choice ? null : choice;
       const previousRecord = userVotes.find(
@@ -501,6 +506,9 @@ export function useFeed(): FeedContextValue {
       voteFor,
       toggleVote: async (postIdOrSlug: string, choice: VoteChoice) => {
         const target = findPost(postIdOrSlug);
+        if (!isGuest && target?.isMine) {
+          return err({ kind: 'authorization', code: 'not_found_or_denied' });
+        }
         const currentChoice = voteFor(postIdOrSlug);
         const nextChoice: VoteChoice | null = currentChoice === choice ? null : choice;
         if (target) {

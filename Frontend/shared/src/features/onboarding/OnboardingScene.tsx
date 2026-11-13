@@ -1024,11 +1024,12 @@ function Person({
 }) {
   const styles = useThemedStyles(stylesFor);
   const hop = useSharedValue(0);
-  const { step } = person;
+  // Extract primitives before `useAnimatedStyle` so the worklet closure does not capture `person.art` (a React element / FiberNode).
+  const { step, x, y, h, art, vote } = person;
   // The pick's tally counts up once, on the first arrival at the votes.
   const countRun = useRef(0);
   if (arrived.step === 2 && arrived.first) countRun.current = arrived.run;
-  const lift = person.vote?.pick ? 14 : 6;
+  const lift = vote?.pick ? 14 : 6;
 
   useEffect(() => {
     if (arrived.step !== step || !arrived.first || reduceMotion) return;
@@ -1046,8 +1047,8 @@ function Person({
     return {
       opacity: near > 0 ? 1 : 0,
       transform: [
-        { translateX: person.x + (step - p.value) * stage.width * 0.35 },
-        { translateY: person.y + (1 - up) * (person.h + 20) },
+        { translateX: x + (step - p.value) * stage.width * 0.35 },
+        { translateY: y + (1 - up) * (h + 20) },
       ],
     };
   });
@@ -1055,12 +1056,11 @@ function Person({
     transform: [{ translateY: -Math.sin(hop.value * Math.PI) * lift }],
   }));
 
-  const vote = person.vote;
   const [sx, sy] = vote ? voterSignAt[vote.raise] : [0, 0];
   return (
     <Animated.View style={[styles.person, place]}>
       <Animated.View style={bob}>
-        {person.art}
+        {art}
         {vote ? (
           <View style={[styles.signSpot, { left: sx - 70, top: sy - 70 }]}>
             <View
@@ -1295,30 +1295,30 @@ function Doodle({
   readonly intro: SharedValue<number>;
 }) {
   const styles = useThemedStyles(stylesFor);
+  // Extract primitives before `useAnimatedStyle` so the worklet closure does not capture `mark.node` (a React element / FiberNode).
+  const { step, x, y, w, h, rot, depth, back, node } = mark;
   const style = useAnimatedStyle(() => {
-    const d = p.value - mark.step;
+    const d = p.value - step;
     const near = clamp(1 - Math.abs(d) * 1.6);
     const bob = Math.sin(clock.value * 1.3 + phase) * 3;
-    const wob = mark.back ? 0 : Math.sin(clock.value * 0.9 + phase) * 4;
+    const wob = back ? 0 : Math.sin(clock.value * 0.9 + phase) * 4;
     const start = 0.05 * (slot - 1);
-    const t = mark.back ? 1 : seg(pop.value, start, start + 0.45);
+    const t = back ? 1 : seg(pop.value, start, start + 0.45);
     // The first page's blob grows in as the cover lifts; later ones grow with the swipe.
-    const enter = mark.step === 0 ? easeOut(seg(intro.value, 0, 0.6)) : 1;
-    const grow = mark.back ? (0.85 + 0.15 * near) * (0.6 + 0.4 * enter) : popOut(t);
+    const enter = step === 0 ? easeOut(seg(intro.value, 0, 0.6)) : 1;
+    const grow = back ? (0.85 + 0.15 * near) * (0.6 + 0.4 * enter) : popOut(t);
     return {
-      opacity: near * (mark.back ? enter : 1),
+      opacity: near * (back ? enter : 1),
       transform: [
-        { translateX: mark.x - mark.w / 2 - d * stage.width * mark.depth },
-        { translateY: mark.y - mark.h / 2 + (mark.back ? bob * 0.4 : bob) },
-        { rotate: `${mark.rot + wob - (1 - t) * 40}deg` },
+        { translateX: x - w / 2 - d * stage.width * depth },
+        { translateY: y - h / 2 + (back ? bob * 0.4 : bob) },
+        { rotate: `${rot + wob - (1 - t) * 40}deg` },
         { scale: grow },
       ],
     };
   });
   return (
-    <Animated.View style={[styles.doodle, { width: mark.w, height: mark.h }, style]}>
-      {mark.node}
-    </Animated.View>
+    <Animated.View style={[styles.doodle, { width: w, height: h }, style]}>{node}</Animated.View>
   );
 }
 

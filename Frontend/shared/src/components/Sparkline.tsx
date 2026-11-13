@@ -30,6 +30,8 @@ export function Sparkline({ values, height = 56, filled = true, color }: Sparkli
   const reduceMotion = useReducedMotion();
   const [width, setWidth] = useState(0);
   const draw = useSharedValue(reduceMotion ? 1 : 0);
+  const pathLength = useSharedValue(0);
+  const focusTick = useSharedValue(0);
   const focused = useIsFocused();
 
   const { line, area, length } = useMemo(() => {
@@ -60,18 +62,29 @@ export function Sparkline({ values, height = 56, filled = true, color }: Sparkli
   }, [height, values, width]);
 
   useEffect(() => {
+    pathLength.value = length;
+  }, [length, pathLength]);
+
+  useEffect(() => {
+    if (focused) focusTick.value += 1;
+  }, [focusTick, focused]);
+
+  useEffect(() => {
     if (reduceMotion || length === 0) return;
     draw.value = 0;
     draw.value = withTiming(1, { duration: 1100, easing: Easing.bezier(0.16, 1, 0.3, 1) });
   }, [draw, length, reduceMotion]);
 
-  // Re-applied whenever the screen comes back into view: a line drawn while its screen was out
-  // of sight can miss the native view.
-  const lineProps = useAnimatedProps(
-    () => ({ strokeDashoffset: length * (1 - draw.value) }),
-    [focused, length],
-  );
-  const areaProps = useAnimatedProps(() => ({ opacity: draw.value }), [focused]);
+  // Re-applied whenever the screen comes back into view without passing a Reanimated dependency
+  // array (which warns on native).
+  const lineProps = useAnimatedProps(() => {
+    void focusTick.value;
+    return { strokeDashoffset: pathLength.value * (1 - draw.value) };
+  });
+  const areaProps = useAnimatedProps(() => {
+    void focusTick.value;
+    return { opacity: draw.value };
+  });
 
   return (
     <View style={{ height }} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>

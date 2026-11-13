@@ -13,6 +13,7 @@ import { requireSignedIn } from './session';
 interface ProfileJoin {
   readonly id: string;
   readonly handle: string;
+  readonly display_name?: string | null;
   readonly avatar_url?: string | null;
 }
 
@@ -54,7 +55,7 @@ interface VoteRow {
 }
 
 const postColumns =
-  'id, slug, owner_id, title, category, body, estimate_php, scan_id, listing_id, photo_path, too_high_count, just_right_count, too_low_count, moderation_status, created_at, author:profiles!feed_posts_owner_id_fkey(id, handle, avatar_url), listing:listings!feed_posts_listing_id_fkey(id, slug, asking_php, photo_path)';
+  'id, slug, owner_id, title, category, body, estimate_php, scan_id, listing_id, photo_path, too_high_count, just_right_count, too_low_count, moderation_status, created_at, author:profiles!feed_posts_owner_id_fkey(id, handle, display_name, avatar_url), listing:listings!feed_posts_listing_id_fkey(id, slug, asking_php, photo_path)';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -99,6 +100,7 @@ function toFeedPost(
     author: {
       userId: author?.id ?? row.owner_id,
       handle: author?.handle ?? 'collector',
+      ...(author?.display_name?.trim() ? { displayName: author.display_name.trim() } : {}),
       avatarUrl: author?.avatar_url ?? null,
     },
     scanId: row.scan_id ?? null,
@@ -276,7 +278,7 @@ export function createSupabaseFeedRepository(
       const userId = signedIn.value;
 
       const target = await findPostRow(postIdOrSlug);
-      if (!target) {
+      if (!target || target.owner_id === userId) {
         return err({ kind: 'authorization', code: 'not_found_or_denied' });
       }
 

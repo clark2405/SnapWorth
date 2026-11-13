@@ -1,6 +1,7 @@
 // supabase-js needs a complete URL implementation, which React Native does not ship.
 import 'react-native-url-polyfill/auto';
 
+import { NavigationBar } from 'expo-navigation-bar';
 import { Stack, useRouter, type Href } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useState } from 'react';
@@ -101,6 +102,7 @@ function Shell() {
     >
       <TipsProvider store={deviceTipStore}>
         <StatusBar style={isDark ? 'light' : 'dark'} />
+        <NavigationBar hidden style={isDark ? 'light' : 'dark'} />
         <RevealGate open={revealOpen}>
           <Stack
             screenOptions={{

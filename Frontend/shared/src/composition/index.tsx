@@ -277,7 +277,10 @@ export function createAppServices(config: BackendConfig): AppServices {
     comments: createCommentService(
       createLocalCommentRepository({
         store: AsyncStorage,
-        viewer: profileOf(previewProfile.user),
+        viewer: {
+          ...profileOf(previewProfile.user),
+          displayName: previewProfile.displayName,
+        },
         seed: previewSeed(),
         screen: screenWithRules,
       }),

@@ -20,22 +20,33 @@ describe('createLocalFeedRepository', () => {
     expect(created.value.author.handle).toBe('maya');
     expect(created.value.votes).toEqual({ too_high: 0, just_right: 0, too_low: 0 });
 
-    // Casting a vote increments the tally and records the voter's choice
-    const voted = await repo.setVote(created.value.slug, 'just_right');
+    // An author cannot vote on their own post
+    const selfVote = await repo.setVote(created.value.slug, 'just_right');
+    expect(selfVote).toEqual({
+      ok: false,
+      error: { kind: 'authorization', code: 'not_found_or_denied' },
+    });
+
+    // Casting a vote on someone else's post increments the tally and records the voter's choice
+    const otherRepo = createLocalFeedRepository({
+      viewerHandle: 'alex',
+      seed: [{ ...created.value, isMine: false }],
+    });
+    const voted = await otherRepo.setVote(created.value.slug, 'just_right');
     expect(voted.ok).toBe(true);
     if (voted.ok) {
       expect(voted.value.votes).toEqual({ too_high: 0, just_right: 1, too_low: 0 });
     }
 
     // Changing the vote moves the count from just_right to too_high
-    const changed = await repo.setVote(created.value.slug, 'too_high');
+    const changed = await otherRepo.setVote(created.value.slug, 'too_high');
     expect(changed.ok).toBe(true);
     if (changed.ok) {
       expect(changed.value.votes).toEqual({ too_high: 1, just_right: 0, too_low: 0 });
     }
 
     // Withdrawing the vote decrements the count back to zero
-    const withdrawn = await repo.setVote(created.value.slug, null);
+    const withdrawn = await otherRepo.setVote(created.value.slug, null);
     expect(withdrawn.ok).toBe(true);
     if (withdrawn.ok) {
       expect(withdrawn.value.votes).toEqual({ too_high: 0, just_right: 0, too_low: 0 });
@@ -155,7 +166,11 @@ describe('createSupabaseFeedRepository', () => {
    * rewrite post_id and user_id), is refused with 42501, and an update only reaches the caller's
    * own row.
    */
-  function votesClient(existing: { choice: string } | null, insertFailsWith?: string) {
+  function votesClient(
+    existing: { choice: string } | null,
+    insertFailsWith?: string,
+    postOwnerId = '00000000-0000-4000-8000-0000000000aa',
+  ) {
     const calls: { op: string; payload?: Record<string, unknown>; filters: [string, unknown][] }[] =
       [];
     let row = existing;
@@ -224,7 +239,7 @@ describe('createSupabaseFeedRepository', () => {
                   data: {
                     id: postId,
                     slug: 'retro-windbreaker',
-                    owner_id: '00000000-0000-4000-8000-0000000000aa',
+                    owner_id: postOwnerId,
                     body: 'Fair price?',
                     estimate_php: 2450,
                     too_high_count: 12,
@@ -293,6 +308,16 @@ describe('createSupabaseFeedRepository', () => {
       ok: false,
       error: { kind: 'authorization', code: 'not_found_or_denied' },
     });
+  });
+
+  it('refuses voting on the caller’s own post without touching the votes table', async () => {
+    const { repo, calls } = votesClient(null, undefined, userId);
+    const cast = await repo.setVote('retro-windbreaker', 'just_right');
+    expect(cast).toEqual({
+      ok: false,
+      error: { kind: 'authorization', code: 'not_found_or_denied' },
+    });
+    expect(calls).toEqual([]);
   });
 
   it('withdraws a vote with a delete and returns the updated tallies', async () => {

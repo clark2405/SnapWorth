@@ -42,7 +42,7 @@ grant execute on all functions in schema tests to anon, authenticated, service_r
 
 -- Four fresh accounts. Ana and Ben comment, Cy and Dee only report.
 insert into auth.users (id, email, raw_user_meta_data) values
-  ('00000000-0000-4000-b000-00000000000a', 'ana@test', '{"handle":"ana"}'),
+  ('00000000-0000-4000-b000-00000000000a', 'ana@test', '{"handle":"ana","full_name":"Ana Santos"}'),
   ('00000000-0000-4000-b000-00000000000b', 'ben@test', '{"handle":"ben"}'),
   ('00000000-0000-4000-b000-00000000000c', 'cy@test', '{"handle":"cy_reports"}'),
   ('00000000-0000-4000-b000-00000000000d', 'dee@test', '{}');
@@ -91,6 +91,11 @@ select tests.check(
   (select is_mine from public.comment_thread('retro-windbreaker')
     where id = '00000000-0000-4000-c000-000000000001'),
   'the author sees their own pending comment, marked as theirs'
+);
+select tests.check(
+  (select author_display_name from public.comment_thread('retro-windbreaker')
+    where id = '00000000-0000-4000-c000-000000000001') = 'Ana Santos',
+  'comment_thread returns the author''s account display name'
 );
 
 -- 3. Clients cannot get around moderation or impersonate anyone.
