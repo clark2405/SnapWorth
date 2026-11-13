@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 
 import { EditProfileView } from '@snapworth/shared/features/profile';
 
-import { pickPhoto } from '../../../src/photo-picker';
+import { pickProfilePhoto } from '../../../src/photo-picker';
 
 export default function EditProfileRoute() {
   const router = useRouter();
@@ -12,7 +12,7 @@ export default function EditProfileRoute() {
     <EditProfileView
       onBack={back}
       onSaved={back}
-      onPickPhoto={async () => (await pickPhoto())?.source ?? null}
+      onPickPhoto={async () => (await pickProfilePhoto())?.source ?? null}
     />
   );
 }
