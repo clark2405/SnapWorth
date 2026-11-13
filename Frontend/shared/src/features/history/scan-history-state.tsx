@@ -137,8 +137,18 @@ export function ScanHistoryProvider({
       };
       setScans((current) => [scan, ...current]);
       const outcome = await saveScan(scan, place);
-      if (outcome === 'failed')
+      if (outcome === 'failed') {
         setScans((current) => current.filter((item) => item.id !== scan.id));
+      } else {
+        const path = `${place.owner}/${scan.id}.jpg`;
+        setScans((current) =>
+          current.map((item) =>
+            item.id === scan.id
+              ? { ...item, synced: true, photoPath: path, photoPending: false }
+              : item,
+          ),
+        );
+      }
       return outcome;
     },
     [place],
