@@ -132,10 +132,22 @@ export function useSignIn() {
         return;
       }
 
+      const openedAt = Date.now();
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
       if (result.type !== 'success' || !('url' in result) || !result.url) {
         cancelHandoff();
-        if (result.type === 'cancel' || result.type === 'dismiss') return;
+        if (result.type === 'cancel' || result.type === 'dismiss') {
+          // Closed at once: they changed their mind. Closed after a while: most likely they
+          // signed in with Google and were never sent back to the app (Supabase sends anything
+          // not on its Redirect URLs list to the website instead), so say so.
+          if (Date.now() - openedAt > googleReturnWaitMs) {
+            Alert.alert(
+              'Google didn’t send you back',
+              'If you finished signing in with Google, the app’s sign-in address may not be set up yet. Try again, or log in with your email.',
+            );
+          }
+          return;
+        }
         Alert.alert('Google sign-in failed', 'Sign-in was not completed.');
         return;
       }
@@ -192,6 +204,9 @@ export function useSignIn() {
     close,
   };
 }
+
+/** Longer than this in Google's sheet before it closes, and it was more than a change of mind. */
+const googleReturnWaitMs = 12_000;
 
 function messageOf(failure: unknown): string {
   return failure instanceof Error ? failure.message : 'Something went wrong. Try again.';
