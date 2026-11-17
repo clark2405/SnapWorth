@@ -1,7 +1,8 @@
 import { useIsFocused } from 'expo-router';
-import { History, Images, ScanLine, X, Zap, ZapOff } from 'lucide-react-native';
-import { useEffect, useState, type ReactNode } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { History, Images, Minus, Plus, ScanLine, X, Zap, ZapOff } from 'lucide-react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Image, StyleSheet, View, type LayoutRectangle } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
   FadeIn,
@@ -49,7 +50,30 @@ export interface CaptureViewProps {
    * estimate can rise over it as a sheet; the camera wakes again when it comes back into view.
    */
   readonly afterCapture?: 'fly' | 'freeze';
+  /**
+   * The camera's zoom, from 0 (the main lens) to 1 (as far as the phone goes). With
+   * `onZoomChange` the viewfinder pinches to zoom and shows a zoom control.
+   */
+  readonly zoom?: number;
+  readonly onZoomChange?: (zoom: number) => void;
+  /** Where the frame's corners are on screen, so the photo can be cut down to what's inside. */
+  readonly onFrameLayout?: (frame: CaptureFrame) => void;
 }
+
+/** The frame's rectangle on screen, and the size of the screen the preview fills. */
+export interface CaptureFrame {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly screenWidth: number;
+  readonly screenHeight: number;
+}
+
+/** How far one press of the zoom buttons moves, on the camera's 0 to 1 scale. */
+const zoomStep = 0.08;
+/** How much zoom a pinch to twice the size adds. */
+const zoomPerDoubling = 0.16;
 
 /** Rotated over the viewfinder before the snap: the photo coach's general tips. */
 const tips = generalPhotoTips.shots;
@@ -73,6 +97,9 @@ export function CaptureView({
   onOpenHistory,
   bottomInset = 0,
   afterCapture = 'fly',
+  zoom = 0,
+  onZoomChange,
+  onFrameLayout,
 }: CaptureViewProps) {
   const freeze = afterCapture === 'freeze';
   const insets = useSafeAreaInsets();
@@ -146,6 +173,38 @@ export function CaptureView({
     );
   };
 
+  // Where the frame is: the root (the whole screen), the area the frame centres in, and the
+  // frame within it. Its spring settles at its laid-out size, so layout is where it rests.
+  const screenSize = useRef<{ width: number; height: number } | null>(null);
+  const area = useRef<LayoutRectangle | null>(null);
+  const box = useRef<LayoutRectangle | null>(null);
+  const reportFrame = () => {
+    if (!onFrameLayout || !screenSize.current || !area.current || !box.current) return;
+    onFrameLayout({
+      x: area.current.x + box.current.x,
+      y: area.current.y + box.current.y,
+      width: box.current.width,
+      height: box.current.height,
+      screenWidth: screenSize.current.width,
+      screenHeight: screenSize.current.height,
+    });
+  };
+
+  // Pinching the viewfinder zooms, from where the zoom was when the pinch began.
+  const zoomAtPinch = useRef(zoom);
+  const latestZoom = useRef(zoom);
+  latestZoom.current = zoom;
+  const setZoom = (next: number) => onZoomChange?.(Math.min(1, Math.max(0, next)));
+  const pinch = Gesture.Pinch()
+    .enabled(Boolean(onZoomChange) && !shooting)
+    .runOnJS(true)
+    .onStart(() => {
+      zoomAtPinch.current = latestZoom.current;
+    })
+    .onUpdate((event) => {
+      setZoom(zoomAtPinch.current + Math.log2(Math.max(event.scale, 0.01)) * zoomPerDoubling);
+    });
+
   const frameStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 1.18 - lock.value * 0.18 + hunt.value * 0.04 }],
     opacity: 0.55 + lock.value * 0.45,
@@ -163,10 +222,18 @@ export function CaptureView({
   const controlsBottom = insets.bottom + bottomInset + tokens.spacing[4];
 
   return (
-    <View style={styles.root}>
-      <View style={StyleSheet.absoluteFill}>
-        {viewfinder ?? <SimulatedScene still={freeze && shooting} />}
-      </View>
+    <View
+      style={styles.root}
+      onLayout={(event) => {
+        screenSize.current = event.nativeEvent.layout;
+        reportFrame();
+      }}
+    >
+      <GestureDetector gesture={pinch}>
+        <View style={StyleSheet.absoluteFill}>
+          {viewfinder ?? <SimulatedScene still={freeze && shooting} />}
+        </View>
+      </GestureDetector>
       <Vignette />
 
       <View style={[styles.topBar, { paddingTop: insets.top + tokens.spacing[2] }]}>
@@ -198,8 +265,20 @@ export function CaptureView({
         />
       </View>
 
-      <View style={styles.frameArea}>
-        <Animated.View style={[styles.frame, frameStyle]}>
+      <View
+        style={styles.frameArea}
+        onLayout={(event) => {
+          area.current = event.nativeEvent.layout;
+          reportFrame();
+        }}
+      >
+        <Animated.View
+          style={[styles.frame, frameStyle]}
+          onLayout={(event) => {
+            box.current = event.nativeEvent.layout;
+            reportFrame();
+          }}
+        >
           {(['topLeft', 'topRight', 'bottomLeft', 'bottomRight'] as const).map((corner) => (
             <View key={corner} style={[styles.bracket, styles[corner]]} />
           ))}
@@ -218,6 +297,43 @@ export function CaptureView({
           <SWText variant="caption" color={tokens.overlay.text} align="center">
             {notice}
           </SWText>
+        ) : null}
+        {onZoomChange ? (
+          <View style={styles.zoomPill}>
+            <IconButton
+              icon={Minus}
+              label="Zoom out"
+              appearance="overlay"
+              size={16}
+              haptic="select"
+              disabled={zoom <= 0}
+              onPress={() => setZoom(zoom - zoomStep)}
+            />
+            <View
+              style={styles.zoomTrack}
+              accessible
+              accessibilityRole="adjustable"
+              accessibilityLabel="Zoom"
+              accessibilityValue={{ min: 0, max: 100, now: Math.round(zoom * 100) }}
+              accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+              onAccessibilityAction={(event) =>
+                setZoom(
+                  zoom + (event.nativeEvent.actionName === 'increment' ? zoomStep : -zoomStep),
+                )
+              }
+            >
+              <View style={[styles.zoomFill, { width: `${Math.round(zoom * 100)}%` }]} />
+            </View>
+            <IconButton
+              icon={Plus}
+              label="Zoom in"
+              appearance="overlay"
+              size={16}
+              haptic="select"
+              disabled={zoom >= 1}
+              onPress={() => setZoom(zoom + zoomStep)}
+            />
+          </View>
         ) : null}
         <View style={styles.tipRow}>
           <Animated.View
@@ -435,6 +551,29 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.overlay.chrome,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: tokens.overlay.border,
+  },
+  zoomPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: tokens.spacing[2],
+    paddingHorizontal: tokens.spacing[1],
+    paddingVertical: tokens.spacing[1],
+    borderRadius: tokens.radius.full,
+    backgroundColor: tokens.overlay.chrome,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: tokens.overlay.border,
+  },
+  zoomTrack: {
+    width: 96,
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
+    backgroundColor: tokens.overlay.border,
+  },
+  zoomFill: {
+    height: '100%',
+    backgroundColor: tokens.overlay.text,
   },
   frameArea: {
     flex: 1,

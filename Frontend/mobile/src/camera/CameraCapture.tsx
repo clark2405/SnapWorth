@@ -1,11 +1,24 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { useEffect, useRef, useState } from 'react';
 import { AppState, Image, Linking, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, SWText } from '@snapworth/shared/components';
-import { tokens } from '@snapworth/shared/design';
-import { CaptureView, coachFor, type PhotoCoach } from '@snapworth/shared/features/capture';
+import {
+  Button,
+  EstimateBadge,
+  SWText,
+  Worthy,
+  type CompanionMood,
+} from '@snapworth/shared/components';
+import { held, tokens } from '@snapworth/shared/design';
+import {
+  CaptureView,
+  EstimatingScene,
+  coachFor,
+  type CaptureFrame,
+  type PhotoCoach,
+} from '@snapworth/shared/features/capture';
 import type { NewScan, SaveOutcome } from '@snapworth/shared/features/history/scan-history';
 import type {
   CapturedItemImage,
@@ -15,6 +28,7 @@ import type {
 } from '@snapworth/shared/types';
 
 import { measurePhoto, prepareItemReader, readItem } from '../snap-sense';
+import { cropToFrame } from './frame-crop';
 import {
   cluesFrom,
   confirmedBrand,
@@ -51,6 +65,9 @@ export function CameraCapture({
   const [ready, setReady] = useState(false);
   const [pictureSize, setPictureSize] = useState<string>();
   const [flashOn, setFlashOn] = useState(false);
+  const [zoom, setZoom] = useState(0);
+  /** Where the frame's corners are on screen: only what's inside them is priced. */
+  const frame = useRef<CaptureFrame | null>(null);
   const [photoUri, setPhotoUri] = useState<string>();
   const [photoData, setPhotoData] = useState<CapturedItemImage>();
   const [estimate, setEstimate] = useState<PhotoEstimate>();
@@ -229,9 +246,13 @@ export function CameraCapture({
     setError(undefined);
     const captureSession = session.current;
     try {
-      const photo = await camera.current.takePictureAsync({ quality: 0.6, base64: true });
+      const shot = await camera.current.takePictureAsync({ quality: 0.85 });
       if (captureSession !== session.current) return;
-      if (!photo?.uri || !photo.base64) throw new Error('No photo returned');
+      if (!shot?.uri) throw new Error('No photo returned');
+      // Only what's inside the frame is read, priced and kept: the rest of the scene is cut
+      // away, so a lamp behind the item isn't what gets valued.
+      const photo = await framedPhoto(shot, frame.current);
+      if (captureSession !== session.current) return;
       const image: CapturedItemImage = { data: photo.base64, mimeType: 'image/jpeg' };
       setReady(false);
       setPhotoUri(photo.uri);
@@ -334,6 +355,18 @@ export function CameraCapture({
   }
 
   if (photoUri) {
+    const working = checking || estimating;
+    const retake = () => {
+      stopEstimate();
+      forgetLook();
+      setEstimating(false);
+      setEstimate(undefined);
+      setSaved(undefined);
+      setEstimateError(undefined);
+      setReady(false);
+      setPhotoUri(undefined);
+      setPhotoData(undefined);
+    };
     return (
       <ScrollView
         style={styles.root}
@@ -342,104 +375,78 @@ export function CameraCapture({
           { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 },
         ]}
       >
-        <Image
-          source={{ uri: photoUri }}
-          accessibilityLabel="Your captured photo"
-          resizeMode="contain"
-          style={styles.photo}
-        />
-        {checking ? (
-          <SWText
-            variant="headingLarge"
-            color={tokens.overlay.text}
-            accessibilityLiveRegion="polite"
-          >
-            Looking at your photo…
-          </SWText>
-        ) : null}
-        {problem ? (
-          <View accessibilityLiveRegion="polite" style={styles.problem}>
-            <SWText variant="headingLarge" color={tokens.overlay.text}>
-              {photoProblemCopy[problem].title}
-            </SWText>
-            <SWText color={tokens.overlay.text}>{photoProblemCopy[problem].body}</SWText>
+        {working ? (
+          <EstimatingScene
+            photoUri={photoUri}
+            stage={checking ? 'looking' : 'estimating'}
+            looksLike={looksLike}
+          />
+        ) : (
+          <View style={styles.resultTop}>
+            <View style={[styles.print, held(darkColors, 4)]}>
+              <Image
+                source={{ uri: photoUri }}
+                accessibilityLabel="Your captured photo"
+                resizeMode="cover"
+                style={styles.printPhoto}
+              />
+            </View>
           </View>
+        )}
+
+        {problem ? (
+          <WorthyNote
+            mood="attentive"
+            title={photoProblemCopy[problem].title}
+            body={photoProblemCopy[problem].body}
+          />
         ) : null}
-        {/* What the phone saw, while the cloud prices it: gone once the estimate names it. */}
-        {looksLike && !estimate ? (
-          <SWText color={tokens.overlay.text}>Looks like: {looksLike}</SWText>
-        ) : null}
-        {clues && clues.text.length > 0 && !estimate && !problem ? (
-          <SWText variant="caption" color={tokens.overlay.text}>
-            Read on the item: {clues.text.slice(0, 3).join(' · ')}
-          </SWText>
-        ) : null}
-        {!checking && !problem ? <CoachList coach={coachFor(itemKind)} /> : null}
-        {estimating ? (
-          <SWText
-            variant="headingLarge"
-            color={tokens.overlay.text}
-            accessibilityLiveRegion="polite"
-          >
-            Estimating your item…
-          </SWText>
-        ) : null}
+
         {estimate ? (
-          <>
-            <SWText variant="headingLarge" color={tokens.overlay.text}>
+          <View style={styles.result} accessibilityLiveRegion="polite">
+            <SWText variant="headingLarge" color={tokens.overlay.text} align="center">
               {estimate.itemName || 'Could not identify the item'}
             </SWText>
             {estimate.status === 'estimated' ? (
-              <>
-                <SWText variant="priceLarge" color={tokens.overlay.text}>
-                  {formatPhp(estimate.amountPhp)}
-                </SWText>
-                <SWText color={tokens.overlay.text}>
-                  Likely {formatPhp(estimate.lowPhp)} – {formatPhp(estimate.highPhp)}
-                </SWText>
-                <SWText color={tokens.overlay.text}>
-                  Rough AI estimate, not a confirmed sale price.
-                </SWText>
-              </>
+              <EstimateBadge
+                size="hero"
+                value={formatPhp(estimate.amountPhp)}
+                range={`Likely ${formatPhp(estimate.lowPhp)} – ${formatPhp(estimate.highPhp)}`}
+              />
             ) : null}
-            <SWText color={tokens.overlay.text}>{estimate.explanation}</SWText>
-            {estimate.assumptions.map((assumption, index) => (
-              <SWText key={index} variant="caption" color={tokens.overlay.text}>
-                {assumption}
+            <View style={styles.card}>
+              <SWText variant="bodyMedium" color={tokens.overlay.text}>
+                {estimate.explanation}
               </SWText>
-            ))}
-          </>
+              {estimate.assumptions.length > 0 ? (
+                <View style={styles.assumptions}>
+                  <SWText variant="overline" color={tokens.overlay.text}>
+                    Assuming
+                  </SWText>
+                  {estimate.assumptions.map((assumption, index) => (
+                    <SWText key={index} variant="caption" color={tokens.overlay.text}>
+                      {`•  ${assumption}`}
+                    </SWText>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          </View>
         ) : null}
+
         {estimateError ? (
-          <SWText color={tokens.overlay.text} accessibilityLiveRegion="polite">
-            {estimateError}
-          </SWText>
+          <WorthyNote mood="attentive" title="That didn’t work" body={estimateError} />
         ) : null}
-        {(estimateError || estimate?.status === 'unable_to_estimate') && photoData ? (
-          <Button
-            label="Retry estimate"
-            onPress={() => void estimatePhoto(photoData, clues, photoUri)}
-          />
-        ) : null}
-        {problem && photoData ? (
-          <Button
-            label="Price it anyway"
-            variant="secondary"
-            onPress={() => {
-              setProblem(undefined);
-              void estimatePhoto(photoData, clues, photoUri);
-            }}
-          />
-        ) : null}
+
+        {/* Worth reading while it works: the shots that would sharpen the estimate. */}
+        {!checking && !problem ? <CoachList coach={coachFor(itemKind)} /> : null}
+
         {estimate?.status === 'estimated' && (saved === 'saved' || saved === 'pending') ? (
-          <>
-            <SWText color={tokens.overlay.text} align="center">
-              {saved === 'saved'
-                ? 'Saved to your History.'
-                : 'Saved to your History on this phone. It’ll sync when you’re back online.'}
-            </SWText>
-            <Button label="View in History" onPress={onOpenHistory} />
-          </>
+          <SWText color={tokens.overlay.text} align="center">
+            {saved === 'saved'
+              ? 'Saved to your History.'
+              : 'Saved to your History on this phone. It’ll sync when you’re back online.'}
+          </SWText>
         ) : estimate?.status === 'estimated' && saved === 'saving' ? (
           <SWText color={tokens.overlay.text} align="center">
             Saving to your History…
@@ -449,21 +456,29 @@ export function CameraCapture({
             This photo and estimate have not been added to History.
           </SWText>
         ) : null}
-        <Button
-          label="Retake photo"
-          onPress={() => {
-            stopEstimate();
-            forgetLook();
-            setEstimating(false);
-            setEstimate(undefined);
-            setSaved(undefined);
-            setEstimateError(undefined);
-            setReady(false);
-            setPhotoUri(undefined);
-            setPhotoData(undefined);
-          }}
-        />
-        <Button label="Close camera" onPress={onClose} />
+
+        <View style={styles.actions}>
+          {estimate?.status === 'estimated' && (saved === 'saved' || saved === 'pending') ? (
+            <Button label="View in History" onPress={onOpenHistory} />
+          ) : null}
+          {(estimateError || estimate?.status === 'unable_to_estimate') && photoData ? (
+            <Button
+              label="Retry estimate"
+              onPress={() => void estimatePhoto(photoData, clues, photoUri)}
+            />
+          ) : null}
+          {problem && photoData ? (
+            <Button
+              label="Price it anyway"
+              onPress={() => {
+                setProblem(undefined);
+                void estimatePhoto(photoData, clues, photoUri);
+              }}
+            />
+          ) : null}
+          <Button label="Retake photo" variant="secondary" onPress={retake} />
+          <Button label="Close camera" variant="tertiary" onPress={onClose} />
+        </View>
       </ScrollView>
     );
   }
@@ -481,6 +496,7 @@ export function CameraCapture({
             facing="back"
             mode="picture"
             pictureSize={pictureSize}
+            zoom={zoom}
             flash={flashOn ? 'on' : 'off'}
             onCameraReady={() => void prepareCamera()}
             onMountError={() => {
@@ -495,6 +511,11 @@ export function CameraCapture({
         onCapture={takePhoto}
         onClose={onClose}
         onOpenHistory={onOpenHistory}
+        zoom={zoom}
+        onZoomChange={setZoom}
+        onFrameLayout={(next) => {
+          frame.current = next;
+        }}
       />
       {error ? (
         <View style={[styles.error, { top: insets.top + 80 }]} accessibilityLiveRegion="polite">
@@ -512,6 +533,34 @@ export function CameraCapture({
           ) : null}
         </View>
       ) : null}
+    </View>
+  );
+}
+
+/** The camera is always dark, whatever the app's theme: its pieces take the dark palette. */
+const darkColors = tokens.color.dark;
+
+/** Worthy, with something to tell you about the photo: a problem, or an estimate that failed. */
+function WorthyNote({
+  mood,
+  title,
+  body,
+}: {
+  readonly mood: CompanionMood;
+  readonly title: string;
+  readonly body: string;
+}) {
+  return (
+    <View style={styles.note} accessibilityLiveRegion="polite">
+      <Worthy size={52} mood={mood} />
+      <View style={styles.noteWords}>
+        <SWText variant="headingSmall" color={tokens.overlay.text}>
+          {title}
+        </SWText>
+        <SWText variant="bodyMedium" color={tokens.overlay.text}>
+          {body}
+        </SWText>
+      </View>
     </View>
   );
 }
@@ -552,9 +601,41 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'stretch',
   },
-  review: { flexGrow: 1, paddingHorizontal: tokens.spacing[6], gap: tokens.spacing[4] },
-  photo: { height: 240, width: '100%' },
-  problem: { gap: tokens.spacing[2] },
+  review: { flexGrow: 1, paddingHorizontal: tokens.spacing[6], gap: tokens.spacing[5] },
+  resultTop: { alignItems: 'center', paddingTop: tokens.spacing[2] },
+  print: {
+    width: 168,
+    aspectRatio: 0.86,
+    padding: 7,
+    paddingBottom: 22,
+    borderRadius: tokens.radius.small,
+    backgroundColor: tokens.illustration.cardStock,
+    transform: [{ rotate: '-3deg' }],
+  },
+  printPhoto: { flex: 1, borderRadius: 3 },
+  result: { alignItems: 'center', gap: tokens.spacing[4] },
+  card: {
+    alignSelf: 'stretch',
+    gap: tokens.spacing[3],
+    padding: tokens.spacing[4],
+    borderRadius: tokens.radius.large,
+    backgroundColor: tokens.overlay.chrome,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: tokens.overlay.border,
+  },
+  assumptions: { gap: tokens.spacing[1] },
+  note: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing[3],
+    padding: tokens.spacing[4],
+    borderRadius: tokens.radius.large,
+    backgroundColor: tokens.overlay.chrome,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: tokens.overlay.border,
+  },
+  noteWords: { flex: 1, gap: tokens.spacing[1] },
+  actions: { gap: tokens.spacing[3], marginTop: tokens.spacing[2] },
   error: {
     position: 'absolute',
     left: tokens.spacing[6],
@@ -564,6 +645,37 @@ const styles = StyleSheet.create({
     gap: tokens.spacing[4],
   },
 });
+
+/** The longest side a photo is sent at: plenty for the AI, and well under the 4 MB limit. */
+const longestSide = 1600;
+
+/**
+ * The photo cut down to the camera's frame (with a little room around it), shrunk to a sensible
+ * size and encoded for the estimate. Without a frame to go by, the whole photo is used.
+ */
+async function framedPhoto(
+  shot: { readonly uri: string; readonly width: number; readonly height: number },
+  frame: CaptureFrame | null,
+): Promise<{ readonly uri: string; readonly base64: string }> {
+  const crop = frame
+    ? cropToFrame(
+        shot,
+        { width: frame.screenWidth, height: frame.screenHeight },
+        { x: frame.x, y: frame.y, width: frame.width, height: frame.height },
+      )
+    : null;
+  const context = ImageManipulator.manipulate(shot.uri);
+  if (crop) context.crop(crop);
+  const width = crop?.width ?? shot.width;
+  const height = crop?.height ?? shot.height;
+  if (Math.max(width, height) > longestSide) {
+    context.resize(width >= height ? { width: longestSide } : { height: longestSide });
+  }
+  const image = await context.renderAsync();
+  const saved = await image.saveAsync({ format: SaveFormat.JPEG, compress: 0.7, base64: true });
+  if (!saved.base64) throw new Error('The photo could not be prepared.');
+  return { uri: saved.uri, base64: saved.base64 };
+}
 
 function formatPhp(amount: number) {
   return new Intl.NumberFormat('en-PH', {
