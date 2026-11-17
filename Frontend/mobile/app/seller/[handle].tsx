@@ -12,6 +12,7 @@ export default function SellerProfileRoute() {
       handle={sellerHandle}
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/marketplace'))}
       onOpenListing={(listingId) => router.push(`/listing/${listingId}`)}
+      onOpenPost={(postId) => router.push(`/post/${postId}`)}
     />
   );
 }

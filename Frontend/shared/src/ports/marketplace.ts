@@ -67,6 +67,16 @@ export interface MarketListing {
   readonly mine: boolean;
 }
 
+/** A collection its owner shows on their profile: what's in it, never the scans themselves. */
+export interface ProfileCollection {
+  readonly id: string;
+  readonly name: string;
+  readonly itemCount: number;
+  readonly totalPhp: number;
+  /** The first few things in it, newest first. */
+  readonly itemNames: readonly string[];
+}
+
 export interface SellerProfile {
   readonly id: string;
   readonly handle: string;
@@ -78,6 +88,8 @@ export interface SellerProfile {
   readonly bio: string;
   readonly location: string;
   readonly listings: readonly MarketListing[];
+  /** The collections they show on their profile; none unless they choose to. */
+  readonly collections?: readonly ProfileCollection[];
 }
 
 export interface SavedListingAlert {

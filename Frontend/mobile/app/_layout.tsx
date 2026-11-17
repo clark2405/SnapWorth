@@ -12,6 +12,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   BannerProvider,
   NavLinkProvider,
+  PersonLinkProvider,
   RevealGate,
   SignInHandoff,
   ToastProvider,
@@ -100,65 +101,76 @@ function Shell() {
       onCreateAccount={() => router.push('/signup?return=1')}
       onSignIn={() => router.push('/login?return=1')}
     >
-      <TipsProvider store={deviceTipStore}>
-        <StatusBar style={isDark ? 'light' : 'dark'} />
-        <NavigationBar hidden style={isDark ? 'light' : 'dark'} />
-        <RevealGate open={revealOpen}>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: colors.canvas },
-              // Native iOS push: interactive edge-swipe back with the system parallax.
-              animation: 'default',
-              gestureEnabled: true,
-              fullScreenGestureEnabled: true,
-              // iOS 26 clips scroll views at the screen edges on its own. Its automatic style drew
-              // a hard cut line above the bottom bars; a soft edge lets content blur away under the
-              // floating bar like the system's toolbars. The top is ours: each header draws its own
-              // soft fade, so the system one stays off rather than doubling it.
-              scrollEdgeEffects: { top: 'hidden', bottom: 'soft', left: 'hidden', right: 'hidden' },
-            }}
-          >
-            <Stack.Screen name="index" options={{ animation: 'none' }} />
-            <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
-            <Stack.Screen name="(auth)/login" options={{ animation: 'fade' }} />
-            <Stack.Screen name="(auth)/signup" options={{ animation: 'fade' }} />
-            <Stack.Screen name="(tabs)" options={{ animation: 'fade', gestureEnabled: false }} />
-            <Stack.Screen name="capture" options={{ presentation: 'fullScreenModal' }} />
-            {/* The snap's answer: a sheet over the frozen camera, half height first. */}
-            <Stack.Screen
-              name="estimate/[id]"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.56, 1],
-                sheetInitialDetentIndex: 0,
-                sheetGrabberVisible: true,
-                // No corner radius of our own: iOS 26 rounds the sheet's corners to follow the
-                // screen's, which a fixed radius would flatten at the bottom.
-                sheetExpandsWhenScrolledToEdge: true,
+      {/* Tapping someone's name or photo opens their profile. */}
+      <PersonLinkProvider onOpen={(handle) => router.push(`/seller/${encodeURIComponent(handle)}`)}>
+        <TipsProvider store={deviceTipStore}>
+          <StatusBar style={isDark ? 'light' : 'dark'} />
+          <NavigationBar hidden style={isDark ? 'light' : 'dark'} />
+          <RevealGate open={revealOpen}>
+            <Stack
+              screenOptions={{
+                headerShown: false,
                 contentStyle: { backgroundColor: colors.canvas },
+                // Native iOS push: interactive edge-swipe back with the system parallax.
+                animation: 'default',
+                gestureEnabled: true,
+                fullScreenGestureEnabled: true,
+                // iOS 26 clips scroll views at the screen edges on its own. Its automatic style drew
+                // a hard cut line above the bottom bars; a soft edge lets content blur away under the
+                // floating bar like the system's toolbars. The top is ours: each header draws its own
+                // soft fade, so the system one stays off rather than doubling it.
+                scrollEdgeEffects: {
+                  top: 'hidden',
+                  bottom: 'soft',
+                  left: 'hidden',
+                  right: 'hidden',
+                },
               }}
+            >
+              <Stack.Screen name="index" options={{ animation: 'none' }} />
+              <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
+              <Stack.Screen name="(auth)/login" options={{ animation: 'fade' }} />
+              <Stack.Screen name="(auth)/signup" options={{ animation: 'fade' }} />
+              <Stack.Screen name="(tabs)" options={{ animation: 'fade', gestureEnabled: false }} />
+              <Stack.Screen name="capture" options={{ presentation: 'fullScreenModal' }} />
+              {/* The snap's answer: a sheet over the frozen camera, half height first. */}
+              <Stack.Screen
+                name="estimate/[id]"
+                options={{
+                  presentation: 'formSheet',
+                  sheetAllowedDetents: [0.56, 1],
+                  sheetInitialDetentIndex: 0,
+                  sheetGrabberVisible: true,
+                  // No corner radius of our own: iOS 26 rounds the sheet's corners to follow the
+                  // screen's, which a fixed radius would flatten at the bottom.
+                  sheetExpandsWhenScrolledToEdge: true,
+                  contentStyle: { backgroundColor: colors.canvas },
+                }}
+              />
+              <Stack.Screen name="worthy" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="ask/[id]" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="list/[id]" options={{ presentation: 'modal' }} />
+            </Stack>
+            <CompanionHost ready={launched} />
+            {/* A new message, offer or meetup in a chat that isn't open: a banner that opens it. */}
+            <ChatBannerHost onOpenConversation={openChat} wants={wantsToHear} />
+            {/* Agreed meetups: a banner here, and a local notification for when the app is closed. */}
+            <MeetupRemindersHost
+              onOpenConversation={openChat}
+              wants={wantsToHear}
+              scheduler={meetupReminderScheduler}
             />
-            <Stack.Screen name="worthy" options={{ presentation: 'modal' }} />
-            <Stack.Screen name="ask/[id]" options={{ presentation: 'modal' }} />
-            <Stack.Screen name="list/[id]" options={{ presentation: 'modal' }} />
-          </Stack>
-          <CompanionHost ready={launched} />
-          {/* A new message, offer or meetup in a chat that isn't open: a banner that opens it. */}
-          <ChatBannerHost onOpenConversation={openChat} wants={wantsToHear} />
-          {/* Agreed meetups: a banner here, and a local notification for when the app is closed. */}
-          <MeetupRemindersHost
-            onOpenConversation={openChat}
-            wants={wantsToHear}
-            scheduler={meetupReminderScheduler}
-          />
-          {/* Signing in closes the screen into Worthy's tag and opens it onto the app. */}
-          <SignInHandoff />
-        </RevealGate>
-        {launched ? null : (
-          <SessionSplashView onExit={() => setRevealOpen(true)} onDone={() => setLaunched(true)} />
-        )}
-      </TipsProvider>
+            {/* Signing in closes the screen into Worthy's tag and opens it onto the app. */}
+            <SignInHandoff />
+          </RevealGate>
+          {launched ? null : (
+            <SessionSplashView
+              onExit={() => setRevealOpen(true)}
+              onDone={() => setLaunched(true)}
+            />
+          )}
+        </TipsProvider>
+      </PersonLinkProvider>
     </SessionProvider>
   );
 }

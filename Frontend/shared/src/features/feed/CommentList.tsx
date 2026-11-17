@@ -7,6 +7,7 @@ import {
   paperIn,
   paperLayout,
   Avatar,
+  PersonLink,
   IconButton,
   PressableScale,
   SWText,
@@ -153,17 +154,21 @@ function CommentRow({
 
   return (
     <View style={styles.row}>
-      <AuthorAvatar
-        handle={author.handle}
-        displayName={author.displayName}
-        avatarUrl={author.avatarUrl}
-        size={compact ? replyAvatar : commentAvatar}
-      />
+      <PersonLink handle={author.handle} label={authorLabel}>
+        <AuthorAvatar
+          handle={author.handle}
+          displayName={author.displayName}
+          avatarUrl={author.avatarUrl}
+          size={compact ? replyAvatar : commentAvatar}
+        />
+      </PersonLink>
       <View style={styles.body}>
         <View style={styles.header}>
-          <SWText variant="labelSmall" numberOfLines={1} style={styles.handle}>
-            {authorLabel}
-          </SWText>
+          <PersonLink handle={author.handle} label={authorLabel} style={styles.handle}>
+            <SWText variant="labelSmall" numberOfLines={1}>
+              {authorLabel}
+            </SWText>
+          </PersonLink>
           <SWText variant="caption" tone="textMuted">
             {relativeTime(comment.createdAt)}
           </SWText>

@@ -60,6 +60,7 @@ interface Collections {
   /** Each change shows at once, and resolves false if it couldn't be kept (and was undone). */
   readonly rename: (id: string, name: string) => Promise<boolean>;
   readonly setItems: (id: string, itemIds: readonly string[]) => Promise<boolean>;
+  readonly setShown: (id: string, shown: boolean) => Promise<boolean>;
   readonly remove: (id: string) => Promise<boolean>;
 }
 
@@ -104,6 +105,12 @@ function collectionActions(
         async (repository) => (await repository.setItems(id, unique)).ok,
       );
     },
+    setShown: (id, shown) =>
+      apply(
+        (current) =>
+          current.map((entry) => (entry.id === id ? { ...entry, shownOnProfile: shown } : entry)),
+        async (repository) => (await repository.setShown(id, shown)).ok,
+      ),
     remove: (id) =>
       apply(
         (current) => current.filter((entry) => entry.id !== id),

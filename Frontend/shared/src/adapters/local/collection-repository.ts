@@ -39,6 +39,10 @@ export function createLocalCollectionRepository({
       save((all) => [...all.filter((entry) => entry.id !== collection.id), collection]),
     rename: (id, name) =>
       save((all) => all.map((entry) => (entry.id === id ? { ...entry, name } : entry))),
+    setShown: (id, shown) =>
+      save((all) =>
+        all.map((entry) => (entry.id === id ? { ...entry, shownOnProfile: shown } : entry)),
+      ),
     setItems: (id, itemIds) =>
       save((all) => all.map((entry) => (entry.id === id ? { ...entry, itemIds } : entry))),
     remove: (id) => save((all) => all.filter((entry) => entry.id !== id)),

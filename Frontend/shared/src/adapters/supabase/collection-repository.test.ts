@@ -136,7 +136,7 @@ it('keeps a collection and its scans, and leaves the sample items out', async ()
   expect(made.ok).toBe(true);
   expect(await repository.list()).toEqual({
     ok: true,
-    value: [{ id: collectionId, name: 'Jackets', itemIds: [scanA, scanB] }],
+    value: [{ id: collectionId, name: 'Jackets', itemIds: [scanA, scanB], shownOnProfile: false }],
   });
 });
 

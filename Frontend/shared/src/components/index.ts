@@ -55,3 +55,4 @@ export * from './Rating';
 export * from './Worthy';
 export * from './WorthySays';
 export * from './paper-motion';
+export * from './PersonLink';

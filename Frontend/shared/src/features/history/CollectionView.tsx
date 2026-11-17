@@ -68,7 +68,7 @@ export function CollectionView({
 }: CollectionViewProps) {
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
-  const { collections, rename, setItems, remove } = useCollections();
+  const { collections, rename, setItems, setShown, remove } = useCollections();
   const { paid } = usePaidPrices();
   const historyChecklist = useHistoryChecklist();
   const [sheet, setSheet] = useState<'rename' | 'items' | 'share' | null>(null);
@@ -211,7 +211,22 @@ export function CollectionView({
         )}
       </Reveal>
 
-      <Reveal index={2} style={styles.actions}>
+      <Reveal index={2} style={styles.option}>
+        <View style={styles.optionText}>
+          <SWText variant="label">Show on my profile</SWText>
+          <SWText variant="caption" tone="textMuted">
+            Others see its name, how many things are in it and what they’re worth. Never your
+            photos, notes or what you paid.
+          </SWText>
+        </View>
+        <Toggle
+          value={collection.shownOnProfile === true}
+          onValueChange={(shown) => keep(setShown(collection.id, shown))}
+          accessibilityLabel="Show this collection on my profile"
+        />
+      </Reveal>
+
+      <Reveal index={3} style={styles.actions}>
         {items.length > 0 ? (
           <Button
             label="Add or take out things"

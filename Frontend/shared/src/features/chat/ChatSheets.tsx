@@ -1,4 +1,4 @@
-import { Ban, Eye, Flag, HandCoins, HeartHandshake, MapPin } from 'lucide-react-native';
+import { Ban, Eye, Flag, HandCoins, HeartHandshake, MapPin, UserRound } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
@@ -400,9 +400,12 @@ export function SafetySheet({
   onClose,
   onReport,
   onBlock,
+  onViewProfile,
 }: {
   readonly visible: boolean;
   readonly handle: string;
+  /** Opens their profile; absent where there are no profiles to open. */
+  readonly onViewProfile?: () => void;
   readonly reported: boolean;
   readonly blocked: boolean;
   readonly onClose: () => void;
@@ -446,6 +449,14 @@ export function SafetySheet({
         </View>
       )}
       <Surface>
+        {onViewProfile ? (
+          <ListRow
+            label={`View @${handle}'s profile`}
+            detail="Their posts, listings and collections"
+            icon={UserRound}
+            onPress={onViewProfile}
+          />
+        ) : null}
         <ListRow
           label={blocked ? `Unblock @${handle}` : `Block @${handle}`}
           detail={blocked ? undefined : "They won't be able to message you"}
