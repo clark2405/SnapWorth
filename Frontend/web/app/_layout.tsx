@@ -147,7 +147,8 @@ function WebCompanion({ ready }: { readonly ready: boolean }) {
     () =>
       companionConfigFor(pathname, {
         go: (href) => router.push(href as Href),
-        ask: (question) => router.push({ pathname: '/worthy', params: { q: question } }),
+        ask: (question) =>
+          router.push({ pathname: '/worthy', params: { q: question, about: pathname } }),
         notify: (title, body) => toast.show({ title, body }),
       }),
     [pathname, router, toast],
@@ -173,7 +174,9 @@ function WebCompanion({ ready }: { readonly ready: boolean }) {
       }
       // The folded tab bar is one short row; Worthy can come down to just above it.
       foldedBottomOffset={config.lift === 'tabBar' && !wide ? 66 : undefined}
-      onAsk={(question) => router.push({ pathname: '/worthy', params: { q: question } })}
+      onAsk={(question) =>
+        router.push({ pathname: '/worthy', params: { q: question, about: pathname } })
+      }
       onHoldSnap={() => router.push('/capture')}
       // Worthy works with your own snaps, listings and chats: a guest is asked for an account.
       onRequestOpen={(open) => requireAccount('worthy', open)}

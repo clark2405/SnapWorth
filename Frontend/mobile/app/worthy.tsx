@@ -9,7 +9,8 @@ import { askWorthy, startWorthyChat, worthyOnDevice } from '../src/snap-sense';
 
 export default function WorthyRoute() {
   const router = useRouter();
-  const { q } = useLocalSearchParams<{ q?: string }>();
+  // `about` is the screen Worthy was opened from, so it can answer about that listing or item.
+  const { q, about } = useLocalSearchParams<{ q?: string; about?: string }>();
   const { isGuest } = useSession();
   const back = () => (router.canGoBack() ? router.back() : router.replace('/feed'));
   // With Apple Intelligence, Worthy answers the light questions on the phone; each visit starts
@@ -28,7 +29,8 @@ export default function WorthyRoute() {
         initialQuestion={q}
         answer={answer}
         onBack={back}
-        onUseListing={() => router.push('/list/nike-neon-windbreaker')}
+        about={about}
+        onUseListing={(scanId) => router.push(`/list/${scanId}`)}
       />
     </ModalSafeArea>
   );

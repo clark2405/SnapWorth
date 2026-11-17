@@ -10,3 +10,4 @@ export * from './marketplace';
 export * from './platform';
 export * from './services';
 export * from './suki';
+export * from './worthy';

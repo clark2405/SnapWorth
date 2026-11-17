@@ -80,6 +80,9 @@ import type { UtcDateTime } from '../types/date-time';
 import type { ChatListing, PublicProfile } from '../types/entities';
 import type { UserId } from '../types/ids';
 import type { PhotoPricingService } from '../types/photo-estimate';
+import type { WorthyCloud } from '../ports/worthy';
+import { createSupabaseWorthyCloud } from '../adapters/supabase/worthy-chat';
+import { WorthyCloudProvider } from '../features/companion/worthy-cloud';
 
 /** What a shell passes in from its environment (EXPO_PUBLIC_SUPABASE_URL / _ANON_KEY). */
 export interface BackendConfig {
@@ -98,6 +101,8 @@ export interface AppServices {
   readonly marketplace: MarketplaceRepository;
   readonly suki: SukiRepository;
   readonly pricing: PhotoPricingService;
+  /** Worthy's chat in the cloud; null with no backend (the chat answers from the app's data). */
+  readonly worthy: WorthyCloud | null;
   /** Who is signed in, for what's kept per account. */
   readonly account: AccountObserver;
   /** Where an account's collections are kept. */
@@ -254,6 +259,7 @@ export function createAppServices(config: BackendConfig): AppServices {
       marketplace: createSupabaseMarketplaceRepository(client),
       suki: createSupabaseSukiRepository(client),
       pricing: createPhotoPricingService(client),
+      worthy: createSupabaseWorthyCloud(client),
       account: createSupabaseAccountObserver(client),
       // Row-level security keeps each account to its own; collections this phone kept before
       // move into the account that owns their things.
@@ -267,6 +273,7 @@ export function createAppServices(config: BackendConfig): AppServices {
   });
   return {
     backend: 'device',
+    worthy: null,
     pricing: {
       async estimate() {
         throw new Error(
@@ -350,44 +357,48 @@ export function AppServicesProvider({
   return (
     <BackendModeProvider mode={services.backend}>
       <PhotoPricingContext.Provider value={services.pricing}>
-        <CommentServiceProvider service={services.comments}>
-          <ChatServiceProvider service={services.chats}>
-            <HanapProvider repository={services.hanap}>
-              <MarketplaceProvider repository={services.marketplace} account={services.account}>
-                <FeedProvider repository={services.feed} account={services.account}>
-                  <SukiProvider repository={services.suki}>
-                    {/* Saved scans, and what was paid for each: in Supabase with a backend, on the
+        <WorthyCloudProvider cloud={services.worthy}>
+          <CommentServiceProvider service={services.comments}>
+            <ChatServiceProvider service={services.chats}>
+              <HanapProvider repository={services.hanap}>
+                <MarketplaceProvider repository={services.marketplace} account={services.account}>
+                  <FeedProvider repository={services.feed} account={services.account}>
+                    <SukiProvider repository={services.suki}>
+                      {/* Saved scans, and what was paid for each: in Supabase with a backend, on the
                     phone without. */}
-                    <ScanHistoryProvider
-                      client={services.supabaseClient ?? null}
-                      store={AsyncStorage}
-                    >
-                      {/* The sample items' prices: kept on the device without a backend; with one
-                      they're a preview, so they aren't kept. */}
-                      <PaidPricesProvider
-                        store={services.backend === 'device' ? AsyncStorage : undefined}
-                        seed={previewPaidPrices}
+                      <ScanHistoryProvider
+                        client={services.supabaseClient ?? null}
+                        store={AsyncStorage}
                       >
-                        <CollectionsProvider
-                          account={services.account}
-                          repositoryFor={services.collectionsFor}
+                        {/* The sample items' prices: kept on the device without a backend; with one
+                      they're a preview, so they aren't kept. */}
+                        <PaidPricesProvider
+                          store={services.backend === 'device' ? AsyncStorage : undefined}
+                          seed={previewPaidPrices}
                         >
-                          {/* Guess the worth needs no account, so its days stay on the device. */}
-                          <GuessProvider store={AsyncStorage}>
-                            {/* Where the viewer is, only when they pick "Near me"; never stored. */}
-                            <ViewerLocationProvider port={deviceLocation}>
-                              <AdminProvider repository={services.admin}>{children}</AdminProvider>
-                            </ViewerLocationProvider>
-                          </GuessProvider>
-                        </CollectionsProvider>
-                      </PaidPricesProvider>
-                    </ScanHistoryProvider>
-                  </SukiProvider>
-                </FeedProvider>
-              </MarketplaceProvider>
-            </HanapProvider>
-          </ChatServiceProvider>
-        </CommentServiceProvider>
+                          <CollectionsProvider
+                            account={services.account}
+                            repositoryFor={services.collectionsFor}
+                          >
+                            {/* Guess the worth needs no account, so its days stay on the device. */}
+                            <GuessProvider store={AsyncStorage}>
+                              {/* Where the viewer is, only when they pick "Near me"; never stored. */}
+                              <ViewerLocationProvider port={deviceLocation}>
+                                <AdminProvider repository={services.admin}>
+                                  {children}
+                                </AdminProvider>
+                              </ViewerLocationProvider>
+                            </GuessProvider>
+                          </CollectionsProvider>
+                        </PaidPricesProvider>
+                      </ScanHistoryProvider>
+                    </SukiProvider>
+                  </FeedProvider>
+                </MarketplaceProvider>
+              </HanapProvider>
+            </ChatServiceProvider>
+          </CommentServiceProvider>
+        </WorthyCloudProvider>
       </PhotoPricingContext.Provider>
     </BackendModeProvider>
   );

@@ -33,7 +33,8 @@ export function CompanionHost({ ready }: { readonly ready: boolean }) {
     () =>
       companionConfigFor(pathname, {
         go: (href) => router.push(href as Href),
-        ask: (question) => router.push({ pathname: '/worthy', params: { q: question } }),
+        ask: (question) =>
+          router.push({ pathname: '/worthy', params: { q: question, about: pathname } }),
         notify: (title, body) => toast.show({ title, body }),
       }),
     [pathname, router, toast],
@@ -47,7 +48,9 @@ export function CompanionHost({ ready }: { readonly ready: boolean }) {
       hidden={!ready || config.hidden}
       bottomOffset={liftRoom[config.lift]}
       foldedBottomOffset={config.lift === 'tabBar' ? foldedTabBarRoom : undefined}
-      onAsk={(question) => router.push({ pathname: '/worthy', params: { q: question } })}
+      onAsk={(question) =>
+        router.push({ pathname: '/worthy', params: { q: question, about: pathname } })
+      }
       onHoldSnap={() => router.push('/capture')}
       // Worthy works with your own snaps, listings and chats: a guest is asked for an account.
       onRequestOpen={(open) => requireAccount('worthy', open)}

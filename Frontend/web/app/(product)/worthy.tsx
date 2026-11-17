@@ -5,7 +5,8 @@ import { AccountGateView, useSession } from '@snapworth/shared/features/session'
 
 export default function WorthyRoute() {
   const router = useRouter();
-  const { q } = useLocalSearchParams<{ q?: string }>();
+  // `about` is the screen Worthy was opened from, so it can answer about that listing or item.
+  const { q, about } = useLocalSearchParams<{ q?: string; about?: string }>();
   const { isGuest } = useSession();
   const back = () => (router.canGoBack() ? router.back() : router.replace('/feed'));
 
@@ -16,7 +17,8 @@ export default function WorthyRoute() {
     <CompanionChatView
       initialQuestion={q}
       onBack={back}
-      onUseListing={() => router.push('/list/nike-neon-windbreaker')}
+      about={about}
+      onUseListing={(scanId) => router.push(`/list/${scanId}`)}
     />
   );
 }

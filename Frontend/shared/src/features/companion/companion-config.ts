@@ -1,5 +1,4 @@
 import {
-  Bell,
   ChartLine,
   HandCoins,
   MessageSquareText,
@@ -11,8 +10,7 @@ import {
   Wallet,
 } from 'lucide-react-native';
 
-import { shareIcon, type CompanionAction, SnapIcon, PriceTagIcon } from '../../components';
-import { formatPeso, previewListingDetail, previewPortfolio } from '../preview/sample-data';
+import { type CompanionAction, SnapIcon, PriceTagIcon } from '../../components';
 
 export interface CompanionConfig {
   readonly hidden: boolean;
@@ -50,7 +48,7 @@ const hiddenOn = [
  * writes the listing, in History it tallies your collection. Hrefs are shared by web and mobile.
  */
 export function companionConfigFor(pathname: string, host: CompanionHost): CompanionConfig {
-  const { go, ask, notify } = host;
+  const { go, ask } = host;
   const hidden = hiddenOn.some((pattern) => pattern.test(pathname));
   const lift = /^\/(feed|marketplace|chat|history)\/?$/.test(pathname)
     ? 'tabBar'
@@ -69,13 +67,13 @@ export function companionConfigFor(pathname: string, host: CompanionHost): Compa
     return {
       hidden,
       lift,
-      greeting: `This one's asking ${formatPeso(previewListingDetail.askingPrice)}. Want my honest read on the price?`,
+      greeting: 'Want my honest read on this price? I’ll weigh it against its AI estimate.',
       hint: 'Is this a fair price? Ask me',
       actions: [
         {
           key: 'fair',
           label: 'Is this a fair price?',
-          detail: 'Compared with 14 recent sales',
+          detail: 'Against its AI estimate',
           icon: Scale,
           onPress: () => ask('Is this a fair price?'),
         },
@@ -85,13 +83,6 @@ export function companionConfigFor(pathname: string, host: CompanionHost): Compa
           detail: 'An amount the seller is likely to accept',
           icon: HandCoins,
           onPress: () => ask('What should I offer?'),
-        },
-        {
-          key: 'watch',
-          label: 'Alert me if it drops',
-          detail: 'Get notified on any price change',
-          icon: Bell,
-          onPress: () => notify('Price alert set', "I'll tell you if this drops below ₱3,000."),
         },
         snap,
       ],
@@ -121,17 +112,10 @@ export function companionConfigFor(pathname: string, host: CompanionHost): Compa
         },
         {
           key: 'trend',
-          label: 'Where is the price heading?',
-          detail: '12 weeks of sales',
+          label: 'What’s selling?',
+          detail: 'What people list most this month',
           icon: ChartLine,
-          onPress: () => ask('Where is the price heading?'),
-        },
-        {
-          key: 'share',
-          label: 'Share a valuation card',
-          detail: 'Send the estimate to a friend',
-          icon: shareIcon,
-          onPress: () => notify('Valuation card ready', 'Saved to your photos.'),
+          onPress: () => ask('What’s trending?'),
         },
       ],
     };
@@ -141,7 +125,7 @@ export function companionConfigFor(pathname: string, host: CompanionHost): Compa
     return {
       hidden,
       lift,
-      greeting: `Your collection is worth about ${formatPeso(previewPortfolio.total)} right now — ${previewPortfolio.changeLabel}.`,
+      greeting: 'I can add up what your things are worth, or help you pick what to sell next.',
       actions: [
         {
           key: 'worth',
