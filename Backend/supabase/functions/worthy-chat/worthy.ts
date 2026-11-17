@@ -1,3 +1,5 @@
+import { modelsToTry, sendWithRetry } from "../_shared/gemini-retry.ts";
+
 /**
  * Worthy's chat in the cloud, for every device without Apple Intelligence (and for writing a
  * listing on any device). The app sends the question, the last few turns, and what it knows of
@@ -13,6 +15,8 @@ interface Dependencies {
   model: string;
   authenticate: (token: string) => Promise<string | null>;
   fetch: typeof fetch;
+  /** Comma-separated models to fall back to when the main one is overloaded. */
+  fallbackModels?: string;
 }
 
 export const defaultChatModel = "gemini-3.6-flash";
@@ -225,18 +229,18 @@ export function createWorthyHandler(deps: Dependencies) {
     const turns = readTurns(input.history);
 
     try {
-      const response = await deps.fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${deps.model}:generateContent`,
+      const models = modelsToTry(deps.model, deps.fallbackModels);
+      const response = await sendWithRetry(
+        (signal, attempt) =>
+          deps.fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${models[Math.min(attempt, models.length - 1)]}:generateContent`,
         {
           method: "POST",
           headers: {
             "content-type": "application/json",
             "x-goog-api-key": deps.apiKey,
           },
-          signal: AbortSignal.any([
-            request.signal,
-            AbortSignal.timeout(25_000),
-          ]),
+          signal,
           body: JSON.stringify({
             systemInstruction: { parts: [{ text: prompt }] },
             contents: [
@@ -264,6 +268,9 @@ export function createWorthyHandler(deps: Dependencies) {
             },
           }),
         },
+          ),
+        request.signal,
+        { perAttemptMs: 14000, totalMs: 30000, label: "worthy-chat" },
       );
       if (response.status === 429) return error(429, "rate_limited");
       if (!response.ok) return error(502, "provider_unavailable");

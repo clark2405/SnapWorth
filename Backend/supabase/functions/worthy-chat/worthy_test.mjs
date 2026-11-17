@@ -116,3 +116,39 @@ test("limits how fast one person can ask", async () => {
   for (let i = 0; i < 9; i += 1) last = await handler(request({ question: `q${i}` }));
   assert.equal(last.status, 429);
 });
+
+test("tries again when Gemini is briefly overloaded", async () => {
+  let calls = 0;
+  const handler = createWorthyHandler({
+    apiKey: "private-test-key",
+    model: "gemini-3.6-flash",
+    authenticate: async () => "user-2",
+    fetch: async () => {
+      calls += 1;
+      return calls === 1
+        ? new Response('{"error":{"status":"UNAVAILABLE"}}', { status: 503 })
+        : geminiReturning({ ...answer, intent: "chat", draftTitle: null, draftDescription: null });
+    },
+  });
+  const response = await handler(request({ question: "hi" }));
+  assert.equal(response.status, 200);
+  assert.equal(calls, 2);
+});
+
+test("falls back to a lighter model while the main one is overloaded", async () => {
+  const models = [];
+  const handler = createWorthyHandler({
+    apiKey: "private-test-key",
+    model: "gemini-3.6-flash",
+    authenticate: async () => "user-3",
+    fetch: async (url) => {
+      models.push(/models\/([^:]+):/.exec(url)[1]);
+      return models.length === 1
+        ? new Response('{"error":{"code":503}}', { status: 503 })
+        : geminiReturning({ ...answer, intent: "chat", draftTitle: null, draftDescription: null });
+    },
+  });
+  const response = await handler(request({ question: "hi" }));
+  assert.equal(response.status, 200);
+  assert.deepEqual(models, ["gemini-3.6-flash", "gemini-3.5-flash-lite"]);
+});
