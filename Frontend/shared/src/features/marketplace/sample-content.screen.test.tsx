@@ -45,7 +45,7 @@ describe('sample content stays out of a backed Market', () => {
   it('says a seller isn’t found instead of showing a sample seller', async () => {
     renderScreen(withBackend(<SellerProfileView handle="mariacruz" />));
 
-    await waitFor(() => expect(screen.getByText('Seller not found')).toBeOnTheScreen());
+    await waitFor(() => expect(screen.getByText('Profile not found')).toBeOnTheScreen());
     expect(screen.queryByText('Maria Cruz')).toBeNull();
   });
 

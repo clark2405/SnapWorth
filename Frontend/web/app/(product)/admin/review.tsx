@@ -1,13 +1,6 @@
-import { useRouter } from 'expo-router';
+import { Redirect } from 'expo-router';
 
-import { AdminReviewView } from '@snapworth/shared/features/admin';
-
+/** The review queue lives in the moderation console on the website now. */
 export default function AdminReviewRoute() {
-  const router = useRouter();
-
-  return (
-    <AdminReviewView
-      onBack={() => (router.canGoBack() ? router.back() : router.replace('/profile'))}
-    />
-  );
+  return <Redirect href="/admin" />;
 }

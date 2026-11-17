@@ -12,6 +12,7 @@ Deno.serve(
     model: Deno.env.get("AI_MODEL") ?? defaultPricingModel,
     thinkingLevel: Deno.env.get("AI_THINKING_LEVEL"),
     fetch,
+    fallbackModels: Deno.env.get("AI_FALLBACK_MODELS"),
     authenticate: async (token) => {
       const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
         headers: { apikey: supabaseKey, authorization: `Bearer ${token}` },

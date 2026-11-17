@@ -15,6 +15,7 @@ import Animated, {
 
 import {
   Avatar,
+  PersonLink,
   EstimateBadge,
   Photo,
   PriceTagIcon,
@@ -103,19 +104,25 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
   return (
     <View style={styles.post}>
       <View style={styles.header}>
-        <Avatar
-          source={post.author.avatar}
-          name={post.author.displayName?.trim() || post.author.handle}
-          size={32}
-        />
-        <View style={styles.byline}>
-          <SWText variant="labelSmall">
-            {post.author.displayName?.trim() || `@${post.author.handle}`}
-          </SWText>
-          <SWText variant="caption" tone="textMuted">
-            {post.postedAgo}
-          </SWText>
-        </View>
+        <PersonLink
+          handle={post.author.handle}
+          label={post.author.displayName?.trim() || `@${post.author.handle}`}
+          style={styles.person}
+        >
+          <Avatar
+            source={post.author.avatar}
+            name={post.author.displayName?.trim() || post.author.handle}
+            size={32}
+          />
+          <View style={styles.byline}>
+            <SWText variant="labelSmall">
+              {post.author.displayName?.trim() || `@${post.author.handle}`}
+            </SWText>
+            <SWText variant="caption" tone="textMuted">
+              {post.postedAgo}
+            </SWText>
+          </View>
+        </PersonLink>
         {/* A listing reposted for a price check: the vote is on what the seller is asking. */}
         {post.listing ? (
           <Tag
@@ -227,6 +234,12 @@ const stylesFor = themedStyles((colors, name) => ({
     paddingVertical: tokens.spacing[5],
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing[3],
+  },
+  person: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing[3],

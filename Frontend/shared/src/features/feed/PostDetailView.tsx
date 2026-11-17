@@ -12,6 +12,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import {
   Avatar,
+  PersonLink,
   BottomBar,
   Button,
   EmptyState,
@@ -366,20 +367,26 @@ function PostDiscussion({
             bodyY.current = event.nativeEvent.layout.y;
           }}
         >
-          <Reveal index={0} style={styles.author}>
-            <Avatar
-              source={post.author.avatar}
-              name={post.author.displayName?.trim() || post.author.handle}
-              size={40}
-            />
-            <View>
-              <SWText variant="label">
-                {post.author.displayName?.trim() || `@${post.author.handle}`}
-              </SWText>
-              <SWText variant="caption" tone="textMuted">
-                {post.postedAgo}
-              </SWText>
-            </View>
+          <Reveal index={0}>
+            <PersonLink
+              handle={post.author.handle}
+              label={post.author.displayName?.trim() || `@${post.author.handle}`}
+              style={styles.author}
+            >
+              <Avatar
+                source={post.author.avatar}
+                name={post.author.displayName?.trim() || post.author.handle}
+                size={40}
+              />
+              <View>
+                <SWText variant="label">
+                  {post.author.displayName?.trim() || `@${post.author.handle}`}
+                </SWText>
+                <SWText variant="caption" tone="textMuted">
+                  {post.postedAgo}
+                </SWText>
+              </View>
+            </PersonLink>
           </Reveal>
 
           <Reveal index={1} style={styles.question}>

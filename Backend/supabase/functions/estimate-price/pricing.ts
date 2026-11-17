@@ -1,9 +1,13 @@
+import { modelsToTry, sendWithRetry } from "../_shared/gemini-retry.ts";
+
 interface Dependencies {
   apiKey: string;
   model: string;
   thinkingLevel?: string;
   authenticate: (token: string) => Promise<string | null>;
   fetch: typeof fetch;
+  /** Comma-separated models to fall back to when the main one is overloaded. */
+  fallbackModels?: string;
 }
 
 export const defaultPricingModel = "gemini-3.6-flash";
@@ -275,18 +279,18 @@ export function createEstimateHandler(deps: Dependencies) {
       return error(429, "rate_limited");
     recent.set(userId, [...attempts, now]);
     try {
-      const response = await deps.fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${deps.model}:generateContent`,
+      const models = modelsToTry(deps.model, deps.fallbackModels);
+      const response = await sendWithRetry(
+        (signal, attempt) =>
+          deps.fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${models[Math.min(attempt, models.length - 1)]}:generateContent`,
         {
           method: "POST",
           headers: {
             "content-type": "application/json",
             "x-goog-api-key": deps.apiKey,
           },
-          signal: AbortSignal.any([
-            request.signal,
-            AbortSignal.timeout(60_000),
-          ]),
+          signal,
           body: JSON.stringify({
             systemInstruction: { parts: [{ text: prompt }] },
             contents: [
@@ -306,11 +310,15 @@ export function createEstimateHandler(deps: Dependencies) {
               responseSchema,
               maxOutputTokens: 4096,
               thinkingConfig: {
-                thinkingLevel,
+                // The fallbacks are lighter models: keep them quick.
+                thinkingLevel: attempt === 0 ? thinkingLevel : "low",
               },
             },
           }),
         },
+          ),
+        request.signal,
+        { perAttemptMs: 25000, totalMs: 55000, label: "estimate-price" },
       );
       if (response.status === 429) return error(429, "rate_limited");
       if (!response.ok) return error(502, "provider_unavailable");

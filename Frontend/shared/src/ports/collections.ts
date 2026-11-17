@@ -7,6 +7,8 @@ export interface Collection {
   readonly name: string;
   /** History item ids, in the order they were added. */
   readonly itemIds: readonly string[];
+  /** Shown on the owner's profile (its name, count and worth); private unless turned on. */
+  readonly shownOnProfile?: boolean;
 }
 
 /**
@@ -20,6 +22,8 @@ export interface CollectionRepository {
   rename(id: string, name: string): Promise<Result<void, AppError>>;
   /** Makes these the things in the collection. */
   setItems(id: string, itemIds: readonly string[]): Promise<Result<void, AppError>>;
+  /** Shows the collection on the owner's profile, or takes it off. */
+  setShown(id: string, shown: boolean): Promise<Result<void, AppError>>;
   /** Deletes the collection; its things stay in History. */
   remove(id: string): Promise<Result<void, AppError>>;
 }

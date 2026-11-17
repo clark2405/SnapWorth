@@ -10,12 +10,14 @@ import { toAppError } from './errors';
 interface CollectionRow {
   readonly id: string;
   readonly name: string;
+  readonly shown_on_profile?: boolean | null;
   readonly collection_items: readonly { readonly scan_id: string; readonly added_at: string }[];
 }
 
 const fromRow = (row: CollectionRow): Collection => ({
   id: row.id,
   name: row.name,
+  shownOnProfile: row.shown_on_profile === true,
   itemIds: [...(row.collection_items ?? [])]
     .sort((a, b) => a.added_at.localeCompare(b.added_at))
     .map((item) => item.scan_id),
@@ -98,7 +100,7 @@ export function createSupabaseCollectionRepository(
       await adoptDeviceCollections().catch(() => undefined);
       const { data, error } = await client
         .from('collections')
-        .select('id, name, collection_items(scan_id, added_at)')
+        .select('id, name, shown_on_profile, collection_items(scan_id, added_at)')
         .order('created_at', { ascending: true });
       if (error) return err(toAppError(error, 'load_collections', 'collection'));
       return ok((data as unknown as CollectionRow[]).map(fromRow));
@@ -116,6 +118,18 @@ export function createSupabaseCollectionRepository(
       const { data, error } = await client
         .from('collections')
         .update({ name })
+        .eq('id', id)
+        .select('id');
+      if (error) return err(toAppError(error, 'save_collection', 'collection'));
+      return data.length > 0
+        ? ok(undefined)
+        : err({ kind: 'authorization', code: 'not_found_or_denied' });
+    },
+
+    async setShown(id, shown) {
+      const { data, error } = await client
+        .from('collections')
+        .update({ shown_on_profile: shown })
         .eq('id', id)
         .select('id');
       if (error) return err(toAppError(error, 'save_collection', 'collection'));

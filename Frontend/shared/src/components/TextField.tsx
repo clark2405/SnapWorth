@@ -1,5 +1,5 @@
 import { ChevronDown } from 'lucide-react-native';
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { Platform, TextInput, View, type TextInputProps, type TextStyle } from 'react-native';
 import Animated, {
   interpolateColor,
@@ -52,6 +52,8 @@ export function Field({ label, helper, children }: FieldProps) {
 }
 
 export interface TextFieldProps extends Omit<TextInputProps, 'style'> {
+  /** The input itself, to move the cursor to it (React 19 passes it through with the props). */
+  readonly ref?: Ref<TextInput>;
   readonly prefix?: string;
   readonly size?: 'regular' | 'large';
   /** Leading glyph, e.g. a search icon. */

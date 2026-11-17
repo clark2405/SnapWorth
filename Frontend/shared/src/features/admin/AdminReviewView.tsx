@@ -1,4 +1,13 @@
-import { Check, EyeOff, ShieldCheck, ShieldOff, Trash2, WifiOff, X } from 'lucide-react-native';
+import {
+  Check,
+  EyeOff,
+  ShieldCheck,
+  ShieldOff,
+  Trash2,
+  UserSearch,
+  WifiOff,
+  X,
+} from 'lucide-react-native';
 import { useState } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
@@ -51,6 +60,26 @@ const decisionButtons = {
  */
 export function AdminReviewView({ onBack }: AdminReviewViewProps) {
   const styles = useThemedStyles(stylesFor);
+  return (
+    <Screen
+      header={<NavHeader title="Review queue" onBack={onBack} />}
+      contentStyle={styles.content}
+    >
+      <ReviewQueue />
+    </Screen>
+  );
+}
+
+/**
+ * The queue itself, for the review screen and the moderation console's Queue tab. `onLookUp`
+ * opens the author in the console's People tab, to see their record or suspend them.
+ */
+export function ReviewQueue({
+  onLookUp,
+}: {
+  readonly onLookUp?: (handle: string) => void;
+} = {}) {
+  const styles = useThemedStyles(stylesFor);
   const toast = useToast();
   const { status, cases, refresh, decide } = useAdminReview();
   const [deciding, setDeciding] = useState<string | null>(null);
@@ -67,10 +96,7 @@ export function AdminReviewView({ onBack }: AdminReviewViewProps) {
   };
 
   return (
-    <Screen
-      header={<NavHeader title="Review queue" onBack={onBack} />}
-      contentStyle={styles.content}
-    >
+    <>
       {status === 'denied' ? (
         <EmptyState
           icon={ShieldOff}
@@ -111,6 +137,7 @@ export function AdminReviewView({ onBack }: AdminReviewViewProps) {
                     item={item}
                     busy={deciding === item.id}
                     onDecide={(decision) => void act(item, decision)}
+                    onLookUp={onLookUp ? () => onLookUp(item.authorHandle) : undefined}
                   />
                 </Reveal>
               </Animated.View>
@@ -118,7 +145,7 @@ export function AdminReviewView({ onBack }: AdminReviewViewProps) {
           )}
         </>
       )}
-    </Screen>
+    </>
   );
 }
 
@@ -126,10 +153,12 @@ function CaseCard({
   item,
   busy,
   onDecide,
+  onLookUp,
 }: {
   item: ReviewCase;
   busy: boolean;
   onDecide: (decision: ReviewDecision) => void;
+  onLookUp?: () => void;
 }) {
   const styles = useThemedStyles(stylesFor);
   return (
@@ -158,6 +187,15 @@ function CaseCard({
           </View>
         )}
         <SWText variant="labelSmall">@{item.authorHandle}</SWText>
+        {onLookUp ? (
+          <Button
+            label="Their record"
+            variant="tertiary"
+            size="small"
+            icon={UserSearch}
+            onPress={onLookUp}
+          />
+        ) : null}
       </View>
       {item.title ? (
         <SWText variant="headingSmall" accessibilityRole="header">

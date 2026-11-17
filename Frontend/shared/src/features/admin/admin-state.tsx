@@ -36,16 +36,29 @@ export function AdminProvider({
 }
 
 /** Without a provider (a screen rendered on its own, as in tests) nobody is an admin. */
+const denied = () =>
+  Promise.resolve(err({ kind: 'authorization', code: 'not_found_or_denied' } as const));
 const nobody: AdminRepository = {
-  queue: () => Promise.resolve(err({ kind: 'authorization', code: 'not_found_or_denied' })),
-  decide: () => Promise.resolve(err({ kind: 'authorization', code: 'not_found_or_denied' })),
+  queue: denied,
+  decide: denied,
+  overview: denied,
+  people: denied,
+  suspend: denied,
+  reinstate: denied,
+  history: denied,
 };
+
+/** The admin repository, for the console's other tabs; refuses everything outside a provider. */
+export function useAdminRepository(): AdminRepository {
+  return useContext(AdminContext) ?? nobody;
+}
 
 /**
  * The review queue as the database gives it. `denied` means the signed-in person isn't an admin
  * (or isn't signed in): the database refused, whatever the app showed them to get here.
  */
-export function useAdminReview(): AdminReviewState {
+/** The queue; with `enabled` false (someone who isn't an admin) nothing is asked for. */
+export function useAdminReview(enabled = true): AdminReviewState {
   const repository = useContext(AdminContext) ?? nobody;
   const [status, setStatus] = useState<ReviewLoadStatus>('loading');
   const [cases, setCases] = useState<readonly ReviewCase[]>([]);
@@ -64,8 +77,8 @@ export function useAdminReview(): AdminReviewState {
   }, [repository]);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    if (enabled) void refresh();
+  }, [enabled, refresh]);
 
   const decide = useCallback(
     async (item: ReviewCase, decision: ReviewDecision) => {
@@ -81,7 +94,7 @@ export function useAdminReview(): AdminReviewState {
 }
 
 /** How many cases wait, for an admin's profile; nothing until it's known, and for anyone else. */
-export function useReviewCount(): number | null {
-  const { status, cases } = useAdminReview();
+export function useReviewCount(enabled = true): number | null {
+  const { status, cases } = useAdminReview(enabled);
   return status === 'ready' ? cases.length : null;
 }

@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   BannerProvider,
   Companion,
+  PersonLinkProvider,
   RevealGate,
   SignInHandoff,
   ToastProvider,
@@ -104,28 +105,34 @@ function Shell() {
       onCreateAccount={() => router.push('/signup?return=1')}
       onSignIn={() => router.push('/login?return=1')}
     >
-      <TipsProvider store={browserTipStore}>
-        <StatusBar style={isDark ? 'light' : 'dark'} />
-        <RevealGate open={revealOpen}>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: colors.canvas },
-              animation: 'fade',
-            }}
-          />
-          <WebCompanion ready={launched} />
-          {/* A new message, offer or meetup in a chat that isn't open: a banner that opens it. */}
-          <ChatBannerHost onOpenConversation={openChat} wants={wantsToHear} />
-          {/* Agreed meetups: a banner here when it's time. A browser can't wake a closed tab. */}
-          <MeetupRemindersHost onOpenConversation={openChat} wants={wantsToHear} />
-          {/* Signing in closes the screen into Worthy's tag and opens it onto the app. */}
-          <SignInHandoff />
-        </RevealGate>
-        {launched ? null : (
-          <SessionSplashView onExit={() => setRevealOpen(true)} onDone={() => setLaunched(true)} />
-        )}
-      </TipsProvider>
+      {/* Tapping someone's name or photo opens their profile. */}
+      <PersonLinkProvider onOpen={(handle) => router.push(`/seller/${encodeURIComponent(handle)}`)}>
+        <TipsProvider store={browserTipStore}>
+          <StatusBar style={isDark ? 'light' : 'dark'} />
+          <RevealGate open={revealOpen}>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: colors.canvas },
+                animation: 'fade',
+              }}
+            />
+            <WebCompanion ready={launched} />
+            {/* A new message, offer or meetup in a chat that isn't open: a banner that opens it. */}
+            <ChatBannerHost onOpenConversation={openChat} wants={wantsToHear} />
+            {/* Agreed meetups: a banner here when it's time. A browser can't wake a closed tab. */}
+            <MeetupRemindersHost onOpenConversation={openChat} wants={wantsToHear} />
+            {/* Signing in closes the screen into Worthy's tag and opens it onto the app. */}
+            <SignInHandoff />
+          </RevealGate>
+          {launched ? null : (
+            <SessionSplashView
+              onExit={() => setRevealOpen(true)}
+              onDone={() => setLaunched(true)}
+            />
+          )}
+        </TipsProvider>
+      </PersonLinkProvider>
     </SessionProvider>
   );
 }
@@ -140,7 +147,8 @@ function WebCompanion({ ready }: { readonly ready: boolean }) {
     () =>
       companionConfigFor(pathname, {
         go: (href) => router.push(href as Href),
-        ask: (question) => router.push({ pathname: '/worthy', params: { q: question } }),
+        ask: (question) =>
+          router.push({ pathname: '/worthy', params: { q: question, about: pathname } }),
         notify: (title, body) => toast.show({ title, body }),
       }),
     [pathname, router, toast],
@@ -166,7 +174,9 @@ function WebCompanion({ ready }: { readonly ready: boolean }) {
       }
       // The folded tab bar is one short row; Worthy can come down to just above it.
       foldedBottomOffset={config.lift === 'tabBar' && !wide ? 66 : undefined}
-      onAsk={(question) => router.push({ pathname: '/worthy', params: { q: question } })}
+      onAsk={(question) =>
+        router.push({ pathname: '/worthy', params: { q: question, about: pathname } })
+      }
       onHoldSnap={() => router.push('/capture')}
       // Worthy works with your own snaps, listings and chats: a guest is asked for an account.
       onRequestOpen={(open) => requireAccount('worthy', open)}

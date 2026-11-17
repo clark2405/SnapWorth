@@ -37,6 +37,28 @@ const goodPhoto = {
   codes: [],
 };
 
+// Cutting the photo down to the frame: the stand-in hands back what the camera took, so the
+// tests see the photo and its data as they were.
+jest.mock('expo-image-manipulator', () => ({
+  SaveFormat: { JPEG: 'jpeg' },
+  ImageManipulator: {
+    manipulate: (uri: string) => {
+      const context = {
+        crop: () => context,
+        resize: () => context,
+        renderAsync: async () => ({
+          saveAsync: async () => {
+            const shot = (await mockTakePicture.mock.results.at(-1)?.value) as
+              { base64?: string } | undefined;
+            return { uri, base64: shot?.base64 ?? '' };
+          },
+        }),
+      };
+      return context;
+    },
+  },
+}));
+
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
@@ -68,13 +90,24 @@ jest.mock('expo-camera', () => {
 // permission, capture, error, and lifecycle handling run unchanged.
 jest.mock('@snapworth/shared/features/capture', () => {
   const React = jest.requireActual<typeof ReactApi>('react');
-  const { View, Button } = jest.requireActual<typeof ReactNativeApi>('react-native');
+  const { View, Button, Text } = jest.requireActual<typeof ReactNativeApi>('react-native');
   // The photo coach is plain data, so the real one is used.
   const { coachFor } = jest.requireActual<{ coachFor: unknown }>(
     '@snapworth/shared/features/capture/photo-coach',
   );
   return {
     coachFor,
+    EstimatingScene: (props: { stage: string; looksLike?: string }) =>
+      React.createElement(
+        View,
+        null,
+        React.createElement(
+          Text,
+          null,
+          props.stage === 'looking' ? 'Looking at your photo' : 'Pricing your item',
+        ),
+        props.looksLike ? React.createElement(Text, null, `Looks like: ${props.looksLike}`) : null,
+      ),
     CaptureView: (props: {
       viewfinder: React.ReactNode;
       captureDisabled: boolean;
@@ -103,15 +136,20 @@ jest.mock('@snapworth/shared/components', () => {
       React.createElement(Button, { ...props, title: label }),
     SWText: ({ children }: { children: React.ReactNode }) =>
       React.createElement(Text, null, children),
+    EstimateBadge: ({ value, range }: { value: string; range?: string }) =>
+      React.createElement(Text, null, `${value} ${range ?? ''}`),
+    Worthy: () => null,
   };
 });
 
 jest.mock('@snapworth/shared/design', () => ({
+  held: () => ({}),
   tokens: {
     color: { dark: { sunken: '#000' } },
-    overlay: { text: '#fff', chrome: '#0008' },
-    radius: { medium: 16 },
-    spacing: { 1: 4, 3: 12, 4: 16, 6: 24 },
+    overlay: { text: '#fff', chrome: '#0008', border: '#fff3' },
+    illustration: { cardStock: '#fff' },
+    radius: { small: 12, medium: 16, large: 20 },
+    spacing: { 1: 4, 2: 8, 3: 12, 4: 16, 5: 20, 6: 24 },
   },
 }));
 
@@ -347,7 +385,7 @@ it('does not display an old estimate after retaking the photo', async () => {
   openCamera();
   await readyCamera();
   fireEvent.press(screen.getByText('Take photo'));
-  await screen.findByText('Estimating your item…');
+  await screen.findByText('Pricing your item');
   fireEvent.press(screen.getByText('Retake photo'));
   await act(async () => finishEstimate(sampleEstimate));
   expect(screen.queryByText('Camera-tested jacket')).toBeNull();

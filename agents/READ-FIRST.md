@@ -176,6 +176,22 @@ Last updated 2026-11-12.
   in the SQL editor. Clark's account is an admin; anyone else needs the one-liner under
   "Making someone an admin".
 
+### Added 2026-11-17
+
+- **Moderation console on the website** (`/admin`, "Moderation" in the sidebar for admins):
+  overview, the review queue, people (look up, suspend for 1, 7 or 30 days or until lifted,
+  optionally taking down their content; reinstate) and the history of decisions.
+  `20261117000100_moderation_console` adds `account_suspensions` and the `admin_*` functions; a
+  suspended account can look around but can't post, comment, list, vote or message. The phone
+  keeps its review screen.
+- **Profiles:** tapping a name or photo on a post, comment or chat opens that person's profile
+  (`/seller/<handle>`, `SellerProfileView`) with their posts, listings and the collections they
+  chose to show ("Show on my profile" on a collection, via `profile_collections()`: names,
+  counts and totals only).
+- **Camera:** only what's inside the frame is priced (`mobile/src/camera/frame-crop.ts`); pinch
+  or the − / + pill zooms; the wait is `EstimatingScene` (Worthy, a print being scanned, a tag's
+  digits rolling).
+
 ### Kept on the device only
 
 - **Guess the worth:** a daily game on the Feed. It's five of the Market's listings, the same five
@@ -192,12 +208,6 @@ on them isn't saved.
 - **With no backend only:** History's sample items before the first scan, and their sample market
   detail (demand, condition, trend and recent sales) on the item screen. With a backend History is
   empty until the first scan, and a real scan has no market detail yet.
-- **Worthy's cards:** price, trend and collection answers. Real accounts see these today, so a
-  "fair price" answer quotes "14 similar sales" and a range whatever the item. Without Apple
-  Intelligence (the web, Android, older iPhones) every chat reply is canned. Worthy's panel on a
-  listing offers "Alert me if it drops" and on an item "Share a valuation card": both only show a
-  toast, setting and saving nothing. All of this is the cloud AI owner's (see "Handoff" below).
-
 ### Not done yet
 
 - **Sign-in:**
@@ -205,10 +215,9 @@ on them isn't saved.
     Supabase's Google provider set up first; see "Sign-in setup".
   - Sign in with Apple is written but hidden: it needs the paid Apple Developer account. See
     "Sign-in setup" to turn it on.
-- **Cloud AI** (a teammate owns this; see "Handoff" below):
-  - Worthy's chat in the cloud.
-  - Real data behind Worthy's cards.
-  - Deploying the `estimate-price` update.
+- **Deploying the cloud AI:** `worthy-chat` (Worthy's chat) and the `estimate-price` clues change
+  are in code but must be deployed (`npx --yes supabase@3.1.0 functions deploy worthy-chat
+  estimate-price`). Until then the chat answers in plain sentences from the app's data.
 - **Notifications:**
   - Push needs the paid Apple Developer account. Until then `app.config.ts` sets the
     `expo-notifications` plugin to `enableRemoteNotifications: false`, so a prebuild doesn't add the
@@ -330,35 +339,26 @@ comes from a real person."
   | Worthy's light questions (how-to, photo tips, wording) | Phone                      | Cloud model                                  |
   | Prices, trends, collection value, listing drafts       | Cloud                      | Cloud                                        |
 
-#### Handoff: the cloud AI belongs to another team member
+#### The cloud AI
 
-A teammate owns the cloud AI work, including the choice of cloud model. The on-device side and
-the connection points are built, so the cloud work only needs to fill in the parts below. Other
-contributors (people or agents) shouldn't build these parts; leave them to the owner.
+Ivan owned the cloud AI; Worthy's chat in the cloud was then built on 2026-11-17 at Clark's request.
+Talk to Ivan before changing the model, prompts or limits.
 
-**What's done:**
+**What's built:**
 
-- On-device photo check, label reading and first look (`mobile/modules/snap-sense`).
-- On-device Worthy chat for Apple Intelligence iPhones.
-- `estimate-price` accepts the phone's `PhotoClues`, cut to size and marked as untrusted. That
-  change is merged in code but **not deployed** to Supabase yet. Until it's deployed, the clues
-  are ignored and nothing breaks.
-
-**What the cloud work needs to fill in:**
-
-1. **Worthy's chat in the cloud**, for every device without Apple Intelligence. Until it exists
-   they get canned sample replies (`replyForIntent` in
-   `shared/src/features/companion/CompanionChatView.tsx`).
-   - Pass it as the `answer` prop on `CompanionChatView`, the way the phone's answerer is
-     passed in `mobile/app/worthy.tsx`.
-   - It must return `WorthyAnswer` (`intent` plus `reply`), so `settleAnswer` keeps money out of
-     chat replies on every device.
-   - Follow `estimate-price` for sign-in checks, request limits, and treating input as untrusted.
-2. **Real data behind Worthy's cards.** Price, trend, collection and listing answers show sample
-   data (`previewCompanionReplies`, `previewListingInsight` and the rest in
-   `shared/src/features/preview/sample-data.ts`). A price question about a PS5 shows the
-   windbreaker's range.
-3. **Deploying `estimate-price`** with the clues change.
+- On-device photo check, label reading and first look (`mobile/modules/snap-sense`), and the
+  on-device Worthy chat for Apple Intelligence iPhones.
+- `estimate-price`: prices a photo (cut down to the camera's frame first) with Gemini. It accepts
+  the phone's `PhotoClues`, cut to size and marked as untrusted.
+- `worthy-chat` (`Backend/supabase/functions/worthy-chat`): Worthy's chat. The app sends the
+  question, the last six turns and the person's own things (`contextFor` in
+  `shared/src/features/companion/worthy-answers.ts`: their scans, the listing Worthy was opened
+  on, the Market's real trends). It answers with an intent, a reply and, for "write my listing",
+  a draft. It quotes money only as it appears in that data. Same key and model as
+  `estimate-price`, low thinking, 25s limit, 8 a minute and 60 a day per account.
+- The chat (`CompanionChatView`): the phone's model first (light chat only; `settleAnswer` keeps
+  money out of its replies), then the cloud, then plain sentences from the data
+  (`plainAnswer`). Every card comes from real data (`cardFor`); no data, no card.
 
 **What the live `estimate-price` does today** (checked 2026-11-13, signed in as test accounts):
 

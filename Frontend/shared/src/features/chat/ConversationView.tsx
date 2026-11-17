@@ -23,6 +23,7 @@ import {
   hideWebFocusOutline,
   IconButton,
   NavHeader,
+  useOpenPerson,
   Photo,
   PressableScale,
   Reveal,
@@ -90,6 +91,7 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
   const handle = conversation?.other.handle ?? 'seller';
   // The other person deleted their account: the history stays, shown as theirs-no-longer.
   const gone = conversation?.otherGone ?? false;
+  const openPerson = useOpenPerson();
   const name = gone ? 'Deleted account' : `@${handle}`;
   const askingPrice = conversation?.listing.askingPricePhp ?? 0;
   const iAmSeller = conversation?.iAmSeller ?? false;
@@ -507,6 +509,14 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
       <SafetySheet
         visible={sheet === 'safety'}
         handle={handle}
+        onViewProfile={
+          openPerson && !gone
+            ? () => {
+                setSheet(null);
+                openPerson(handle);
+              }
+            : undefined
+        }
         reported={reported}
         blocked={blocked}
         onClose={() => setSheet(null)}

@@ -1,5 +1,5 @@
 import { ArrowUp, PenLine } from 'lucide-react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, TextInput, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -23,43 +23,29 @@ import {
   Worthy,
 } from '../../components';
 import { NightRoom, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
+import type { WorthyTurn } from '../../ports/worthy';
+import { useScanHistory } from '../history/scan-history-state';
+import { useMarketplace } from '../marketplace/marketplace-state';
+import { formatPeso } from '../preview/sample-data';
+import { useTrends } from '../trends/use-trends';
 import {
-  formatPeso,
-  previewCompanionReplies,
-  previewListingInsight,
-  previewPortfolio,
-  previewValuation,
-} from '../preview/sample-data';
-import { settleAnswer, type WorthyAnswerer, type WorthyIntent } from './worthy-replies';
-
-type ReplyCard = 'range' | 'listing' | 'trend' | 'portfolio' | null;
+  cardFor,
+  contextFor,
+  plainAnswer,
+  subjectOf,
+  type ReplyCard,
+  type WorthyData,
+} from './worthy-answers';
+import { useWorthyCloud } from './worthy-cloud';
+import { intentFor, settleAnswer, type WorthyAnswerer, type WorthyIntent } from './worthy-replies';
 
 interface ChatMessage {
   readonly id: string;
   readonly role: 'user' | 'worthy';
   readonly text: string;
-  readonly card: ReplyCard;
+  readonly card: ReplyCard | null;
   /** Answered by the model on this device, in its own words. */
   readonly onDevice?: boolean;
-}
-
-/** The app's own answer for an intent: words and the evidence card beneath them. */
-function replyForIntent(intent: WorthyIntent): { text: string; card: ReplyCard } {
-  switch (intent) {
-    case 'collection':
-      return {
-        text: `Your ${previewPortfolio.itemCount} items add up to about ${formatPeso(previewPortfolio.total)}, ${previewPortfolio.changeLabel}. ${previewPortfolio.topMover.title} is your top mover.`,
-        card: 'portfolio',
-      };
-    case 'price':
-      return { text: previewCompanionReplies.fairPrice, card: 'range' };
-    case 'listing':
-      return { text: previewCompanionReplies.listing, card: 'listing' };
-    case 'trend':
-      return { text: previewCompanionReplies.trend, card: 'trend' };
-    case 'chat':
-      return { text: previewCompanionReplies.fallback, card: null };
-  }
 }
 
 const followUps = [
@@ -72,7 +58,10 @@ const followUps = [
 export interface CompanionChatViewProps {
   readonly initialQuestion?: string;
   readonly onBack?: () => void;
-  readonly onUseListing?: () => void;
+  /** Opens the listing form for one of the person's scans, with Worthy's draft. */
+  readonly onUseListing?: (scanId: string) => void;
+  /** The screen Worthy was opened from (`/listing/<slug>`, `/item/<id>`): what it's about. */
+  readonly about?: string;
   /**
    * Answers on the device where it can (Apple Intelligence on iOS): it works out what's being
    * asked and answers the light questions itself. Without it, Worthy goes by the question's words.
@@ -94,7 +83,13 @@ export function CompanionChatView(props: CompanionChatViewProps) {
   );
 }
 
-function CompanionChat({ initialQuestion, onBack, onUseListing, answer }: CompanionChatViewProps) {
+function CompanionChat({
+  initialQuestion,
+  onBack,
+  onUseListing,
+  answer,
+  about,
+}: CompanionChatViewProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const toast = useToast();
@@ -108,6 +103,28 @@ function CompanionChat({ initialQuestion, onBack, onUseListing, answer }: Compan
   // unless the person has scrolled up to reread something.
   const following = useRef(true);
 
+  // What Worthy answers from: the person's own scans, the listing or item it was opened from,
+  // and the Market's real trends. Never the sample data.
+  const cloud = useWorthyCloud();
+  const { scans } = useScanHistory();
+  const { findListing } = useMarketplace();
+  const { trends, detailFor } = useTrends();
+  const subject = subjectOf(about);
+  const data = useMemo<WorthyData>(
+    () => ({
+      scans,
+      listing: subject?.kind === 'listing' ? findListing(subject.id) : null,
+      scan:
+        subject?.kind === 'item' ? (scans.find((scan) => scan.id === subject.id) ?? null) : null,
+      trends,
+      detailFor,
+    }),
+    [detailFor, findListing, scans, subject?.id, subject?.kind, trends],
+  );
+  const latestData = useRef(data);
+  latestData.current = data;
+  const turns = useRef<WorthyTurn[]>([]);
+
   const ask = useCallback(
     (question: string) => {
       following.current = true;
@@ -118,22 +135,43 @@ function CompanionChat({ initialQuestion, onBack, onUseListing, answer }: Compan
         { id: `u${id}`, role: 'user', text: question, card: null },
       ]);
       setThinking(true);
-      const reply = (settled: ReturnType<typeof settleAnswer>) => {
-        const message: ChatMessage = settled.words
-          ? { id: `w${id}`, role: 'worthy', text: settled.words, card: null, onDevice: true }
-          : { id: `w${id}`, role: 'worthy', ...replyForIntent(settled.intent) };
+      const finish = (reply: Omit<ChatMessage, 'id' | 'role'>) => {
+        turns.current = [
+          ...turns.current,
+          { role: 'user' as const, text: question },
+          { role: 'worthy' as const, text: reply.text },
+        ].slice(-6);
         setThinking(false);
-        setMessages((current) => [...current, message]);
+        setMessages((current) => [...current, { id: `w${id}`, role: 'worthy', ...reply }]);
       };
-      if (answer) {
-        void answer(question)
-          .catch(() => null)
-          .then((found) => reply(settleAnswer(question, found)));
-      } else {
-        setTimeout(() => reply(settleAnswer(question, null)), 1200);
-      }
+      void (async () => {
+        const now = latestData.current;
+        let intent: WorthyIntent | null = null;
+        // 1. The phone's own model (Apple Intelligence) takes the light questions.
+        if (answer) {
+          const found = await answer(question).catch(() => null);
+          const settled = settleAnswer(question, found);
+          if (settled.words) {
+            finish({ text: settled.words, card: null, onDevice: true });
+            return;
+          }
+          if (found) intent = settled.intent;
+        }
+        // 2. The cloud, told the person's own things, for everything else.
+        if (cloud) {
+          const result = await cloud.ask(question, turns.current, contextFor(now));
+          if (result.ok) {
+            const { intent: cloudIntent, reply, draft } = result.value;
+            finish({ text: reply, card: cardFor(cloudIntent, now, draft) });
+            return;
+          }
+        }
+        // 3. No model to ask: plain words from the same data.
+        const settledIntent = intent ?? intentFor(question);
+        finish({ text: plainAnswer(settledIntent, now), card: cardFor(settledIntent, now) });
+      })();
     },
-    [answer],
+    [answer, cloud],
   );
 
   useEffect(() => {
@@ -227,9 +265,9 @@ function CompanionChat({ initialQuestion, onBack, onUseListing, answer }: Compan
             <WorthyReply
               key={message.id}
               message={message}
-              onUseListing={() => {
+              onUseListing={(scanId) => {
                 toast.show({ title: 'Listing drafted', body: 'Review it before you publish.' });
-                onUseListing?.();
+                onUseListing?.(scanId);
               }}
             />
           ),
@@ -239,7 +277,7 @@ function CompanionChat({ initialQuestion, onBack, onUseListing, answer }: Compan
           <Animated.View entering={FadeIn} style={styles.thinking}>
             <Worthy size={28} mood="thinking" />
             <SWText variant="labelMedium" tone="textMuted">
-              {answer ? 'Thinking…' : 'Checking recent sales…'}
+              Thinking…
             </SWText>
           </Animated.View>
         ) : null}
@@ -264,7 +302,7 @@ function WorthyReply({
   onUseListing,
 }: {
   readonly message: ChatMessage;
-  readonly onUseListing: () => void;
+  readonly onUseListing: (scanId: string) => void;
 }) {
   const styles = useThemedStyles(stylesFor);
   const [typed, setTyped] = useState('');
@@ -306,55 +344,73 @@ function ReplyCardView({
   card,
   onUseListing,
 }: {
-  readonly card: Exclude<ReplyCard, null>;
-  readonly onUseListing: () => void;
+  readonly card: ReplyCard;
+  readonly onUseListing: (scanId: string) => void;
 }) {
   const styles = useThemedStyles(stylesFor);
-  if (card === 'range') {
+  if (card.kind === 'range') {
     return (
       <Surface padding={tokens.spacing[4]} contentStyle={styles.card}>
-        <SWText variant="overline" tone="textMuted">
-          Fair range
+        <SWText variant="overline" tone="textMuted" numberOfLines={1}>
+          {`AI range · ${card.title}`}
         </SWText>
         <SWText variant="priceLarge">
-          {formatPeso(previewListingInsight.estimateLow)} –{' '}
-          {formatPeso(previewListingInsight.estimateHigh)}
+          {formatPeso(card.low)} – {formatPeso(card.high)}
         </SWText>
         <PriceRangeBar
-          low={previewListingInsight.estimateLow}
-          high={previewListingInsight.estimateHigh}
-          estimate={previewListingInsight.estimate}
-          confidence={previewListingInsight.confidence}
-          asking={3200}
+          low={card.low}
+          high={card.high}
+          estimate={card.estimate}
+          asking={card.asking ?? undefined}
           format={formatPeso}
         />
       </Surface>
     );
   }
-  if (card === 'listing') {
-    const draft = previewCompanionReplies.listingDraft;
+  if (card.kind === 'listing') {
     return (
       <Surface padding={tokens.spacing[4]} contentStyle={styles.card}>
         <Overline icon={PenLine} label="Draft listing" />
-        <SWText variant="headingMedium">{draft.title}</SWText>
-        <SWText variant="bodyMedium" tone="textSecondary">
-          {draft.body}
-        </SWText>
-        <SWText variant="priceMedium">{formatPeso(draft.price)}</SWText>
-        <Button label="Use this listing" size="medium" onPress={onUseListing} />
+        <SWText variant="headingMedium">{card.title}</SWText>
+        {card.body ? (
+          <SWText variant="bodyMedium" tone="textSecondary">
+            {card.body}
+          </SWText>
+        ) : null}
+        <SWText variant="priceMedium">{formatPeso(card.price)}</SWText>
+        <Button label="Use this listing" size="medium" onPress={() => onUseListing(card.scanId)} />
       </Surface>
     );
   }
-  const series = card === 'portfolio' ? previewPortfolio.series : previewValuation.trend;
+  if (card.kind === 'trend') {
+    return (
+      <Surface padding={tokens.spacing[4]} contentStyle={styles.card}>
+        <SWText variant="overline" tone="textMuted">
+          {`${card.label} · listed most this month`}
+        </SWText>
+        <SWText variant="priceLarge">{`About ${formatPeso(card.typical)}`}</SWText>
+        <SWText variant="caption" tone="textMuted">
+          {[
+            'Typical asking price',
+            card.listed !== null ? `${card.listed} listed this month` : null,
+            card.change ? `${card.change} on last month` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </SWText>
+        {card.series.length > 1 ? <Sparkline values={card.series} height={64} /> : null}
+      </Surface>
+    );
+  }
   return (
     <Surface padding={tokens.spacing[4]} contentStyle={styles.card}>
       <SWText variant="overline" tone="textMuted">
-        {card === 'portfolio' ? 'Collection value' : 'Vintage sportswear, 12 weeks'}
+        Your collection
       </SWText>
-      <SWText variant="priceLarge">
-        {card === 'portfolio' ? formatPeso(previewPortfolio.total) : previewValuation.trendChange}
+      <SWText variant="priceLarge">{formatPeso(card.total)}</SWText>
+      <SWText variant="caption" tone="textMuted">
+        {`${card.count === 1 ? '1 item' : `${card.count} items`} at their AI estimates${card.top ? ` · worth the most: ${card.top.title}` : ''}`}
       </SWText>
-      <Sparkline values={series} height={64} />
     </Surface>
   );
 }

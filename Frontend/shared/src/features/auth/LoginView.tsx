@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View } from 'react-native';
+import { useRef, useState } from 'react';
+import { View, type TextInput } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import {
@@ -122,6 +122,10 @@ export function LoginView({
   // On a wide window the colour block and the form sit side by side, so it all fits at once.
   const wide = useWideLayout();
   const half = wide ? styles.half : null;
+
+  const passwordInput = useRef<TextInput>(null);
+  const confirmInput = useRef<TextInput>(null);
+  const nameInput = useRef<TextInput>(null);
 
   const submit = () => {
     if (submitting) return;
@@ -248,6 +252,10 @@ export function LoginView({
                       keyboardType="email-address"
                       textContentType="emailAddress"
                       accessibilityLabel="Email address"
+                      // Return goes on to the password rather than doing nothing.
+                      returnKeyType="next"
+                      submitBehavior="submit"
+                      onSubmitEditing={() => passwordInput.current?.focus()}
                     />
                   </Field>
                 </View>
@@ -264,6 +272,13 @@ export function LoginView({
                       autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                       textContentType={mode === 'login' ? 'password' : 'newPassword'}
                       accessibilityLabel="Password"
+                      ref={passwordInput}
+                      // Logging in, Return logs in: the button can be hidden behind the keyboard.
+                      returnKeyType={mode === 'login' ? 'go' : 'next'}
+                      submitBehavior={mode === 'login' ? 'blurAndSubmit' : 'submit'}
+                      onSubmitEditing={() =>
+                        mode === 'login' ? submit() : confirmInput.current?.focus()
+                      }
                     />
                   </Field>
                 </View>
@@ -282,6 +297,10 @@ export function LoginView({
                           placeholder="Repeat your password"
                           textContentType="newPassword"
                           accessibilityLabel="Confirm Password"
+                          ref={confirmInput}
+                          returnKeyType="next"
+                          submitBehavior="submit"
+                          onSubmitEditing={() => nameInput.current?.focus()}
                         />
                       </Field>
                     </View>
@@ -294,6 +313,8 @@ export function LoginView({
                           autoCapitalize="words"
                           textContentType="name"
                           accessibilityLabel="Full Name"
+                          ref={nameInput}
+                          returnKeyType="done"
                         />
                       </Field>
                     </View>

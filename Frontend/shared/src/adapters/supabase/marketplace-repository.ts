@@ -101,6 +101,14 @@ function formatJoined(isoDate?: string | null): string {
   return `Joined ${month} ${date.getFullYear()}`;
 }
 
+interface ProfileCollectionRow {
+  readonly id: string;
+  readonly name: string;
+  readonly item_count: number;
+  readonly total_php: number | string;
+  readonly item_names: readonly string[] | null;
+}
+
 function unwrapSeller(seller: ListingRow['seller']): ProfileJoin | null {
   if (!seller) return null;
   return (Array.isArray(seller) ? seller[0] : seller) ?? null;
@@ -311,21 +319,27 @@ export function createSupabaseMarketplaceRepository(
       if (!profileData) return ok(null);
 
       const profile = profileData as unknown as ProfileJoin;
-      const [{ data: listingData, error: listingError }, { count: soldCount }, viewer] =
-        await Promise.all([
-          client
-            .from('listings')
-            .select(listingColumns)
-            .eq('seller_id', profile.id)
-            .eq('status', 'active')
-            .order('created_at', { ascending: false }),
-          client
-            .from('listings')
-            .select('id', { count: 'exact', head: true })
-            .eq('seller_id', profile.id)
-            .eq('status', 'sold'),
-          viewerId(),
-        ]);
+      const [
+        { data: listingData, error: listingError },
+        { count: soldCount },
+        viewer,
+        { data: collectionData },
+      ] = await Promise.all([
+        client
+          .from('listings')
+          .select(listingColumns)
+          .eq('seller_id', profile.id)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false }),
+        client
+          .from('listings')
+          .select('id', { count: 'exact', head: true })
+          .eq('seller_id', profile.id)
+          .eq('status', 'sold'),
+        viewerId(),
+        // The collections they chose to show; a project without the function shows none.
+        client.rpc('profile_collections', { target: profile.id }),
+      ]);
       if (listingError) return err(toAppError(listingError, 'load_marketplace', 'listing'));
 
       const rows = (listingData ?? []) as unknown as ListingRow[];
@@ -360,6 +374,13 @@ export function createSupabaseMarketplaceRepository(
         bio: profile.bio ?? '',
         location: profile.location ?? '',
         listings,
+        collections: ((collectionData ?? []) as readonly ProfileCollectionRow[]).map((row) => ({
+          id: row.id,
+          name: row.name,
+          itemCount: Number(row.item_count) || 0,
+          totalPhp: Number(row.total_php) || 0,
+          itemNames: row.item_names ?? [],
+        })),
       });
     },
 

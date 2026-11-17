@@ -100,3 +100,21 @@ describe('LoginView: checking the form on the screen', () => {
     });
   });
 });
+
+describe('LoginView: the keyboard', () => {
+  it('logs in from the password field’s Return key, as the button can sit under the keyboard', async () => {
+    const onSubmit = jest.fn();
+    renderScreen(<LoginView onSubmit={onSubmit} />);
+    fireEvent.changeText(screen.getByLabelText('Email address'), 'sam@example.com');
+    fireEvent.changeText(screen.getByLabelText('Password'), 'long-enough-one');
+
+    fireEvent(screen.getByLabelText('Password'), 'submitEditing');
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled(), { timeout: 3000 });
+    expect(onSubmit.mock.calls[0]?.[0]).toMatchObject({
+      mode: 'login',
+      email: 'sam@example.com',
+      password: 'long-enough-one',
+    });
+  });
+});

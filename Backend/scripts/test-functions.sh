@@ -9,5 +9,5 @@ cd "$functions"
 
 # The repository root has a package.json; tell Deno not to treat this as a Node project.
 deno check --no-lock --node-modules-dir=none moderate-content/index.ts estimate-price/index.ts \
-  delete-account/index.ts
+  delete-account/index.ts worthy-chat/index.ts
 deno test --no-lock --node-modules-dir=none --quiet .
