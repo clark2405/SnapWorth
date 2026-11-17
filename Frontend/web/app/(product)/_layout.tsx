@@ -3,6 +3,8 @@ import { View } from 'react-native';
 
 import { requestScrollToTop, SideNav, WithSkeleton } from '@snapworth/shared/components';
 import { useLayoutClass, useTheme } from '@snapworth/shared/design';
+import { useReviewCount } from '@snapworth/shared/features/admin';
+import { useUserProfile } from '@snapworth/shared/features/profile';
 import { useAccountGate } from '@snapworth/shared/features/session';
 
 import { placeForPath, tabRoutes, tabs } from '../../src/places';
@@ -21,6 +23,8 @@ export default function ProductLayout() {
   const pathname = usePathname();
   const router = useRouter();
   const requireAccount = useAccountGate();
+  const { profile } = useUserProfile();
+  const reviewCount = useReviewCount(profile.isAdmin);
 
   const stack = (
     <Stack
@@ -62,6 +66,9 @@ export default function ProductLayout() {
         onSnap={() => requireAccount('snap', () => router.push('/capture'))}
         onSearch={() => router.push('/search')}
         onOpenProfile={() => router.push('/profile')}
+        // The website is the moderators' place: their console sits in the sidebar.
+        onModerate={profile.isAdmin ? () => router.push('/admin') : undefined}
+        moderationCount={profile.isAdmin ? reviewCount : null}
       />
       <View style={{ flex: 1 }}>{stack}</View>
     </View>

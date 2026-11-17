@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import type { AdminRepository, ReviewCase, ReviewKind } from '../../ports/admin';
+import type { AdminRepository, ModerationEntry, ReviewCase, ReviewKind } from '../../ports/admin';
 import type { UtcDateTime } from '../../types/date-time';
 import type { ModerationStatus } from '../../types/entities';
 import { err, ok } from '../../types/result';
@@ -43,6 +43,43 @@ function fromRow(row: ReviewRow, photoLinks: Readonly<Record<string, string>>): 
   };
 }
 
+interface OverviewRow {
+  readonly open_cases: number;
+  readonly reports_this_week: number;
+  readonly suspended_accounts: number;
+  readonly new_accounts_this_week: number;
+  readonly posts_this_week: number;
+  readonly decisions_this_week: number;
+}
+
+interface PersonRow {
+  readonly id: string;
+  readonly handle: string;
+  readonly display_name: string | null;
+  readonly avatar_url: string | null;
+  readonly joined_at: string;
+  readonly post_count: number;
+  readonly comment_count: number;
+  readonly listing_count: number;
+  readonly reports_against: number;
+  readonly removed_count: number;
+  readonly suspended: boolean;
+  readonly suspended_until: string | null;
+  readonly suspension_reason: string | null;
+  readonly is_admin: boolean;
+}
+
+interface HistoryRow {
+  readonly id: string;
+  readonly kind: string;
+  readonly target_id: string;
+  readonly decision: string;
+  readonly note: string | null;
+  readonly decided_at: string;
+  readonly decided_by_handle: string;
+  readonly target_label: string | null;
+}
+
 /**
  * The review queue in Supabase. It's read and decided only through `admin_review_queue()` and
  * `admin_review_decide()`, which check the caller is an admin and write who decided and when. This
@@ -64,6 +101,78 @@ export function createSupabaseAdminRepository(
         rows.flatMap((row) => (row.photo_path ? [row.photo_path] : [])),
       );
       return ok(rows.map((row) => fromRow(row, photoLinks)));
+    },
+
+    async overview() {
+      const { data, error } = await client.rpc('admin_overview');
+      if (error) return err(toAppError(error, 'load_moderation_queue', 'review'));
+      const row = ((data ?? []) as OverviewRow[])[0];
+      return ok({
+        openCases: row?.open_cases ?? 0,
+        reportsThisWeek: row?.reports_this_week ?? 0,
+        suspendedAccounts: row?.suspended_accounts ?? 0,
+        newAccountsThisWeek: row?.new_accounts_this_week ?? 0,
+        postsThisWeek: row?.posts_this_week ?? 0,
+        decisionsThisWeek: row?.decisions_this_week ?? 0,
+      });
+    },
+
+    async people(search) {
+      const term = search.trim().replace(/^@/, '');
+      const { data, error } = await client.rpc('admin_find_people', { search: term || null });
+      if (error) return err(toAppError(error, 'load_moderation_queue', 'review'));
+      return ok(
+        ((data ?? []) as PersonRow[]).map((row) => ({
+          id: row.id,
+          handle: row.handle,
+          displayName: row.display_name?.trim() || null,
+          avatarUrl: row.avatar_url,
+          joinedAt: row.joined_at as UtcDateTime,
+          postCount: row.post_count,
+          commentCount: row.comment_count,
+          listingCount: row.listing_count,
+          reportsAgainst: row.reports_against,
+          removedCount: row.removed_count,
+          suspended: row.suspended,
+          suspendedUntil: (row.suspended_until as UtcDateTime | null) ?? null,
+          suspensionReason: row.suspension_reason,
+          isAdmin: row.is_admin,
+        })),
+      );
+    },
+
+    async suspend(personId, input) {
+      const { error } = await client.rpc('admin_suspend_account', {
+        target: personId,
+        reason: input.reason,
+        days: input.days,
+        take_down: input.takeDown,
+      });
+      if (error) return err(toAppError(error, 'resolve_moderation_case', 'review'));
+      return ok(undefined);
+    },
+
+    async reinstate(personId) {
+      const { error } = await client.rpc('admin_reinstate_account', { target: personId });
+      if (error) return err(toAppError(error, 'resolve_moderation_case', 'review'));
+      return ok(undefined);
+    },
+
+    async history() {
+      const { data, error } = await client.rpc('admin_moderation_history', { max_rows: 100 });
+      if (error) return err(toAppError(error, 'load_moderation_queue', 'review'));
+      return ok(
+        ((data ?? []) as HistoryRow[]).map((row) => ({
+          id: row.id,
+          kind: row.kind as ModerationEntry['kind'],
+          targetId: row.target_id,
+          decision: row.decision as ModerationEntry['decision'],
+          note: row.note,
+          decidedAt: row.decided_at as UtcDateTime,
+          decidedBy: row.decided_by_handle,
+          targetLabel: row.target_label,
+        })),
+      );
     },
 
     async decide({ kind, targetId }, decision) {

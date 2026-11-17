@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react-native';
-import { Search, UserRound } from 'lucide-react-native';
+import { Search, ShieldCheck, UserRound } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import {
   Pressable,
@@ -39,6 +39,9 @@ export interface SideNavProps<Key extends string> {
   readonly onSnap?: () => void;
   readonly onSearch?: () => void;
   readonly onOpenProfile?: () => void;
+  /** For moderators only: opens the moderation console, with how many cases wait. */
+  readonly onModerate?: () => void;
+  readonly moderationCount?: number | null;
   /** A narrow rail of icons alone, for screens with room for a rail but not a sidebar. */
   readonly rail?: boolean;
 }
@@ -55,6 +58,8 @@ export function SideNav<Key extends string>({
   onSnap,
   onSearch,
   onOpenProfile,
+  onModerate,
+  moderationCount,
   rail = false,
 }: SideNavProps<Key>) {
   const styles = useThemedStyles(stylesFor);
@@ -129,6 +134,24 @@ export function SideNav<Key extends string>({
       <View style={styles.spacer} />
 
       <View style={styles.places}>
+        {onModerate ? (
+          <NavPressable
+            label={
+              moderationCount ? `Moderation, ${moderationCount} waiting for review` : 'Moderation'
+            }
+            rail={rail}
+            onPress={onModerate}
+            style={[styles.item, rail ? styles.itemRail : null]}
+            hoverStyle={styles.itemHover}
+          >
+            <ShieldCheck size={22} strokeWidth={1.75} color={colors.textSecondary} />
+            {rail ? null : (
+              <SWText variant="label" color={colors.textSecondary} style={styles.itemLabel}>
+                {moderationCount ? `Moderation · ${moderationCount}` : 'Moderation'}
+              </SWText>
+            )}
+          </NavPressable>
+        ) : null}
         {onSearch ? (
           <NavPressable
             label="Search"

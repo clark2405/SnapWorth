@@ -47,6 +47,60 @@ export interface ReviewCase {
  * Where the review queue is read and decided: Supabase, or sample data on a device with no
  * project. Only an admin gets anything; anyone else is refused (an `authorization` error).
  */
+/** Someone an admin looked up: what they've put out, how it's gone, and whether they're suspended. */
+export interface ModeratedPerson {
+  readonly id: string;
+  readonly handle: string;
+  readonly displayName: string | null;
+  readonly avatarUrl: string | null;
+  readonly joinedAt: UtcDateTime;
+  readonly postCount: number;
+  readonly commentCount: number;
+  readonly listingCount: number;
+  /** Reports on their comments and on chats they were in, made by others. */
+  readonly reportsAgainst: number;
+  /** Their posts, comments and listings that moderation took down. */
+  readonly removedCount: number;
+  readonly suspended: boolean;
+  /** When the suspension ends; null with `suspended` means until lifted. */
+  readonly suspendedUntil: UtcDateTime | null;
+  readonly suspensionReason: string | null;
+  readonly isAdmin: boolean;
+}
+
+export type HistoryDecision = ReviewDecision | 'suspend' | 'reinstate';
+
+/** One decision in the moderation history. */
+export interface ModerationEntry {
+  readonly id: string;
+  readonly kind: ReviewKind | 'account';
+  readonly targetId: string;
+  readonly decision: HistoryDecision;
+  readonly note: string | null;
+  readonly decidedAt: UtcDateTime;
+  readonly decidedBy: string;
+  /** What it was about, in a few words (a handle, a post's first line); null once it's gone. */
+  readonly targetLabel: string | null;
+}
+
+/** The week at a glance, for the console's overview. */
+export interface ModerationOverview {
+  readonly openCases: number;
+  readonly reportsThisWeek: number;
+  readonly suspendedAccounts: number;
+  readonly newAccountsThisWeek: number;
+  readonly postsThisWeek: number;
+  readonly decisionsThisWeek: number;
+}
+
+export interface SuspendInput {
+  readonly reason: string;
+  /** How many days; null until an admin lifts it. */
+  readonly days: number | null;
+  /** Also take down everything they've published. */
+  readonly takeDown: boolean;
+}
+
 export interface AdminRepository {
   /** Open cases, most reported first and then oldest. */
   queue(): Promise<Result<readonly ReviewCase[], AppError>>;
@@ -54,4 +108,10 @@ export interface AdminRepository {
     item: Pick<ReviewCase, 'kind' | 'targetId'>,
     decision: ReviewDecision,
   ): Promise<Result<void, AppError>>;
+  overview(): Promise<Result<ModerationOverview, AppError>>;
+  /** People matching a handle or name; with no search, the most reported first. */
+  people(search: string): Promise<Result<readonly ModeratedPerson[], AppError>>;
+  suspend(personId: string, input: SuspendInput): Promise<Result<void, AppError>>;
+  reinstate(personId: string): Promise<Result<void, AppError>>;
+  history(): Promise<Result<readonly ModerationEntry[], AppError>>;
 }
