@@ -1,4 +1,4 @@
-import { Flag, FolderHeart, MessageSquareText, UserX } from 'lucide-react-native';
+import { Flag, FolderHeart, MessageCircle, MessageSquareText, UserX } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -7,6 +7,7 @@ import {
   paperIn,
   paperLayout,
   Avatar,
+  Button,
   EmptyState,
   Photo,
   PressableScale,
@@ -16,6 +17,7 @@ import {
   Reveal,
   Screen,
   ScreenSkeleton,
+  Sheet,
   SWText,
 } from '../../components';
 import { held, themedStyles, tokens, useThemedStyles } from '../../design';
@@ -35,6 +37,8 @@ export interface SellerProfileViewProps {
   readonly onBack?: () => void;
   readonly onOpenListing?: (listingId: string) => void;
   readonly onOpenPost?: (postId: string) => void;
+  /** Opens (or reopens) a chat with them about one of their listings, by its slug. */
+  readonly onMessage?: (listingSlug: string) => void;
   /** Report and block live here, as they do in chat (SRS 3.1.10). */
   readonly onReport?: () => void;
 }
@@ -44,6 +48,7 @@ export function SellerProfileView({
   onBack,
   onOpenListing,
   onOpenPost,
+  onMessage,
   onReport,
 }: SellerProfileViewProps) {
   const styles = useThemedStyles(stylesFor);
@@ -54,6 +59,7 @@ export function SellerProfileView({
 
   // `undefined` while the seller is being looked up; `null` once they're known not to exist.
   const [seller, setSeller] = useState<SellerProfile | null | undefined>(undefined);
+  const [picking, setPicking] = useState(false);
 
   useEffect(() => {
     if (!normalized) {
@@ -94,6 +100,15 @@ export function SellerProfileView({
     )
     .map(toPreviewPost);
   const collections = seller.collections ?? [];
+  // Chats are about a listing: with one, Message goes straight to it; with more, you pick.
+  const mine = seller.listings.some((listing) => listing.mine);
+  const canMessage = Boolean(onMessage) && !mine && seller.listings.length > 0;
+  const message = (slug: string) => requireAccount('message', () => onMessage?.(slug));
+  const messageThem = () => {
+    const only = seller.listings.length === 1 ? seller.listings[0] : undefined;
+    if (only) message(only.slug);
+    else setPicking(true);
+  };
 
   return (
     <Screen
@@ -142,6 +157,12 @@ export function SellerProfileView({
           <SWText variant="bodyMedium" tone="textSecondary">
             {seller.bio}
           </SWText>
+        </Reveal>
+      ) : null}
+
+      {canMessage ? (
+        <Reveal index={1}>
+          <Button label={`Message @${seller.handle}`} icon={MessageCircle} onPress={messageThem} />
         </Reveal>
       ) : null}
 
@@ -202,12 +223,44 @@ export function SellerProfileView({
                 layout={paperLayout}
                 style={styles.cell}
               >
-                <ListingCard listing={listing} onOpen={() => onOpenListing?.(listing.id)} />
+                <ListingCard
+                  listing={listing}
+                  onOpen={() => onOpenListing?.(listing.id)}
+                  onMessageSeller={canMessage ? () => onMessage?.(listing.id) : undefined}
+                />
+                {canMessage ? (
+                  <Button
+                    label="Message"
+                    variant="secondary"
+                    size="small"
+                    icon={MessageCircle}
+                    onPress={() => message(listing.id)}
+                  />
+                ) : null}
               </Animated.View>
             ))}
           </View>
         )}
       </Reveal>
+      <Sheet
+        visible={picking}
+        onClose={() => setPicking(false)}
+        title={`Message @${seller.handle} about…`}
+      >
+        <View style={styles.rows}>
+          {seller.listings.map((listing) => (
+            <Button
+              key={listing.id}
+              label={`${listing.title} · ${formatPeso(listing.askingPrice)}`}
+              variant="secondary"
+              onPress={() => {
+                setPicking(false);
+                message(listing.slug);
+              }}
+            />
+          ))}
+        </View>
+      </Sheet>
     </Screen>
   );
 }
