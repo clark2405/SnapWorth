@@ -32,8 +32,10 @@ const model = process.env.PRICING_TEST_MODEL || readSetting("AI_MODEL") || defau
 const thinkingLevel = process.env.PRICING_TEST_THINKING || readSetting("AI_THINKING_LEVEL") || undefined;
 const handler = createEstimateHandler({
   apiKey: readSetting("AI_API_KEY"),
+  fallbackApiKey: readSetting("AI_API_KEY_2") || undefined,
   model,
   thinkingLevel,
+  fallbackModels: readSetting("AI_FALLBACK_MODELS") || undefined,
   fetch: async (...args) => {
     const response = await fetch(...args);
     if (!response.ok) {

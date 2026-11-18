@@ -3,12 +3,12 @@ import { createEstimateHandler, defaultPricingModel } from "./pricing.ts";
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
+const geminiEnabled = Deno.env.get("AI_PROVIDER") === "gemini";
+
 Deno.serve(
   createEstimateHandler({
-    apiKey:
-      Deno.env.get("AI_PROVIDER") === "gemini"
-        ? (Deno.env.get("AI_API_KEY") ?? "")
-        : "",
+    apiKey: geminiEnabled ? (Deno.env.get("AI_API_KEY") ?? "") : "",
+    fallbackApiKey: geminiEnabled ? (Deno.env.get("AI_API_KEY_2") ?? "") : "",
     model: Deno.env.get("AI_MODEL") ?? defaultPricingModel,
     thinkingLevel: Deno.env.get("AI_THINKING_LEVEL"),
     fetch,
