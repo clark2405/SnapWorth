@@ -101,7 +101,10 @@ describe('createSupabaseCommentRepository', () => {
       }),
       functions: {
         invoke: async () => ({
-          data: { error: 'This comment violates community guidelines and was blocked.', blocked: true },
+          data: {
+            error: 'This comment violates community guidelines and was blocked.',
+            blocked: true,
+          },
           error: { message: 'This comment violates community guidelines and was blocked.' },
         }),
       },

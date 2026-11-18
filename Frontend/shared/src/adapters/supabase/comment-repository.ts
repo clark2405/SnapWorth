@@ -119,8 +119,16 @@ export function createSupabaseCommentRepository(client: SupabaseClient): Comment
         | (ThreadRow & {
             readonly text?: string;
             readonly author?:
-              | { readonly handle?: string; readonly display_name?: string | null; readonly avatar_url?: string | null }
-              | readonly { readonly handle?: string; readonly display_name?: string | null; readonly avatar_url?: string | null }[];
+              | {
+                  readonly handle?: string;
+                  readonly display_name?: string | null;
+                  readonly avatar_url?: string | null;
+                }
+              | readonly {
+                  readonly handle?: string;
+                  readonly display_name?: string | null;
+                  readonly avatar_url?: string | null;
+                }[];
           })
         | undefined;
 
@@ -151,8 +159,10 @@ export function createSupabaseCommentRepository(client: SupabaseClient): Comment
         'moderate-content',
         { body: { type: 'comment', id: commentId } },
       );
-      if (error) return ok('approved');
-      return ok(data?.status ?? 'approved');
+      // A 503 means the provider could not decide yet: the comment stays pending, privately.
+      // Never call it approved here: the database still holds it, and nobody else would see it.
+      if (error) return err(toAppError(error, 'submit_comment'));
+      return ok(data?.status ?? 'pending');
     },
 
     async softDelete(commentId) {

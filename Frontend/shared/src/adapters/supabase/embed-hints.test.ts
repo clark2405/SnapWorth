@@ -36,7 +36,9 @@ function embedsIn(text: string): { relation: string; hint: string | undefined }[
 describe('PostgREST embeds in the Supabase adapters', () => {
   it('finds the embeds this guard is about', () => {
     const all = sources.flatMap((source) => embedsIn(source.text));
-    expect(all.length).toBeGreaterThanOrEqual(7);
+    // Comments are written through the moderate-comment Edge Function now, so the comment
+    // repository has one embed fewer; the guard still has every other one to check.
+    expect(all.length).toBeGreaterThanOrEqual(6);
   });
 
   it.each(sources.map((source) => [source.name, source.text] as const))(
