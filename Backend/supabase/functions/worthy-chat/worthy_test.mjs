@@ -152,3 +152,34 @@ test("falls back to a lighter model while the main one is overloaded", async () 
   assert.equal(response.status, 200);
   assert.deepEqual(models, ["gemini-3.6-flash", "gemini-3.5-flash-lite"]);
 });
+
+test("switches between primary and secondary keys on 429 and returns 429 when both are exhausted", async () => {
+  const seen = [];
+  const handler = createWorthyHandler({
+    apiKey: "key-one",
+    fallbackApiKey: "key-two",
+    model: "gemini-3.6-flash",
+    authenticate: async () => "user-4",
+    fetch: async (url, init) => {
+      const key = init.headers["x-goog-api-key"];
+      const model = /models\/([^:]+):/.exec(url)[1];
+      seen.push({ key, model });
+      if (seen.length === 1) return new Response('{"error":{"code":429}}', { status: 429 });
+      if (seen.length === 2) {
+        return geminiReturning({ ...answer, intent: "chat", draftTitle: null, draftDescription: null });
+      }
+      return new Response('{"error":{"code":429}}', { status: 429 });
+    },
+  });
+
+  const first = await handler(request({ question: "hi" }));
+  assert.equal(first.status, 200);
+  const second = await handler(request({ question: "still there?" }));
+  assert.equal(second.status, 429);
+  assert.deepEqual(seen, [
+    { key: "key-one", model: "gemini-3.6-flash" },
+    { key: "key-two", model: "gemini-3.6-flash" },
+    { key: "key-two", model: "gemini-3.6-flash" },
+    { key: "key-one", model: "gemini-3.6-flash" },
+  ]);
+});

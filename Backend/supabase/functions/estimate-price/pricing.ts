@@ -1,7 +1,14 @@
-import { modelsToTry, sendWithRetry } from "../_shared/gemini-retry.ts";
+import {
+  createGeminiKeyPool,
+  modelsToTry,
+  resolveApiKeys,
+  sendWithRetry,
+} from "../_shared/gemini-retry.ts";
 
 interface Dependencies {
   apiKey: string;
+  /** Optional second Gemini key (`AI_API_KEY_2`) for automatic failover on quota/timeouts. */
+  fallbackApiKey?: string;
   model: string;
   thinkingLevel?: string;
   authenticate: (token: string) => Promise<string | null>;
@@ -220,11 +227,13 @@ the photo agrees with it.`;
 /** Instance-level abuse guard for the prototype; provider quota remains the hard project cap. */
 export function createEstimateHandler(deps: Dependencies) {
   const recent = new Map<string, number[]>();
+  const keys = resolveApiKeys(deps.apiKey, deps.fallbackApiKey);
+  const keyPool = createGeminiKeyPool(keys);
   return async (request: Request): Promise<Response> => {
     if (request.method === "OPTIONS")
       return new Response(null, { headers: cors });
     if (request.method !== "POST") return error(405, "method_not_allowed");
-    if (!deps.apiKey || !/^[a-z0-9.-]+$/.test(deps.model))
+    if (keys.length === 0 || !/^[a-z0-9.-]+$/.test(deps.model))
       return error(503, "not_configured");
     const thinkingLevel = deps.thinkingLevel ??
       (deps.model === defaultPricingModel ? "medium" : "low");
@@ -281,44 +290,51 @@ export function createEstimateHandler(deps: Dependencies) {
     try {
       const models = modelsToTry(deps.model, deps.fallbackModels);
       const response = await sendWithRetry(
-        (signal, attempt) =>
+        (signal, target) =>
           deps.fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${models[Math.min(attempt, models.length - 1)]}:generateContent`,
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "x-goog-api-key": deps.apiKey,
-          },
-          signal,
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: prompt }] },
-            contents: [
-              {
-                role: "user",
-                parts: [
-                  { inlineData: image },
-                  { text: "Estimate this item." },
-                  ...(clues
-                    ? [{ text: `${cluesPreamble}\n${JSON.stringify(clues)}` }]
-                    : []),
+            `https://generativelanguage.googleapis.com/v1beta/models/${target.model}:generateContent`,
+            {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+                "x-goog-api-key": target.apiKey,
+              },
+              signal,
+              body: JSON.stringify({
+                systemInstruction: { parts: [{ text: prompt }] },
+                contents: [
+                  {
+                    role: "user",
+                    parts: [
+                      { inlineData: image },
+                      { text: "Estimate this item." },
+                      ...(clues
+                        ? [{ text: `${cluesPreamble}\n${JSON.stringify(clues)}` }]
+                        : []),
+                    ],
+                  },
                 ],
-              },
-            ],
-            generationConfig: {
-              responseMimeType: "application/json",
-              responseSchema,
-              maxOutputTokens: 4096,
-              thinkingConfig: {
-                // The fallbacks are lighter models: keep them quick.
-                thinkingLevel: attempt === 0 ? thinkingLevel : "low",
-              },
+                generationConfig: {
+                  responseMimeType: "application/json",
+                  responseSchema,
+                  maxOutputTokens: 4096,
+                  thinkingConfig: {
+                    // Keep configured thinking level on the primary model even after key failover;
+                    // lighter fallback models stay quick at low.
+                    thinkingLevel: target.isPrimaryModel ? thinkingLevel : "low",
+                  },
+                },
+              }),
             },
-          }),
-        },
           ),
         request.signal,
-        { perAttemptMs: 25000, totalMs: 55000, label: "estimate-price" },
+        {
+          keyPool,
+          models,
+          perAttemptMs: 25000,
+          totalMs: 55000,
+          label: "estimate-price",
+        },
       );
       if (response.status === 429) return error(429, "rate_limited");
       if (!response.ok) return error(502, "provider_unavailable");

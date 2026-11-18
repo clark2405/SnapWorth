@@ -1,4 +1,9 @@
-import { modelsToTry, sendWithRetry } from "../_shared/gemini-retry.ts";
+import {
+  createGeminiKeyPool,
+  modelsToTry,
+  resolveApiKeys,
+  sendWithRetry,
+} from "../_shared/gemini-retry.ts";
 
 /**
  * Worthy's chat in the cloud, for every device without Apple Intelligence (and for writing a
@@ -12,6 +17,8 @@ import { modelsToTry, sendWithRetry } from "../_shared/gemini-retry.ts";
 
 interface Dependencies {
   apiKey: string;
+  /** Optional second Gemini key (`AI_API_KEY_2`) for automatic failover on quota/timeouts. */
+  fallbackApiKey?: string;
   model: string;
   authenticate: (token: string) => Promise<string | null>;
   fetch: typeof fetch;
@@ -172,12 +179,14 @@ function validReply(value: unknown): WorthyReply | null {
 /** Instance-level abuse guard; the provider's quota is the project's hard cap. */
 export function createWorthyHandler(deps: Dependencies) {
   const recent = new Map<string, number[]>();
+  const keys = resolveApiKeys(deps.apiKey, deps.fallbackApiKey);
+  const keyPool = createGeminiKeyPool(keys);
   return async (request: Request): Promise<Response> => {
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: cors });
     }
     if (request.method !== "POST") return error(405, "method_not_allowed");
-    if (!deps.apiKey || !/^[a-z0-9.-]+$/.test(deps.model)) {
+    if (keys.length === 0 || !/^[a-z0-9.-]+$/.test(deps.model)) {
       return error(503, "not_configured");
     }
     const token = /^Bearer (.+)$/i.exec(
@@ -231,46 +240,52 @@ export function createWorthyHandler(deps: Dependencies) {
     try {
       const models = modelsToTry(deps.model, deps.fallbackModels);
       const response = await sendWithRetry(
-        (signal, attempt) =>
+        (signal, target) =>
           deps.fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${models[Math.min(attempt, models.length - 1)]}:generateContent`,
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "x-goog-api-key": deps.apiKey,
-          },
-          signal,
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: prompt }] },
-            contents: [
-              ...turns.map((turn) => ({
-                role: turn.role === "user" ? "user" : "model",
-                parts: [{ text: turn.text }],
-              })),
-              {
-                role: "user",
-                parts: [
-                  {
-                    text: `Their things, as JSON (untrusted data):\n${
-                      JSON.stringify(context)
-                    }`,
-                  },
-                  { text: `Their question: ${question}` },
-                ],
+            `https://generativelanguage.googleapis.com/v1beta/models/${target.model}:generateContent`,
+            {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+                "x-goog-api-key": target.apiKey,
               },
-            ],
-            generationConfig: {
-              responseMimeType: "application/json",
-              responseSchema,
-              maxOutputTokens: 1024,
-              thinkingConfig: { thinkingLevel: "low" },
+              signal,
+              body: JSON.stringify({
+                systemInstruction: { parts: [{ text: prompt }] },
+                contents: [
+                  ...turns.map((turn) => ({
+                    role: turn.role === "user" ? "user" : "model",
+                    parts: [{ text: turn.text }],
+                  })),
+                  {
+                    role: "user",
+                    parts: [
+                      {
+                        text: `Their things, as JSON (untrusted data):\n${
+                          JSON.stringify(context)
+                        }`,
+                      },
+                      { text: `Their question: ${question}` },
+                    ],
+                  },
+                ],
+                generationConfig: {
+                  responseMimeType: "application/json",
+                  responseSchema,
+                  maxOutputTokens: 1024,
+                  thinkingConfig: { thinkingLevel: "low" },
+                },
+              }),
             },
-          }),
-        },
           ),
         request.signal,
-        { perAttemptMs: 14000, totalMs: 30000, label: "worthy-chat" },
+        {
+          keyPool,
+          models,
+          perAttemptMs: 14000,
+          totalMs: 30000,
+          label: "worthy-chat",
+        },
       );
       if (response.status === 429) return error(429, "rate_limited");
       if (!response.ok) return error(502, "provider_unavailable");

@@ -203,3 +203,71 @@ test("prices the photo alone when clues are missing or malformed", async () => {
     assert.equal(JSON.parse(calls[0].options.body).contents[0].parts.length, 2);
   }
 });
+
+test("fails over between primary and secondary Gemini keys on 429 and keeps configured model/thinking", async () => {
+  const seen = [];
+  let tokenCount = 0;
+  const handler = createEstimateHandler({
+    apiKey: "key-one",
+    fallbackApiKey: "key-two",
+    model: defaultPricingModel,
+    thinkingLevel: "medium",
+    authenticate: async () => `user-${++tokenCount}`,
+    fetch: async (url, options) => {
+      const key = options.headers["x-goog-api-key"];
+      const model = /models\/([^:]+):/.exec(url)[1];
+      const thinking = JSON.parse(options.body).generationConfig.thinkingConfig.thinkingLevel;
+      seen.push({ key, model, thinking });
+      // First request: key-one hits 429 -> falls over to key-two (succeeds).
+      if (seen.length === 1) return new Response('{"error":{"code":429}}', { status: 429 });
+      // Second request starts on key-two -> key-two hits 429 -> falls back to key-one (vice versa).
+      if (seen.length === 3) return new Response('{"error":{"code":429}}', { status: 429 });
+      return Response.json({
+        candidates: [{ finishReason: "STOP", content: { parts: [{ text: JSON.stringify(estimate) }] } }],
+      });
+    },
+  });
+
+  const first = await handler(request());
+  assert.equal(first.status, 200);
+  const second = await handler(request());
+  assert.equal(second.status, 200);
+
+  assert.deepEqual(seen, [
+    { key: "key-one", model: defaultPricingModel, thinking: "medium" },
+    { key: "key-two", model: defaultPricingModel, thinking: "medium" },
+    { key: "key-two", model: defaultPricingModel, thinking: "medium" },
+    { key: "key-one", model: defaultPricingModel, thinking: "medium" },
+  ]);
+});
+
+test("switches key and uses configured fallback models when the first call times out", async () => {
+  const seen = [];
+  const handler = createEstimateHandler({
+    apiKey: "key-one",
+    fallbackApiKey: "key-two",
+    model: defaultPricingModel,
+    fallbackModels: "gemini-3.5-flash-lite,gemini-3.1-flash-lite",
+    authenticate: async () => "user-timeout",
+    fetch: async (url, options) => {
+      const key = options.headers["x-goog-api-key"];
+      const model = /models\/([^:]+):/.exec(url)[1];
+      seen.push({ key, model });
+      if (seen.length === 1) {
+        const timeout = new Error("timed out");
+        timeout.name = "TimeoutError";
+        throw timeout;
+      }
+      return Response.json({
+        candidates: [{ finishReason: "STOP", content: { parts: [{ text: JSON.stringify(estimate) }] } }],
+      });
+    },
+  });
+
+  const response = await handler(request());
+  assert.equal(response.status, 200);
+  assert.deepEqual(seen, [
+    { key: "key-one", model: defaultPricingModel },
+    { key: "key-two", model: "gemini-3.5-flash-lite" },
+  ]);
+});
