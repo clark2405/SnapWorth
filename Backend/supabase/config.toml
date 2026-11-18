@@ -26,3 +26,14 @@ verify_jwt = false
 [functions.worthy-chat]
 # As for estimate-price: the handler checks the caller's session with Supabase Auth itself.
 verify_jwt = false
+
+[functions.moderate-comment]
+enabled = true
+verify_jwt = false
+import_map = "./functions/moderate-comment/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/moderate-comment/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/moderate-comment/*.html" ]

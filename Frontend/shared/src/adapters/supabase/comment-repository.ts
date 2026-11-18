@@ -69,24 +69,85 @@ export function createSupabaseCommentRepository(client: SupabaseClient): Comment
       const post = await client.from('feed_posts').select('id').eq('slug', postKey).single();
       if (post.error) return err(toAppError(post.error, 'submit_comment'));
 
-      const { data, error } = await client
-        .from('comments')
-        .insert({ post_id: post.data.id, parent_id: replyTo ?? null, body })
-        .select(
-          'id, parent_id, body, moderation_status, created_at, author_id, author:profiles!comments_author_id_fkey(handle, display_name, avatar_url)',
-        )
-        .single();
-      if (error) return err(toAppError(error, 'submit_comment'));
+      const { data, error } = await client.functions.invoke<{
+        success?: boolean;
+        data?: ThreadRow | ThreadRow[];
+        error?: string;
+        blocked?: boolean;
+      }>('moderate-comment', {
+        body: {
+          text: body,
+          postId: post.data.id,
+          parentId: replyTo ?? null,
+        },
+      });
 
-      const author = (Array.isArray(data.author) ? data.author[0] : data.author) as
-        { handle: string; display_name?: string | null; avatar_url: string | null } | undefined;
+      if (error) {
+        let message = String((error as { message?: string }).message ?? '');
+        let isBlocked = false;
+
+        const errorWithContext = error as { context?: { json?: () => Promise<unknown> } };
+        if (typeof errorWithContext?.context?.json === 'function') {
+          try {
+            const body = await errorWithContext.context.json();
+            if (body && typeof body === 'object') {
+              const b = body as { error?: string; message?: string; blocked?: boolean };
+              const errStr = b.error ?? b.message;
+              if (errStr) message = String(errStr);
+              if (b.blocked) isBlocked = true;
+            }
+          } catch {
+            // ignore non-json error responses
+          }
+        }
+
+        if (isBlocked || /violat|blocked|community guideline/i.test(message)) {
+          return err({ kind: 'validation', code: 'blocked', field: 'comment' });
+        }
+        return err(toAppError(new Error(message || 'submit_comment failed'), 'submit_comment'));
+      }
+
+      if (data?.error) {
+        if (data.blocked || /violat|blocked|community guideline/i.test(data.error)) {
+          return err({ kind: 'validation', code: 'blocked', field: 'comment' });
+        }
+        return err({ kind: 'validation', code: 'rejected', field: 'comment' });
+      }
+
+      const commentData = data?.data ?? data;
+      const row = (Array.isArray(commentData) ? commentData[0] : commentData) as
+        | (ThreadRow & {
+            readonly text?: string;
+            readonly author?:
+              | {
+                  readonly handle?: string;
+                  readonly display_name?: string | null;
+                  readonly avatar_url?: string | null;
+                }
+              | readonly {
+                  readonly handle?: string;
+                  readonly display_name?: string | null;
+                  readonly avatar_url?: string | null;
+                }[];
+          })
+        | undefined;
+
+      if (!row || !row.id) {
+        return err(toAppError(new Error('Failed to create comment'), 'submit_comment'));
+      }
+
+      const author = Array.isArray(row.author) ? row.author[0] : row.author;
       return ok(
         fromRow({
-          ...data,
+          ...row,
+          body: row.body ?? row.text ?? body,
+          moderation_status: row.moderation_status ?? 'approved',
+          parent_id: row.parent_id ?? replyTo ?? null,
           parent_hidden: false,
-          author_handle: author?.handle ?? 'you',
-          author_display_name: author?.display_name ?? null,
-          author_avatar_url: author?.avatar_url ?? null,
+          author_id: row.author_id ?? '',
+          author_handle: author?.handle ?? row.author_handle ?? 'you',
+          author_display_name: author?.display_name ?? row.author_display_name ?? null,
+          author_avatar_url: author?.avatar_url ?? row.author_avatar_url ?? null,
           is_mine: true,
           reported_by_me: false,
         } as ThreadRow),
@@ -98,7 +159,8 @@ export function createSupabaseCommentRepository(client: SupabaseClient): Comment
         'moderate-content',
         { body: { type: 'comment', id: commentId } },
       );
-      // A 503 means the provider could not decide yet; the comment stays pending, privately.
+      // A 503 means the provider could not decide yet: the comment stays pending, privately.
+      // Never call it approved here: the database still holds it, and nobody else would see it.
       if (error) return err(toAppError(error, 'submit_comment'));
       return ok(data?.status ?? 'pending');
     },
