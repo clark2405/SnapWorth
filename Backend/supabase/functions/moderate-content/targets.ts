@@ -25,6 +25,8 @@ export interface Target {
   readonly table: string;
   readonly columns: string;
   readonly textOf: (row: Record<string, unknown>) => string;
+  /** Comments with obvious severe abuse can be auto-removed; listings/posts stay held for review. */
+  readonly allowAutoRemove: boolean;
 }
 
 const text = (value: unknown) => (typeof value === 'string' ? value : '');
@@ -37,16 +39,32 @@ const text = (value: unknown) => (typeof value === 'string' ? value : '');
 export function targetFor(type: unknown): Target | null {
   switch (type) {
     case 'comment':
-      return { table: 'comments', columns: 'body', textOf: (row) => text(row.body) };
+      return {
+        table: 'comments',
+        columns: 'body',
+        textOf: (row) => text(row.body),
+        allowAutoRemove: true,
+      };
     case 'hanap':
-      return { table: 'hanap_posts', columns: 'body', textOf: (row) => text(row.body) };
+      return {
+        table: 'hanap_posts',
+        columns: 'body',
+        textOf: (row) => text(row.body),
+        allowAutoRemove: false,
+      };
     case 'post':
-      return { table: 'feed_posts', columns: 'body', textOf: (row) => text(row.body) };
+      return {
+        table: 'feed_posts',
+        columns: 'body',
+        textOf: (row) => text(row.body),
+        allowAutoRemove: false,
+      };
     case 'listing':
       return {
         table: 'listings',
         columns: 'title, description',
         textOf: (row) => [text(row.title), text(row.description)].filter(Boolean).join('\n\n'),
+        allowAutoRemove: false,
       };
     default:
       return null;

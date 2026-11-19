@@ -5,7 +5,7 @@ export type ModerationStatus = 'pending' | 'approved' | 'held' | 'removed';
 /** The slice of the database moderation needs; the function wires it to Supabase. */
 export interface CommentStore {
   get(id: string): Promise<{ readonly body: string; readonly status: ModerationStatus } | null>;
-  settle(id: string, status: 'approved' | 'held', ref: string): Promise<void>;
+  settle(id: string, status: 'approved' | 'held' | 'removed', ref: string): Promise<void>;
 }
 
 export type Outcome =
@@ -14,9 +14,9 @@ export type Outcome =
   | { readonly kind: 'retry_later' };
 
 /**
- * Screens one pending comment. Fail-closed throughout: with no provider configured the comment
- * is held for a person to review, and if the provider is temporarily down it stays pending
- * (still invisible to everyone but its author) so a later call can finish the job. Comments that
+ * Screens one pending item. Fail-closed throughout: with no provider configured the item is
+ * held for a person to review, and if the provider is temporarily down it stays pending
+ * (still invisible to everyone but its author) so a later call can finish the job. Items that
  * were already decided are left alone, so calling this twice is harmless.
  */
 export async function moderateComment(
@@ -24,6 +24,7 @@ export async function moderateComment(
   provider: ModerationProvider | null,
   commentId: string,
   signal?: AbortSignal,
+  options?: { readonly allowAutoRemove?: boolean },
 ): Promise<Outcome> {
   const comment = await store.get(commentId);
   if (!comment) return { kind: 'not_found' };
@@ -36,9 +37,12 @@ export async function moderateComment(
 
   try {
     const verdict = await provider.screen(comment.body, signal);
-    const ref = verdict.decision === 'held' ? `${verdict.ref} (${verdict.reason})` : verdict.ref;
-    await store.settle(commentId, verdict.decision, ref);
-    return { kind: 'settled', status: verdict.decision };
+    const decision =
+      verdict.decision === 'removed' && options?.allowAutoRemove === false ? 'held' : verdict.decision;
+    const ref =
+      verdict.decision === 'approved' ? verdict.ref : `${verdict.ref} (${verdict.reason})`;
+    await store.settle(commentId, decision, ref);
+    return { kind: 'settled', status: decision };
   } catch (error) {
     if (error instanceof ModerationUnavailable) return { kind: 'retry_later' };
     // Anything unexpected (a rejected request, a bug): hold for review rather than publish.

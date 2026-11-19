@@ -1,8 +1,9 @@
 import { assertEquals } from 'jsr:@std/assert@1';
 
 import {
+  geminiProvider,
+  matchObviousProfanity,
   ModerationUnavailable,
-  openAiProvider,
   providerFromEnv,
   rulesProvider,
   type ModerationProvider,
@@ -84,33 +85,80 @@ Deno.test('an unknown comment is reported as not found', async () => {
 
 Deno.test('provider selection: nothing configured means no provider', () => {
   assertEquals(providerFromEnv(() => undefined), null);
-  assertEquals(providerFromEnv((n) => (n === 'MODERATION_PROVIDER' ? 'openai' : undefined)), null);
+  assertEquals(providerFromEnv((n) => (n === 'MODERATION_PROVIDER' ? 'gemini' : undefined)), null);
   assertEquals(providerFromEnv((n) => (n === 'MODERATION_PROVIDER' ? 'rules' : undefined))?.name, 'rules');
+  const gemini = providerFromEnv((n) =>
+    n === 'MODERATION_PROVIDER' ? 'gemini' : n === 'AI_API_KEY_2' ? 'second-key' : undefined,
+  );
+  assertEquals(gemini?.name, 'gemini');
 });
 
-Deno.test('OpenAI: flagged categories hold the content', async () => {
-  const fetcher = () =>
-    Promise.resolve(
+Deno.test('the word list catches what slipped through before, English and Filipino', () => {
+  // "FUCKK" was approved on a live post: the old short list only knew "fuck" exactly.
+  for (const text of ['Is it worth it? FUCKK', 'f u c k this', 'gago ka', 'putangina mo', 'g4g0']) {
+    assertEquals(matchObviousProfanity(text), true, text);
+  }
+  for (const text of ['Too expensive for a used fan', 'Looks worn but fair', 'Bobby the seller']) {
+    assertEquals(matchObviousProfanity(text), false, text);
+  }
+});
+
+Deno.test('severe words remove a comment, but only hold a post for a moderator', async () => {
+  const comment = memoryStore('Is it worth it? FUCKK');
+  assertEquals(await moderateComment(comment.store, rulesProvider(), 'c1'), {
+    kind: 'settled',
+    status: 'removed',
+  });
+  const post = memoryStore('Is it worth it? FUCKK');
+  assertEquals(
+    await moderateComment(post.store, rulesProvider(), 'c1', undefined, { allowAutoRemove: false }),
+    { kind: 'settled', status: 'held' },
+  );
+  assertEquals(post.row.ref.startsWith('word-list ('), true);
+});
+
+function gemini(reply: unknown, status = 200) {
+  const calls: string[] = [];
+  const fetcher = (url: string) => {
+    calls.push(url);
+    return Promise.resolve(
       new Response(
-        JSON.stringify({
-          id: 'modr-1',
-          results: [{ flagged: true, categories: { harassment: true, violence: false } }],
-        }),
+        status === 200
+          ? JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(reply) }] } }] })
+          : 'busy',
+        { status },
       ),
     );
-  const verdict = await openAiProvider('key', fetcher as typeof fetch).screen('text');
-  assertEquals(verdict, { decision: 'held', ref: 'openai:modr-1', reason: 'harassment' });
+  };
+  return { provider: geminiProvider({ apiKey: 'key', fetch: fetcher as typeof fetch }), calls };
+}
+
+Deno.test('Gemini: severe words are decided without asking it', async () => {
+  const { provider, calls } = gemini({ decision: 'approved', reason: null });
+  const verdict = await provider.screen('gago');
+  assertEquals(verdict.decision, 'removed');
+  assertEquals(calls.length, 0);
 });
 
-Deno.test('OpenAI: rate limits and outages are retryable', async () => {
-  for (const status of [429, 503]) {
-    const fetcher = () => Promise.resolve(new Response('busy', { status }));
-    let retryable = false;
-    try {
-      await openAiProvider('key', fetcher as typeof fetch).screen('text');
-    } catch (error) {
-      retryable = error instanceof ModerationUnavailable;
-    }
-    assertEquals(retryable, true, `status ${status}`);
+Deno.test('Gemini: its decision is used for everything else', async () => {
+  const held = await gemini({ decision: 'held', reason: 'off-platform contact' }).provider.screen(
+    'message me on viber',
+  );
+  assertEquals(held, {
+    decision: 'held',
+    ref: 'gemini:gemini-3.5-flash-lite',
+    reason: 'off-platform contact',
+  });
+  const approved = await gemini({ decision: 'approved', reason: null }).provider.screen('Fair price');
+  assertEquals(approved.decision, 'approved');
+});
+
+Deno.test('Gemini: a rate limit is retryable, so the item stays pending', async () => {
+  let retryable = false;
+  try {
+    await gemini(null, 429).provider.screen('Nice find');
+  } catch (error) {
+    retryable = error instanceof ModerationUnavailable;
   }
+  assertEquals(retryable, true);
 });

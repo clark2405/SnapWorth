@@ -367,7 +367,7 @@ export function createEstimateHandler(deps: Dependencies) {
       }
       if (!validEstimate(result)) return error(502, "invalid_response");
       // Return only validated fields, never an arbitrary provider object.
-      const value = {
+      const value: Record<string, unknown> = {
         ...(result as Record<string, unknown>),
         // Optional, and only one of the kinds the tips know: anything else is no kind at all.
         itemKind: itemKinds.includes(String((result as Record<string, unknown>).itemKind))
