@@ -7,6 +7,7 @@ export * from './feed';
 export * from './hanap';
 export * from './location';
 export * from './marketplace';
+export * from './meetup-location';
 export * from './platform';
 export * from './services';
 export * from './suki';

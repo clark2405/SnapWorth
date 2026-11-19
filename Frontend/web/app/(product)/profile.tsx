@@ -3,43 +3,37 @@ import { useRouter } from 'expo-router';
 import { useToast } from '@snapworth/shared/components';
 import { deleteAccount } from '@snapworth/shared/features/auth';
 import { ProfileView } from '@snapworth/shared/features/profile';
-import { AccountGateView, useSession } from '@snapworth/shared/features/session';
+import { useSession } from '@snapworth/shared/features/session';
 
+/**
+ * The moderator's own account on the website: who's signed in, the look, the console, help and
+ * signing out. Their scans, listings, votes and chats are in the phone app (BrowseOnly hides them).
+ */
 export default function ProfileRoute() {
   const router = useRouter();
-  const { isGuest, user, endSession } = useSession();
+  const { user, endSession } = useSession();
   const toast = useToast();
-  const back = () => (router.canGoBack() ? router.back() : router.replace('/feed'));
-
-  if (isGuest) return <AccountGateView title="Profile" intent="profile" onBack={back} />;
+  const back = () => (router.canGoBack() ? router.back() : router.replace('/admin'));
 
   return (
     <ProfileView
       onBack={back}
       onOpen={(destination) => {
         if (destination === 'edit-profile') router.push('/settings/profile');
-        if (destination === 'listings') router.push('/history?filter=listed');
-        if (destination === 'votes') router.push('/votes');
-        if (destination === 'conversations') router.push('/chat');
-        if (destination === 'moderation') router.push('/admin/review');
-        if (destination === 'introduction') router.push('/onboarding?replay=1');
-        if (destination === 'notifications') router.push('/settings/notifications');
-        if (destination === 'price-alerts') router.push('/settings/price-alerts');
+        if (destination === 'moderation') router.push('/admin');
         if (destination === 'help') router.push('/settings/help');
       }}
-      // Logging out leaves a guest who can keep looking around.
       onLogOut={() => {
         endSession();
-        router.replace('/feed');
+        router.replace('/login');
       }}
-      // Deletes the account and everything in it on the server, then this device's copy, and
-      // leaves a guest who can keep looking around. A failure stays in the sheet with the reason.
+      // Deletes the account and everything in it on the server; a failure stays in the sheet.
       onDeleteAccount={async (typed) => {
         const outcome = await deleteAccount(typed, user?.id);
         if (outcome.kind === 'deleted') {
           endSession();
-          toast.show({ title: 'Account deleted', body: 'You can keep looking around.' });
-          router.replace('/feed');
+          toast.show({ title: 'Account deleted' });
+          router.replace('/login');
         }
         return outcome;
       }}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Keyboard, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
@@ -12,7 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { haptic, themedStyles, tokens, useThemedStyles } from '../design';
+import { haptic, themedStyles, tokens, useThemedStyles, useWindowSize } from '../design';
 import { SWText } from './SWText';
 
 export interface SheetProps {
@@ -34,14 +34,23 @@ export function Sheet({ visible, onClose, title, children }: SheetProps) {
   const [height, setHeight] = useState(600);
   const offset = useSharedValue(800);
   const dim = useSharedValue(0);
+  // How far it's lifted above the keyboard, so what's being typed stays in view.
+  const lift = useSharedValue(0);
+  const { height: windowHeight } = useWindowSize();
+  const measuredHeight = useRef(600);
   const needsPresent = useRef(visible);
+  // Whether it was open last time: it rises only on opening. (Re-arming it on every height change
+  // made it drop and rise again whenever its content changed size, e.g. a hint growing a line.)
+  const wasVisible = useRef(false);
 
   useEffect(() => {
-    if (visible) {
+    const opening = visible && !wasVisible.current;
+    wasVisible.current = visible;
+    if (opening) {
       needsPresent.current = true;
       setMounted(true);
       haptic('tap');
-    } else if (mounted) {
+    } else if (!visible && mounted) {
       dim.value = withTiming(0, { duration: 200 });
       offset.value = withTiming(
         height + 40,
@@ -53,7 +62,31 @@ export function Sheet({ visible, onClose, title, children }: SheetProps) {
     }
   }, [dim, height, mounted, offset, visible]);
 
+  // The keyboard opening lifts the sheet with it, in step with the keyboard, but never so far that
+  // the sheet's top leaves the screen: a tall sheet rises only as far as there's room above it.
+  useEffect(() => {
+    if (!mounted) return;
+    const ios = Platform.OS === 'ios';
+    const shown = Keyboard.addListener(ios ? 'keyboardWillShow' : 'keyboardDidShow', (event) => {
+      const room = windowHeight - insets.top - tokens.spacing[2] - measuredHeight.current;
+      const target = Math.min(
+        Math.max(0, event.endCoordinates.height - insets.bottom),
+        Math.max(0, room),
+      );
+      lift.value = withTiming(target, { duration: event.duration || 250 });
+    });
+    const hidden = Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', (event) => {
+      lift.value = withTiming(0, { duration: event?.duration || 250 });
+    });
+    return () => {
+      shown.remove();
+      hidden.remove();
+      lift.value = 0;
+    };
+  }, [insets.bottom, insets.top, lift, mounted, windowHeight]);
+
   const present = (measured: number) => {
+    measuredHeight.current = measured;
     setHeight(measured);
     if (!visible) return;
     offset.value = measured + 40;
@@ -78,7 +111,9 @@ export function Sheet({ visible, onClose, title, children }: SheetProps) {
       }
     });
 
-  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: offset.value }] }));
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: offset.value - lift.value }],
+  }));
   const backdropStyle = useAnimatedStyle(() => ({ opacity: dim.value }));
 
   if (!mounted) return null;
@@ -93,9 +128,16 @@ export function Sheet({ visible, onClose, title, children }: SheetProps) {
           <Animated.View
             style={[styles.sheet, { paddingBottom: insets.bottom + tokens.spacing[4] }, sheetStyle]}
             onLayout={(event) => {
-              if (!needsPresent.current) return;
-              needsPresent.current = false;
-              present(event.nativeEvent.layout.height);
+              const measured = event.nativeEvent.layout.height;
+              if (needsPresent.current) {
+                needsPresent.current = false;
+                present(measured);
+              } else {
+                // Content changed size while open: it stays where it is, and how far a drag must
+                // go to close it follows the new height.
+                measuredHeight.current = measured;
+                setHeight(measured);
+              }
             }}
           >
             <View style={styles.grabber} />

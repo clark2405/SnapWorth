@@ -1,6 +1,7 @@
 export * from './local/account';
 export * from './local/admin-repository';
 export * from './local/chat-repository';
+export * from './local/meetup-location';
 export * from './local/collection-repository';
 export * from './local/comment-repository';
 export * from './local/feed-repository';
@@ -11,6 +12,7 @@ export * from './local/suki-repository';
 export * from './supabase/account';
 export * from './supabase/admin-repository';
 export * from './supabase/chat-repository';
+export * from './supabase/meetup-location';
 export * from './supabase/client';
 export * from './supabase/collection-repository';
 export * from './supabase/comment-repository';

@@ -17,6 +17,7 @@ import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import type { ThreadComment } from '../../types/entities';
 import { previewAvatarByHandle } from '../preview/sample-data';
 import { useBackendMode } from '../session/backend-mode';
+import { useBrowseOnly } from '../session/browse-only';
 import { relativeTime, type ThreadGroup } from './comment-thread-model';
 
 export interface CommentListProps {
@@ -151,6 +152,8 @@ function CommentRow({
   const authorLabel = author.displayName?.trim() || `@${author.handle}`;
   // Only approved comments can be answered: anything else is invisible to everyone else.
   const canReply = comment.moderationStatus === 'approved';
+  // On the moderators' website a comment is there to be read; acting on it is the console's job.
+  const browseOnly = useBrowseOnly();
 
   return (
     <View style={styles.row}>
@@ -183,47 +186,53 @@ function CommentRow({
           <Tag label="Held for review · only you can see this" tone="warn" icon={ShieldAlert} />
         ) : null}
 
-        <View style={styles.actions}>
-          {canReply ? (
-            <PressableScale
-              accessibilityLabel={`Reply to ${authorLabel}`}
-              haptic="select"
-              hitSlop={tokens.spacing[2]}
-              onPress={() => onReply(comment)}
-              style={styles.reply}
-            >
-              <CornerDownRight size={14} strokeWidth={2} color={colors.textSecondary} />
-              <SWText variant="labelSmall" tone="textSecondary">
-                Reply
-              </SWText>
-            </PressableScale>
-          ) : null}
-          <View style={styles.spacer} />
-          {comment.isMine ? (
-            <IconButton
-              icon={Trash2}
-              label={compact ? 'Delete your reply' : 'Delete your comment'}
-              tone="textMuted"
-              size={16}
-              onPress={() => onDelete(comment)}
-            />
-          ) : comment.reportedByMe ? (
-            <View style={styles.reported} accessible accessibilityLabel="You reported this comment">
-              <Flag size={14} strokeWidth={2} color={colors.textMuted} />
-              <SWText variant="caption" tone="textMuted">
-                Reported
-              </SWText>
-            </View>
-          ) : (
-            <IconButton
-              icon={Flag}
-              label={`Report comment by ${author.displayName?.trim() || author.handle}`}
-              tone="textMuted"
-              size={16}
-              onPress={() => onReport(comment)}
-            />
-          )}
-        </View>
+        {browseOnly ? null : (
+          <View style={styles.actions}>
+            {canReply ? (
+              <PressableScale
+                accessibilityLabel={`Reply to ${authorLabel}`}
+                haptic="select"
+                hitSlop={tokens.spacing[2]}
+                onPress={() => onReply(comment)}
+                style={styles.reply}
+              >
+                <CornerDownRight size={14} strokeWidth={2} color={colors.textSecondary} />
+                <SWText variant="labelSmall" tone="textSecondary">
+                  Reply
+                </SWText>
+              </PressableScale>
+            ) : null}
+            <View style={styles.spacer} />
+            {comment.isMine ? (
+              <IconButton
+                icon={Trash2}
+                label={compact ? 'Delete your reply' : 'Delete your comment'}
+                tone="textMuted"
+                size={16}
+                onPress={() => onDelete(comment)}
+              />
+            ) : comment.reportedByMe ? (
+              <View
+                style={styles.reported}
+                accessible
+                accessibilityLabel="You reported this comment"
+              >
+                <Flag size={14} strokeWidth={2} color={colors.textMuted} />
+                <SWText variant="caption" tone="textMuted">
+                  Reported
+                </SWText>
+              </View>
+            ) : (
+              <IconButton
+                icon={Flag}
+                label={`Report comment by ${author.displayName?.trim() || author.handle}`}
+                tone="textMuted"
+                size={16}
+                onPress={() => onReport(comment)}
+              />
+            )}
+          </View>
+        )}
       </View>
     </View>
   );

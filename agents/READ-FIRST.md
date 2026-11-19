@@ -225,8 +225,9 @@ on them isn't saved.
   - With the app closed, only meetup reminders and estimates reach the phone (local
     notifications). New messages and offers need push. The web has no reminders for a closed tab.
 - **Map tiles and place search for launch:** a provider and plan for each. The defaults
-  (OpenStreetMap's own tiles, and its Nominatim search behind the meetup map's search box) are
-  for development only. Set `EXPO_PUBLIC_MAP_TILES_URL` and `EXPO_PUBLIC_PLACE_SEARCH_URL`.
+  (OpenStreetMap's own tiles, and Photon's search-as-you-type behind the meetup map's search
+  box) are for development only. Set `EXPO_PUBLIC_MAP_TILES_URL` and
+  `EXPO_PUBLIC_PLACE_SEARCH_URL` (any Photon-compatible endpoint).
 - **Android:** not yet checked on a phone. The Snap bar may be hidden behind the tab bar.
 - **A moderation provider for launch:** the live project runs `MODERATION_PROVIDER=rules`, the
   built-in word rules, which are fine while testing. Before launch switch to `openai` with an

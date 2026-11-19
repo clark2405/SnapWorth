@@ -408,6 +408,8 @@ export function ConversationView({ conversationId, onBack, onViewItem }: Convers
             ) : message.meetup ? (
               <MeetupCard
                 meetup={message.meetup}
+                meetupId={message.id}
+                otherHandle={gone ? undefined : handle}
                 mine={message.mine}
                 locked={Boolean(closed) || blocked}
                 onConfirm={() => confirmMeetup(message)}

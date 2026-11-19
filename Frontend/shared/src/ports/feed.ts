@@ -15,6 +15,8 @@ export interface FeedPostListingLink {
   readonly id: string;
   readonly slug: string;
   readonly askingPrice: number;
+  /** The listing has sold: the post says so instead of "For sale". */
+  readonly sold?: boolean;
 }
 
 export interface FeedPost {

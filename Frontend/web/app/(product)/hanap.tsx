@@ -9,7 +9,6 @@ export default function HanapRoute() {
     <HanapView
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/marketplace'))}
       onOpenListing={(listingId) => router.push(`/listing/${listingId}`)}
-      onSnap={() => router.push('/capture')}
     />
   );
 }

@@ -1,4 +1,4 @@
-import { resolveMeetupStart } from './meetup-time';
+import { formatMeetupWhen, meetupDays, resolveMeetupStart } from './meetup-time';
 
 // Wednesday 11 November 2026, 9:30 AM on the device's own clock.
 const wednesday = new Date(2026, 10, 11, 9, 30);
@@ -68,5 +68,46 @@ describe('resolveMeetupStart', () => {
     expect(resolveMeetupStart('Today, 13:00 PM', wednesday)).toBeNull();
     expect(resolveMeetupStart('Today, 2:75 PM', wednesday)).toBeNull();
     expect(resolveMeetupStart('Today, 2:00 PM', 'not a date')).toBeNull();
+  });
+});
+
+describe('a meetup set for a date', () => {
+  it('writes the date in full, in English', () => {
+    expect(formatMeetupWhen(new Date(2026, 10, 22, 14, 30))).toBe('Sun, Nov 22, 2:30 PM');
+    expect(formatMeetupWhen(new Date(2026, 11, 1, 0, 15))).toBe('Tue, Dec 1, 12:15 AM');
+  });
+
+  it('reads it back as that day and time', () => {
+    expect(resolveMeetupStart('Sun, Nov 22, 2:30 PM', wednesday)).toEqual(
+      new Date(2026, 10, 22, 14, 30),
+    );
+    // Proposed for later the same day.
+    expect(resolveMeetupStart('Wed, Nov 11, 6:00 PM', wednesday)).toEqual(
+      new Date(2026, 10, 11, 18, 0),
+    );
+  });
+
+  it('reads a date early in the year, proposed in December, as next year', () => {
+    const december = new Date(2026, 11, 28, 9, 0);
+    expect(resolveMeetupStart('Sat, Jan 2, 10:00 AM', december)).toEqual(
+      new Date(2027, 0, 2, 10, 0),
+    );
+  });
+
+  it('refuses a date that does not exist', () => {
+    expect(resolveMeetupStart('Feb 30, 10:00 AM', wednesday)).toBeNull();
+    expect(resolveMeetupStart('Nov 22, 13:00 PM', wednesday)).toBeNull();
+  });
+
+  it('offers three weeks of days, naming today, tomorrow and a new month', () => {
+    const days = meetupDays(new Date(2026, 10, 28, 9, 0));
+    expect(days).toHaveLength(21);
+    expect(days.slice(0, 4).map((day) => day.label)).toEqual([
+      'Today',
+      'Tomorrow',
+      'Mon 30',
+      'Tue, Dec 1',
+    ]);
+    expect(days[3]!.key).toBe('2026-12-01');
   });
 });

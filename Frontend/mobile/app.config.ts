@@ -11,7 +11,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: 'automatic',
   icon: './assets/icon.png',
   ios: {
-    bundleIdentifier: 'com.snapworth.app',
+    // A free Apple account can't sign com.snapworth.app (it's registered elsewhere), so a
+    // developer building onto their own iPhone sets IOS_BUNDLE_ID in their git-ignored
+    // .env.local (and APPLE_TEAM_ID if Xcode needs telling which team).
+    bundleIdentifier: process.env.IOS_BUNDLE_ID || 'com.snapworth.app',
+    ...(process.env.APPLE_TEAM_ID ? { appleTeamId: process.env.APPLE_TEAM_ID } : {}),
     supportsTablet: false,
     // A layered Icon Composer icon: the kraft price tag on the brand red, its eyelet a lens and
     // its string looping free. iOS 26 gives the tag and lens Liquid Glass depth, and draws the

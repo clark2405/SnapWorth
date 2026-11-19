@@ -5,7 +5,7 @@ import Svg, { Ellipse, Path } from 'react-native-svg';
 import { Stamp, Sticker, SWText } from '../../components';
 import { held, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import { mapTiles } from './map-tiles';
-import { frameAt, project, tilesFor, type Frame } from './meetup-map-geo';
+import { frameAt, pixelsPerUnit, project, tilesFor, type Frame } from './meetup-map-geo';
 
 /**
  * The map under a meetup: street tiles from an online map provider, shown as they are. Only what
@@ -148,14 +148,33 @@ export interface MeetupMapProps {
   readonly lng: number;
   /** Both sides have agreed: the pin turns jeepney green and the map is stamped. */
   readonly agreed?: boolean;
+  /** People sharing where they are, drawn as dots when they're within the map's view. */
+  readonly people?: readonly MapPerson[];
   readonly accessibilityLabel: string;
 }
+
+/** Someone sharing their position at the meetup: the viewer (`mine`) or the other person. */
+export interface MapPerson {
+  readonly key: string;
+  readonly lat: number;
+  readonly lng: number;
+  readonly label: string;
+  readonly mine: boolean;
+}
+
+const dotSize = 16;
 
 /** How close the chat card's map is: a few streets around the pin. */
 const cardZoom = 15.5;
 
 /** The small map on a meetup card in the chat: where the two people are meeting. */
-export function MeetupMap({ lat, lng, agreed = false, accessibilityLabel }: MeetupMapProps) {
+export function MeetupMap({
+  lat,
+  lng,
+  agreed = false,
+  people = [],
+  accessibilityLabel,
+}: MeetupMapProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -192,6 +211,33 @@ export function MeetupMap({ lat, lng, agreed = false, accessibilityLabel }: Meet
             eyelet={agreed ? colors.onPlaceChat : colors.mapLand}
           />
         </View>
+        {size.width > 0
+          ? people.map((person) => {
+              const at = project(person.lat, person.lng);
+              const scale = pixelsPerUnit(camera.zoom);
+              const left = (at.x - frame.x) * scale;
+              const top = (at.y - frame.y) * scale;
+              // Off this little map: the card says how far they are instead.
+              if (left < 0 || top < 0 || left > size.width || top > size.height) return null;
+              return (
+                <View
+                  key={person.key}
+                  pointerEvents="none"
+                  style={[styles.person, { left: left - dotSize / 2, top: top - dotSize / 2 }]}
+                >
+                  <View
+                    style={[
+                      styles.dot,
+                      { backgroundColor: person.mine ? colors.accent : colors.placeChat },
+                    ]}
+                  />
+                  <SWText variant="caption" style={styles.personLabel} numberOfLines={1}>
+                    {person.label}
+                  </SWText>
+                </View>
+              );
+            })
+          : null}
         {agreed ? <Stamp label="Agreed" side="end" style={styles.stamp} /> : null}
         <MapCredit />
       </View>
@@ -259,6 +305,27 @@ const stylesFor = themedStyles((colors) => ({
   },
   creditText: {
     fontSize: 9,
+    lineHeight: 12,
+  },
+  person: {
+    position: 'absolute',
+    alignItems: 'center',
+    width: dotSize,
+    overflow: 'visible',
+  },
+  dot: {
+    ...held(colors, 1),
+    width: dotSize,
+    height: dotSize,
+    borderRadius: dotSize / 2,
+    borderWidth: 3,
+    borderColor: colors.surface,
+  },
+  personLabel: {
+    marginTop: 2,
+    width: 80,
+    textAlign: 'center',
+    fontSize: 10,
     lineHeight: 12,
   },
   stamp: {

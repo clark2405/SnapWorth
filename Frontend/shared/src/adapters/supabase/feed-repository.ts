@@ -23,6 +23,7 @@ interface ListingJoin {
   readonly asking_php: number;
   readonly photo_path?: string | null;
   readonly scan_id?: string | null;
+  readonly status?: string | null;
 }
 
 interface FeedPostRow {
@@ -56,7 +57,7 @@ interface VoteRow {
 }
 
 const postColumns =
-  'id, slug, owner_id, title, category, body, estimate_php, scan_id, listing_id, photo_path, too_high_count, just_right_count, too_low_count, moderation_status, created_at, author:profiles!feed_posts_owner_id_fkey(id, handle, display_name, avatar_url), listing:listings!feed_posts_listing_id_fkey(id, slug, asking_php, photo_path, scan_id)';
+  'id, slug, owner_id, title, category, body, estimate_php, scan_id, listing_id, photo_path, too_high_count, just_right_count, too_low_count, moderation_status, created_at, author:profiles!feed_posts_owner_id_fkey(id, handle, display_name, avatar_url), listing:listings!feed_posts_listing_id_fkey(id, slug, asking_php, photo_path, scan_id, status)';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -114,6 +115,7 @@ function toFeedPost(
           id: listing.id,
           slug: listing.slug,
           askingPrice: listing.asking_php,
+          ...(listing.status === 'sold' ? { sold: true } : {}),
         }
       : null,
     isMine: viewerId !== null && row.owner_id === viewerId,

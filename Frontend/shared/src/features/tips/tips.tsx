@@ -12,6 +12,7 @@ import {
 import type { StyleProp, ViewStyle } from 'react-native';
 
 import { TipCard, SnapIcon } from '../../components';
+import { useBrowseOnly } from '../session/browse-only';
 
 /**
  * The few things worth teaching, each where it happens. A tip retires for good once the person
@@ -110,7 +111,9 @@ export function useTip(id: TipId) {
 /** The tip itself, shown in place until it is done or closed. */
 export function Tip({ id, style }: { readonly id: TipId; readonly style?: StyleProp<ViewStyle> }) {
   const { visible, done } = useTip(id);
-  if (!visible) return null;
+  // Every tip teaches taking part (snapping, voting, saving), which the moderators' website leaves out.
+  const browseOnly = useBrowseOnly();
+  if (!visible || browseOnly) return null;
   const copy = tipCopy[id];
   return (
     <TipCard

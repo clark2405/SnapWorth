@@ -93,7 +93,7 @@ export interface PreviewPost {
   readonly votes: VoteCounts;
   readonly comments: readonly PreviewComment[];
   /** Set when the post is a marketplace listing reposted to ask whether its price is fair. */
-  readonly listing?: { readonly id: string; readonly askingPrice: number };
+  readonly listing?: { readonly id: string; readonly askingPrice: number; readonly sold?: boolean };
   /** True when the signed-in viewer owns this post. */
   readonly isMine?: boolean;
 }
@@ -420,18 +420,6 @@ export const previewConversation = {
 } as const;
 
 /** The days and times offered when arranging a meetup. */
-
-export const previewMeetupDays: readonly { readonly key: string; readonly label: string }[] = [
-  { key: 'today', label: 'Today' },
-  { key: 'tomorrow', label: 'Tomorrow' },
-  { key: 'saturday', label: 'Saturday' },
-];
-
-export const previewMeetupTimes: readonly { readonly key: string; readonly label: string }[] = [
-  { key: '10am', label: '10:00 AM' },
-  { key: '2pm', label: '2:00 PM' },
-  { key: '6pm', label: '6:00 PM' },
-];
 
 export const previewReportReasons: readonly { readonly key: string; readonly label: string }[] = [
   { key: 'scam', label: 'Scam or fraud' },

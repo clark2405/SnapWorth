@@ -62,8 +62,8 @@ export interface MarketplaceViewProps {
   readonly onOpenHanap?: () => void;
 }
 
-// Preview-only: listings don't carry a category field yet, so map them locally against
-// `previewMarketCategories` until that field exists on the real listing.
+// Real listings carry their own `category`. The preview's sample listings (no Supabase project)
+// predate that field, so theirs are filled in here.
 const categoryByListing: Readonly<Record<string, string>> = {
   'polaroid-sun-600': 'collectibles',
   'air-jordan-1-bred': 'sneakers',

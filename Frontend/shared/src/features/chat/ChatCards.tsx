@@ -5,19 +5,25 @@ import {
   Clock3,
   Eye,
   HandCoins,
+  LocateFixed,
+  LocateOff,
   MapPin,
   Navigation,
   Repeat2,
 } from 'lucide-react-native';
+import { useState } from 'react';
 import { Linking, Platform, View } from 'react-native';
 
 import { Button, SWText, Tag, type TagTone } from '../../components';
 import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import type { ChatMeetup, ChatOffer, OfferStatus } from '../../types/entities';
+import type { MessageId } from '../../types/ids';
 import { findMeetupSpot } from '../../types/meetup-spots';
 import { formatPeso } from '../preview/sample-data';
-import { directionsUrl } from './meetup-map-geo';
-import { MeetupMap } from './MeetupMap';
+import { distanceMeters, directionsUrl } from './meetup-map-geo';
+import { formatDistance, formatUpdated, useMeetupLocation } from './meetup-location-state';
+import { formatClock } from './meetup-time';
+import { MeetupMap, type MapPerson } from './MeetupMap';
 
 const offerStatus: Record<
   OfferStatus,
@@ -124,12 +130,18 @@ export function OfferCard({
 /** A proposed handoff: a public place and a time, confirmed by the other side. */
 export function MeetupCard({
   meetup,
+  meetupId,
+  otherHandle,
   mine,
   locked = false,
   onConfirm,
   onSuggestAnother,
 }: {
   readonly meetup: ChatMeetup;
+  /** The meetup's message, for sharing live location once it's agreed. */
+  readonly meetupId?: MessageId;
+  /** The other person's handle, to say who's sharing. */
+  readonly otherHandle?: string;
   readonly mine: boolean;
   readonly locked?: boolean;
   readonly onConfirm: () => void;
@@ -141,6 +153,19 @@ export function MeetupCard({
   const location = meetup.location;
   const known = findMeetupSpot(meetup.spotKey);
   const viewing = meetup.purpose === 'viewing';
+  // Where they're meeting, for how far each person is from it.
+  const spot = location ?? (known ? { lat: known.lat, lng: known.lng } : null);
+  // Live location: only for an agreed meetup in a conversation that's still open.
+  const canShare = Boolean(meetupId) && confirmed && !locked && spot !== null;
+  const live = useMeetupLocation(meetupId ?? ('' as MessageId), canShare);
+  const them = otherHandle ? `@${otherHandle}` : 'The other person';
+  const people: MapPerson[] = live.positions.map((position) => ({
+    key: position.userId,
+    lat: position.lat,
+    lng: position.lng,
+    label: position.mine ? 'You' : them,
+    mine: position.mine,
+  }));
 
   return (
     <View style={styles.card}>
@@ -149,7 +174,10 @@ export function MeetupCard({
           lat={location.lat}
           lng={location.lng}
           agreed={confirmed}
-          accessibilityLabel={`Map showing ${meetup.place}${confirmed ? ', agreed' : ''}`}
+          people={people}
+          accessibilityLabel={`Map showing ${meetup.place}${confirmed ? ', agreed' : ''}${
+            live.theirs ? `, and where ${them} is` : ''
+          }`}
         />
       ) : null}
       <View style={styles.meetupRow}>
@@ -214,12 +242,124 @@ export function MeetupCard({
           />
         </View>
       )}
+      {canShare && live.available && spot ? (
+        <LiveLocation live={live} spot={spot} them={them} />
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * Finding each other at an agreed meetup: who's sharing where, how far from the spot, and the
+ * viewer's own sharing, started and stopped here.
+ */
+function LiveLocation({
+  live,
+  spot,
+  them,
+}: {
+  readonly live: ReturnType<typeof useMeetupLocation>;
+  readonly spot: { readonly lat: number; readonly lng: number };
+  readonly them: string;
+}) {
+  const styles = useThemedStyles(stylesFor);
+  const [turnedOff, setTurnedOff] = useState<'denied' | 'unavailable' | null>(null);
+  const { theirs, sharing } = live;
+  const until = sharing ? new Date(sharing.until) : null;
+
+  return (
+    <View style={styles.live}>
+      {theirs ? (
+        <SWText variant="bodySmall" accessibilityLiveRegion="polite">
+          {`${them} is sharing their location · ${formatDistance(
+            distanceMeters(theirs, spot),
+          )} from the spot · ${formatUpdated(theirs.updatedAt, live.now)}`}
+        </SWText>
+      ) : (
+        <SWText variant="caption" tone="textMuted">
+          On your way? Share where you are so you can find each other at the spot.
+        </SWText>
+      )}
+      {until ? (
+        <SWText variant="caption" tone="textSecondary">
+          {`Sharing your location with ${them} until ${formatClock(until.getHours(), until.getMinutes())}.`}
+        </SWText>
+      ) : null}
+      {turnedOff ? (
+        <SWText variant="caption" tone="danger" accessibilityLiveRegion="polite">
+          {turnedOff === 'denied'
+            ? 'Location is off for SnapWorth. Turn it on in Settings to share where you are.'
+            : 'Couldn’t find where you are. Check that Location Services are on.'}
+        </SWText>
+      ) : null}
+      {live.problem ? (
+        <SWText variant="caption" tone="danger" accessibilityLiveRegion="polite">
+          {live.problem}
+        </SWText>
+      ) : null}
+      <View style={styles.liveButtons}>
+        <Button
+          label={sharing ? 'Stop sharing' : 'Share my location'}
+          variant={sharing ? 'secondary' : 'primary'}
+          size="small"
+          icon={sharing ? LocateOff : LocateFixed}
+          haptic="select"
+          accessibilityHint={
+            sharing
+              ? `Stops showing ${them} where you are`
+              : `Shows ${them} where you are for the next hour, while SnapWorth is open`
+          }
+          onPress={() => {
+            if (sharing) {
+              void live.stop();
+              return;
+            }
+            setTurnedOff(null);
+            void live.start().then((outcome) => {
+              if (outcome !== 'sharing') setTurnedOff(outcome);
+            });
+          }}
+        />
+        {theirs ? (
+          <Button
+            label={`Go to ${them}`}
+            variant="tertiary"
+            size="small"
+            icon={Navigation}
+            accessibilityHint={`Opens where ${them} is in your maps app`}
+            onPress={() =>
+              void Linking.openURL(
+                directionsUrl(
+                  { name: them, lat: theirs.lat, lng: theirs.lng },
+                  Platform.OS === 'ios' ? 'ios' : 'other',
+                ),
+              )
+            }
+          />
+        ) : null}
+      </View>
     </View>
   );
 }
 
 const stylesFor = themedStyles((colors) => ({
+  live: {
+    gap: tokens.spacing[2],
+    marginTop: tokens.spacing[3],
+    paddingTop: tokens.spacing[3],
+    borderTopWidth: tokens.border.hairline,
+    borderTopColor: colors.borderSubtle,
+  },
+  liveButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: tokens.spacing[2],
+  },
+  // Offer and pickup cards fill their column, so their answer buttons always have room (shrunk to
+  // its words, an offer's card squeezed Accept down to its tick).
   card: {
+    alignSelf: 'stretch',
     gap: tokens.spacing[1],
     padding: tokens.spacing[4],
     borderRadius: tokens.radius.large,

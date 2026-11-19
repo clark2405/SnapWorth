@@ -88,6 +88,7 @@ export function toPreviewPost(post: FeedPost): PreviewPost {
       ? {
           id: post.listing.slug || post.listing.id,
           askingPrice: post.listing.askingPrice,
+          ...(post.listing.sold ? { sold: true } : {}),
         }
       : undefined,
     isMine: post.isMine,

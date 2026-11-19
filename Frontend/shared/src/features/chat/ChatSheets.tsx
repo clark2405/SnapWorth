@@ -14,12 +14,7 @@ import {
   TextField,
 } from '../../components';
 import { themedStyles, tokens, useThemedStyles, useWindowSize } from '../../design';
-import {
-  formatPeso,
-  previewMeetupDays,
-  previewMeetupTimes,
-  previewReportReasons,
-} from '../preview/sample-data';
+import { formatPeso, previewReportReasons } from '../preview/sample-data';
 import type { MeetupProposal } from '../../ports/services';
 import type { MeetupPurpose } from '../../types/entities';
 import { findMeetupSpot, homeCity, meetupSpots } from '../../types/meetup-spots';
@@ -28,8 +23,11 @@ import { MeetupPicker, placingZoom } from './MeetupPicker';
 import type { FoundPlace } from './place-search';
 import { PlaceSearch } from './PlaceSearch';
 import { FullMeetupMap } from './FullMeetupMap';
+import { formatMeetupWhen } from './meetup-time';
+import { MeetupWhenPicker } from './MeetupWhenPicker';
 import { sukiDiscounts } from '../../ports/suki';
 import { sukiPrice } from './suki';
+import { suggestedOffers } from '../marketplace/offer-suggestions';
 
 /** The composer's plus: what a chat about an item needs beyond words. */
 export function ChatActionsSheet({
@@ -120,10 +118,7 @@ export function OfferSheet({
   const suki = sukiPct === null ? null : sukiPrice(askingPrice, sukiPct);
   // A suki's own price comes first; the rest are steps under the asking price.
   const suggestions = [
-    ...new Set([
-      ...(suki === null ? [] : [suki]),
-      ...[0.9, 0.95, 1].map((factor) => Math.round((askingPrice * factor) / 50) * 50),
-    ]),
+    ...new Set([...(suki === null ? [] : [suki]), ...suggestedOffers(askingPrice, [0.9, 0.95, 1])]),
   ];
 
   return (
@@ -248,8 +243,9 @@ export function MeetupSheet({
   const [camera, setCamera] = useState<Camera>(overview);
   const [spotKey, setSpotKey] = useState<string | null>(null);
   const [name, setName] = useState('');
-  const [day, setDay] = useState<string | null>(null);
-  const [time, setTime] = useState<string | null>(null);
+  const [at, setAt] = useState<Date | null>(null);
+  // The moment the sheet opened, so the days and the hours left today hold still while it's open.
+  const [openedAt, setOpenedAt] = useState(() => new Date());
   // The map, full screen, for when the sheet's is too small to find the spot.
   const [fullMap, setFullMap] = useState(false);
   // A shorter map on a short phone, so the whole sheet still fits.
@@ -261,8 +257,8 @@ export function MeetupSheet({
     setCamera(overview);
     setSpotKey(null);
     setName('');
-    setDay(null);
-    setTime(null);
+    setAt(null);
+    setOpenedAt(new Date());
     setFullMap(false);
   }, [initialPurpose, visible]);
 
@@ -295,10 +291,9 @@ export function MeetupSheet({
     setCamera({ center: project(place.lat, place.lng), zoom: spotZoom });
   };
 
-  const label = (options: typeof previewMeetupDays, key: string | null) =>
-    options.find((option) => option.key === key)?.label ?? '';
   const placed = camera.zoom >= placingZoom;
-  const ready = placed && name.trim().length > 0 && day !== null && time !== null;
+  const ready = placed && name.trim().length > 0 && at !== null;
+  const near = unproject(camera.center);
 
   return (
     <Sheet
@@ -318,15 +313,16 @@ export function MeetupSheet({
         <SWText variant="overline" tone="textMuted">
           Where
         </SWText>
-        <PlaceSearch onPick={goTo} />
-        <MeetupPicker
-          camera={camera}
-          onCameraChange={moveTo}
-          label={name.trim() || undefined}
-          aspect={aspect}
-          accessibilityLabel="Map for choosing where to meet"
-          onToggleSize={() => setFullMap(true)}
-        />
+        <PlaceSearch onPick={goTo} near={near}>
+          <MeetupPicker
+            camera={camera}
+            onCameraChange={moveTo}
+            label={name.trim() || undefined}
+            aspect={aspect}
+            accessibilityLabel="Map for choosing where to meet"
+            onToggleSize={() => setFullMap(true)}
+          />
+        </PlaceSearch>
         <FullMeetupMap
           visible={fullMap}
           camera={camera}
@@ -356,14 +352,7 @@ export function MeetupSheet({
         <SWText variant="overline" tone="textMuted">
           When
         </SWText>
-        <ChoiceChips label="Day" options={previewMeetupDays} value={day} scroll onChange={setDay} />
-        <ChoiceChips
-          label="Time"
-          options={previewMeetupTimes}
-          value={time}
-          scroll
-          onChange={setTime}
-        />
+        {visible ? <MeetupWhenPicker now={openedAt} value={at} onChange={setAt} /> : null}
       </View>
       <SWText variant="caption" tone="textMuted">
         {purpose === 'viewing'
@@ -382,7 +371,7 @@ export function MeetupSheet({
               spotKey: spotKey ?? undefined,
               location: { lat, lng },
               place: name.trim(),
-              when: `${label(previewMeetupDays, day)}, ${label(previewMeetupTimes, time)}`,
+              when: formatMeetupWhen(at!),
             });
           }}
         />

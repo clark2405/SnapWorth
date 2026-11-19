@@ -47,8 +47,9 @@ import type { MarketListing } from '../../ports/marketplace';
 import type { ModerationStatus } from '../../types/entities';
 import { haptic, themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import { formatPeso } from '../preview/sample-data';
-import { useAccountGate, useSession } from '../session';
+import { useAccountGate, useBrowseOnly, useSession } from '../session';
 import { askingLine } from './asking-line';
+import { suggestedOffers } from './offer-suggestions';
 import { verdictChip, verdictLabel } from './ListingCard';
 import {
   listingPhotoSource,
@@ -87,8 +88,6 @@ const categoryDisplayLabel: Readonly<Record<string, string>> = {
   electronics: 'Electronics',
   home: 'Home',
 };
-
-const roundTo50 = (value: number) => Math.max(50, Math.round(value / 50) * 50);
 
 /**
  * A listing's page. The listing comes from the Market (Supabase's, or the device's sample ones in
@@ -129,6 +128,8 @@ function ListingDetail({
   const toast = useToast();
   const { isGuest } = useSession();
   const requireAccount = useAccountGate();
+  // The moderators' website shows the listing without buying, selling or saving.
+  const browseOnly = useBrowseOnly();
   const {
     isSaved,
     getAlert,
@@ -174,11 +175,7 @@ function ListingDetail({
         }
       : null;
   const saves = marketListing.stats.saves;
-  const offerSuggestions = [
-    roundTo50(askingPrice * 0.88),
-    roundTo50(askingPrice * 0.93),
-    roundTo50(askingPrice * 0.97),
-  ];
+  const offerSuggestions = suggestedOffers(askingPrice, [0.88, 0.93, 0.97]);
 
   const sold = marketListing.status === 'sold';
   const [markingSold, setMarkingSold] = useState(false);
@@ -284,7 +281,7 @@ function ListingDetail({
                   onPress={onShare}
                 />
               ) : null}
-              {owned ? null : (
+              {owned || browseOnly ? null : (
                 <LikeButton
                   liked={saved}
                   onToggle={toggleSaved}
@@ -298,7 +295,7 @@ function ListingDetail({
         />
       }
       footer={
-        owned && sold ? (
+        browseOnly ? undefined : owned && sold ? (
           <BottomBar>
             <View style={styles.footerRow}>
               <Button
@@ -475,31 +472,33 @@ function ListingDetail({
 
             {owned ? null : (
               <>
-                <Surface>
-                  <ListRow
-                    label="Alert me if the price drops"
-                    trailing={
-                      <Toggle
-                        value={priceAlert}
-                        onValueChange={(value) =>
-                          requireAccount('alert', () => {
-                            void saveAlert(activeId, undefined, value).then((result) => {
-                              if (!result.ok) toast.show(savedNotKept);
-                              else if (value) {
-                                haptic('select');
-                                toast.show({
-                                  title: 'Alert set',
-                                  body: "We'll notify you if the price drops.",
-                                });
-                              }
-                            });
-                          })
-                        }
-                        accessibilityLabel="Alert me if the price drops"
-                      />
-                    }
-                  />
-                </Surface>
+                {browseOnly ? null : (
+                  <Surface>
+                    <ListRow
+                      label="Alert me if the price drops"
+                      trailing={
+                        <Toggle
+                          value={priceAlert}
+                          onValueChange={(value) =>
+                            requireAccount('alert', () => {
+                              void saveAlert(activeId, undefined, value).then((result) => {
+                                if (!result.ok) toast.show(savedNotKept);
+                                else if (value) {
+                                  haptic('select');
+                                  toast.show({
+                                    title: 'Alert set',
+                                    body: "We'll notify you if the price drops.",
+                                  });
+                                }
+                              });
+                            })
+                          }
+                          accessibilityLabel="Alert me if the price drops"
+                        />
+                      }
+                    />
+                  </Surface>
+                )}
                 {saves > 0 ? (
                   <SWText variant="caption" tone="textMuted">
                     {saves === 1
@@ -555,7 +554,8 @@ function ListingDetail({
           prefix="₱"
           value={offerText}
           onChangeText={setOfferText}
-          placeholder="Enter your offer"
+          // Short enough for the big amount type ("Enter your offer" was cut off): an example.
+          placeholder={offerSuggestions[0] ? String(offerSuggestions[0]) : 'Amount'}
           keyboardType="decimal-pad"
           inputMode="decimal"
           accessibilityLabel="Your offer in pesos"

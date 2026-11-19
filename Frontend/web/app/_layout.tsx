@@ -1,37 +1,29 @@
-import { Stack, usePathname, useRouter, type Href } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import {
   BannerProvider,
-  Companion,
   PersonLinkProvider,
   RevealGate,
   SignInHandoff,
   ToastProvider,
-  useToast,
 } from '@snapworth/shared/components';
 import {
   ThemeProvider,
-  tokens,
   useTheme,
-  useWideLayout,
   type ThemePreference,
   type ThemePreferenceStore,
 } from '@snapworth/shared/design';
-import { companionConfigFor } from '@snapworth/shared/features/companion';
 import { AppServicesProvider, type BackendConfig } from '@snapworth/shared/composition';
 import { useSnapWorthFonts } from '@snapworth/shared/design/font-assets';
-import { ChatBannerHost, MeetupRemindersHost } from '@snapworth/shared/features/chat';
 import { SessionSplashView } from '@snapworth/shared/features/launch';
-import { wantsNotification, type NotificationKey } from '@snapworth/shared/features/profile';
-import { SessionProvider, useAccountGate } from '@snapworth/shared/features/session';
+import { BrowseOnlyProvider, SessionProvider } from '@snapworth/shared/features/session';
 import { TipsProvider } from '@snapworth/shared/features/tips';
 
-import { loadNotificationPreferences } from '../src/notifications';
 import { browserTipStore } from '../src/tip-store';
 
 const appearanceKey = 'snapworth.appearance';
@@ -59,10 +51,6 @@ const browserThemeStore: ThemePreferenceStore = {
 
 // A Supabase project's URL and public anon key, from EXPO_PUBLIC_* environment variables
 // (see Backend/README.md). Without them, comments are kept on this device instead.
-/** Whether the person wants to hear about this kind of thing, as they last chose. */
-const wantsToHear = (kind: NotificationKey) =>
-  wantsNotification(loadNotificationPreferences(), kind);
-
 const backend: BackendConfig = {
   supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
   supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
@@ -93,7 +81,6 @@ function Shell() {
   const [revealOpen, setRevealOpen] = useState(false);
   const [launched, setLaunched] = useState(false);
   const fontsReady = useSnapWorthFonts();
-  const openChat = useCallback((id: string) => router.push(`/chat/${id}`), [router]);
 
   // Hold on the bare canvas for the moment the bundled faces take to load, so no text ever
   // renders in a fallback face and then jumps.
@@ -107,79 +94,31 @@ function Shell() {
     >
       {/* Tapping someone's name or photo opens their profile. */}
       <PersonLinkProvider onOpen={(handle) => router.push(`/seller/${encodeURIComponent(handle)}`)}>
-        <TipsProvider store={browserTipStore}>
-          <StatusBar style={isDark ? 'light' : 'dark'} />
-          <RevealGate open={revealOpen}>
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: colors.canvas },
-                animation: 'fade',
-              }}
-            />
-            <WebCompanion ready={launched} />
-            {/* A new message, offer or meetup in a chat that isn't open: a banner that opens it. */}
-            <ChatBannerHost onOpenConversation={openChat} wants={wantsToHear} />
-            {/* Agreed meetups: a banner here when it's time. A browser can't wake a closed tab. */}
-            <MeetupRemindersHost onOpenConversation={openChat} wants={wantsToHear} />
-            {/* Signing in closes the screen into Worthy's tag and opens it onto the app. */}
-            <SignInHandoff />
-          </RevealGate>
-          {launched ? null : (
-            <SessionSplashView
-              onExit={() => setRevealOpen(true)}
-              onDone={() => setLaunched(true)}
-            />
-          )}
-        </TipsProvider>
+        {/* The website is the moderators' place: the shared screens are for looking, and
+            taking part (Worthy, chats, voting, selling) is the phone app's. */}
+        <BrowseOnlyProvider>
+          <TipsProvider store={browserTipStore}>
+            <StatusBar style={isDark ? 'light' : 'dark'} />
+            <RevealGate open={revealOpen}>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: colors.canvas },
+                  animation: 'fade',
+                }}
+              />
+              {/* Signing in closes the screen into Worthy's tag and opens it onto the app. */}
+              <SignInHandoff />
+            </RevealGate>
+            {launched ? null : (
+              <SessionSplashView
+                onExit={() => setRevealOpen(true)}
+                onDone={() => setLaunched(true)}
+              />
+            )}
+          </TipsProvider>
+        </BrowseOnlyProvider>
       </PersonLinkProvider>
     </SessionProvider>
-  );
-}
-
-function WebCompanion({ ready }: { readonly ready: boolean }) {
-  const pathname = usePathname();
-  const router = useRouter();
-  const toast = useToast();
-  const wide = useWideLayout();
-  const requireAccount = useAccountGate();
-  const config = useMemo(
-    () =>
-      companionConfigFor(pathname, {
-        go: (href) => router.push(href as Href),
-        ask: (question) =>
-          router.push({ pathname: '/worthy', params: { q: question, about: pathname } }),
-        notify: (title, body) => toast.show({ title, body }),
-      }),
-    [pathname, router, toast],
-  );
-
-  return (
-    <Companion
-      actions={config.actions}
-      greeting={config.greeting}
-      hint={config.hint}
-      // Beside a desktop conversation it would sit on the message box, and has nothing to add.
-      hidden={!ready || config.hidden || (wide && pathname === '/chat')}
-      // On a wide window there's no floating tab bar to ride above, only the page's edge; a
-      // screen's own bottom bar is still there to clear.
-      bottomOffset={
-        config.lift === 'tabBar'
-          ? wide
-            ? tokens.spacing[6]
-            : 142
-          : config.lift === 'actionBar'
-            ? 92
-            : 0
-      }
-      // The folded tab bar is one short row; Worthy can come down to just above it.
-      foldedBottomOffset={config.lift === 'tabBar' && !wide ? 66 : undefined}
-      onAsk={(question) =>
-        router.push({ pathname: '/worthy', params: { q: question, about: pathname } })
-      }
-      onHoldSnap={() => router.push('/capture')}
-      // Worthy works with your own snaps, listings and chats: a guest is asked for an account.
-      onRequestOpen={(open) => requireAccount('worthy', open)}
-    />
   );
 }

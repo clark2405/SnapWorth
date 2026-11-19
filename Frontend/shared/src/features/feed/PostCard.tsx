@@ -124,10 +124,11 @@ export function PostCard({ post, vote, onVote, onOpen, onShare, onSave, onReport
           </View>
         </PersonLink>
         {/* A listing reposted for a price check: the vote is on what the seller is asking. */}
+        {/* Once it has sold it says so, rather than still offering it. */}
         {post.listing ? (
           <Tag
-            label={`For sale · ${formatPeso(post.listing.askingPrice)}`}
-            tone="mint"
+            label={`${post.listing.sold ? 'Sold' : 'For sale'} · ${formatPeso(post.listing.askingPrice)}`}
+            tone={post.listing.sold ? 'grave' : 'mint'}
             icon={PriceTagIcon}
           />
         ) : null}

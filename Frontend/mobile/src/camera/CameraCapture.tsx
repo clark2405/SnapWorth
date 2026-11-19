@@ -140,6 +140,9 @@ export function CameraCapture({
         : onEstimate(image, controller.signal));
       if (generation === estimateGeneration.current && !controller.signal.aborted) {
         setEstimate(result);
+        // Without Apple Intelligence the phone can't tell what kind of item this is; the
+        // estimate says, so the tips beneath it name the shots for that kind.
+        setItemKind((current) => current ?? result.itemKind ?? null);
         const resolvedUri = uriForSave || photoUri;
         if (result.status === 'estimated' && resolvedUri) {
           toSave = {

@@ -10,21 +10,19 @@ import {
   WithSkeleton,
 } from '@snapworth/shared/components';
 import { useTheme, useWideLayout } from '@snapworth/shared/design';
-import { useAccountGate } from '@snapworth/shared/features/session';
 
-import { tabRoutes, tabs, type TabKey } from '../../../src/places';
+import { compactTabs, tabRoutes, tabs, type TabKey } from '../../../src/places';
 
 /**
- * The four places, kept alive side by side: switching shows a tab that's already built, with
- * its scroll position and state, instead of building it again. On a phone-sized window they
- * share the floating tab bar, laid out like iOS's, with Snap above it and Search beside it;
+ * The places a moderator looks through, kept alive side by side: switching shows a tab that's
+ * already built, with its scroll position and state, instead of building it again. On a
+ * phone-sized window they share the floating tab bar, with the console and Search beside them;
  * wider, the sidebar beside the whole app takes its place.
  */
 export default function TabsLayout() {
   const { colors } = useTheme();
   const wide = useWideLayout();
   const router = useRouter();
-  const requireAccount = useAccountGate();
 
   // Each screen's code arrives the first time it's opened. Once the app has settled, the other
   // tabs are fetched and built in the background, so opening one never waits on the network.
@@ -68,15 +66,16 @@ export default function TabsLayout() {
             const activeKey = active?.name as TabKey | undefined;
             return (
               <TabBar
-                tabs={tabs}
+                tabs={compactTabs}
                 activeKey={activeKey}
-                // Tapping the tab you are on takes its page back to the top.
+                // Tapping the tab you are on takes its page back to the top; the console isn't one
+                // of these tabs, so it opens as a page of its own.
                 onSelect={(key) => {
                   if (key === activeKey) return requestScrollToTop();
                   const route = state.routes.find((entry) => entry.name === key);
                   if (route) navigateToTab(route.key);
+                  else router.navigate(tabRoutes[key]);
                 }}
-                onSnap={() => requireAccount('snap', () => router.push('/capture'))}
                 onSearch={() => router.push('/search')}
               />
             );
@@ -84,8 +83,9 @@ export default function TabsLayout() {
         >
           <Tabs.Screen name="feed" />
           <Tabs.Screen name="marketplace" />
-          <Tabs.Screen name="chat" />
-          <Tabs.Screen name="history" />
+          {/* Chats and History are the phone app's; the product layout sends them to the console. */}
+          <Tabs.Screen name="chat" options={{ href: null }} />
+          <Tabs.Screen name="history" options={{ href: null }} />
         </Tabs>
       </View>
     </BackdropHostContext.Provider>

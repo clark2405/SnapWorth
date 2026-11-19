@@ -43,6 +43,7 @@ import { useFeed } from '../feed/feed-state';
 import { useHistoryItems } from '../history/scan-history-state';
 import { useMarketplace } from '../marketplace/marketplace-state';
 import { formatPeso, type PreviewSearchResult } from '../preview/sample-data';
+import { useBrowseOnly } from '../session/browse-only';
 import { useTrends } from '../trends/use-trends';
 import { useRecentSearches } from './recent-searches';
 
@@ -61,6 +62,8 @@ export interface SearchViewProps {
    */
   readonly mode?: 'overlay' | 'tab';
 }
+
+const noItems: ReturnType<typeof useHistoryItems>['items'] = [];
 
 const scopes: readonly { key: SearchScope; label: string }[] = [
   { key: 'all', label: 'Everything' },
@@ -155,7 +158,11 @@ export function SearchView({
 
   const { previewListings: marketListings } = useMarketplace();
   const { previewPosts: feedPosts } = useFeed();
-  const { items: historyItems } = useHistoryItems();
+  const { items: ownItems } = useHistoryItems();
+  // The moderators' website searches what's public; a moderator's own History isn't part of it.
+  const browseOnly = useBrowseOnly();
+  const historyItems = browseOnly ? noItems : ownItems;
+  const shownScopes = browseOnly ? scopes.filter((option) => option.key !== 'history') : scopes;
 
   const searchIndex = useMemo<readonly PreviewSearchResult[]>(
     () => [
@@ -341,7 +348,7 @@ export function SearchView({
           contentContainerStyle={styles.pills}
           accessibilityRole="tablist"
         >
-          {scopes.map((option) => {
+          {shownScopes.map((option) => {
             const active = option.key === scope;
             return (
               <PressableScale

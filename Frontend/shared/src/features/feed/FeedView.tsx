@@ -26,7 +26,7 @@ import { ProfileButton } from '../profile/ProfileButton';
 import { CategoryArt } from '../trends/CategoryArt';
 import type { Trend } from '../trends/trends';
 import { useTrends } from '../trends/use-trends';
-import { useAccountGate, useSession } from '../session';
+import { useAccountGate, useBrowseOnly, useSession } from '../session';
 import { Tip, useTip } from '../tips';
 import { useFeed, voteNotSaved } from './feed-state';
 import { PostCard } from './PostCard';
@@ -66,6 +66,7 @@ export function FeedView({
   const { heading, trends } = useTrends();
   const { isGuest } = useSession();
   const requireAccount = useAccountGate();
+  const browseOnly = useBrowseOnly();
   const toast = useToast();
   const voteTip = useTip('vote');
   // One column of posts on a phone; on a wide window as many as fit, up to three.
@@ -108,7 +109,7 @@ export function FeedView({
 
       {/* Only what's really trending: with a Supabase project, categories people have listed in
           this month; with nothing listed, no row. */}
-      {trends.length > 0 ? (
+      {trends.length > 0 && !browseOnly ? (
         <Reveal index={0} style={styles.trending}>
           <Sign icon={Flame} label={heading} />
           <ScrollView
@@ -157,7 +158,7 @@ export function FeedView({
               post={post}
               vote={voteFor(post.id)}
               onVote={
-                isGuest || !post.isMine
+                !browseOnly && (isGuest || !post.isMine)
                   ? (choice) =>
                       requireAccount('vote', () => {
                         voteTip.done();
