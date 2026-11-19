@@ -1,16 +1,22 @@
+import { beforeEach, expect, it, jest } from '@jest/globals';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { useCameraPermissions } from 'expo-camera';
+import { useCameraPermissions, type PermissionResponse } from 'expo-camera';
 import type * as ReactApi from 'react';
 import { AppState, Platform } from 'react-native';
 import type * as ReactNativeApi from 'react-native';
 
+import type { NewScan, SaveOutcome } from '@snapworth/shared/features/history/scan-history';
+import type { PhotoEstimate, PhotoPricingService } from '@snapworth/shared/types';
+
 import { CameraCapture } from './CameraCapture';
 
-const mockTakePicture = jest.fn();
-const mockRequestPermission = jest.fn();
-const mockEstimate = jest.fn();
+const mockTakePicture =
+  jest.fn<() => Promise<{ uri: string; base64?: string; width?: number; height?: number }>>();
+const mockRequestPermission = jest.fn<() => Promise<PermissionResponse>>();
+const mockGetPermission = jest.fn<() => Promise<PermissionResponse>>();
+const mockEstimate = jest.fn<PhotoPricingService['estimate']>();
 const mockCameraMount = jest.fn();
-const sampleEstimate = {
+const sampleEstimate: PhotoEstimate = {
   status: 'estimated',
   itemName: 'Camera-tested jacket',
   amountPhp: 1500,
@@ -21,8 +27,8 @@ const sampleEstimate = {
 };
 
 // The native photo check: absent by default, as on Android, so pricing runs as it always did.
-const mockMeasurePhoto = jest.fn();
-const mockReadItem = jest.fn();
+const mockMeasurePhoto = jest.fn<(uri: string) => Promise<unknown>>();
+const mockReadItem = jest.fn<(uri: string) => Promise<unknown>>();
 jest.mock('../snap-sense', () => ({
   measurePhoto: (uri: string) => mockMeasurePhoto(uri),
   readItem: (uri: string) => mockReadItem(uri),
@@ -68,7 +74,7 @@ jest.mock('expo-camera', () => {
   const { View } = jest.requireActual<typeof ReactNativeApi>('react-native');
   return {
     useCameraPermissions: jest.fn(),
-    CameraView: React.forwardRef((props: object, ref: unknown) => {
+    CameraView: React.forwardRef((props: object, ref: ReactApi.ForwardedRef<unknown>) => {
       React.useEffect(() => {
         mockCameraMount();
       }, []);
@@ -90,13 +96,41 @@ jest.mock('expo-camera', () => {
 // permission, capture, error, and lifecycle handling run unchanged.
 jest.mock('@snapworth/shared/features/capture', () => {
   const React = jest.requireActual<typeof ReactApi>('react');
-  const { View, Button, Text } = jest.requireActual<typeof ReactNativeApi>('react-native');
+  const { View, Button, Image, Text } = jest.requireActual<typeof ReactNativeApi>('react-native');
   // The photo coach is plain data, so the real one is used.
   const { coachFor } = jest.requireActual<{ coachFor: unknown }>(
     '@snapworth/shared/features/capture/photo-coach',
   );
   return {
     coachFor,
+    CaptureResultScene: (props: {
+      photoUri: string;
+      title: string;
+      amountPhp?: number;
+      formatPrice?: (amount: number) => string;
+    }) =>
+      React.createElement(
+        View,
+        null,
+        React.createElement(Image, {
+          source: { uri: props.photoUri },
+          accessibilityLabel: 'Your captured photo',
+        }),
+        React.createElement(Text, null, props.title),
+        props.amountPhp !== undefined && props.formatPrice
+          ? React.createElement(Text, null, props.formatPrice(props.amountPhp))
+          : null,
+      ),
+    EstimateRange: (props: {
+      lowPhp: number;
+      highPhp: number;
+      formatPrice: (amount: number) => string;
+    }) =>
+      React.createElement(
+        Text,
+        null,
+        `Likely ${props.formatPrice(props.lowPhp)} – ${props.formatPrice(props.highPhp)}`,
+      ),
     EstimatingScene: (props: { stage: string; looksLike?: string }) =>
       React.createElement(
         View,
@@ -136,19 +170,47 @@ jest.mock('@snapworth/shared/components', () => {
       React.createElement(Button, { ...props, title: label }),
     SWText: ({ children }: { children: React.ReactNode }) =>
       React.createElement(Text, null, children),
-    EstimateBadge: ({ value, range }: { value: string; range?: string }) =>
-      React.createElement(Text, null, `${value} ${range ?? ''}`),
     Worthy: () => null,
   };
 });
 
 jest.mock('@snapworth/shared/design', () => ({
+  // The photo's review takes the app's theme; these are stand-in colours.
+  useTheme: () => ({
+    isDark: false,
+    colors: {
+      canvas: '#fffbf5',
+      surface: '#fff',
+      surfaceRaised: '#fff7ec',
+      sand: '#f0e6d6',
+      sandInk: '#6f5f45',
+      borderSubtle: '#ece3d6',
+      borderStrong: '#ddd1c0',
+      textPrimary: '#1a1714',
+      textSecondary: '#5f564c',
+      textMuted: '#6a6055',
+    },
+  }),
   held: () => ({}),
   tokens: {
-    color: { dark: { sunken: '#000' } },
+    color: {
+      dark: {
+        sunken: '#000',
+        surface: '#111',
+        surfaceRaised: '#1c1814',
+        borderSubtle: '#2a241e',
+        borderStrong: '#3d342b',
+        textPrimary: '#f5eee3',
+        textSecondary: '#aaa',
+        textMuted: '#777',
+        kraft: '#cdae7c',
+        success: '#4c9',
+        marigold: '#fb0',
+        accent: '#f53',
+      },
+    },
     overlay: { text: '#fff', chrome: '#0008', border: '#fff3' },
-    illustration: { cardStock: '#fff' },
-    radius: { small: 12, medium: 16, large: 20 },
+    radius: { small: 12, medium: 16, large: 20, full: 999 },
     spacing: { 1: 4, 2: 8, 3: 12, 4: 16, 5: 20, 6: 24 },
   },
 }));
@@ -162,7 +224,7 @@ beforeEach(() => {
     .mockReturnValue([
       { granted: true, canAskAgain: true, status: 'granted', expires: 'never' } as never,
       mockRequestPermission,
-      jest.fn(),
+      mockGetPermission,
     ]);
   mockTakePicture.mockResolvedValue({
     uri: 'file:///photo.jpg',
@@ -220,7 +282,7 @@ it('requests permission before mounting the camera', () => {
     .mockReturnValue([
       { granted: false, canAskAgain: true, status: 'undetermined', expires: 'never' } as never,
       mockRequestPermission,
-      jest.fn(),
+      mockGetPermission,
     ]);
   openCamera();
   expect(screen.queryByTestId('camera')).toBeNull();
@@ -234,7 +296,7 @@ it('offers settings when camera permission cannot be requested again', () => {
     .mockReturnValue([
       { granted: false, canAskAgain: false, status: 'denied', expires: 'never' } as never,
       mockRequestPermission,
-      jest.fn(),
+      mockGetPermission,
     ]);
   openCamera();
   expect(screen.getByText('Open settings')).toBeTruthy();
@@ -452,7 +514,7 @@ it('sends what the phone read along with a good photo', async () => {
     fireEvent.press(screen.getByText('Take photo'));
   });
   await waitFor(() => expect(mockEstimate).toHaveBeenCalledTimes(1));
-  expect(mockEstimate.mock.calls[0][2]).toEqual({
+  expect(mockEstimate.mock.calls[0]?.[2]).toEqual({
     text: ['NIKE', 'AIR JORDAN 1 RETRO HIGH OG'],
     codes: [],
     looksLike: { item: 'high top sneakers', category: 'shoes', colours: ['red', 'black'] },
@@ -485,7 +547,7 @@ it('forgets the last photo’s check on retake', async () => {
 });
 
 it('saves a successful estimate and provides a View in History button', async () => {
-  const onSaveScan = jest.fn().mockResolvedValue('saved');
+  const onSaveScan = jest.fn<(scan: NewScan) => Promise<SaveOutcome>>().mockResolvedValue('saved');
   const onOpenHistory = jest.fn();
   render(
     <CameraCapture
@@ -512,7 +574,7 @@ it('saves a successful estimate and provides a View in History button', async ()
 });
 
 it('does not save to history if the estimate fails', async () => {
-  const onSaveScan = jest.fn();
+  const onSaveScan = jest.fn<(scan: NewScan) => Promise<SaveOutcome>>();
   mockEstimate.mockRejectedValueOnce(new Error('AI failed'));
   render(
     <CameraCapture
@@ -532,7 +594,9 @@ it('does not save to history if the estimate fails', async () => {
 });
 
 it('says when a scan is kept on the phone to sync later', async () => {
-  const onSaveScan = jest.fn().mockResolvedValue('pending');
+  const onSaveScan = jest
+    .fn<(scan: NewScan) => Promise<SaveOutcome>>()
+    .mockResolvedValue('pending');
   render(
     <CameraCapture
       active={true}
@@ -551,7 +615,7 @@ it('says when a scan is kept on the phone to sync later', async () => {
 });
 
 it('doesn’t claim a scan was saved when saving failed', async () => {
-  const onSaveScan = jest.fn().mockResolvedValue('failed');
+  const onSaveScan = jest.fn<(scan: NewScan) => Promise<SaveOutcome>>().mockResolvedValue('failed');
   render(
     <CameraCapture
       active={true}
