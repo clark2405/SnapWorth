@@ -7,6 +7,12 @@ interface EstimateDetails {
   readonly itemName: string;
   readonly explanation: string;
   readonly assumptions: readonly string[];
+  /**
+   * The kind of item, as the cloud judged it (`clothing`, `shoes`, `bags`, `electronics`,
+   * `collectibles`, `home`, `other`), or none. It picks the camera's photo tips on a phone that
+   * can't tell the kind itself.
+   */
+  readonly itemKind?: string | null;
 }
 export type PhotoEstimate =
   | (EstimateDetails & {

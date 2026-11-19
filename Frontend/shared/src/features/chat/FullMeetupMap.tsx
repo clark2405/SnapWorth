@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, SWText, TextField } from '../../components';
 import { themedStyles, tokens, useThemedStyles } from '../../design';
-import type { Camera } from './meetup-map-geo';
+import { unproject, type Camera } from './meetup-map-geo';
 import { MeetupPicker, placingZoom } from './MeetupPicker';
 import type { FoundPlace } from './place-search';
 import { PlaceSearch } from './PlaceSearch';
@@ -51,15 +51,16 @@ export function FullMeetupMap({
           <SWText variant="headingLarge" accessibilityRole="header">
             Where to meet
           </SWText>
-          <PlaceSearch onPick={onPick} />
-          <MeetupPicker
-            camera={camera}
-            onCameraChange={onCameraChange}
-            label={name.trim() || undefined}
-            accessibilityLabel="Map for choosing where to meet, full screen"
-            onToggleSize={onClose}
-            expanded
-          />
+          <PlaceSearch onPick={onPick} near={unproject(camera.center)} fill>
+            <MeetupPicker
+              camera={camera}
+              onCameraChange={onCameraChange}
+              label={name.trim() || undefined}
+              accessibilityLabel="Map for choosing where to meet, full screen"
+              onToggleSize={onClose}
+              expanded
+            />
+          </PlaceSearch>
           <TextField
             value={name}
             onChangeText={onNameChange}

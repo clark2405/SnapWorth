@@ -26,7 +26,12 @@ interface Dependencies {
   fallbackModels?: string;
 }
 
-export const defaultChatModel = "gemini-3.6-flash";
+/**
+ * Worthy's replies are a sentence or three over data the app already sent, so a light model
+ * answers in a few seconds where the pricing model (which reads photos) took 10-17. Set
+ * `AI_CHAT_MODEL` to use another; pricing keeps `AI_MODEL`.
+ */
+export const defaultChatModel = "gemini-3.5-flash-lite";
 
 const cors = {
   "access-control-allow-origin": "*",
@@ -282,8 +287,10 @@ export function createWorthyHandler(deps: Dependencies) {
         {
           keyPool,
           models,
-          perAttemptMs: 14000,
-          totalMs: 30000,
+          // A light model answers in seconds; a try that hasn't in 8 is stuck, so the next
+          // model gets its turn while the person is still waiting.
+          perAttemptMs: 8000,
+          totalMs: 20000,
           label: "worthy-chat",
         },
       );

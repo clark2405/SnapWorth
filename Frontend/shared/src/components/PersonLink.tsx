@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from 'react';
-import { View, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { PressableScale } from './PressableScale';
 
@@ -42,8 +42,21 @@ export function PersonLink({
 }) {
   const open = useOpenPerson();
   if (!open || !handle) return <View style={style}>{children}</View>;
+  // The press wraps the styled row: when the row is to stretch (a post's byline beside its tag),
+  // the press must stretch too, or the row inside measures as nothing and the name disappears.
+  const flat = StyleSheet.flatten(style) ?? {};
+  const stretch =
+    flat.flex !== undefined || flat.flexGrow !== undefined || flat.alignSelf !== undefined
+      ? {
+          flex: flat.flex,
+          flexGrow: flat.flexGrow,
+          flexShrink: flat.flexShrink,
+          alignSelf: flat.alignSelf,
+        }
+      : undefined;
   return (
     <PressableScale
+      containerStyle={stretch}
       accessibilityRole="link"
       accessibilityLabel={`${label ?? `@${handle}`}. Opens their profile`}
       haptic="select"

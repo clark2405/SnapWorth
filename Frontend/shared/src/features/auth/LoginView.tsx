@@ -27,6 +27,7 @@ import {
   useThemedStyles,
   useWideLayout,
 } from '../../design';
+import { useBrowseOnly } from '../session/browse-only';
 import { minimumPasswordLength } from './password-reset';
 
 export type AuthMode = 'login' | 'signup';
@@ -79,6 +80,16 @@ const copy = {
   },
 } as const;
 
+/**
+ * The moderators' website: only moderators sign in there, and nobody signs up (an account is
+ * made a moderator in the database), so it greets them and has no Sign up tab.
+ */
+const moderatorCopy = {
+  title: 'Welcome back, moderator.',
+  why: 'Sign in to review posts, comments and reports, and keep SnapWorth fair and friendly.',
+  submit: 'Log in',
+} as const;
+
 /** The first thing wrong with what was typed, or null when it can be sent. */
 function problemWith(
   mode: AuthMode,
@@ -108,7 +119,8 @@ export function LoginView({
   const { colors } = useTheme();
   const brand = placeColors(colors, 'feed');
 
-  const [mode, setMode] = useState<AuthMode>(initialMode);
+  const forModerators = useBrowseOnly();
+  const [mode, setMode] = useState<AuthMode>(forModerators ? 'login' : initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -118,7 +130,7 @@ export function LoginView({
   // What's wrong with the form, said on the screen: an alert box does nothing on the web.
   const [problem, setProblem] = useState<string | null>(null);
 
-  const text = copy[mode];
+  const text = forModerators ? moderatorCopy : copy[mode];
   // On a wide window the colour block and the form sit side by side, so it all fits at once.
   const wide = useWideLayout();
   const half = wide ? styles.half : null;
@@ -231,14 +243,16 @@ export function LoginView({
             </View>
 
             <View style={styles.form}>
-              <SegmentedControl
-                options={modes}
-                value={mode}
-                onChange={(next) => {
-                  setMode(next);
-                  setProblem(null);
-                }}
-              />
+              {forModerators ? null : (
+                <SegmentedControl
+                  options={modes}
+                  value={mode}
+                  onChange={(next) => {
+                    setMode(next);
+                    setProblem(null);
+                  }}
+                />
+              )}
 
               <View style={[styles.fields, wide ? styles.pair : null]}>
                 <View style={half}>

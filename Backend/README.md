@@ -82,8 +82,11 @@ key is never sent to the app. The function keeps nothing: the app saves a succes
 
 The function uses the existing `AI_PROVIDER=gemini` and `AI_API_KEY` Edge Function secrets.
 `AI_MODEL` optionally overrides the default `gemini-3.6-flash`; use a model available on your
-free tier. There is no automatic model or paid fallback. Rate limits return an explicit retry
-error. The prototype also has a per-instance guard of two requests/minute and ten/day per
+free tier. When the model is overloaded (500/503) or a try runs out of time, the call moves on to
+lighter models (`AI_FALLBACK_MODELS`, comma-separated; by default `gemini-3.5-flash-lite` then
+`gemini-3.1-flash-lite`), all within the same overall time limit. An optional second key,
+`AI_API_KEY_2`, takes over when the first one answers 429 (its quota is spent) and hands back when
+the second runs out; with neither key left, the app gets an explicit retry error. The prototype also has a per-instance guard of two requests/minute and ten/day per
 user; this is not a durable project-wide quota across multiple Edge instances. Before a public
 launch, add a shared persistent quota and abuse controls for anonymous signups.
 
@@ -94,7 +97,9 @@ level supported by the selected model (3.8 Flash does not support minimal). Keep
 on the server. The prompt checks identification, visible condition and completeness, and asks
 for missing details when necessary rather than inventing an exact model or functionality.
 The user's selected deployment configuration is `AI_MODEL=gemini-3.6-flash` and
-`AI_THINKING_LEVEL=medium`. There is no automatic model fallback. Timing varies, and the
+`AI_THINKING_LEVEL=medium`. Worthy's chat (`worthy-chat`) uses its own, lighter model,
+`AI_CHAT_MODEL` (default `gemini-3.5-flash-lite`), since it writes a few sentences from data the
+app sends rather than reading a photo; `AI_MODEL` is the pricing model. Timing varies, and the
 free-tier quota can block estimates until its applicable limit resets. The five-photo
 [3.6 comparison](../docs/benchmarks/gemini-3.6-comparison.md) records provider errors and
 timings for low and medium reasoning. These tests do not establish pricing accuracy.

@@ -4,8 +4,8 @@ import { FeedView } from '@snapworth/shared/features/feed';
 
 import { useShareLink } from '../../../src/share-link';
 
-// Snap and Search live in the tab bar (or, on a wide window, the sidebar), as on iOS, so the
-// header doesn't repeat them.
+// The moderators' look at the Feed: posts open to their discussion. Voting, Snap and the price
+// game are the phone app's (the shared screens hide them under BrowseOnly).
 export default function FeedRoute() {
   const router = useRouter();
   const share = useShareLink();
@@ -15,8 +15,6 @@ export default function FeedRoute() {
       onOpenPost={(postId) => router.push(`/post/${postId}`)}
       onSharePost={(postId) => share(`/post/${postId}`, 'Is this priced right? Vote on SnapWorth.')}
       onOpenProfile={() => router.push('/profile')}
-      onOpenTrend={(trend) => router.push(`/trend/${trend}`)}
-      onOpenGuess={() => router.push('/guess')}
     />
   );
 }

@@ -12,6 +12,7 @@ const estimate = {
   highPhp: 2500,
   explanation: "Rough resale value.",
   assumptions: ["Condition is based on the photo."],
+  itemKind: "clothing",
 };
 const request = (body = { image }, token = "session-token") =>
   new Request("https://example.test/estimate-price", {
@@ -166,7 +167,7 @@ test("returns an explicit unable-to-estimate result for an unclear photo", async
         ],
       }),
   });
-  assert.deepEqual(await (await handler(request())).json(), result);
+  assert.deepEqual(await (await handler(request())).json(), { itemKind: null, ...result });
 });
 test("passes the phone's clues to Gemini as untrusted data, cut to size", async () => {
   const { handler, calls } = setup();
@@ -270,4 +271,19 @@ test("switches key and uses configured fallback models when the first call times
     { key: "key-one", model: defaultPricingModel },
     { key: "key-two", model: "gemini-3.5-flash-lite" },
   ]);
+});
+
+test("names the kind of item only from the photo tips' list", async () => {
+  for (const [given, expected] of [["shoes", "shoes"], ["spaceship", null], [undefined, null]]) {
+    const { handler } = setup({
+      fetch: async () =>
+        Response.json({
+          candidates: [
+            { content: { parts: [{ text: JSON.stringify({ ...estimate, itemKind: given }) }] } },
+          ],
+        }),
+    });
+    const body = await (await handler(request())).json();
+    assert.equal(body.itemKind, expected);
+  }
 });

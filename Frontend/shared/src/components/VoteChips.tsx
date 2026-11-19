@@ -102,7 +102,7 @@ function VoteChip({
       <PressableScale
         accessibilityRole={onVote ? 'radio' : 'text'}
         accessibilityState={{ selected: isSelected, disabled: !onVote }}
-        accessibilityLabel={`${vote.label}, ${count} votes`}
+        accessibilityLabel={`${vote.label}, ${count} ${count === 1 ? 'vote' : 'votes'}`}
         accessibilityHint={isSelected ? 'Tap again to withdraw your vote' : undefined}
         disabled={!onVote}
         haptic="none"
@@ -183,7 +183,9 @@ export function VerdictBar({ tally }: VerdictBarProps) {
       style={styles.verdict}
       accessible
       accessibilityLabel={
-        leader ? `${leader.share}% say ${leader.label}, ${total} votes` : 'No votes yet'
+        leader
+          ? `${leader.share}% say ${leader.label}, ${total} ${total === 1 ? 'vote' : 'votes'}`
+          : 'No votes yet'
       }
     >
       <View style={styles.verdictBar}>
@@ -203,7 +205,7 @@ export function VerdictBar({ tally }: VerdictBarProps) {
               {leader.share}% {leader.label}
             </SWText>
             <SWText variant="caption" tone="textMuted">
-              {total} votes
+              {total} {total === 1 ? 'vote' : 'votes'}
             </SWText>
           </>
         ) : (

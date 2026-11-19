@@ -10,6 +10,7 @@ import {
   createLocalFeedRepository,
   createLocalHanapRepository,
   createLocalMarketplaceRepository,
+  createLocalMeetupLocations,
   createLocalSukiRepository,
   createSupabaseAccountObserver,
   createSupabaseAdminRepository,
@@ -19,6 +20,7 @@ import {
   createSupabaseFeedRepository,
   createSupabaseHanapRepository,
   createSupabaseMarketplaceRepository,
+  createSupabaseMeetupLocations,
   createSupabaseSukiRepository,
   createPhotoPricingService,
   deviceAccount,
@@ -26,11 +28,12 @@ import {
   type LocalSeedComment,
   type LocalSeedConversation,
 } from '../adapters';
-import { createDeviceLocation } from '../adapters/device/location';
+import { createDeviceLocation, createDevicePositionWatch } from '../adapters/device/location';
 import { getSupabase } from '../adapters/supabaseClient';
 import { AdminProvider } from '../features/admin/admin-state';
 import { buildPreviewReviewCases } from '../features/admin/review-seed';
 import { ChatServiceProvider } from '../features/chat/chat-state';
+import { MeetupLocationProvider } from '../features/chat/meetup-location-state';
 import { SukiProvider } from '../features/chat/suki';
 import {
   buildPreviewFeedPosts,
@@ -73,6 +76,7 @@ import type { CollectionRepository } from '../ports/collections';
 import type { FeedRepository } from '../ports/feed';
 import type { HanapRepository } from '../ports/hanap';
 import type { MarketplaceRepository } from '../ports/marketplace';
+import type { MeetupLocationRepository } from '../ports/meetup-location';
 import type { ChatService, CommentService } from '../ports/services';
 import type { SukiRepository } from '../ports/suki';
 import { createChatService, createCommentService } from '../services';
@@ -100,6 +104,8 @@ export interface AppServices {
   readonly hanap: HanapRepository;
   readonly marketplace: MarketplaceRepository;
   readonly suki: SukiRepository;
+  /** Live location at agreed meetups. */
+  readonly meetupLocations: MeetupLocationRepository;
   readonly pricing: PhotoPricingService;
   /** Worthy's chat in the cloud; null with no backend (the chat answers from the app's data). */
   readonly worthy: WorthyCloud | null;
@@ -258,6 +264,7 @@ export function createAppServices(config: BackendConfig): AppServices {
       hanap: createSupabaseHanapRepository(client),
       marketplace: createSupabaseMarketplaceRepository(client),
       suki: createSupabaseSukiRepository(client),
+      meetupLocations: createSupabaseMeetupLocations(client),
       pricing: createPhotoPricingService(client),
       worthy: createSupabaseWorthyCloud(client),
       account: createSupabaseAccountObserver(client),
@@ -330,10 +337,12 @@ export function createAppServices(config: BackendConfig): AppServices {
       store: AsyncStorage,
       seed: { [`seller:${profileOf(previewUsers.sugboHype).userId}`]: 10 },
     }),
+    meetupLocations: createLocalMeetupLocations(profileOf(previewProfile.user).userId),
   };
 }
 
 const deviceLocation = createDeviceLocation();
+const positionWatch = createDevicePositionWatch();
 
 const PhotoPricingContext = createContext<PhotoPricingService | null>(null);
 
@@ -364,34 +373,39 @@ export function AppServicesProvider({
                 <MarketplaceProvider repository={services.marketplace} account={services.account}>
                   <FeedProvider repository={services.feed} account={services.account}>
                     <SukiProvider repository={services.suki}>
-                      {/* Saved scans, and what was paid for each: in Supabase with a backend, on the
-                    phone without. */}
-                      <ScanHistoryProvider
-                        client={services.supabaseClient ?? null}
-                        store={AsyncStorage}
+                      <MeetupLocationProvider
+                        repository={services.meetupLocations}
+                        watcher={positionWatch}
                       >
-                        {/* The sample items' prices: kept on the device without a backend; with one
-                      they're a preview, so they aren't kept. */}
-                        <PaidPricesProvider
-                          store={services.backend === 'device' ? AsyncStorage : undefined}
-                          seed={previewPaidPrices}
+                        {/* Saved scans, and what was paid for each: in Supabase with a backend, on the
+                    phone without. */}
+                        <ScanHistoryProvider
+                          client={services.supabaseClient ?? null}
+                          store={AsyncStorage}
                         >
-                          <CollectionsProvider
-                            account={services.account}
-                            repositoryFor={services.collectionsFor}
+                          {/* The sample items' prices: kept on the device without a backend; with one
+                      they're a preview, so they aren't kept. */}
+                          <PaidPricesProvider
+                            store={services.backend === 'device' ? AsyncStorage : undefined}
+                            seed={previewPaidPrices}
                           >
-                            {/* Guess the worth needs no account, so its days stay on the device. */}
-                            <GuessProvider store={AsyncStorage}>
-                              {/* Where the viewer is, only when they pick "Near me"; never stored. */}
-                              <ViewerLocationProvider port={deviceLocation}>
-                                <AdminProvider repository={services.admin}>
-                                  {children}
-                                </AdminProvider>
-                              </ViewerLocationProvider>
-                            </GuessProvider>
-                          </CollectionsProvider>
-                        </PaidPricesProvider>
-                      </ScanHistoryProvider>
+                            <CollectionsProvider
+                              account={services.account}
+                              repositoryFor={services.collectionsFor}
+                            >
+                              {/* Guess the worth needs no account, so its days stay on the device. */}
+                              <GuessProvider store={AsyncStorage}>
+                                {/* Where the viewer is, only when they pick "Near me"; never stored. */}
+                                <ViewerLocationProvider port={deviceLocation}>
+                                  <AdminProvider repository={services.admin}>
+                                    {children}
+                                  </AdminProvider>
+                                </ViewerLocationProvider>
+                              </GuessProvider>
+                            </CollectionsProvider>
+                          </PaidPricesProvider>
+                        </ScanHistoryProvider>
+                      </MeetupLocationProvider>
                     </SukiProvider>
                   </FeedProvider>
                 </MarketplaceProvider>

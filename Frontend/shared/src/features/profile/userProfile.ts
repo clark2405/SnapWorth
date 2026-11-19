@@ -190,6 +190,20 @@ async function loadUserProfile(authUser?: SessionUser | null): Promise<UserProfi
     try {
       const supabase = getSupabase();
 
+      // The session can say who someone is a moment before the connection carries their sign-in
+      // (just after signing in or out). Asked then, the database answers as nobody: every count
+      // fails and the admin check says no. Ask only once the connection is theirs; until then the
+      // counts are unknown, and the next load (on the sign-in's own change) fills them in.
+      const { data: connection } = await supabase.auth.getSession();
+      const signedInAs = connection.session?.user?.id;
+      if (!connection.session || (signedInAs && signedInAs !== user.id)) {
+        return {
+          ...fallback,
+          stats: { checked: null, listed: null, sold: null },
+          activity: { listings: null, votes: null, conversations: null },
+        };
+      }
+
       // Only the database grants the role; this is asking it, not deciding.
       isAdmin = await fetchIsAdmin(supabase);
 
@@ -459,4 +473,60 @@ export function avatarSourceFor(
     return { uri: avatarUrl };
   }
   return fallbackSource;
+}
+
+/**
+ * Whether the person signed in is an admin, as the database says, with "still asking" kept apart
+ * from "no": the moderators' website waits on it before deciding what to show. `failed` is a
+ * question that got no answer (offline, a server error), which is not a no either.
+ */
+export type AdminStatus = 'checking' | 'guest' | 'admin' | 'not-admin' | 'failed';
+
+export function useAdminStatus(): { readonly status: AdminStatus; readonly retry: () => void } {
+  const { user, status: session } = useSession();
+  const [answer, setAnswer] = useState<{ readonly for: string; readonly status: AdminStatus }>();
+  const [attempt, setAttempt] = useState(0);
+  const userId = user?.id ?? null;
+
+  useEffect(() => {
+    if (!userId) return;
+    if (!isSupabaseConfigured()) {
+      setAnswer({ for: userId, status: deviceAdmin() ? 'admin' : 'not-admin' });
+      return;
+    }
+    let current = true;
+    void (async () => {
+      try {
+        const supabase = getSupabase();
+        // Asked before the connection carries the sign-in, the database would answer as nobody.
+        const { data: connection } = await supabase.auth.getSession();
+        if (connection.session?.user.id !== userId) {
+          // It catches up within moments; ask again then.
+          if (current) setTimeout(() => setAttempt((value) => value + 1), 400);
+          return;
+        }
+        const { data, error } = await supabase.rpc('is_admin');
+        if (current) {
+          setAnswer({
+            for: userId,
+            status: error ? 'failed' : data === true ? 'admin' : 'not-admin',
+          });
+        }
+      } catch {
+        if (current) setAnswer({ for: userId, status: 'failed' });
+      }
+    })();
+    return () => {
+      current = false;
+    };
+  }, [attempt, userId]);
+
+  const retry = useCallback(() => {
+    setAnswer(undefined);
+    setAttempt((value) => value + 1);
+  }, []);
+
+  if (session === 'loading') return { status: 'checking', retry };
+  if (!userId) return { status: 'guest', retry };
+  return { status: answer?.for === userId ? answer.status : 'checking', retry };
 }

@@ -24,7 +24,7 @@ export default function AuthCallbackRoute() {
   useEffect(() => {
     if (outcome?.kind === 'signed-in') {
       startSession(outcome.user);
-      router.replace('/feed');
+      router.replace('/admin');
     } else if (outcome?.kind === 'cancelled') {
       toast.show({
         title: 'Google sign-in cancelled',

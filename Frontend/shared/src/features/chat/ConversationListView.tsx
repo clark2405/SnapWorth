@@ -1,5 +1,6 @@
 import { Archive, MessageSquare, MessagesSquare } from 'lucide-react-native';
-import { useState } from 'react';
+import { useIsFocused } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
@@ -49,6 +50,15 @@ export function ConversationListView({
   const styles = useThemedStyles(stylesFor);
   const [view, setView] = useState<'open' | 'past'>('open');
   const list = useConversationList();
+  // Coming back to Chats asks again: a listing that sold meanwhile (marked on its own screen, by
+  // either side) moves its chats to Past, which no message would have announced.
+  const focused = useIsFocused();
+  const wasFocused = useRef(focused);
+  const { refresh } = list;
+  useEffect(() => {
+    if (focused && !wasFocused.current) void refresh();
+    wasFocused.current = focused;
+  }, [focused, refresh]);
   const open = list.conversations.filter((conversation) => !conversation.closed);
   const past = list.conversations.filter((conversation) => conversation.closed);
   const conversations = view === 'open' ? open : past;

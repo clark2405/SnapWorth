@@ -42,7 +42,7 @@ import { themedStyles, tokens, useTheme, useThemedStyles } from '../../design';
 import { commentBodyMaxLength, type ThreadComment } from '../../types/entities';
 import type { AppError } from '../../types/errors';
 import { formatPeso, type PreviewPost } from '../preview/sample-data';
-import { useAccountGate, useSession } from '../session';
+import { useAccountGate, useBrowseOnly, useSession } from '../session';
 import { Tip, useTip } from '../tips';
 import { CommentList } from './CommentList';
 import { useCommentThread } from './comment-thread';
@@ -148,6 +148,8 @@ function PostDiscussion({
   const thread = useCommentThread(post.id);
   const { isGuest } = useSession();
   const requireAccount = useAccountGate();
+  // The moderators' website shows the discussion without the box to join it, or the vote.
+  const browseOnly = useBrowseOnly();
   const voteTip = useTip('vote');
   const vote = voteFor(post.id);
   const [draft, setDraft] = useState('');
@@ -255,101 +257,103 @@ function PostDiscussion({
         />
       }
       footer={
-        <BottomBar>
-          {replyingTo ? (
-            <Animated.View
-              entering={FadeIn.duration(tokens.motion.duration.base)}
-              exiting={FadeOut.duration(tokens.motion.duration.fast)}
-              style={styles.replyingRow}
-            >
-              <SWText
-                variant="labelSmall"
-                tone="textSecondary"
-                numberOfLines={1}
-                style={styles.replyingLabel}
+        browseOnly ? undefined : (
+          <BottomBar>
+            {replyingTo ? (
+              <Animated.View
+                entering={FadeIn.duration(tokens.motion.duration.base)}
+                exiting={FadeOut.duration(tokens.motion.duration.fast)}
+                style={styles.replyingRow}
               >
-                Replying to{' '}
-                {replyingTo.author.displayName?.trim() || `@${replyingTo.author.handle}`}
-              </SWText>
+                <SWText
+                  variant="labelSmall"
+                  tone="textSecondary"
+                  numberOfLines={1}
+                  style={styles.replyingLabel}
+                >
+                  Replying to{' '}
+                  {replyingTo.author.displayName?.trim() || `@${replyingTo.author.handle}`}
+                </SWText>
+                <PressableScale
+                  accessibilityLabel="Cancel reply"
+                  haptic="select"
+                  hitSlop={tokens.spacing[2]}
+                  onPress={() => setReplyingTo(null)}
+                  style={styles.cancelReply}
+                >
+                  <X size={14} strokeWidth={2.2} color={colors.textSecondary} />
+                </PressableScale>
+              </Animated.View>
+            ) : null}
+            {blockedNote ? (
+              <Animated.View
+                entering={FadeIn.duration(tokens.motion.duration.base)}
+                exiting={FadeOut.duration(tokens.motion.duration.fast)}
+                style={styles.blockedRow}
+                accessibilityLiveRegion="polite"
+              >
+                <ShieldX size={14} strokeWidth={2.2} color={colors.danger} />
+                <SWText variant="labelSmall" tone="danger" style={styles.replyingLabel}>
+                  Not posted: it breaks a community guideline
+                </SWText>
+              </Animated.View>
+            ) : null}
+            {isGuest ? (
+              // A guest sees where their take would go; tapping it asks for an account first.
               <PressableScale
-                accessibilityLabel="Cancel reply"
+                accessibilityRole="button"
+                accessibilityLabel="Add your take on the price"
+                accessibilityHint="Asks you to sign in or create an account"
                 haptic="select"
-                hitSlop={tokens.spacing[2]}
-                onPress={() => setReplyingTo(null)}
-                style={styles.cancelReply}
+                onPress={() => requireAccount('comment', () => input.current?.focus())}
+                style={styles.composerRow}
               >
-                <X size={14} strokeWidth={2.2} color={colors.textSecondary} />
+                <SWText variant="bodyLarge" tone="textMuted" style={styles.guestComposer}>
+                  Add your take on the price
+                </SWText>
               </PressableScale>
-            </Animated.View>
-          ) : null}
-          {blockedNote ? (
-            <Animated.View
-              entering={FadeIn.duration(tokens.motion.duration.base)}
-              exiting={FadeOut.duration(tokens.motion.duration.fast)}
-              style={styles.blockedRow}
-              accessibilityLiveRegion="polite"
-            >
-              <ShieldX size={14} strokeWidth={2.2} color={colors.danger} />
-              <SWText variant="labelSmall" tone="danger" style={styles.replyingLabel}>
-                Not posted: it breaks a community guideline
-              </SWText>
-            </Animated.View>
-          ) : null}
-          {isGuest ? (
-            // A guest sees where their take would go; tapping it asks for an account first.
-            <PressableScale
-              accessibilityRole="button"
-              accessibilityLabel="Add your take on the price"
-              accessibilityHint="Asks you to sign in or create an account"
-              haptic="select"
-              onPress={() => requireAccount('comment', () => input.current?.focus())}
-              style={styles.composerRow}
-            >
-              <SWText variant="bodyLarge" tone="textMuted" style={styles.guestComposer}>
-                Add your take on the price
-              </SWText>
-            </PressableScale>
-          ) : (
-            <View style={styles.composerRow}>
-              <TextInput
-                ref={input}
-                value={draft}
-                onChangeText={(text) => {
-                  setDraft(text);
-                  setBlockedNote(false);
-                }}
-                placeholder={
-                  replyingTo
-                    ? `Reply to ${replyingTo.author.displayName?.trim() || `@${replyingTo.author.handle}`}`
-                    : 'Add your take on the price'
-                }
-                placeholderTextColor={colors.textMuted}
-                selectionColor={colors.accent}
-                accessibilityLabel={replyingTo ? 'Write a reply' : 'Write a comment'}
-                maxLength={commentBodyMaxLength}
-                multiline
-                // A browser's textarea starts two lines tall, leaving the placeholder floating at
-                // the top of the box; one line keeps it centred, and it still grows as you type.
-                numberOfLines={Platform.OS === 'web' ? 1 : undefined}
-                style={[
-                  styles.composerInput,
-                  typeStyle('bodyLarge'),
-                  { color: colors.textPrimary, lineHeight: undefined },
-                  hideWebFocusOutline,
-                ]}
-              />
-              <IconButton
-                icon={ArrowUp}
-                label={replyingTo ? 'Post reply' : 'Post comment'}
-                appearance="accent"
-                size={18}
-                haptic="pop"
-                disabled={!canSend}
-                onPress={() => void submit()}
-              />
-            </View>
-          )}
-        </BottomBar>
+            ) : (
+              <View style={styles.composerRow}>
+                <TextInput
+                  ref={input}
+                  value={draft}
+                  onChangeText={(text) => {
+                    setDraft(text);
+                    setBlockedNote(false);
+                  }}
+                  placeholder={
+                    replyingTo
+                      ? `Reply to ${replyingTo.author.displayName?.trim() || `@${replyingTo.author.handle}`}`
+                      : 'Add your take on the price'
+                  }
+                  placeholderTextColor={colors.textMuted}
+                  selectionColor={colors.accent}
+                  accessibilityLabel={replyingTo ? 'Write a reply' : 'Write a comment'}
+                  maxLength={commentBodyMaxLength}
+                  multiline
+                  // A browser's textarea starts two lines tall, leaving the placeholder floating at
+                  // the top of the box; one line keeps it centred, and it still grows as you type.
+                  numberOfLines={Platform.OS === 'web' ? 1 : undefined}
+                  style={[
+                    styles.composerInput,
+                    typeStyle('bodyLarge'),
+                    { color: colors.textPrimary, lineHeight: undefined },
+                    hideWebFocusOutline,
+                  ]}
+                />
+                <IconButton
+                  icon={ArrowUp}
+                  label={replyingTo ? 'Post reply' : 'Post comment'}
+                  appearance="accent"
+                  size={18}
+                  haptic="pop"
+                  disabled={!canSend}
+                  onPress={() => void submit()}
+                />
+              </View>
+            )}
+          </BottomBar>
+        )
       }
       contentStyle={styles.content}
     >
@@ -413,7 +417,7 @@ function PostDiscussion({
               }
               selected={vote}
               onVote={
-                isGuest || !isMine
+                !browseOnly && (isGuest || !isMine)
                   ? (choice) =>
                       requireAccount('vote', () => {
                         voteTip.done();
@@ -491,14 +495,15 @@ function CrossPost({
   const { colors } = useTheme();
   const styles = useThemedStyles(stylesFor);
   const { isGuest } = useSession();
-  const mine = !isGuest && Boolean(isMine);
+  const browseOnly = useBrowseOnly();
+  const mine = !isGuest && !browseOnly && Boolean(isMine);
   const { listing } = post;
 
   if (listing) {
     return (
       <PressableScale
         accessibilityRole="link"
-        accessibilityLabel={`For sale, asking ${formatPeso(listing.askingPrice)}. View listing`}
+        accessibilityLabel={`${listing.sold ? 'Sold' : 'For sale'}, asking ${formatPeso(listing.askingPrice)}. View listing`}
         haptic="select"
         depth="surface"
         onPress={() => onOpenListing?.(listing.id)}
@@ -508,9 +513,11 @@ function CrossPost({
             <PriceTagIcon size={18} strokeWidth={2} color={colors.mintInk} />
           </View>
           <View style={styles.crossText}>
-            <SWText variant="label">For sale on the market</SWText>
+            <SWText variant="label">
+              {listing.sold ? 'Sold on the market' : 'For sale on the market'}
+            </SWText>
             <SWText variant="caption" tone="textSecondary">
-              Asking {formatPeso(listing.askingPrice)}
+              {listing.sold ? 'Sold' : 'Asking'} {formatPeso(listing.askingPrice)}
             </SWText>
           </View>
           <ChevronRight size={18} strokeWidth={2} color={colors.textMuted} />

@@ -4,7 +4,11 @@ import { buildFallbackProfile, fetchUserProfile } from './userProfile';
 let isAdminAnswer: { data: unknown; error: unknown } = { data: false, error: null };
 const mockRpc = jest.fn(() => Promise.resolve(isAdminAnswer));
 const mockClient = {
-  auth: { getUser: () => Promise.resolve({ data: { user: null } }) },
+  auth: {
+    getUser: () => Promise.resolve({ data: { user: null } }),
+    // The connection carries a sign-in, so the profile's questions are asked as someone.
+    getSession: () => Promise.resolve({ data: { session: {} } }),
+  },
   rpc: mockRpc,
   // The counts and the profile row aren't what's tested; each is tried and given up on.
   from: () => {

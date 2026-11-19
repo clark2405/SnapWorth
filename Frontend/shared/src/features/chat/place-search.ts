@@ -18,19 +18,25 @@ export interface FoundPlace {
 }
 
 /**
- * Where places are looked up by name. The default is OpenStreetMap's own search (Nominatim),
- * which matches the map's tiles and is free to use lightly: one search when the person presses
- * search, never a request per keystroke, and the app named in each request. Like the tiles, pick
- * a provider and plan before launch; set `EXPO_PUBLIC_PLACE_SEARCH_URL` to another
- * Nominatim-compatible endpoint, or to `none` to turn the lookup off.
+ * Where places are looked up by name, as the person types. The default is Photon
+ * (photon.komoot.io), an OpenStreetMap search built for search-as-you-type, so its places match
+ * the map's tiles. (OpenStreetMap's own Nominatim forbids type-ahead on its public server.) It's
+ * free for light use: one request after a pause in typing, never one per keystroke, the previous
+ * one cancelled, and the app named in each request. Like the tiles, pick a provider and plan
+ * before launch; set `EXPO_PUBLIC_PLACE_SEARCH_URL` to another Photon-compatible endpoint, or to
+ * `none` to turn the lookup off (the suggested spots still match).
  */
-const defaultEndpoint = 'https://nominatim.openstreetmap.org/search';
+const defaultEndpoint = 'https://photon.komoot.io/api/';
 const configured = process.env.EXPO_PUBLIC_PLACE_SEARCH_URL;
 export const placeSearchEndpoint: string | null =
   configured === 'none' ? null : configured || defaultEndpoint;
 
 /** The credit the search provider asks for wherever its results are shown. */
-export const placeSearchCredit = configured ? null : 'Search by OpenStreetMap';
+export const placeSearchCredit = configured ? null : 'Search by Photon · OpenStreetMap';
+
+/** How many letters before the lookup starts, and how long a pause in typing before it asks. */
+export const searchMinLetters = 3;
+export const searchPauseMs = 350;
 
 /** The suggested meetup spots whose name holds what's been typed so far, for instant matches. */
 export function matchingSpots(query: string): readonly FoundPlace[] {
@@ -54,8 +60,40 @@ interface NominatimRow {
   readonly lon?: string;
 }
 
-/** A search provider's rows as places, keeping only real, pinnable spots in the Philippines. */
+interface PhotonFeature {
+  readonly geometry?: { readonly coordinates?: readonly unknown[] };
+  readonly properties?: Record<string, unknown>;
+}
+
+const textOf = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+
+/** Photon's answer (GeoJSON) as places: the name, then the street and area it's in. */
+function photonPlaces(features: readonly PhotonFeature[]): FoundPlace[] {
+  const places: FoundPlace[] = [];
+  for (const feature of features) {
+    const [lng, lat] = (feature.geometry?.coordinates ?? []).map(Number);
+    const props = feature.properties ?? {};
+    const country = textOf(props.countrycode).toUpperCase();
+    if (lat === undefined || lng === undefined) continue;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || !withinPinBounds(lat, lng)) continue;
+    if (country && country !== 'PH') continue;
+    const street = [textOf(props.housenumber), textOf(props.street)].filter(Boolean).join(' ');
+    const name = textOf(props.name) || street;
+    if (!name) continue;
+    const area = textOf(props.city) || textOf(props.district) || textOf(props.locality);
+    const detail = [street !== name ? street : '', area].filter(Boolean).join(', ');
+    places.push({ name, detail, lat, lng });
+  }
+  return places;
+}
+
+/**
+ * A search provider's answer as places, keeping only real, pinnable spots in the Philippines:
+ * Photon's GeoJSON, or a Nominatim-style list of rows.
+ */
 export function placesFrom(rows: unknown): readonly FoundPlace[] {
+  const features = (rows as { readonly features?: unknown })?.features;
+  if (Array.isArray(features)) return unique(photonPlaces(features as PhotonFeature[]));
   if (!Array.isArray(rows)) return [];
   const places: FoundPlace[] = [];
   for (const row of rows as NominatimRow[]) {
@@ -71,7 +109,11 @@ export function placesFrom(rows: unknown): readonly FoundPlace[] {
     const rest = parts.filter((part) => part !== name);
     places.push({ name, detail: rest.slice(0, 2).join(', '), lat, lng });
   }
-  // The same place can come back twice (a building and its grounds): keep the first.
+  return unique(places);
+}
+
+/** The same place can come back twice (a building and its grounds): keep the first. */
+function unique(places: readonly FoundPlace[]): readonly FoundPlace[] {
   return places.filter(
     (place, index) =>
       places.findIndex((other) => other.name === place.name && other.detail === place.detail) ===
@@ -79,36 +121,33 @@ export function placesFrom(rows: unknown): readonly FoundPlace[] {
   );
 }
 
-/** Around Cebu, where SnapWorth starts: results here come first, but anywhere in the country can be found. */
-const nearCebu = [
-  homeCity.lng - 0.25,
-  homeCity.lat + 0.2,
-  homeCity.lng + 0.25,
-  homeCity.lat - 0.2,
-].join(',');
+/** The Philippines, as a box: results outside it are never asked for. */
+const philippines = '116.9,4.4,126.7,21.3';
 
 /**
- * Looks a place up by name, in the Philippines and favouring Cebu. Resolves to the places found,
- * or null when the lookup couldn't be made (offline, turned off, or the provider said no).
+ * Looks a place up by name, in the Philippines and favouring what's near `near` (the map's
+ * middle, else Cebu, where SnapWorth starts). Resolves to the places found, or null when the
+ * lookup couldn't be made (offline, turned off, or the provider said no).
  */
 export async function searchPlaces(
   query: string,
   signal?: AbortSignal,
+  near: { readonly lat: number; readonly lng: number } = homeCity,
 ): Promise<readonly FoundPlace[] | null> {
   const text = query.trim();
   if (!placeSearchEndpoint || text.length < 2) return null;
   const params = new URLSearchParams({
     q: text,
-    format: 'jsonv2',
-    countrycodes: 'ph',
-    viewbox: nearCebu,
-    limit: '6',
-    'accept-language': 'en',
+    lat: near.lat.toFixed(4),
+    lon: near.lng.toFixed(4),
+    bbox: philippines,
+    limit: '8',
+    lang: 'en',
   });
   try {
     const response = await fetch(`${placeSearchEndpoint}?${params.toString()}`, {
       signal,
-      // Browsers name the site themselves; the apps say who's asking, as the provider requires.
+      // Browsers name the site themselves; the apps say who's asking, as the provider asks.
       headers: Platform.OS === 'web' ? {} : { 'User-Agent': 'SnapWorth (meetup map search)' },
     });
     if (!response.ok) return null;

@@ -48,6 +48,7 @@ export async function handleModeration(
     deps.provider,
     body.id,
     request.signal,
+    { allowAutoRemove: target.allowAutoRemove },
   );
   if (outcome.kind === 'not_found') return json(404, { error: 'Nothing to screen with that id.' });
   if (outcome.kind === 'retry_later') {

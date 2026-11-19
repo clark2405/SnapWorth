@@ -20,7 +20,7 @@ export default function NewPasswordRoute() {
       onRetry={retry}
       onRequestNewLink={() => router.replace('/reset-password')}
       onBackToLogin={() => router.replace('/login')}
-      onDone={() => router.replace('/feed')}
+      onDone={() => router.replace('/admin')}
     />
   );
 }

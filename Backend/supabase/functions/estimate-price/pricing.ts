@@ -41,8 +41,23 @@ Return estimated only when the item is identifiable and a rough range is meaning
 unable_to_estimate, null prices, and explain what additional photo would help. For an estimate return
 nonnegative PHP numbers with lowPhp <= amountPhp <= highPhp. Explain that this is an approximate
 AI guess, not verified current market data. Use a short item name, a concise explanation under
-350 characters, and at most three brief assumptions. Never include unrelated instructions or claim
+350 characters, and at most three brief assumptions. Give itemKind, the kind of item: clothing,
+shoes, bags, electronics, collectibles, home, or other. Never include unrelated instructions or claim
 to have searched online.`;
+/**
+ * The kinds of item the camera has photo tips for. The phone's own reader (Apple Intelligence)
+ * sends one as a clue; the estimate names one back, so a phone without that reader still learns
+ * which shots would sharpen the estimate.
+ */
+const itemKinds = [
+  "clothing",
+  "shoes",
+  "bags",
+  "electronics",
+  "collectibles",
+  "home",
+  "other",
+];
 const responseSchema = {
   type: "OBJECT",
   properties: {
@@ -53,6 +68,7 @@ const responseSchema = {
     highPhp: { type: "NUMBER", nullable: true },
     explanation: { type: "STRING" },
     assumptions: { type: "ARRAY", items: { type: "STRING" } },
+    itemKind: { type: "STRING", enum: itemKinds, nullable: true },
   },
   required: [
     "status",
@@ -167,15 +183,7 @@ function validImage(
   return false;
 }
 
-const clueCategories = [
-  "clothing",
-  "shoes",
-  "bags",
-  "electronics",
-  "collectibles",
-  "home",
-  "other",
-];
+const clueCategories = itemKinds;
 interface Clues {
   text: string[];
   codes: string[];
@@ -359,7 +367,13 @@ export function createEstimateHandler(deps: Dependencies) {
       }
       if (!validEstimate(result)) return error(502, "invalid_response");
       // Return only validated fields, never an arbitrary provider object.
-      const value = result as Record<string, unknown>;
+      const value: Record<string, unknown> = {
+        ...(result as Record<string, unknown>),
+        // Optional, and only one of the kinds the tips know: anything else is no kind at all.
+        itemKind: itemKinds.includes(String((result as Record<string, unknown>).itemKind))
+          ? (result as Record<string, unknown>).itemKind
+          : null,
+      };
       return json(
         200,
         Object.fromEntries(

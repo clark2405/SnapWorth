@@ -55,6 +55,7 @@ import { formatPeso, previewPortfolio } from '../preview/sample-data';
 import { useFeed } from '../feed/feed-state';
 import { useScanHistory } from '../history/scan-history-state';
 import { useBackendMode } from '../session/backend-mode';
+import { useBrowseOnly } from '../session/browse-only';
 import { avatarSourceFor, previewProfileId, useUserProfile } from './userProfile';
 
 export type ProfileDestination =
@@ -123,6 +124,9 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
   // The collection is worth what the AI said of the account's own scans. The sample total and its
   // trend stand in only on a device with no Supabase project and no scans yet.
   const mode = useBackendMode();
+  // On the moderators' website the profile is the account itself: who's signed in, how the site
+  // looks, the console and signing out. Scans, listings, votes and chats live in the phone app.
+  const browseOnly = useBrowseOnly();
   const collectionIsSample = mode === 'device' && scanHistory.scans.length === 0;
   const collectionTotal = scanHistory.scans.reduce((sum, scan) => sum + scan.estimate, 0);
   const votesCount =
@@ -214,37 +218,39 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
         </PressableScale>
       </Reveal>
 
-      <Reveal index={1} style={styles.stats}>
-        {stats.map((stat) => (
-          <Surface
-            key={stat.label}
-            padding={tokens.spacing[4]}
-            style={styles.statTile}
-            contentStyle={styles.stat}
-          >
-            <View
-              accessible
-              accessibilityLabel={`${stat.value ?? 'unknown'} ${stat.label.toLowerCase()}`}
+      {browseOnly ? null : (
+        <Reveal index={1} style={styles.stats}>
+          {stats.map((stat) => (
+            <Surface
+              key={stat.label}
+              padding={tokens.spacing[4]}
+              style={styles.statTile}
+              contentStyle={styles.stat}
             >
-              {/* A count that couldn't be loaded is shown as unknown, never as 0. */}
-              {stat.value === null ? (
-                <SWText variant="priceMedium">–</SWText>
-              ) : (
-                <CountUp
-                  value={stat.value}
-                  format={(value) => String(Math.round(value))}
-                  variant="priceMedium"
-                />
-              )}
-              <SWText variant="labelSmall" tone="textSecondary">
-                {stat.label}
-              </SWText>
-            </View>
-          </Surface>
-        ))}
-      </Reveal>
+              <View
+                accessible
+                accessibilityLabel={`${stat.value ?? 'unknown'} ${stat.label.toLowerCase()}`}
+              >
+                {/* A count that couldn't be loaded is shown as unknown, never as 0. */}
+                {stat.value === null ? (
+                  <SWText variant="priceMedium">–</SWText>
+                ) : (
+                  <CountUp
+                    value={stat.value}
+                    format={(value) => String(Math.round(value))}
+                    variant="priceMedium"
+                  />
+                )}
+                <SWText variant="labelSmall" tone="textSecondary">
+                  {stat.label}
+                </SWText>
+              </View>
+            </Surface>
+          ))}
+        </Reveal>
+      )}
 
-      {collectionIsSample || collectionTotal > 0 ? (
+      {!browseOnly && (collectionIsSample || collectionTotal > 0) ? (
         <Reveal index={2}>
           <Surface tone="feature" padding={tokens.spacing[5]} contentStyle={styles.collectionCard}>
             <Overline icon={Wallet} label="Collection value" tone="onFeatureDim" />
@@ -265,26 +271,28 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
       ) : null}
 
       <Reveal index={3} style={styles.sections}>
-        <ListGroup title="Your activity" icon={History}>
-          <ListRow
-            label="Your listings"
-            icon={PriceTagIcon}
-            value={countText(profile.activity.listings)}
-            onPress={() => onOpen?.('listings')}
-          />
-          <ListRow
-            label="Votes cast"
-            icon={Vote}
-            value={countText(votesCount)}
-            onPress={() => onOpen?.('votes')}
-          />
-          <ListRow
-            label="Conversations"
-            icon={MessagesSquare}
-            value={countText(profile.activity.conversations)}
-            onPress={() => onOpen?.('conversations')}
-          />
-        </ListGroup>
+        {browseOnly ? null : (
+          <ListGroup title="Your activity" icon={History}>
+            <ListRow
+              label="Your listings"
+              icon={PriceTagIcon}
+              value={countText(profile.activity.listings)}
+              onPress={() => onOpen?.('listings')}
+            />
+            <ListRow
+              label="Votes cast"
+              icon={Vote}
+              value={countText(votesCount)}
+              onPress={() => onOpen?.('votes')}
+            />
+            <ListRow
+              label="Conversations"
+              icon={MessagesSquare}
+              value={countText(profile.activity.conversations)}
+              onPress={() => onOpen?.('conversations')}
+            />
+          </ListGroup>
+        )}
 
         <ListGroup title="The look" icon={Palette}>
           <View style={styles.appearanceRow}>
@@ -297,19 +305,29 @@ export function ProfileView({ onBack, onOpen, onLogOut, onDeleteAccount }: Profi
         </ListGroup>
 
         <ListGroup title="The fine print" icon={Settings2}>
-          <ListRow label="Notifications" icon={Bell} onPress={() => onOpen?.('notifications')} />
-          <ListRow
-            label="Price alerts"
-            icon={TrendingDown}
-            onPress={() => onOpen?.('price-alerts')}
-          />
+          {browseOnly ? null : (
+            <>
+              <ListRow
+                label="Notifications"
+                icon={Bell}
+                onPress={() => onOpen?.('notifications')}
+              />
+              <ListRow
+                label="Price alerts"
+                icon={TrendingDown}
+                onPress={() => onOpen?.('price-alerts')}
+              />
+            </>
+          )}
           {profile.isAdmin ? <ModerationRow onPress={() => onOpen?.('moderation')} /> : null}
           <ListRow label="Help" icon={CircleHelp} onPress={() => onOpen?.('help')} />
-          <ListRow
-            label="Replay introduction"
-            icon={Sparkles}
-            onPress={() => onOpen?.('introduction')}
-          />
+          {browseOnly ? null : (
+            <ListRow
+              label="Replay introduction"
+              icon={Sparkles}
+              onPress={() => onOpen?.('introduction')}
+            />
+          )}
         </ListGroup>
 
         <ListGroup>

@@ -117,12 +117,15 @@ export function SellerProfileView({
         <NavHeader
           title={`@${seller.handle}`}
           onBack={onBack}
+          // A shell with nowhere to report from (the moderators' website) shows no button.
           trailing={
-            <IconButton
-              icon={Flag}
-              label="Report or block this person"
-              onPress={() => requireAccount('report', onReport)}
-            />
+            onReport ? (
+              <IconButton
+                icon={Flag}
+                label="Report or block this person"
+                onPress={() => requireAccount('report', onReport)}
+              />
+            ) : undefined
           }
         />
       }

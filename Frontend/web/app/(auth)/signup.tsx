@@ -20,13 +20,13 @@ export default function SignupRoute() {
   // `?return=1` comes from an account prompt: go back to what the person was doing.
   const { return: returning } = useLocalSearchParams<{ return?: string }>();
 
-  // The feed is fetched while you type, so it's ready to unfold out of the tag.
-  useEffect(() => router.prefetch('/feed'), [router]);
+  // The console is fetched while you type, so it's ready to unfold out of the tag.
+  useEffect(() => router.prefetch('/admin'), [router]);
 
   // Someone who is already signed in has no use for this screen: back to what they were doing,
-  // or the Feed. (Signing in here is wrapped, so it can finish its own way out.)
+  // or the console. (Signing in here is wrapped, so it can finish its own way out.)
   const signingIn = useLeaveWhenSignedIn(() =>
-    returning && router.canGoBack() ? router.back() : router.replace('/feed'),
+    returning && router.canGoBack() ? router.back() : router.replace('/admin'),
   );
 
   const done = signingIn(async (input?: AuthInput) => {
@@ -60,7 +60,7 @@ export default function SignupRoute() {
     });
     startSession(authUser);
     if (returning && router.canGoBack()) router.back();
-    else router.replace('/feed');
+    else router.replace('/admin');
     openFromTag();
   });
   const google = useGoogleSignIn(() => void done());

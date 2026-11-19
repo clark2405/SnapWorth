@@ -11,7 +11,7 @@ export default function OnboardingRoute() {
   const { replay } = useLocalSearchParams<{ replay?: string }>();
 
   if (replay) {
-    const close = () => (router.canGoBack() ? router.back() : router.replace('/feed'));
+    const close = () => (router.canGoBack() ? router.back() : router.replace('/admin'));
     return <OnboardingView mode="replay" onGetStarted={close} onSkip={close} />;
   }
 
@@ -29,7 +29,7 @@ export default function OnboardingRoute() {
       eyebrow: 'Guest pass',
       waiting: 'Opening the feed',
     });
-    router.replace('/feed');
+    router.replace('/admin');
     openFromTag();
   };
 

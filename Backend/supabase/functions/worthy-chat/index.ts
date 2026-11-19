@@ -9,7 +9,8 @@ Deno.serve(
   createWorthyHandler({
     apiKey: geminiEnabled ? (Deno.env.get("AI_API_KEY") ?? "") : "",
     fallbackApiKey: geminiEnabled ? (Deno.env.get("AI_API_KEY_2") ?? "") : "",
-    model: Deno.env.get("AI_MODEL") ?? defaultChatModel,
+    // Chat has its own model (light and quick); AI_MODEL is the pricing model.
+    model: Deno.env.get("AI_CHAT_MODEL") ?? defaultChatModel,
     fetch,
     fallbackModels: Deno.env.get("AI_FALLBACK_MODELS"),
     authenticate: async (token) => {

@@ -1,17 +1,26 @@
-# UI handoff: screens waiting on services
+# Screens and the services behind them
 
-These screens are built and run on preview data from `preview/sample-data.ts`. Each one hands its actions out through props, so wiring a service means passing a handler in the route (`web/app`, `mobile/app`) and replacing the preview data. Nothing below has a service behind it yet. Comments and chats do: see `Backend/README.md`.
+Every screen in the app runs on a service. With a Supabase project configured
+(`EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`), the composition root
+(`composition/index.tsx`) wires each port to its Supabase adapter, and screens show only that
+account's real data: anything the project can't supply is hidden or says it's empty. Without a
+project the app runs alone on the device on the preview data in `preview/sample-data.ts`, which is
+how it's tried out and demoed. Sample content never shows in Supabase mode (`useBackendMode()`).
 
-| Feature (SD3)                | Screen                                       | Props to wire                                                                                                       | Preview data to replace                                  |
-| ---------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| Marketplace filters          | `marketplace/MarketplaceView`                | `onFiltersChange(filters: MarketFilters)` with category, price range, area and radius                               | `previewListings`, `previewListingPlaces`                |
-| Destination choice           | `item/EstimateResultView`                    | `onKeepPrivate`, `onPostToFeed(source)`, `onListForSale`, `onViewPost(postId)`, `onViewListing(listingId)`          | `previewSharingByItem`                                   |
-| Do both                      | `marketplace/ConfirmPriceView`               | `onPublish(price, alsoAskFeed)`                                                                                     | none                                                     |
-| Marketplace to feed          | `marketplace/ListingDetailView` (owner mode) | `onAskFeed`, `onEditPrice`, `onMarkSold`                                                                            | `previewMyListing`, `previewMyListingInsight`            |
-| Feed to marketplace          | `feed/PostDetailView`                        | `onListForSale(postId)`, `onOpenListing(listingId)`                                                                 | `PreviewPost.listing`                                    |
-| Post moderation              | `feed/CreatePostView`                        | `outcome` (`approved`, `pending`, `held`, `blocked`), `source` (`item` or `listing`), `onPublish(question)`         | none (routes read `?outcome=` and `?from=` for previews) |
-| Comment moderation (blocked) | `feed/PostDetailView`                        | already wired; return a `validation` error with code `blocked` from moderation to show the notice                   | none                                                     |
-| Votes cast (account history) | `profile/VotesView` (`/votes`)               | `onOpenPost`                                                                                                        | `previewVotesCast`, `previewOlderPosts`                  |
-| Account activity             | `profile/ProfileView`                        | `onOpen('listings' / 'votes' / 'conversations')` (routes already go to `/history?filter=listed`, `/votes`, `/chat`) | `previewProfile.stats`                                   |
+| Area                                | Port / provider                              | Supabase side                                                           |
+| ----------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------- |
+| Feed, votes, posts                  | `FeedRepository` (`feed/feed-state.tsx`)     | `feed_posts`, `votes`, moderated by `moderate-content`                  |
+| Comments                            | `CommentService`                             | posted through `moderate-comment`, screened again by `moderate-content` |
+| Marketplace, listings, price alerts | `MarketplaceRepository`                      | `listings` (with `category`), saved listings                            |
+| Hanap                               | `HanapRepository`                            | `hanap_posts`, moderated by `moderate-content`                          |
+| Chats, offers, meetups              | `ChatService` (`chat/chat-state.tsx`)        | conversations and messages over Realtime                                |
+| History, collections, paid prices   | `ScanHistoryProvider`, `CollectionsProvider` | `scan_history`, `collections`, photo Storage                            |
+| Photo estimates                     | `PhotoPricingService`                        | `estimate-price` (Gemini)                                               |
+| Worthy's chat                       | `WorthyCloud` (`companion/worthy-cloud.tsx`) | `worthy-chat` (Gemini)                                                  |
+| Moderation console                  | `AdminRepository` (`admin/admin-state.tsx`)  | admin RPCs, checked against `public.admins` on every call               |
+| Account deletion                    | `features/auth/account-deletion.ts`          | `delete-account`                                                        |
 
-Chats run on `ChatService` (`features/chat/chat-state.tsx`). With Supabase configured, messages are stored there and arrive over Realtime. Without it, they're kept on the device and the other person is played by the device adapter (`simulateReplies` in `composition/index.tsx`), so the flows can still be demoed. Listing photos in chats still fall back to the bundled preview photos until listings have uploaded ones.
+The website is the moderators' console: it opens on `/admin`, lets only admins in, and wraps the
+shared screens in `BrowseOnlyProvider` (`session/browse-only.tsx`) so they show posts, listings,
+comments and people without voting, commenting, buying or selling. Everything else is the phone
+app's. See `Backend/README.md` for the database, the Edge Functions and their secrets.

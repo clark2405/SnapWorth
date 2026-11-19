@@ -15,7 +15,6 @@ export default function PostDetailRoute() {
       postId={postId}
       onBack={() => router.back()}
       onOpenListing={(listingId) => router.push(`/listing/${listingId}`)}
-      onListForSale={(id) => router.push(`/list/${id}`)}
       onShare={() => share(`/post/${postId ?? ''}`, 'Is this priced right? Vote on SnapWorth.')}
     />
   );

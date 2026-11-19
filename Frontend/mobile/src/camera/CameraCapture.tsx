@@ -1,21 +1,18 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { useEffect, useRef, useState } from 'react';
-import { AppState, Image, Linking, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { AppState, Linking, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Button, SWText, Worthy, type CompanionMood } from '@snapworth/shared/components';
+import { held, tokens, useTheme } from '@snapworth/shared/design';
 import {
-  Button,
-  EstimateBadge,
-  SWText,
-  Worthy,
-  type CompanionMood,
-} from '@snapworth/shared/components';
-import { held, tokens } from '@snapworth/shared/design';
-import {
+  CaptureResultScene,
   CaptureView,
+  EstimateRange,
   EstimatingScene,
   coachFor,
+  type FoundSticker,
   type CaptureFrame,
   type PhotoCoach,
 } from '@snapworth/shared/features/capture';
@@ -93,6 +90,8 @@ export function CameraCapture({
   const [cameraFailed, setCameraFailed] = useState(false);
   const [cameraVersion, setCameraVersion] = useState(0);
   const insets = useSafeAreaInsets();
+  // The camera itself is always dark; the photo's review that follows takes the app's theme.
+  const { colors } = useTheme();
   const running = active && foreground;
 
   const stopEstimate = () => {
@@ -140,6 +139,9 @@ export function CameraCapture({
         : onEstimate(image, controller.signal));
       if (generation === estimateGeneration.current && !controller.signal.aborted) {
         setEstimate(result);
+        // Without Apple Intelligence the phone can't tell what kind of item this is; the
+        // estimate says, so the tips beneath it name the shots for that kind.
+        setItemKind((current) => current ?? result.itemKind ?? null);
         const resolvedUri = uriForSave || photoUri;
         if (result.status === 'estimated' && resolvedUri) {
           toSave = {
@@ -367,117 +369,144 @@ export function CameraCapture({
       setPhotoUri(undefined);
       setPhotoData(undefined);
     };
+    const labelRead = clues?.text.find((text) => {
+      const trimmed = text.trim();
+      return trimmed.length >= 2 && trimmed.length <= 18;
+    });
+    const found: FoundSticker[] = [
+      ...(labelRead ? [{ label: 'LABEL', value: `“${labelRead.trim()}”` }] : []),
+      ...(looksLike ? [{ label: 'LOOKS LIKE', value: looksLike }] : []),
+    ];
+    const priced = estimate?.status === 'estimated' ? estimate : undefined;
+    const kept = priced && (saved === 'saved' || saved === 'pending');
     return (
       <ScrollView
-        style={styles.root}
-        contentContainerStyle={[
-          styles.review,
-          { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 },
-        ]}
+        style={[styles.root, { backgroundColor: colors.canvas }]}
+        contentContainerStyle={[styles.review, { paddingBottom: insets.bottom + 24 }]}
       >
         {working ? (
           <EstimatingScene
             photoUri={photoUri}
             stage={checking ? 'looking' : 'estimating'}
             looksLike={looksLike}
+            labelRead={labelRead?.trim()}
+            topInset={insets.top}
+            onClose={onClose}
           />
         ) : (
-          <View style={styles.resultTop}>
-            <View style={[styles.print, held(darkColors, 4)]}>
-              <Image
-                source={{ uri: photoUri }}
-                accessibilityLabel="Your captured photo"
-                resizeMode="cover"
-                style={styles.printPhoto}
-              />
-            </View>
-          </View>
+          <CaptureResultScene
+            photoUri={photoUri}
+            topInset={insets.top}
+            onClose={onClose}
+            eyebrow={
+              priced
+                ? 'PRICED BY WORTHY'
+                : problem
+                  ? 'CHECK THE PHOTO'
+                  : estimate
+                    ? 'COULDN’T PRICE IT'
+                    : 'NOT PRICED YET'
+            }
+            title={
+              priced
+                ? priced.itemName || 'Estimated item'
+                : problem
+                  ? // Worthy's note below says what's wrong; the band doesn't repeat it.
+                    'One thing first'
+                  : estimate
+                    ? estimate.itemName || 'Could not identify the item'
+                    : estimateError
+                      ? 'That didn’t work'
+                      : 'Your photo'
+            }
+            amountPhp={priced?.amountPhp}
+            formatPrice={priced ? formatPhp : undefined}
+            found={priced ? found : []}
+          />
         )}
 
-        {problem ? (
-          <WorthyNote
-            mood="attentive"
-            title={photoProblemCopy[problem].title}
-            body={photoProblemCopy[problem].body}
-          />
-        ) : null}
+        <View style={styles.body}>
+          {problem ? (
+            <WorthyNote
+              mood="attentive"
+              title={photoProblemCopy[problem].title}
+              body={photoProblemCopy[problem].body}
+            />
+          ) : null}
 
-        {estimate ? (
-          <View style={styles.result} accessibilityLiveRegion="polite">
-            <SWText variant="headingLarge" color={tokens.overlay.text} align="center">
-              {estimate.itemName || 'Could not identify the item'}
-            </SWText>
-            {estimate.status === 'estimated' ? (
-              <EstimateBadge
-                size="hero"
-                value={formatPhp(estimate.amountPhp)}
-                range={`Likely ${formatPhp(estimate.lowPhp)} – ${formatPhp(estimate.highPhp)}`}
-              />
-            ) : null}
-            <View style={styles.card}>
-              <SWText variant="bodyMedium" color={tokens.overlay.text}>
+          {priced ? (
+            <EstimateRange
+              lowPhp={priced.lowPhp}
+              highPhp={priced.highPhp}
+              amountPhp={priced.amountPhp}
+              formatPrice={formatPhp}
+            />
+          ) : null}
+
+          {estimate ? (
+            <View
+              style={[styles.card, { backgroundColor: colors.surface }, held(colors, 3)]}
+              accessibilityLiveRegion="polite"
+            >
+              <SWText variant="stamp" color={colors.textMuted}>
+                Worthy’s take
+              </SWText>
+              <SWText variant="bodyMedium" color={colors.textPrimary}>
                 {estimate.explanation}
               </SWText>
               {estimate.assumptions.length > 0 ? (
-                <View style={styles.assumptions}>
-                  <SWText variant="overline" color={tokens.overlay.text}>
+                <View style={[styles.assumptions, { borderTopColor: colors.borderSubtle }]}>
+                  <SWText variant="stamp" color={colors.textMuted}>
                     Assuming
                   </SWText>
                   {estimate.assumptions.map((assumption, index) => (
-                    <SWText key={index} variant="caption" color={tokens.overlay.text}>
+                    <SWText key={index} variant="caption" color={colors.textSecondary}>
                       {`•  ${assumption}`}
                     </SWText>
                   ))}
                 </View>
               ) : null}
             </View>
+          ) : null}
+
+          {estimateError ? (
+            <WorthyNote mood="attentive" title="That didn’t work" body={estimateError} />
+          ) : null}
+
+          {/* Worth reading while it works: the shots that would sharpen the estimate. */}
+          {!checking && !problem ? <CoachList coach={coachFor(itemKind)} /> : null}
+
+          {estimate ? (
+            <SWText variant="caption" color={colors.textSecondary} align="center">
+              {kept
+                ? saved === 'saved'
+                  ? 'Saved to your History.'
+                  : 'Saved to your History on this phone. It’ll sync when you’re back online.'
+                : priced && saved === 'saving'
+                  ? 'Saving to your History…'
+                  : 'This photo and estimate have not been added to History.'}
+            </SWText>
+          ) : null}
+
+          <View style={styles.actions}>
+            {kept ? <Button label="View in History" onPress={onOpenHistory} /> : null}
+            {(estimateError || estimate?.status === 'unable_to_estimate') && photoData ? (
+              <Button
+                label="Retry estimate"
+                onPress={() => void estimatePhoto(photoData, clues, photoUri)}
+              />
+            ) : null}
+            {problem && photoData ? (
+              <Button
+                label="Price it anyway"
+                onPress={() => {
+                  setProblem(undefined);
+                  void estimatePhoto(photoData, clues, photoUri);
+                }}
+              />
+            ) : null}
+            <Button label="Retake photo" variant="secondary" onPress={retake} />
           </View>
-        ) : null}
-
-        {estimateError ? (
-          <WorthyNote mood="attentive" title="That didn’t work" body={estimateError} />
-        ) : null}
-
-        {/* Worth reading while it works: the shots that would sharpen the estimate. */}
-        {!checking && !problem ? <CoachList coach={coachFor(itemKind)} /> : null}
-
-        {estimate?.status === 'estimated' && (saved === 'saved' || saved === 'pending') ? (
-          <SWText color={tokens.overlay.text} align="center">
-            {saved === 'saved'
-              ? 'Saved to your History.'
-              : 'Saved to your History on this phone. It’ll sync when you’re back online.'}
-          </SWText>
-        ) : estimate?.status === 'estimated' && saved === 'saving' ? (
-          <SWText color={tokens.overlay.text} align="center">
-            Saving to your History…
-          </SWText>
-        ) : estimate !== undefined ? (
-          <SWText color={tokens.overlay.text} align="center">
-            This photo and estimate have not been added to History.
-          </SWText>
-        ) : null}
-
-        <View style={styles.actions}>
-          {estimate?.status === 'estimated' && (saved === 'saved' || saved === 'pending') ? (
-            <Button label="View in History" onPress={onOpenHistory} />
-          ) : null}
-          {(estimateError || estimate?.status === 'unable_to_estimate') && photoData ? (
-            <Button
-              label="Retry estimate"
-              onPress={() => void estimatePhoto(photoData, clues, photoUri)}
-            />
-          ) : null}
-          {problem && photoData ? (
-            <Button
-              label="Price it anyway"
-              onPress={() => {
-                setProblem(undefined);
-                void estimatePhoto(photoData, clues, photoUri);
-              }}
-            />
-          ) : null}
-          <Button label="Retake photo" variant="secondary" onPress={retake} />
-          <Button label="Close camera" variant="tertiary" onPress={onClose} />
         </View>
       </ScrollView>
     );
@@ -550,14 +579,18 @@ function WorthyNote({
   readonly title: string;
   readonly body: string;
 }) {
+  const { colors } = useTheme();
   return (
-    <View style={styles.note} accessibilityLiveRegion="polite">
+    <View
+      style={[styles.note, { backgroundColor: colors.surfaceRaised }, held(colors, 3)]}
+      accessibilityLiveRegion="polite"
+    >
       <Worthy size={52} mood={mood} />
       <View style={styles.noteWords}>
-        <SWText variant="headingSmall" color={tokens.overlay.text}>
+        <SWText variant="headingSmall" color={colors.textPrimary}>
           {title}
         </SWText>
-        <SWText variant="bodyMedium" color={tokens.overlay.text}>
+        <SWText variant="bodyMedium" color={colors.textSecondary}>
           {body}
         </SWText>
       </View>
@@ -567,17 +600,21 @@ function WorthyNote({
 
 /** The photo coach after a snap: the shots that would help buyers and the AI judge it. */
 function CoachList({ coach }: { readonly coach: PhotoCoach }) {
+  const { colors } = useTheme();
   return (
     <View
-      style={styles.coach}
+      style={[styles.coach, { backgroundColor: colors.sand, borderColor: colors.borderStrong }]}
       accessible
       accessibilityLabel={`${coach.title}: ${coach.shots.join(', ')}`}
     >
-      <SWText variant="label" color={tokens.overlay.text}>
+      <SWText variant="stamp" color={colors.sandInk}>
+        Sharper estimate tips
+      </SWText>
+      <SWText variant="label" color={colors.textPrimary}>
         {coach.title}
       </SWText>
       {coach.shots.map((shot) => (
-        <SWText key={shot} variant="caption" color={tokens.overlay.text}>
+        <SWText key={shot} variant="caption" color={colors.textSecondary}>
           {`•  ${shot}`}
         </SWText>
       ))}
@@ -587,61 +624,48 @@ function CoachList({ coach }: { readonly coach: PhotoCoach }) {
 
 const styles = StyleSheet.create({
   coach: {
-    gap: tokens.spacing[1],
-    padding: tokens.spacing[3],
-    borderRadius: tokens.radius.medium,
-    backgroundColor: tokens.overlay.chrome,
+    gap: tokens.spacing[1] + 2,
+    padding: tokens.spacing[4],
+    borderRadius: tokens.radius.large,
+    borderWidth: 1,
   },
-  root: { flex: 1, backgroundColor: tokens.color.dark.sunken },
+  root: { flex: 1, backgroundColor: darkColors.sunken },
   panel: {
     flex: 1,
-    backgroundColor: tokens.color.dark.sunken,
+    backgroundColor: darkColors.sunken,
     paddingHorizontal: tokens.spacing[6],
     gap: tokens.spacing[4],
     justifyContent: 'center',
     alignItems: 'stretch',
   },
-  review: { flexGrow: 1, paddingHorizontal: tokens.spacing[6], gap: tokens.spacing[5] },
-  resultTop: { alignItems: 'center', paddingTop: tokens.spacing[2] },
-  print: {
-    width: 168,
-    aspectRatio: 0.86,
-    padding: 7,
-    paddingBottom: 22,
-    borderRadius: tokens.radius.small,
-    backgroundColor: tokens.illustration.cardStock,
-    transform: [{ rotate: '-3deg' }],
-  },
-  printPhoto: { flex: 1, borderRadius: 3 },
-  result: { alignItems: 'center', gap: tokens.spacing[4] },
+  review: { flexGrow: 1, gap: tokens.spacing[5] },
+  body: { paddingHorizontal: tokens.spacing[5], gap: tokens.spacing[4] },
   card: {
-    alignSelf: 'stretch',
-    gap: tokens.spacing[3],
+    gap: tokens.spacing[2] + 2,
     padding: tokens.spacing[4],
     borderRadius: tokens.radius.large,
-    backgroundColor: tokens.overlay.chrome,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: tokens.overlay.border,
   },
-  assumptions: { gap: tokens.spacing[1] },
+  assumptions: {
+    gap: tokens.spacing[1] + 2,
+    marginTop: tokens.spacing[2],
+    paddingTop: tokens.spacing[3],
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   note: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing[3],
     padding: tokens.spacing[4],
     borderRadius: tokens.radius.large,
-    backgroundColor: tokens.overlay.chrome,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: tokens.overlay.border,
   },
   noteWords: { flex: 1, gap: tokens.spacing[1] },
-  actions: { gap: tokens.spacing[3], marginTop: tokens.spacing[2] },
+  actions: { gap: tokens.spacing[3], marginTop: tokens.spacing[1] },
   error: {
     position: 'absolute',
     left: tokens.spacing[6],
     right: tokens.spacing[6],
     padding: tokens.spacing[4],
-    backgroundColor: tokens.color.dark.sunken,
+    backgroundColor: darkColors.sunken,
     gap: tokens.spacing[4],
   },
 });

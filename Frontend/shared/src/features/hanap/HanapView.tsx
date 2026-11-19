@@ -25,7 +25,7 @@ import { relativeTime } from '../feed/comment-thread-model';
 import { useMarketplace } from '../marketplace/marketplace-state';
 import { formatPeso } from '../preview/peso';
 import type { PreviewListing } from '../preview/sample-data';
-import { useAccountGate } from '../session';
+import { useAccountGate, useBrowseOnly } from '../session';
 import { matchesHanap, parseBudget } from './hanap-match';
 import { useHanap } from './hanap-state';
 
@@ -55,6 +55,8 @@ export function HanapView({ onBack, onOpenListing, onSnap }: HanapViewProps) {
   const requireAccount = useAccountGate();
   const { status, mine, others, post, setFound, remove } = useHanap();
   const [posting, setPosting] = useState(false);
+  // The moderators' website lists what people want without asking anyone to post or answer.
+  const browseOnly = useBrowseOnly();
 
   return (
     <Screen
@@ -63,18 +65,20 @@ export function HanapView({ onBack, onOpenListing, onSnap }: HanapViewProps) {
       contentStyle={styles.content}
     >
       {/* A card, so the header's fade sits over paper rather than washing out the words. */}
-      <Reveal index={0}>
-        <Surface padding={tokens.spacing[4]} contentStyle={styles.intro}>
-          <SWText variant="bodyMedium" tone="textSecondary">
-            Tell sellers what you’re looking for. When a listing matches, it shows up here.
-          </SWText>
-          <Button
-            label="Post a hanap"
-            icon={Megaphone}
-            onPress={() => requireAccount('hanap', () => setPosting(true))}
-          />
-        </Surface>
-      </Reveal>
+      {browseOnly ? null : (
+        <Reveal index={0}>
+          <Surface padding={tokens.spacing[4]} contentStyle={styles.intro}>
+            <SWText variant="bodyMedium" tone="textSecondary">
+              Tell sellers what you’re looking for. When a listing matches, it shows up here.
+            </SWText>
+            <Button
+              label="Post a hanap"
+              icon={Megaphone}
+              onPress={() => requireAccount('hanap', () => setPosting(true))}
+            />
+          </Surface>
+        </Reveal>
+      )}
 
       {mine.length > 0 ? (
         <Reveal index={1} style={styles.section}>
@@ -118,7 +122,11 @@ export function HanapView({ onBack, onOpenListing, onSnap }: HanapViewProps) {
           <EmptyState
             icon={Search}
             title="Nobody’s looking yet"
-            body="Be the first: post what you’re hunting for."
+            body={
+              browseOnly
+                ? 'Nobody has posted what they’re looking for.'
+                : 'Be the first: post what you’re hunting for.'
+            }
           />
         ) : (
           others.map((entry) => (
@@ -130,14 +138,16 @@ export function HanapView({ onBack, onOpenListing, onSnap }: HanapViewProps) {
               <SWText variant="labelSmall" tone="textSecondary">
                 {entry.maxPhp === null ? 'Any price' : `Up to ${formatPeso(entry.maxPhp)}`}
               </SWText>
-              <View style={styles.cardActions}>
-                <Button
-                  label="I have one"
-                  variant="secondary"
-                  size="small"
-                  onPress={() => requireAccount('snap', () => onSnap?.())}
-                />
-              </View>
+              {browseOnly ? null : (
+                <View style={styles.cardActions}>
+                  <Button
+                    label="I have one"
+                    variant="secondary"
+                    size="small"
+                    onPress={() => requireAccount('snap', () => onSnap?.())}
+                  />
+                </View>
+              )}
             </Surface>
           ))
         )}

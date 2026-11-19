@@ -22,3 +22,23 @@ export interface DeviceLocationPort {
   /** Asks permission when it hasn't been given, then reads the position once. */
   current(): Promise<DeviceLocationResult>;
 }
+
+/** Where the phone is now, and how far off the reading might be, in metres. */
+export interface LivePosition extends Coordinates {
+  readonly accuracyM: number | null;
+}
+
+/** A position being followed: `stop` ends it. */
+export type PositionWatch =
+  | { readonly status: 'granted'; readonly stop: () => void }
+  | { readonly status: 'denied' }
+  | { readonly status: 'unavailable' };
+
+/**
+ * Follows the phone's position while the app is open, for sharing it with the other person at an
+ * agreed meetup. Unlike `DeviceLocationPort` it's precise and keeps going until stopped.
+ */
+export interface PositionWatchPort {
+  /** Asks permission when it hasn't been given, then calls `onPosition` as the phone moves. */
+  watch(onPosition: (position: LivePosition) => void): Promise<PositionWatch>;
+}

@@ -31,7 +31,8 @@ export type OperationName =
   | 'publish_hanap'
   | 'update_hanap'
   | 'load_collections'
-  | 'save_collection';
+  | 'save_collection'
+  | 'share_location';
 
 export type AppError =
   | {

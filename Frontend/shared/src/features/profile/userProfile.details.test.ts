@@ -12,7 +12,11 @@ const counted = () => {
   return query;
 };
 const client = {
-  auth: { getUser: () => Promise.resolve({ data: { user: null } }) },
+  auth: {
+    getUser: () => Promise.resolve({ data: { user: null } }),
+    // The connection carries a sign-in, so the profile's questions are asked as someone.
+    getSession: () => Promise.resolve({ data: { session: {} } }),
+  },
   from: () => ({
     select: (_columns: string, options?: { head?: boolean }) =>
       options?.head

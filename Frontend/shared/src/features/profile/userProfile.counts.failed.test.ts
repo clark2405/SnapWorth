@@ -22,6 +22,7 @@ const counted = (table: string) => {
 const client = {
   auth: {
     getUser: () => Promise.resolve({ data: { user: null } }),
+    getSession: () => Promise.resolve({ data: { session: {} } }),
     updateUser: () => Promise.resolve({ error: null }),
   },
   from: (table: string) => ({

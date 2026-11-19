@@ -43,3 +43,39 @@ it('reads a search provider’s results, keeping only places in the Philippines'
   ]);
   expect(placesFrom({ error: 'nope' })).toEqual([]);
 });
+
+it('reads Photon’s answer, naming each place by its street and city', () => {
+  const places = placesFrom({
+    features: [
+      {
+        geometry: { coordinates: [123.8940889, 10.3095785] },
+        properties: {
+          name: 'Jollibee',
+          street: 'General Maxilom Avenue',
+          district: 'Camputhaw',
+          city: 'Cebu City',
+          countrycode: 'PH',
+        },
+      },
+      {
+        geometry: { coordinates: [139.7, 35.6] },
+        properties: { name: 'Jollibee Tokyo', countrycode: 'JP' },
+      },
+      { geometry: { coordinates: ['x', 10.3] }, properties: { name: 'Broken' } },
+      {
+        geometry: { coordinates: [123.9, 10.31] },
+        properties: { housenumber: '12', street: 'Gorordo Avenue', countrycode: 'PH' },
+      },
+    ],
+  });
+
+  expect(places).toEqual([
+    {
+      name: 'Jollibee',
+      detail: 'General Maxilom Avenue, Cebu City',
+      lat: 10.3095785,
+      lng: 123.8940889,
+    },
+    { name: '12 Gorordo Avenue', detail: '', lat: 10.31, lng: 123.9 },
+  ]);
+});

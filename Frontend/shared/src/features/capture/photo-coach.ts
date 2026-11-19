@@ -1,8 +1,8 @@
 /**
  * The photo coach: which shots buyers and the AI need to judge a kind of item. The kind comes
  * from the iPhone's own item reader where it has Apple Intelligence (`ItemReader.swift` reads it
- * as one of these). Everywhere else nothing works it out yet, so the coach gives general tips:
- * that needs the cloud AI, which isn't built yet (see `agents/READ-FIRST.md`).
+ * as one of these), else from the cloud estimate (`itemKind`) once it's back. Until one of them
+ * knows, the coach gives general tips.
  */
 
 export type ItemKind =
